@@ -1,5 +1,7 @@
 <template>
-  <div ref="container" class="battlefield-3d-canvas"></div>
+  <div class="battlefield-3d-wrapper">
+    <div ref="container" class="battlefield-3d-canvas"></div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -13,6 +15,7 @@ import SpriteText from 'three-spritetext'
 const props = defineProps<{
   nodes: any[]
   links: any[]
+  battleAreaPolygon?: { x: number; y: number }[]
 }>()
 
 const emit = defineEmits<{
@@ -22,6 +25,69 @@ const emit = defineEmits<{
 const container = ref<HTMLDivElement | null>(null)
 let Graph: ForceGraph3DInstance | null = null
 let resizeObserver: ResizeObserver | null = null
+let battleAreaGroup: THREE.Group | null = null
+
+function drawBattleAreaPolygons(scene: THREE.Scene, points?: { x: number; y: number }[]) {
+  if (battleAreaGroup) {
+    scene.remove(battleAreaGroup)
+    battleAreaGroup = null
+  }
+  if (!points || points.length < 3) return
+
+  battleAreaGroup = new THREE.Group()
+
+  // 第二层 (z: 0, 链路层/地面接收站) 与 第三层 (z: -150, 终端层/指挥中心)
+  const targetLayersZ = [0, -150]
+
+  targetLayersZ.forEach((layerZ) => {
+    // 1. 半透明战区多边形填充面
+    const shape = new THREE.Shape()
+    points.forEach((pt, i) => {
+      if (i === 0) shape.moveTo(pt.x, pt.y)
+      else shape.lineTo(pt.x, pt.y)
+    })
+    shape.closePath()
+
+    const shapeGeo = new THREE.ShapeGeometry(shape)
+    const shapeMat = new THREE.MeshBasicMaterial({
+      color: 0xffaa00,
+      transparent: true,
+      opacity: 0.15,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    const shapeMesh = new THREE.Mesh(shapeGeo, shapeMat)
+    shapeMesh.position.z = layerZ
+    battleAreaGroup!.add(shapeMesh)
+
+    // 2. 红色高亮警示边界闭合线
+    const linePoints = points.map((pt) => new THREE.Vector3(pt.x, pt.y, layerZ))
+    linePoints.push(new THREE.Vector3(points[0].x, points[0].y, layerZ))
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(linePoints)
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0xff3300,
+      transparent: true,
+      opacity: 0.85,
+    })
+    const lineMesh = new THREE.Line(lineGeo, lineMat)
+    battleAreaGroup!.add(lineMesh)
+
+    // 3. 多边形顶点 3D 说明标牌
+    const layerTag = layerZ === 0 ? '第二层:链路层' : '第三层:终端层'
+    const label = new SpriteText(`✦ 战场管控区域 [${layerTag}]`)
+    label.color = '#ffaa00'
+    label.textHeight = 6.5
+    label.backgroundColor = 'rgba(24, 12, 0, 0.85)'
+    label.borderColor = '#ffaa00'
+    label.borderWidth = 0.8
+    label.borderRadius = 3
+    label.padding = [2, 5]
+    label.position.set(points[0].x, points[0].y, layerZ + 5)
+    battleAreaGroup!.add(label)
+  })
+
+  scene.add(battleAreaGroup)
+}
 
 onMounted(() => {
   if (!container.value) return
@@ -111,28 +177,24 @@ onMounted(() => {
       }
     })
     .linkDirectionalParticles((link: any) => {
-      //设置链路两端的箭头数量
       if (link.link_status === 'TRANSMITTING') return 3
       if (link.link_status === 'JAMMED') return 1
       if (link.link_status === 'ENGAGEMENT') return 4
       return 0
     })
     .linkDirectionalParticleColor((link: any) => {
-      //设置链路两端的箭头颜色
-      if (link.link_status === 'TRANSMITTING') return '#00e1ff' //正常通信
-      if (link.link_status === 'JAMMED') return '#9ca3af' //阻断成功
-      if (link.link_status === 'ENGAGEMENT') return '#ff2a5f' //对抗
+      if (link.link_status === 'TRANSMITTING') return '#00e1ff'
+      if (link.link_status === 'JAMMED') return '#9ca3af'
+      if (link.link_status === 'ENGAGEMENT') return '#ff2a5f'
       return '#2d3748'
     })
-    .linkDirectionalParticleWidth(2.5) //设置链路两端的箭头粗细
+    .linkDirectionalParticleWidth(2.5)
     .linkDirectionalParticleSpeed((link: any) => {
-      //设置链路两端的箭头速度
-      if (link.link_status === 'JAMMED') return 0.003 //干扰
-      if (link.link_status === 'ENGAGEMENT') return 0.016 //对抗
-      return 0.012 //正常通信
+      if (link.link_status === 'JAMMED') return 0.003
+      if (link.link_status === 'ENGAGEMENT') return 0.016
+      return 0.012
     })
     .onNodeClick((node: any) => {
-      //设置节点点击事件
       const type = node.id.startsWith('weapon-') ? 'WEAPON' : 'ASSET'
       emit('select-node', node.id, type)
     })
@@ -160,14 +222,39 @@ onMounted(() => {
 
   const scene = Graph!.scene()
 
+  // 三层平面网格及其边缘名称标注
   const gridConfigs = [
-    { z: 150, color: '#00e1ff', opacity: 0.15 }, // 太空卫星网格 (Space - Layer 2)
-    { z: 0, color: '#10b981', opacity: 0.15 }, // 雷达接收站网格 (Air/Station - Layer 1)
-    { z: -150, color: '#3b82f6', opacity: 0.18 }, // 地面指挥网格 (Ground - Layer 0)
+    {
+      name: '信号源',
+      enName: 'SOURCE',
+      z: 150,
+      color: '#00e1ff',
+      opacity: 0.18,
+      desc: '卫星数据',
+    },
+    {
+      name: '链路层',
+      enName: 'LINK LAYER',
+      z: 0,
+      color: '#10b981',
+      opacity: 0.18,
+      desc: '地面接收站',
+    },
+    {
+      name: '终端层',
+      enName: 'TERMINAL LAYER',
+      z: -150,
+      color: '#3b82f6',
+      opacity: 0.22,
+      desc: '指挥中心',
+    },
   ]
 
+  const planeHalfSize = 250
+
   gridConfigs.forEach((config) => {
-    const grid = new THREE.GridHelper(500, 30, config.color, config.color)
+    // 1. 三层网格平面
+    const grid = new THREE.GridHelper(planeHalfSize * 2, 30, config.color, config.color)
     grid.position.z = config.z
     grid.rotation.x = Math.PI / 2
 
@@ -177,7 +264,83 @@ onMounted(() => {
     mat.depthWrite = false
 
     scene.add(grid)
+
+    // 2. 平面边缘高亮轮廓外框线 (Boundary Line Box)
+    const borderPoints = [
+      new THREE.Vector3(-planeHalfSize, -planeHalfSize, config.z),
+      new THREE.Vector3(planeHalfSize, -planeHalfSize, config.z),
+      new THREE.Vector3(planeHalfSize, planeHalfSize, config.z),
+      new THREE.Vector3(-planeHalfSize, planeHalfSize, config.z),
+      new THREE.Vector3(-planeHalfSize, -planeHalfSize, config.z),
+    ]
+    const borderGeo = new THREE.BufferGeometry().setFromPoints(borderPoints)
+    const borderMat = new THREE.LineBasicMaterial({
+      color: config.color,
+      transparent: true,
+      opacity: 0.7,
+    })
+    const borderLine = new THREE.Line(borderGeo, borderMat)
+    scene.add(borderLine)
+
+    // 3. 在每层平面边缘添加 3D 名称标注标牌 (SpriteText)
+    // 左前边缘标注标牌 (-250, -250)
+    const labelLeft = new SpriteText(
+      // `✦ ${config.name} (${config.enName})\nZ: ${config.z > 0 ? '+' : ''}${config.z}m | ${config.desc}`
+      `✦ ${config.name}`
+    )
+    labelLeft.color = config.color
+    labelLeft.textHeight = 8.5
+    labelLeft.backgroundColor = 'rgba(6, 12, 24, 0.88)'
+    labelLeft.borderColor = config.color
+    labelLeft.borderWidth = 1.0
+    labelLeft.borderRadius = 4
+    labelLeft.padding = [3, 6]
+    labelLeft.position.set(-planeHalfSize - 15, -planeHalfSize - 15, config.z + 4)
+    scene.add(labelLeft)
+
+    // 右前边缘标注标牌 (250, -250)
+    const labelRight = new SpriteText(`${config.desc}`)
+    labelRight.color = config.color
+    labelRight.textHeight = 7.0
+    labelRight.backgroundColor = 'rgba(6, 12, 24, 0.82)'
+    labelRight.borderColor = config.color
+    labelRight.borderWidth = 0.8
+    labelRight.borderRadius = 3
+    labelRight.padding = [2, 5]
+    labelRight.position.set(planeHalfSize + 15, -planeHalfSize - 15, config.z + 4)
+    scene.add(labelRight)
+
+    // 4. 四角垂直结构导轨线 (立体空间连接导轨)
+    const corners = [
+      { x: -planeHalfSize, y: -planeHalfSize },
+      { x: planeHalfSize, y: -planeHalfSize },
+      { x: planeHalfSize, y: planeHalfSize },
+      { x: -planeHalfSize, y: planeHalfSize },
+    ]
+    corners.forEach((corner) => {
+      if (config.z === -150) {
+        const pillarGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(corner.x, corner.y, -150),
+          new THREE.Vector3(corner.x, corner.y, 150),
+        ])
+        const pillarMat = new THREE.LineDashedMaterial({
+          color: '#4b5563',
+          dashSize: 8,
+          gapSize: 6,
+          transparent: true,
+          opacity: 0.35,
+        })
+        const pillar = new THREE.Line(pillarGeo, pillarMat)
+        pillar.computeLineDistances()
+        scene.add(pillar)
+      }
+    })
   })
+
+  // 绘制战场范围多边形在第二层 (z = 0) 和第三层 (z = -150)
+  if (props.battleAreaPolygon) {
+    drawBattleAreaPolygons(scene, props.battleAreaPolygon)
+  }
 
   // Custom 3D Objects with Labels
   Graph!.nodeThreeObject((node: any) => {
@@ -186,7 +349,7 @@ onMounted(() => {
 
     let color = node.side === 'RED' ? '#ff2a5f' : '#00e1ff'
     if (isDestroyed) {
-      color = '#ef4444' // 彻底打掉的蓝方资产显示为警示红
+      color = '#ef4444'
     }
 
     const material = new THREE.MeshLambertMaterial({
@@ -236,57 +399,43 @@ onMounted(() => {
     const label = new SpriteText(`${nameStr}${statusTag}\n${classStr} ${usageStr}`)
     label.color = isDestroyed ? '#fca5a5' : node.side === 'RED' ? '#ff87a3' : '#a5f3fc'
     label.textHeight = 3.5
-    label.position.set(0, -12, 0) // Display below the mesh
+    label.position.set(0, -12, 0)
     group.add(label)
 
     return group
   })
 
-  // 视角模式配置：
-  // 1. 当 FIXED_VIEW_MODE = false 时，为视角调试模式，您可以在页面上自由用鼠标拖拽相机。
-  //    此时浏览器控制台（F12 Console）会实时输出相机的位置（Position）和目标点（Target），以及极角（纬度）/方位角（经度）。
-  // 2. 当您用鼠标调整到最佳视角后，请把控制台输出的 Position 和 Target 复制并填入下方的 BEST_VIEW 中。
-  //    然后将 FIXED_VIEW_MODE 改为 true 即可完全固定该视角，后面三维场景将不可被鼠标拖拽转动。
   const FIXED_VIEW_MODE = true
   const BEST_VIEW = {
-    position: { x: -18.5, y: -734.86, z: 55.09 }, // 默认视角，请在此填入找到的最佳 Camera Position
-    target: { x: 0, y: 0, z: 0 }, // 默认目标点，请在此填入找到的最佳 Target Position
+    position: { x: -20.5, y: -814.25, z: 61.04 },
+    target: { x: 0, y: 0, z: 0 },
   }
 
-  // Fixed 45-degree isometric initial camera with Z-up logic
   const camera = Graph!.camera()
   const controls = Graph!.controls() as OrbitControls
 
   if (camera && controls) {
-    // Set Z as the logical vertical up axis
     camera.up.set(0, 0, 1)
 
     if (FIXED_VIEW_MODE) {
-      // 锁定视角模式：完全锁定视角，不允许旋转和位移
       controls.enableRotate = false
       controls.enablePan = false
-      controls.enableZoom = true // 允许鼠标滚轮缩放，如需彻底禁用缩放可设为 false
+      controls.enableZoom = true
 
-      // 立即定位到最佳固定视角
       Graph.cameraPosition(BEST_VIEW.position, BEST_VIEW.target, 0)
     } else {
-      // 调试视角模式：允许自由操作，并实时输出经纬度及笛卡尔视角参数
       controls.enablePan = true
       controls.enableRotate = true
       controls.enableZoom = true
 
-      // 限制极角以防底朝天
       controls.minPolarAngle = Math.PI / 6
       controls.maxPolarAngle = Math.PI / 2.1
 
-      // 启用阻尼
       controls.enableDamping = true
       controls.dampingFactor = 0.05
 
-      // Position camera to look at the center from an angle
       Graph.cameraPosition(BEST_VIEW.position, BEST_VIEW.target, 1000)
 
-      // 监听相机视角变化并实时打印
       controls.addEventListener('change', () => {
         const polar = controls.getPolarAngle()
         const azimuthal = controls.getAzimuthalAngle()
@@ -302,7 +451,6 @@ onMounted(() => {
     controls.update()
   }
 
-  // ResizeObserver to automatically fit the container size
   resizeObserver = new ResizeObserver((entries) => {
     for (let entry of entries) {
       const { width, height } = entry.contentRect
@@ -315,7 +463,6 @@ onMounted(() => {
   resizeObserver.observe(container.value)
 })
 
-// Watch for data changes
 watch(
   () => [props.nodes, props.links],
   ([newNodes, newLinks]) => {
@@ -323,6 +470,16 @@ watch(
       const clonedNodes = JSON.parse(JSON.stringify(newNodes))
       const clonedLinks = JSON.parse(JSON.stringify(newLinks))
       Graph.graphData({ nodes: clonedNodes, links: clonedLinks })
+    }
+  },
+  { deep: true }
+)
+
+watch(
+  () => props.battleAreaPolygon,
+  (newPolygon) => {
+    if (Graph) {
+      drawBattleAreaPolygons(Graph.scene(), newPolygon)
     }
   },
   { deep: true }
@@ -341,10 +498,17 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped lang="scss">
-.battlefield-3d-canvas {
-  outline: none;
+.battlefield-3d-wrapper {
   width: 100%;
   height: 100%;
   position: relative;
+  overflow: hidden;
+
+  .battlefield-3d-canvas {
+    outline: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
 }
 </style>

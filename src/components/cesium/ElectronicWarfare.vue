@@ -213,7 +213,13 @@
 
         <!-- Network Topology Canvas (3D Force Graph) -->
         <div class="canvas-container">
-          <Battlefield3D v-if="isScenarioLoaded" :nodes="assets" :links="links" @select-node="selectEntity" />
+          <Battlefield3D
+            v-if="isScenarioLoaded"
+            :nodes="assets"
+            :links="links"
+            :battleAreaPolygon="battleAreaPolygon"
+            @select-node="selectEntity"
+          />
           <div v-else class="empty-canvas-message">请在左侧点击“初始化数据”载入推演场景</div>
         </div>
       </section>
@@ -373,6 +379,50 @@ const hasOrbitData = ref(false)
 const currentView = ref<'SANDBOX' | 'AAR'>('SANDBOX')
 const sqlSandboxRef = ref<any>(null)
 const tacticalMatrixDrawerRef = ref<any>(null)
+
+// 战场范围多边形 3D 转换数据
+const battleAreaPolygon = ref<{ x: number; y: number }[]>([])
+
+function mapLonLatToXY(lng: number, lat: number) {
+  let x = 0
+  let y = 0
+  if (lng >= 118.0 && lng <= 124.0 && lat >= 21.0 && lat <= 27.0) {
+    x = ((lng - 121.0) / 3.0) * 100
+    y = ((lat - 24.0) / 3.0) * 100
+  } else if (lng >= 70.0 && lng < 118.0) {
+    x = -110 - ((118.0 - lng) / 48.0) * 60
+    y = ((lat - 35.0) / 20.0) * 70
+  } else {
+    x = (lng / 180.0) * 170
+    y = (lat / 90.0) * 150
+  }
+  const CLAMP_BOUND = 190
+  x = Math.max(-CLAMP_BOUND, Math.min(CLAMP_BOUND, x))
+  y = Math.max(-CLAMP_BOUND, Math.min(CLAMP_BOUND, y))
+  return { x, y }
+}
+
+const updateBattleAreaPolygon = () => {
+  const areaBounds = store.battleAreaBounds
+  let rawPoints: { lon: number; lat: number }[] = []
+
+  if (areaBounds && Array.isArray(areaBounds.lonlats) && areaBounds.lonlats.length >= 3) {
+    rawPoints = areaBounds.lonlats
+  } else {
+    const minLng = areaBounds?.min_lng ?? 119.0
+    const maxLng = areaBounds?.max_lng ?? 123.0
+    const minLat = areaBounds?.min_lat ?? 22.0
+    const maxLat = areaBounds?.max_lat ?? 26.0
+    rawPoints = [
+      { lon: minLng, lat: minLat },
+      { lon: maxLng, lat: minLat },
+      { lon: maxLng, lat: maxLat },
+      { lon: minLng, lat: maxLat },
+    ]
+  }
+
+  battleAreaPolygon.value = rawPoints.map((p) => mapLonLatToXY(p.lon, p.lat))
+}
 
 // 实时延时开销矩阵数据
 const overheadRealtimeData = ref<any[]>([])
@@ -705,6 +755,7 @@ const refreshData = async () => {
         [simTime.value]
       )
       matrixProbeAttacks.value = activeAttacks
+      updateBattleAreaPolygon()
     } else {
       isScenarioLoaded.value = false
       hasOrbitData.value = false
@@ -730,6 +781,7 @@ const loadMockScenario = async () => {
   try {
     const areaBounds = store.battleAreaBounds
     await seedMockData(sqliteClient, suppressionTime.value, baseStartTime.value, areaBounds)
+    updateBattleAreaPolygon()
     addLog('导入基础场景数据完成！正在进行初始轨道视算...', 'info')
     await sqliteClient.calculateWindows('scen-001')
     addLog('初始轨道视算完成！星地链路已生成。', 'success')
