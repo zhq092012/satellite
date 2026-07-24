@@ -1,0 +1,22 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+/dist*
+pnpm-debug
+auto-*.d.ts
+components.d.ts
+.idea
+.history
+pnpm-lock.yaml
+yarn-lock.yaml
+.vscode
+document
+deploy
+
+# 先忽略 docker 文件夹下的所有内容
+docker/*
+
+# 用感叹号 ! 来“取反”，表示不忽略这个文件
+!docker/docker部署.md

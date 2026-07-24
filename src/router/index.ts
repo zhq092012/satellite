@@ -1,0 +1,186 @@
+import { createWebHistory, createRouter, type RouteRecordRaw } from 'vue-router'
+import { useAuthStore } from '@/store/modules/auth'
+import { ElMessage } from 'element-plus'
+import { hasPermission, hasRole } from '@/utils/permission'
+
+const routes: Array<RouteRecordRaw> = [
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/auth/Login.vue'),
+    meta: {
+      title: '登录',
+      public: true,
+      showInMenu: false,
+    },
+  },
+  {
+    path: '/',
+    name: 'Dashboard',
+    component: () => import('@/layout/Dashboard.vue'),
+    redirect: '/home',
+    meta: {
+      title: '首页',
+      icon: 'HomeFilled',
+      requiresAuth: true,
+      showInMenu: true,
+    },
+    children: [
+      {
+        path: 'home',
+        name: 'Home',
+        component: () => import('@/layout/Home.vue'),
+        meta: {
+          title: '整体态势分析',
+          icon: 'icon-situation',
+          showInMenu: true,
+        },
+      },
+      {
+        path: 'situation',
+        name: 'Situation',
+        component: () => import('@/layout/BattleSituation.vue'),
+        meta: {
+          title: '战场态势分析',
+          icon: 'icon-situation',
+          showInMenu: true,
+        },
+      },
+      {
+        path: 'system',
+        name: 'SystemManage',
+        component: () => import('@/layout/SystemManage.vue'),
+        beforeEnter: (to: { path: string }) => {
+          if (to.path === '/system') {
+            return '/system/users'
+          }
+          return true
+        },
+        meta: {
+          title: '系统管理',
+          icon: 'icon-yunweizhishichouqu',
+          showInMenu: true,
+          requiresAuth: true,
+          roles: ['admin'],
+        },
+        children: [
+          {
+            path: 'users',
+            name: 'UserManage',
+            component: () => import('@/views/admin/UserManage.vue'),
+            meta: {
+              title: '用户管理',
+              icon: 'icon-us',
+              showInMenu: true,
+              requiresAuth: true,
+              roles: ['admin'],
+            },
+          },
+          {
+            path: 'roles',
+            name: 'RoleManage',
+            component: () => import('@/views/admin/RoleManage.vue'),
+            meta: {
+              title: '角色管理',
+              icon: 'icon-jurassic_data',
+              showInMenu: true,
+              requiresAuth: true,
+              roles: ['admin'],
+            },
+          },
+          {
+            path: 'menus',
+            name: 'MenuManage',
+            component: () => import('@/views/admin/MenuManage.vue'),
+            meta: {
+              title: '菜单管理',
+              icon: 'icon-layer',
+              showInMenu: true,
+              requiresAuth: true,
+              roles: ['admin'],
+            },
+          },
+          {
+            path: 'weapons',
+            name: 'WeaponManage',
+            component: () => import('@/views/weapons/WeaponList.vue'),
+            meta: {
+              title: '武器管理',
+              icon: 'icon-sword',
+              showInMenu: true,
+              requiresAuth: true,
+              roles: ['admin'],
+              permission: 'system:weapon:list',
+            },
+          },
+          {
+            path: 'basestations',
+            name: 'BaseStationManage',
+            component: () => import('@/views/basestations/BaseStationList.vue'),
+            meta: {
+              title: '基站管理',
+              icon: 'icon-basestation',
+              showInMenu: true,
+              requiresAuth: true,
+              roles: ['admin'],
+              permission: 'system:basestations:list',
+            },
+          },
+          {
+            path: 'missiles',
+            name: 'MissileManage',
+            component: () => import('@/views/weapons/MissileList.vue'),
+            meta: {
+              title: '导弹管理',
+              icon: 'icon-missile',
+              showInMenu: true,
+              requiresAuth: true,
+              roles: ['admin'],
+              permission: 'system:missiles:list',
+            },
+          },
+          {
+            path: 'missileBases',
+            name: 'MissileBaseManage',
+            component: () => import('@/views/weapons/MissileBase.vue'),
+            meta: {
+              title: '导弹基地管理',
+              icon: 'icon-missile-base',
+              showInMenu: true,
+              requiresAuth: true,
+              roles: ['admin'],
+              permission: 'system:missileBases:list',
+            },
+          },
+        ],
+      },
+    ],
+  },
+]
+
+const router = createRouter({
+  history: createWebHistory(import.meta.env.VITE_BASE_ROUTER),
+  routes,
+})
+
+router.beforeEach((to) => {
+  const authStore = useAuthStore()
+  const requiredRoles = (to.meta.roles as string[] | undefined) ?? []
+  const routeMeta = to.meta as { permission?: string; permissions?: string[] }
+  const isAdmin = authStore.roles.includes('admin')
+
+  if (requiredRoles.length > 0 && !hasRole(authStore.roles, requiredRoles)) {
+    ElMessage.warning('您没有权限访问该页面')
+    return '/home'
+  }
+
+  const requiredPermissions = routeMeta.permissions ?? (routeMeta.permission ? [routeMeta.permission] : [])
+  if (!isAdmin && requiredPermissions.length > 0 && !hasPermission(authStore.permissions, requiredPermissions)) {
+    ElMessage.warning('您没有权限访问该页面')
+    return '/home'
+  }
+
+  return true
+})
+
+export default router

@@ -1,0 +1,27 @@
+$el-bg-color: #08162a;
+@forward 'element-plus/theme-chalk/src/dark/var.scss'
+  with(
+    $bg-color: (
+      'page': $el-bg-color,
+      '': $el-bg-color,
+      'overlay': #0d233b,
+    ),
+    $colors: (
+      'primary': (
+        'base': #4f93dd,
+      ),
+    )
+  );
+
+@use 'element-plus/theme-chalk/src/dark/css-vars.scss' as *;
+@use 'element-plus/theme-chalk/src/index.scss' as *;
+
+:root {
+  --el-table-border-color: rgba(255, 255, 255, 0.06);
+  --el-table-header-bg-color: rgba(15, 44, 72, 0.96);
+  --el-table-tr-bg-color: rgba(10, 33, 56, 0.92);
+  --el-table-row-hover-bg-color: rgba(19, 54, 87, 0.96);
+  --el-table-current-row-bg-color: rgba(19, 54, 87, 0.96);
+  --el-table-text-color: #d9e9fb;
+  --el-table-header-text-color: #b8d1ea;
+}

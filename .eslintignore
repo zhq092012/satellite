@@ -1,0 +1,12 @@
+dist
+node_modules
+public
+*.local
+*.d.ts
+coverage
+/cypress/
+*.css
+*.scss
+*.sass
+*.less
+*.styl

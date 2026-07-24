@@ -1,0 +1,2 @@
+//覆盖 Element 默认变量
+@forward 'element-plus/theme-chalk/src/mixins/config.scss' with($namespace: 'atlas-app');

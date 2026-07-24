@@ -1,0 +1,149 @@
+:root {
+  font-family: 'Segoe', 'PingFang SC', 'Microsoft YaHei', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* 使用细的滚动条 */
+  scrollbar-width: none;
+
+  /* 背景色 */
+  --app-bg-color: #08162a;
+  --app-bg-gradient: linear-gradient(180deg, #0a1f38 0%, #08162a 55%, #061120 100%);
+  /* 菜单背景色 */
+  --menu-bg-color: #0d233b;
+  /* 菜单栏背景色 */
+  --nav-bar-background: #10304f;
+  --header-bg-gradient: linear-gradient(135deg, #0b2744 0%, #123c63 100%);
+  --sidebar-bg-gradient: linear-gradient(180deg, #0d2a49 0%, #0a213b 100%);
+  /* 边框颜色 */
+  --border-color: rgba(112, 162, 220, 0.24);
+  /* 浅色边框 */
+  --light-border-color: rgba(164, 201, 238, 0.34);
+  /* 激活的菜单背景色 */
+  --menu-bg-color--active: #19466d;
+  /* element 主色 */
+  --primary-color: #4f93dd;
+  /* 提示条背景色 */
+  --tips-background: #14395d;
+  /* g6工具栏边框颜色 */
+  --g6-toolbar-border-color: rgba(116, 168, 225, 0.24);
+  /* 亮色背景 */
+  --light-bg-color: #dfe6ee;
+  --dark-bg-color: #394a5d;
+  /* 面板/表格基础色 */
+  --surface-bg-color: rgba(9, 30, 51, 0.96);
+  --surface-bg-color-soft: rgba(12, 38, 64, 0.95);
+  --surface-bg-color-strong: rgba(14, 45, 75, 0.98);
+  --surface-hover-bg-color: rgba(20, 55, 90, 0.98);
+  --surface-border-color: rgba(110, 163, 225, 0.18);
+  --surface-border-strong: rgba(110, 163, 225, 0.3);
+  --text-color-primary: #d9e9fb;
+  --text-color-secondary: #9db6d2;
+  --text-color-strong: #f1f7ff;
+  --accent-color: #4f93dd;
+  --accent-color-hover: #66a6ea;
+  --accent-color-active: #7fb6f0;
+  --transition-fast: 180ms;
+  --transition-medium: 240ms;
+  --transition-slow: 320ms;
+  /* 滚动条配色 */
+  --scrollbar-track: #08162a; /* 轨道=背景，完全融合 */
+  --scrollbar-thumb: #1a3e64; /* 滑块，比背景略亮 */
+  --scrollbar-thumb-hover: #24527f; /* 悬停，再亮一点 */
+  box-sizing: border-box;
+  color: var(--text-color-primary);
+  transition:
+    background-color var(--transition-medium) ease,
+    color var(--transition-medium) ease,
+    border-color var(--transition-medium) ease,
+    box-shadow var(--transition-medium) ease,
+    fill var(--transition-medium) ease,
+    stroke var(--transition-medium) ease;
+  /* 全局滚动条样式 */
+  /* WebKit 浏览器（Chrome / Edge / Safari） */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 4px;
+    transition: background var(--transition-fast) ease;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+}
+/* Firefox */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  background: var(--app-bg-gradient);
+}
+html.dark {
+  background: var(--app-bg-gradient);
+  color-scheme: dark;
+  --el-bg-color: var(--surface-bg-color);
+  --el-bg-color-page: var(--app-bg-color);
+  --el-bg-color-overlay: var(--surface-bg-color-soft);
+  --el-fill-color-blank: var(--surface-bg-color);
+  --el-fill-color-light: rgba(16, 47, 78, 0.95);
+  --el-fill-color: rgba(20, 55, 90, 0.96);
+  --el-text-color-primary: var(--text-color-primary);
+  --el-text-color-regular: var(--text-color-primary);
+  --el-text-color-secondary: var(--text-color-secondary);
+  --el-border-color: var(--surface-border-color);
+  --el-border-color-light: var(--surface-border-color);
+  --el-border-color-lighter: rgba(110, 163, 225, 0.12);
+  --el-disabled-bg-color: rgba(13, 36, 59, 0.9);
+  --el-disabled-text-color: rgba(157, 182, 210, 0.7);
+  --el-color-primary: var(--accent-color);
+  --el-color-primary-light-3: var(--accent-color-hover);
+  --el-color-primary-light-5: var(--accent-color-active);
+  --el-color-primary-dark-2: #3e7fc4;
+  --el-table-border-color: rgba(255, 255, 255, 0.06);
+  --el-table-header-bg-color: rgba(15, 44, 72, 0.96);
+  --el-table-tr-bg-color: rgba(10, 33, 56, 0.92);
+  --el-table-row-hover-bg-color: rgba(19, 54, 87, 0.96);
+  --el-table-current-row-bg-color: rgba(19, 54, 87, 0.96);
+  --el-table-text-color: var(--text-color-primary);
+  --el-table-header-text-color: #b8d1ea;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  place-items: center;
+  background: var(--app-bg-gradient);
+  color: var(--text-color-primary);
+}
+
+#atlas-app {
+  height: 100vh;
+  width: 100%;
+  min-height: 300px;
+  min-width: 500px;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+  padding: 0;
+  text-align: center;
+  overflow: hidden;
+}
+
+* {
+  transition:
+    background-color var(--transition-medium) ease,
+    color var(--transition-medium) ease,
+    border-color var(--transition-medium) ease,
+    box-shadow var(--transition-medium) ease,
+    fill var(--transition-medium) ease,
+    stroke var(--transition-medium) ease;
+}

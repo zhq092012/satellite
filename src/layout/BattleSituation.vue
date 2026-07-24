@@ -1,0 +1,1021 @@
+<template>
+  <div class="container">
+    <main class="main">
+      <div class="tabs-bar">
+        <div class="tabs">
+          <div v-for="tab in visibleTabs" :key="tab.value" :class="{ active: store.activetab === tab.value }"
+            @click="switchTab(tab.value)">
+            {{ tab.label }}
+          </div>
+        </div>
+        <!-- 显示当前战场和任务名称（面包屑） -->
+        <div class="filter filter-breadcrumb" v-if="store.activedTask">
+          <span class="crumb">
+            <i class="el-icon-s-platform"></i>
+            <strong>{{ store.battle?.name || '未选择战场' }}</strong>
+          </span>
+          <span class="sep">/</span>
+          <span class="crumb">
+            <i class="el-icon-s-order"></i>
+            {{ store.activedTask.name || '未选择任务' }}
+          </span>
+        </div>
+      </div>
+      <div v-if="store.activetab === '战场态势视图'" class="battle-grid">
+        <!-- 己方侧边栏 -->
+        <div class="battle-grid__side battle-grid__side--left">
+          <BattleCampPanel v-if="redCampCard" :camp-key="redCampCard.key" :title="redCampCard.label"
+            :theme="redCampCard.theme" :total="redCampCard.total" :total-label="redCampCard.totalLabel"
+            :duration-text="redCampCard.durationText" :summary-rows="redCampCard.summaryRows"
+            :ring-style="redCampCard.ringStyle" :focus-list="redCampCard.focusList"
+            :satellite-rows="redCampCard.satelliteRows" :weapon-rows="redCampCard.weaponRows"
+            @focus-satellite="handleFocusSatellite" />
+        </div>
+        <!-- 中间地球 -->
+        <div class="battle-grid__center">
+          <div class="battle-grid__earth">
+            <component v-if="activeTabComponent" :is="activeTabComponent" :key="store.activetab" :ref="setRef"
+              @threatAnalysis="threatAnalysis" @changeEffectModel="handleChangeEffectModel" :tab-key="store.activetab"
+              :has-nav="true" :has-legend="false" :show-sat-msg="true" :showTimeLine="true" :showAnimation="true" />
+          </div>
+          <!-- 卫星列表 -->
+          <Transition name="slidet">
+            <div class="satellite-list-panel" v-show="store.showSatelliteList && store.activetab === '战场态势视图'">
+              <div class="tabs-bar" style="padding: 0 5px">
+                <div class="tabs">
+                  <div :class="{ active: activetime === '卫星列表' }" @click="switchTime('卫星列表')">卫星列表</div>
+                </div>
+                <div style="font-size: 12px">共{{ satellite_loadnum }}/{{ satellite_total }}颗卫星</div>
+              </div>
+              <div class="satellite-list">
+                <el-table :data="satelliteList" style="width: 100%; height: 240px" fit
+                  :cell-style="{ fontSize: '12px' }" :default-sort="{ prop: 'norad', order: 'ascending' }">
+                  <el-table-column prop="norad" label="编号" sortable> </el-table-column>
+                  <el-table-column prop="int_id" label="国际编号"> </el-table-column>
+                  <el-table-column prop="name_en" label="英文名称"> </el-table-column>
+                  <el-table-column prop="country" label="国家/地区"> </el-table-column>
+                  <el-table-column prop="sat_type" label="卫星类型"> </el-table-column>
+                  <el-table-column prop="orbit_status" label="轨道状态">
+                    <template #default="scope">
+                      <span v-if="scope.row.orbit_status === 0">未知</span>
+                      <span v-if="scope.row.orbit_status === 1">在轨</span>
+                      <span v-if="scope.row.orbit_status === 2">离轨</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="orbit_type" label="轨道类型">
+                    <template #default="scope">
+                      <span v-if="scope.row.orbit_type === 0">未知</span>
+                      <span v-if="scope.row.orbit_type === 1">低轨</span>
+                      <span v-if="scope.row.orbit_type === 2">中轨</span>
+                      <span v-if="scope.row.orbit_type === 3">高轨</span>
+                      <span v-if="scope.row.orbit_type === 4">大椭圆</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="payload_status" label="载荷状态">
+                    <template #default="scope">
+                      <span v-if="scope.row.payload_status === 0">未知</span>
+                      <span v-if="scope.row.payload_status === 1">堪用</span>
+                      <span v-if="scope.row.payload_status === 2">失效</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="contractors" label="制造商" width="300"> </el-table-column>
+                  <el-table-column label="操作">
+                    <template #default="scope">
+                      <el-button type="primary" link @click="detail(scope.row.norad)">详情</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div class="page-box">
+                  <el-pagination :page-size="10" layout="total, prev, pager, next" :total="satellite_total"
+                    @current-change="handleCurrentChange" />
+                </div>
+              </div>
+            </div>
+          </Transition>
+        </div>
+        <!-- 敌方侧边栏 -->
+        <div class="battle-grid__side battle-grid__side--right">
+          <BattleCampPanel v-if="blueCampCard" :camp-key="blueCampCard.key" :title="blueCampCard.label"
+            :theme="blueCampCard.theme" :total="blueCampCard.total" :total-label="blueCampCard.totalLabel"
+            :duration-text="blueCampCard.durationText" :summary-rows="blueCampCard.summaryRows"
+            :ring-style="blueCampCard.ringStyle" :focus-list="blueCampCard.focusList"
+            :satellite-rows="blueCampCard.satelliteRows" :weapon-rows="blueCampCard.weaponRows"
+            @focus-satellite="handleFocusSatellite" />
+        </div>
+      </div>
+      <div v-else class="map-box">
+        <div class="tab-content">
+          <keep-alive include="EvaluationReport,ThreatAnalysis,SatelliteAttackabilityView,ElectronicWarfare">
+            <component v-if="activeTabComponent" :is="activeTabComponent" :key="store.activetab" :ref="setRef"
+              @threatAnalysis="threatAnalysis" @changeEffectModel="handleChangeEffectModel" :tab-key="store.activetab"
+              :has-nav="true" :has-legend="true" :show-sat-msg="true" :showTimeLine="true" :showAnimation="true" />
+          </keep-alive>
+        </div>
+      </div>
+    </main>
+  </div>
+</template>
+<script setup lang="ts">
+import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
+import BattleCampPanel from '@/components/cesium/BattleCampPanel.vue'
+import SatelliteNetView from '@/components/cesium/SatelliteNetView.vue'
+import SatelliteUnReal from '@/components/cesium/SatelliteUnReal.vue'
+import SatelliteThreatView from '@/components/cesium/SatelliteThreatView.vue'
+import SatelliteAttackabilityView from '@/components/cesium/SatelliteAttackabilityView.vue'
+import EvaluationReport from '@/components/cesium/EvaluationReport.vue'
+import StationReport from '@/components/cesium/StationReport.vue'
+import ConfrontView from '@/components/cesium/ConfrontationAnalysis.vue'
+import ElectronicWarfare from '@/components/cesium/ElectronicWarfare.vue'
+import { useLayoutStore } from '@/store/modules/layout'
+import { useAuthStore } from '@/store/modules/auth'
+import { getSatelliteList, getSituationDataOfTask, getStrikeSatellites, type SituationData } from '@/api/dashboard'
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
+import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
+const store = useLayoutStore()
+const authStore = useAuthStore()
+const { openSatelliteProfile } = useSatelliteProfileDialog()
+const compMap = {
+  CesiumViewer,
+  SatelliteNetView,
+  SatelliteUnReal,
+  SatelliteThreatView,
+  SatelliteAttackabilityView,
+  EvaluationReport,
+  StationReport,
+  ConfrontView,
+  ElectronicWarfare,
+}
+/**
+ * 定义tab对象数组
+ */
+const tabDefs = [
+  { label: '战场态势视图', value: '战场态势视图', component: 'CesiumViewer', permissionCode: 'battle:situation' },
+  { label: '卫星威胁分析', value: '卫星威胁分析', component: 'SatelliteThreatView', permissionCode: 'battle:threat' },
+  {
+    label: '可打击度分析',
+    value: '可打击度分析',
+    component: 'SatelliteAttackabilityView',
+    permissionCode: 'battle:strike',
+  },
+  {
+    label: '杀伤链方案',
+    value: '杀伤链方案',
+    component: 'StationReport',
+    permissionCode: 'battle:killChain',
+  },
+  {
+    label: '打击结果评估',
+    value: '异常事件分析',
+    component: 'EvaluationReport',
+    permissionCode: 'battle:evaluation',
+  },
+  {
+    label: '打击方案仿真',
+    value: '打击方案仿真',
+    component: 'SatelliteUnReal',
+    permissionCode: 'battle:unreal',
+  },
+  {
+    label: '红蓝对抗分析',
+    value: '红蓝对抗分析',
+    component: 'ConfrontView',
+    permissionCode: 'battle:confront',
+  },
+  {
+    label: '电子对抗分析',
+    value: '电子对抗分析',
+    component: 'ElectronicWarfare',
+    permissionCode: 'battle:electronicWarfare',
+  },
+] as const
+
+/**
+ * 计算可见的tab
+ */
+const visibleTabs = computed(() => {
+  // 如果是管理员，显示所有tab
+  if (authStore.roles.includes('admin')) {
+    return [...tabDefs]
+  }
+  // 根据权限过滤tab
+  const permissionSet = new Set(authStore.permissions)
+  const filtered = tabDefs.filter((tab) => permissionSet.has(tab.permissionCode))
+  return filtered
+})
+/**
+ * 获取组件实例类型
+ */
+type InstanceOf<T> = T extends new (...args: any[]) => infer R ? R : never
+/**
+ * 战场态势视图组件实例类型
+ */
+type CesiumViewerInst = InstanceOf<typeof CesiumViewer>
+/**
+ * 卫星网络视图组件实例类型
+ */
+type SatelliteNetViewInst = InstanceOf<typeof SatelliteNetView>
+/**
+ * 打击方案仿真组件实例类型
+ */
+type SatelliteUnRealInst = InstanceOf<typeof SatelliteUnReal>
+/**
+ * 卫星威胁分析组件实例类型
+ */
+type SatelliteThreatViewInst = InstanceOf<typeof SatelliteThreatView>
+/**
+ * 可打击度分析组件实例类型
+ */
+type SatelliteAttackabilityViewInst = InstanceOf<typeof SatelliteAttackabilityView>
+/**
+ * 打击结果评估组件实例类型
+ */
+type EvaluationReportInst = InstanceOf<typeof EvaluationReport>
+/**
+ * 红蓝对抗分析组件实例类型
+ */
+type ConfrontInst = InstanceOf<typeof ConfrontView>
+/**
+ * 电子对抗分析组件实例类型
+ */
+type ElectronicWarfareInst = InstanceOf<typeof ElectronicWarfare>
+/**
+ * 当前激活组件的实例类型
+ */
+type ActiveInst =
+  | CesiumViewerInst
+  | SatelliteNetViewInst
+  | SatelliteUnRealInst
+  | SatelliteThreatViewInst
+  | SatelliteAttackabilityViewInst
+  | EvaluationReportInst
+  | ConfrontInst
+  | ElectronicWarfareInst
+
+/**
+ * 获取当前激活的组件
+ */
+const activeTabComponent = shallowRef()
+/**
+ * 当前激活组件的引用
+ */
+const activeRef = shallowRef<ActiveInst | null>(null)
+/**
+ * 战场态势视图组件的引用
+ */
+const cesiumViewerRef = shallowRef<CesiumViewerInst | null>()
+/**
+ * 卫星网络视图组件的引用
+ */
+const netViewerRef = shallowRef<SatelliteNetViewInst | null>()
+/**
+ * 打击方案仿真组件的引用
+ */
+const satelliteUnRealRef = shallowRef<SatelliteUnRealInst | null>()
+/**
+ * 红蓝对抗分析组件的引用
+ */
+const confrontRef = shallowRef<ConfrontInst | null>()
+/**
+ * 电子对抗分析组件的引用
+ */
+const electronicWarfareRef = shallowRef<ElectronicWarfareInst | null>()
+/**
+ * 设置组件引用
+ * @param el 组件实例
+ */
+function setRef(el: any) {
+  activeRef.value = el as ActiveInst
+  // 切换时清理上一个 tab 的引用，避免旧组件方法继续调用（如视图切换时）
+  cesiumViewerRef.value = null
+  netViewerRef.value = null
+  satelliteUnRealRef.value = null
+  confrontRef.value = null
+
+  if (activeRef.value) {
+    switch (store.activetab) {
+      case '战场态势视图':
+        cesiumViewerRef.value = activeRef.value as CesiumViewerInst
+        break
+      case '卫星网络视图':
+        netViewerRef.value = activeRef.value as SatelliteNetViewInst
+        break
+      case '打击方案仿真':
+        satelliteUnRealRef.value = activeRef.value as SatelliteUnRealInst
+        break
+      case '红蓝对抗分析':
+        confrontRef.value = activeRef.value as ConfrontInst
+        break
+      case '电子对抗分析':
+        electronicWarfareRef.value = activeRef.value as ElectronicWarfareInst
+        break
+    }
+  }
+}
+const threatAnalysis = () => {
+  switchTab('卫星威胁分析')
+}
+
+const SATELLITE_TYPE_ORDER = ['导弹预警', '侦察', '通信', '导航', '太空目标监视与攻防'] as const
+const weaponTypeOrder = ['动能', '定向能', '电子干扰', '天基武器', '其他'] as const
+
+const battleSituationData = ref<SituationData | null>(null)
+const strikeSatelliteList = ref<SatelliteStrike[]>([])
+
+const normalizeCountryList = (value?: string) =>
+  String(value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+const enemyCountrySet = computed(() => new Set(normalizeCountryList(store.activedTask?.enemyCountry)))
+
+const formatCount = (value?: number) => `${Number(value ?? 0)}`
+
+const formatDuration = (value?: number) => {
+  const duration = Number(value ?? 0)
+  if (!Number.isFinite(duration)) return '0'
+  return `${duration}`
+}
+
+const toTopRows = (source?: Record<string, number>, limit = 4) => {
+  return Object.entries(source ?? {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([name, value]) => ({ name, value: formatCount(value) }))
+}
+
+const getFixedSatelliteTypeRows = (source?: Record<string, number>) => {
+  return SATELLITE_TYPE_ORDER.map((name) => ({
+    name,
+    value: Number(source?.[name] ?? 0),
+  }))
+}
+
+const normalizeWeaponType = (type?: string) => {
+  const text = String(type ?? '').trim()
+  if (!text) return '其他'
+  if (text.includes('动能')) return '动能'
+  if (text.includes('定向能')) return '定向能'
+  if (text.includes('电子干扰') || text.includes('干扰')) return '电子干扰'
+  if (text.includes('天基')) return '天基武器'
+  return '其他'
+}
+
+const getWeaponTypeRows = (list?: Array<{ type?: string }>) => {
+  const counts = new Map<string, number>()
+  for (const item of list ?? []) {
+    const key = normalizeWeaponType(item?.type)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return weaponTypeOrder
+    .map((name) => ({ name, value: Number(counts.get(name) ?? 0) }))
+    .filter((item) => item.value > 0 || item.name !== '其他')
+}
+
+const redFocusList = computed(() =>
+  strikeSatelliteList.value.filter((sat) => enemyCountrySet.value.has(String(sat.country).trim()))
+)
+
+const blueFocusList = computed(() =>
+  strikeSatelliteList.value.filter((sat) => !enemyCountrySet.value.has(String(sat.country).trim()))
+)
+
+const battleCampCards = computed(() => {
+  const data = battleSituationData.value
+  if (!data) return []
+
+  const redTotal = Number(data['红方']?.红方过境卫星总数 ?? 0)
+  const blueTotal = Number(data['蓝方']?.蓝方过境卫星总数 ?? 0)
+
+  return [
+    {
+      key: 'red' as const,
+      label: '红方',
+      theme: 'is-red' as const,
+      total: redTotal,
+      totalLabel: `${redTotal}`,
+      durationText: formatDuration(data['红方']?.红方卫星过境总时长),
+      summaryRows: toTopRows(data['红方']?.红方各地区过境卫星数量, 3),
+      ringStyle: {
+        background: `conic-gradient(#8f6662 0 68%, rgba(255, 255, 255, 0.08) 68% 100%)`,
+      },
+      satelliteRows: getFixedSatelliteTypeRows(data['红方']?.红方过境卫星分类数量),
+      weaponRows: getWeaponTypeRows(data['红方']?.红方武器阵地列表),
+      focusList: redFocusList.value,
+    },
+    {
+      key: 'blue' as const,
+      label: '蓝方',
+      theme: 'is-blue' as const,
+      total: blueTotal,
+      totalLabel: `${blueTotal}`,
+      durationText: formatDuration(data['蓝方']?.蓝方卫星过境总时长),
+      summaryRows: toTopRows(data['蓝方']?.蓝方各地区过境卫星数量, 3),
+      ringStyle: {
+        background: `conic-gradient(var(--accent-color) 0 66%, rgba(255, 255, 255, 0.08) 66% 100%)`,
+      },
+      satelliteRows: getFixedSatelliteTypeRows(data['蓝方']?.蓝方过境卫星分类数量),
+      weaponRows: getWeaponTypeRows(data['蓝方']?.蓝方武器阵地列表),
+      focusList: blueFocusList.value,
+    },
+  ]
+})
+
+const redCampCard = computed(() => battleCampCards.value[0])
+const blueCampCard = computed(() => battleCampCards.value[1])
+
+async function loadSituationData(taskId: number) {
+  const res = await getSituationDataOfTask(taskId)
+  if (res.code === 200 && res.data) {
+    battleSituationData.value = res.data
+  }
+}
+
+async function loadStrikeList(taskId: number) {
+  const res = await getStrikeSatellites(taskId, 1, 10000)
+  if (res.code === 200) {
+    strikeSatelliteList.value = res.data.content ?? []
+  }
+}
+
+async function loadBattleSituationData(taskId: number) {
+  await Promise.all([loadSituationData(taskId), loadStrikeList(taskId)])
+}
+
+const handleFocusSatellite = (payload: { norad_id: string }) => {
+  cesiumViewerRef.value?.highlightSatellite?.(payload)
+}
+/**
+ * 切换tab页面
+ * @param tab tab名称
+ */
+const switchTab = (tab: string) => {
+  store.activetab = tab
+  const current = tabDefs.find((item) => item.value === tab)
+  if (!current) {
+    activeTabComponent.value = undefined
+    return
+  }
+  activeTabComponent.value = compMap[current.component]
+}
+
+watch(
+  visibleTabs,
+  (tabs) => {
+    if (tabs.length === 0) {
+      activeTabComponent.value = undefined
+      return
+    }
+
+    const hasCurrent = tabs.some((item) => item.value === store.activetab)
+    if (!hasCurrent) {
+      switchTab(tabs[0].value)
+    }
+  },
+  { immediate: true }
+)
+
+const activetime = ref('卫星列表')
+const switchTime = (tab: string) => {
+  activetime.value = tab
+}
+const satelliteList = ref<Satellite[]>([])
+const satellite_total = ref(0)
+const satellite_loadnum = ref(0)
+const pageNum = ref(1)
+const pageSize = ref(10)
+const handleCurrentChange = (num: number) => {
+  pageNum.value = num
+  loadSatelliteList()
+}
+
+const detail = (norad: number) => {
+  openSatelliteProfile(norad)
+}
+//卫星列表数据
+const loadSatelliteList = async () => {
+  const res = await getSatelliteList(pageNum.value, pageSize.value, undefined, store.activedTask?.id!)
+  if (res.code === 200) {
+    satelliteList.value = res.data.content
+    satellite_total.value = res.data.totalElements
+    satellite_loadnum.value = res.data.numberOfElements
+  }
+}
+const handleChangeEffectModel = () => {
+  // 仅在战场态势视图时刷新 orbit 路径（其他 tab 组件不会使用该 viewer）
+  if (store.activetab === '战场态势视图') {
+    loadOrbitSateList()
+  }
+  // 标记战场
+  markBattleArea()
+}
+
+const loadOrbitSateList = () => {
+  if (store.activedTask?.id && store.activetab === '战场态势视图') {
+    // 显示卫星轨迹（仅在战场态势视图激活时）
+    cesiumViewerRef.value?.renderSateliitePathWithEntity(store.activedTask?.id, undefined)
+  }
+}
+
+onMounted(() => {
+  if (visibleTabs.value.length > 0) {
+    const hasCurrent = visibleTabs.value.some((item) => item.value === store.activetab)
+    switchTab(hasCurrent ? store.activetab : visibleTabs.value[0].value)
+  }
+
+  nextTick(() => {
+    loadOrbitSateList()
+    // 标记战场
+    markBattleArea()
+  })
+  // 卫星列表
+  loadSatelliteList()
+  if (store.activetab === '战场态势视图' && store.activedTask?.id) {
+    void loadBattleSituationData(store.activedTask.id)
+  }
+})
+
+watch(
+  () => store.activetab,
+  async (tab) => {
+    if (tab === '战场态势视图') {
+      nextTick(() => {
+        loadOrbitSateList()
+        markBattleArea()
+      })
+      loadSatelliteList()
+      if (store.activedTask?.id) {
+        await loadBattleSituationData(store.activedTask.id)
+      }
+    }
+  }
+)
+
+watch(
+  () => store.activedTask?.id,
+  async (taskId, prevTaskId) => {
+    if (!taskId || taskId === prevTaskId) return
+    loadSatelliteList()
+    if (store.activetab === '战场态势视图') {
+      await loadBattleSituationData(taskId)
+    }
+  }
+)
+
+function markBattleArea() {
+  if (store.activedTask) {
+    cesiumViewerRef.value?.markBattle()
+  }
+}
+</script>
+<style lang="scss" scoped>
+.battle-page-bg {
+  background: var(--app-bg-gradient);
+}
+
+$bs-page-bg: var(--app-bg-gradient);
+$bs-surface-bg: var(--surface-bg-color);
+$bs-surface-bg-strong: var(--surface-bg-color-strong);
+$bs-surface-bg-soft: var(--surface-bg-color-soft);
+$bs-surface-bg-muted: var(--surface-hover-bg-color);
+$bs-surface-border: var(--surface-border-color);
+$bs-surface-border-strong: var(--surface-border-strong);
+$bs-surface-shadow: rgba(0, 0, 0, 0.32);
+$bs-text-main: var(--text-color-primary);
+$bs-text-strong: var(--text-color-strong);
+$bs-text-muted: var(--text-color-secondary);
+$bs-text-soft: var(--text-color-secondary);
+$bs-accent: var(--accent-color);
+$bs-accent-hover: var(--accent-color-hover);
+$bs-accent-active: var(--accent-color-active);
+$bs-accent-warm: #8d6f63;
+$bs-accent-cool: var(--accent-color);
+$bs-accent-line: rgba(79, 147, 221, 0.35);
+
+.container {
+  .main {
+    .nav-bar {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: start;
+      gap: 10px;
+    }
+
+    .tabs-bar {
+      height: 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      background: $bs-page-bg;
+      box-sizing: border-box;
+
+      .tabs {
+        display: flex;
+        gap: 15px;
+        font-size: 14px;
+
+        div {
+          background: $bs-surface-bg-muted;
+          padding: 5px 10px;
+          cursor: pointer;
+          border-radius: 2px;
+          color: $bs-text-main;
+          border: 1px solid $bs-surface-border;
+
+          &:hover {
+            background: $bs-accent-hover;
+            transition: all 0.3s ease-in-out;
+          }
+        }
+
+        &>div.active {
+          background: $bs-accent-active;
+          color: $bs-text-strong;
+        }
+      }
+
+      .filter {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: $bs-text-main;
+        font-size: 13px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: rgba(12, 38, 64, 0.6);
+        border: 1px solid $bs-surface-border;
+
+        .crumb {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .sep {
+          color: $bs-text-soft;
+        }
+
+        i {
+          color: $bs-accent-active;
+        }
+
+        strong {
+          color: $bs-text-strong;
+          font-weight: 700;
+        }
+
+        &.active {
+          background: rgba(79, 147, 221, 0.3);
+          border-radius: 3px;
+        }
+      }
+    }
+
+    .map-box {
+      position: relative;
+      height: calc(100vh - 100px);
+
+      .filter-panel {
+        height: 100%;
+        width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        font-size: 12px;
+        z-index: 999;
+
+        .nav-bar-filter {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 5px;
+          background: $bs-surface-bg-muted;
+        }
+
+        .filter-content {
+          display: grid;
+          grid-template-columns: 1fr 100px;
+          background: $bs-surface-bg-soft;
+
+          .filter-list {
+            padding: 10px;
+
+            .filter-item {
+              display: flex;
+              align-items: center;
+              gap: 20px;
+              padding-top: 10px;
+
+              .filter-type {
+                color: $bs-text-muted;
+              }
+
+              .filter-condition {
+                display: flex;
+                gap: 10px;
+
+                span {
+                  cursor: pointer;
+
+                  &.active {
+                    border-bottom: 2px solid $bs-accent-active;
+                  }
+                }
+              }
+            }
+          }
+
+          .show-all {
+            color: $bs-accent-active;
+            padding: 20px 10px 10px 10px;
+            display: flex;
+            gap: 2px;
+            cursor: pointer;
+          }
+        }
+      }
+
+      .tab-content {
+        height: 100%;
+      }
+    }
+
+    .battle-grid {
+      height: calc(100vh - 100px);
+      display: grid;
+      grid-template-columns: 380px minmax(0, 1fr) 380px;
+      grid-template-rows: minmax(0, 1fr) 320px;
+      box-sizing: border-box;
+      position: relative;
+      border: 1px solid $bs-surface-border;
+      background:
+        radial-gradient(circle at top left, rgba(79, 147, 221, 0.12), transparent 36%),
+        radial-gradient(circle at bottom right, rgba(79, 147, 221, 0.08), transparent 30%), $bs-page-bg;
+      box-shadow:
+        0 22px 48px $bs-surface-shadow,
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      overflow: hidden;
+
+      &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 18%);
+      }
+
+      &::after {
+        content: '';
+        position: absolute;
+        inset: 1px;
+        pointer-events: none;
+        border-radius: 19px;
+        border: 1px solid rgba(255, 255, 255, 0.04);
+      }
+    }
+
+    .battle-grid__side {
+      min-height: 0;
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+    }
+
+    .battle-grid__side--left {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+    }
+
+    .battle-grid__side--right {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+    }
+
+    .battle-grid__center {
+      display: grid;
+      grid-column: 2;
+      grid-row: 1/-1;
+      min-height: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .battle-grid__earth {
+      min-height: 0;
+      overflow: hidden;
+      background: $bs-surface-bg-strong;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    .battle-grid__earth :deep(.cesium-container) {
+      height: 100%;
+    }
+
+    .battle-grid__center .satellite-list-panel {
+      position: static;
+      height: auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 12px;
+      background: $bs-surface-bg;
+      border: 1px solid $bs-surface-border;
+    }
+
+    .battle-grid__center .satellite-list {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .satellite-list-panel {
+      background: $bs-page-bg;
+      width: 100%;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      z-index: 999;
+      height: 320px;
+
+      .tabs {
+        div {
+          width: 80px;
+          font-size: 14px;
+          padding: 3px;
+        }
+      }
+
+      .satellite-list {
+        .page-box {
+          display: flex;
+          justify-content: end;
+        }
+
+        :deep(.el-table) {
+          --el-table-border-color: var(--surface-border-color);
+          --el-table-header-bg-color: var(--surface-bg-color-strong);
+          --el-table-tr-bg-color: var(--surface-bg-color);
+          --el-table-row-hover-bg-color: var(--surface-hover-bg-color);
+          --el-table-current-row-bg-color: var(--surface-hover-bg-color);
+          --el-table-text-color: var(--text-color-primary);
+          --el-table-header-text-color: var(--text-color-secondary);
+          background: transparent;
+          color: var(--text-color-primary);
+        }
+
+        :deep(.el-table__header-wrapper th) {
+          background: var(--surface-bg-color-strong);
+          color: var(--text-color-secondary);
+          border-bottom: 1px solid var(--surface-border-color);
+        }
+
+        :deep(.el-table__body tr) {
+          background: var(--surface-bg-color);
+        }
+
+        :deep(.el-table__body td) {
+          background: var(--surface-bg-color);
+          border-bottom: 1px solid var(--surface-border-color);
+        }
+
+        :deep(.el-table__body tr:hover > td) {
+          background: var(--surface-hover-bg-color);
+        }
+
+        :deep(.el-pagination) {
+          --el-text-color-primary: var(--text-color-primary);
+          --el-fill-color-blank: var(--surface-bg-color);
+        }
+      }
+    }
+
+    .left-panel {
+      background: $bs-surface-bg;
+      position: absolute;
+      left: 0;
+      top: 50px;
+      z-index: 999;
+      width: 400px;
+
+      .battle-box {
+        .battle-count {
+          display: flex;
+          gap: 10px;
+          padding: 5px;
+
+          &>div {
+            background: $bs-surface-bg-muted;
+            flex: 1;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+
+            &>span:first-child {
+              font-size: 18px;
+              font-weight: bold;
+            }
+
+            &>span:last-child {
+              font-size: 14px;
+              color: $bs-text-muted;
+            }
+          }
+        }
+      }
+
+      .left-panel-scroll {
+        padding-right: 10px;
+        height: calc(100vh - 210px);
+
+        .collapse-item {
+          .title {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: $bs-surface-bg-muted;
+          }
+
+          .task-item {
+            background: $bs-surface-bg-muted;
+            padding: 10px 5px 10px 10px;
+            margin: 5px 0;
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+
+            .task-item__left {
+              &>div {
+                text-align: left;
+              }
+            }
+
+            .task-item__right {
+              justify-content: end;
+              color: $bs-accent-active;
+              cursor: pointer;
+            }
+          }
+        }
+      }
+    }
+
+    .right-panel {
+      background: $bs-surface-bg;
+      position: absolute;
+      right: 0;
+      top: 50px;
+      z-index: 999;
+      width: 400px;
+
+      .right-panel-scroll {
+        height: calc(100vh - 145px);
+        padding-right: 10px;
+
+        .focus-list {
+          .focus-item {
+            background: $bs-surface-bg-muted;
+            margin: 5px 0;
+            padding: 10px 0 10px 10px;
+            font-size: 12px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 80px repeat(4, 30px);
+            gap: 5px;
+
+            .focus-item-1 {
+              display: flex;
+              flex-direction: column;
+              align-items: start;
+              justify-content: space-around;
+            }
+
+            .focus-item-flex {
+              display: grid;
+              grid-template-columns: 1.2fr 2fr;
+
+              &>span:first-child {
+                align-self: center;
+                text-align: right;
+                padding-right: 10px;
+                color: $bs-text-muted;
+              }
+
+              &>span:last-child {
+                text-align: left;
+                align-self: center;
+                white-space: normal;
+                word-break: break-word;
+                overflow-wrap: break-word;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+</style>

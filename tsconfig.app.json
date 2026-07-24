@@ -1,0 +1,31 @@
+{
+  "extends": "@vue/tsconfig/tsconfig.dom.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "datamanage": ["./src/types/data-manage/datamanage.d.ts"],
+      "worker-module": ["./src/types/worker/worker.d.ts"]
+    },
+
+    "types": ["vite/client"],
+    "typeRoots": ["./node_modules/@types", "./src/types"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "src/**/*.d.ts", "src/types/**/*.d.ts"],
+  "exclude": ["node_modules"],
+  "watchOptions": {
+    // 改变监听文件的策略：改为定时轮询（Polling），不再死等系统通知
+    "watchFile": "useFsEventsOnParentDirectory", 
+    // 改变监听目录的策略
+    "watchDirectory": "dynamicPriorityPolling",
+    // 遇到没动过的第三方库，减少轮询频率，节约云端 CPU
+    "fallbackPolling": "dynamicPriority"
+  }
+}
