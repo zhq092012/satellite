@@ -10,11 +10,11 @@
           <button class="tab-btn" :class="{ active: currentView === 'SANDBOX' }" @click="currentView = 'SANDBOX'">
             🖥️ 推演主沙盘
           </button>
-          <button class="tab-btn" :class="{ active: currentView === 'AAR' }" @click="currentView = 'AAR'">
-            📊 战后效能复盘
-          </button>
           <button class="tab-btn" :class="{ active: currentView === 'MATRIX' }" @click="openMatrixView">
             🧮 战术算法矩阵
+          </button>
+          <button class="tab-btn" :class="{ active: currentView === 'AAR' }" @click="currentView = 'AAR'">
+            📊 战后效能复盘
           </button>
         </nav>
       </div>
@@ -38,7 +38,6 @@
             <span class="status-text digital-font">{{ isDbInitialized ? 'SQLite-Wasm (OPFS)' : '连接中...' }}</span>
           </span>
         </div>
-        <el-button size="small" type="success" plain @click="openTacticalMatrix"> 📐 战术决策矩阵 </el-button>
         <el-button size="small" type="primary" plain @click="openSqlSandbox"> 🗄️ SQL 数据沙箱 </el-button>
       </div>
     </header>
