@@ -13,6 +13,9 @@
           <button class="tab-btn" :class="{ active: currentView === 'AAR' }" @click="currentView = 'AAR'">
             📊 战后效能复盘
           </button>
+          <button class="tab-btn" :class="{ active: currentView === 'MATRIX' }" @click="openMatrixView">
+            🧮 战术算法矩阵
+          </button>
         </nav>
       </div>
 
@@ -217,6 +220,8 @@
             v-if="isScenarioLoaded"
             :nodes="assets"
             :links="links"
+            :highlightNodeIds="highlightNodeIds"
+            :highlightLinkIds="highlightLinkIds"
             :battleAreaPolygon="battleAreaPolygon"
             @select-node="selectEntity"
           />
@@ -352,10 +357,17 @@
     </div>
 
     <!-- AAR View -->
-    <AfterActionReview v-else />
+    <AfterActionReview v-else-if="currentView === 'AAR'" />
+
+    <!-- Tactical Matrix View -->
+    <TacticalMatrixView
+      v-else-if="currentView === 'MATRIX'"
+      :matrices="matrixData"
+      :loading="matrixLoading"
+      @refresh="loadMatrices"
+    />
 
     <SqlSandboxDialog ref="sqlSandboxRef" />
-    <TacticalMatrixDrawer ref="tacticalMatrixDrawerRef" />
   </div>
 </template>
 
@@ -368,7 +380,7 @@ import Battlefield3D from '@/components/electronic/Battlefield3D.vue'
 import WeaponAssignmentTable from '@/components/electronic/WeaponAssignmentTable.vue'
 import AfterActionReview from '@/components/electronic/AfterActionReview.vue'
 import SqlSandboxDialog from '@/components/electronic/SqlSandboxDialog.vue'
-import TacticalMatrixDrawer from '@/components/electronic/TacticalMatrixDrawer.vue'
+import TacticalMatrixView from '@/components/electronic/TacticalMatrixView.vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { useLayoutStore } from '@/store/modules/layout'
 const store = useLayoutStore()
@@ -376,10 +388,69 @@ const store = useLayoutStore()
 const isDbInitialized = ref(false)
 const isScenarioLoaded = ref(false)
 const hasOrbitData = ref(false)
-const currentView = ref<'SANDBOX' | 'AAR'>('SANDBOX')
+// 用于标记当前视图是沙箱、战后复盘还是算法矩阵
+const currentView = ref<'SANDBOX' | 'AAR' | 'MATRIX'>('SANDBOX')
 const sqlSandboxRef = ref<any>(null)
 const tacticalMatrixDrawerRef = ref<any>(null)
 
+// 算法矩阵解算数据与状态
+const matrixData = ref<any>(null)
+const matrixLoading = ref(false)
+
+// 3D 全链路高亮节点与链路集合
+const highlightNodeIds = ref<string[]>([])
+const highlightLinkIds = ref<string[]>([])
+/**
+ * 触发全链路算力解算并在 3D 拓扑大屏中高亮链路
+ */
+const triggerFullChainHighlight = async (analysisData?: any) => {
+  try {
+    let data = analysisData
+    if (!data) {
+      const res = await sqliteClient.generateMatrices('scen-001')
+      matrixData.value = res
+      data = res.earliestFullChain
+    }
+    if (data && data.pathNodes) {
+      highlightNodeIds.value = data.pathNodes
+      highlightLinkIds.value = data.pathLinkIds || []
+      currentView.value = 'SANDBOX'
+      addLog(
+        `⚡ 蓝方最早全链路传输解算完成: T+${data.earliestFinishMin}m 实际完成，基准耗时 ${data.totalBaselineOverhead}s，受打压影响延时差额 +${data.delayDelta}s。已在 3D 拓扑图中炫光高亮该全链路！`,
+        'success'
+      )
+      ElMessage.success(`蓝方最早全链路传输解算完成！延时差额 +${data.delayDelta}s，已在 3D 拓扑大屏高亮显现。`)
+    }
+  } catch (err: any) {
+    console.error('高亮全链路失败:', err)
+  }
+}
+/**
+ * 触发 Web Worker 中的 generateMatrices 算力矩阵解算
+ */
+const loadMatrices = async () => {
+  matrixLoading.value = true
+  try {
+    // 场景未加载时自动执行场景数据初始化，防止场景 scenarios 表为空导致 Worker 报错 Scenario scen-001 not found
+    if (!isScenarioLoaded.value) {
+      await loadMockScenario()
+    }
+    const res = await sqliteClient.generateMatrices('scen-001')
+    matrixData.value = res
+  } catch (err: any) {
+    console.error('解算战术算法矩阵失败:', err)
+    ElMessage.error(`解算战术算法矩阵失败: ${err.message}`)
+  } finally {
+    matrixLoading.value = false
+  }
+}
+/**
+ * 切换到战术算法矩阵视图
+ */
+const openMatrixView = () => {
+  currentView.value = 'MATRIX'
+  loadMatrices()
+}
 // 战场范围多边形 3D 转换数据
 const battleAreaPolygon = ref<{ x: number; y: number }[]>([])
 
@@ -989,6 +1060,8 @@ const startSimulationLoop = () => {
     if (simMinutes.value >= suppressionTime.value) {
       addLog(`已达到设定的 ${suppressionTime.value} 分钟压制时长，推演结束。`, 'success')
       stopSimulationLoop()
+      // 触发全链路算力解算并在 3D 拓扑大屏中高亮链路
+      await triggerFullChainHighlight()
       return
     }
     const nextVal = Math.min(suppressionTime.value, simMinutes.value + effectiveStep.value)

@@ -1,12 +1,13 @@
+import type { TacticalMatrices } from '@/types/electronic';
 import { ref } from 'vue';
 
 class SQLiteClient {
   private worker: Worker | null = null;
   private pendingQueries = new Map<string, { resolve: Function; reject: Function }>();
-  
+
   private initResolver: (() => void) | null = null;
   private initRejecter: ((err: Error) => void) | null = null;
-  
+
   public isInitialized = ref(false);
   public initError = ref<string | null>(null);
 
@@ -59,7 +60,7 @@ class SQLiteClient {
   public init(): Promise<void> {
     if (this.isInitialized.value) return Promise.resolve();
     if (this.initError.value) return Promise.reject(new Error(this.initError.value));
-    
+
     return new Promise<void>((resolve, reject) => {
       this.initResolver = resolve;
       this.initRejecter = reject;
@@ -117,18 +118,8 @@ class SQLiteClient {
   /**
    * 生成四大战术决策算力矩阵 (passMatrix, visibleMatrix, overheadMatrix, attackMatrix)
    */
-  public generateMatrices(scenarioId: string = 'scen-001'): Promise<{
-    passMatrix: any[];
-    visibleMatrix: any[];
-    overheadMatrix: any[];
-    attackMatrix: any[];
-  }> {
-    return this.send<{
-      passMatrix: any[];
-      visibleMatrix: any[];
-      overheadMatrix: any[];
-      attackMatrix: any[];
-    }>('GENERATE_MATRICES', '', [scenarioId]);
+  public generateMatrices(scenarioId: string = 'scen-001'): Promise<TacticalMatrices> {
+    return this.send<TacticalMatrices>('GENERATE_MATRICES', '', [scenarioId]);
   }
 }
 

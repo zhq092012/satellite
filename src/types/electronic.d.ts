@@ -64,7 +64,8 @@ export type KillType = 'SOFT' | 'HARD';
  * 'JAMMED':'被干扰'
  * 'DESTROYED':'被摧毁'
  */
-export type LinkStatus = 'PENDING' | 'TRANSMITTING' | 'JAMMED' | 'DESTROYED';
+export type LinkStatus = 'PENDING' | 'TRANSMITTING' | 'JAMMED' | 'DESTROYED' | 'ENGAGEMENT';
+
 
 /**
  * 推演方案预设冲突严重烈度等级
@@ -171,3 +172,238 @@ export interface Engagement {
   final_js_ratio: number;         // 综合上述 5 种空间物理衰减因子后，计算出的最终有效干信比 (J/S Ratio)
   is_successful: 0 | 1;           // 0-拦截失败，1-拦截成功 (高于或低于蓝方抗干扰解扩门槛)
 }
+/**
+ * 时间窗口结构体
+ */
+export interface TimeWindow {
+  window_start: number;
+  window_end: number;
+}
+
+/**
+ * 7. 算法矩阵——1. 空间卫星过境矩阵项
+ */
+export interface PassMatrixItem {
+  sat_id: string;
+  sat_name: string;
+  windows: TimeWindow[];
+}
+
+/**
+ * 7. 算法矩阵——2. 星地通视矩阵项
+ */
+export interface VisibleMatrixItem {
+  source_id: string;
+  source_name: string;
+  target_id: string;
+  target_name: string;
+  windows: TimeWindow[];
+}
+
+/**
+ * 7. 算法矩阵——3. 传输时延开销 Tick 明细
+ */
+export interface OverheadMatrixTick {
+  time: number;
+  tick_min: number;
+  status: LinkStatus | string;
+  trans_delay: number;
+  proc_delay: number;
+  extra_delay: number;
+  total_overhead: number;
+}
+
+/**
+ * 7. 算法矩阵——3. 传输时延开销压缩时间段
+ */
+export interface OverheadMatrixSegment {
+  start_min: number;
+  end_min: number;
+  status: LinkStatus | string;
+  trans_delay: number;
+  proc_delay: number;
+  extra_delay: number;
+  total_overhead: number;
+}
+
+/**
+ * 7. 算法矩阵——3. 传输时延矩阵项
+ */
+export interface OverheadMatrixItem {
+  source_id: string;
+  source_name: string;
+  source_layer: BattlefieldLayer;
+  target_id: string;
+  target_name: string;
+  target_layer: BattlefieldLayer;
+  link_type: 'SAT_TO_STATION' | 'STATION_TO_CMD';
+  trans_delay: number;
+  proc_delay: number;
+  extra_delay: number;
+  total_overhead: number;
+  link_status: LinkStatus;
+  avg_overhead: number;
+  max_overhead: number;
+  min_overhead: number;
+  ticks: OverheadMatrixTick[];
+  segments: OverheadMatrixSegment[];
+}
+/**
+ * 7. 算法矩阵——4. 武器打击矩阵项
+ */
+export interface AttackMatrixItem {
+  weapon_id: string;
+  weapon_name: string;
+  category: WeaponCategory;
+  kill_type: KillType;
+  target_id: string;
+  target_name: string;
+  target_layer: BattlefieldLayer;
+  theoretical_delay: number;
+  actual_delay: number;
+  is_executed: boolean;
+  action_cost: number;
+  windows: TimeWindow[];
+}
+
+/**
+ * 全链路传输过程中受到影响的武器打击归因项
+ */
+export interface FullChainAttribution {
+  /** 打击发生的精确时间戳 (Unix Timestamp, 秒) */
+  time: number;
+
+  /** 相对推演开始时间的分钟数 (T+X min) */
+  minute: number;
+
+  /** 红方武器唯一标识 ID */
+  weapon_id: string;
+
+  /** 红方武器名称 */
+  weapon_name: string;
+
+  /** 武器跨域杀伤分类 */
+  category: WeaponCategory;
+
+  /** 毁伤性质: 软杀伤/硬物理摧毁 */
+  kill_type: KillType;
+
+  /** 受到打击影响的蓝方目标节点 ID */
+  target_id: string;
+
+  /** 受到打击影响的蓝方目标节点名称 */
+  target_name: string;
+
+  /** 该武器打击动作对本次全链路传输造成的延时开销贡献 (秒) */
+  delay_impact: number;
+}
+/**
+ * 四大全域战术算法矩阵集合
+ */
+export interface TacticalMatrices {
+  passMatrix: PassMatrixItem[];
+  visibleMatrix: VisibleMatrixItem[];
+  overheadMatrix: OverheadMatrixItem[];
+  attackMatrix: AttackMatrixItem[];
+
+  /** 蓝方最早完成一次全链路传输分析解算结果 */
+  earliestFullChain?: EarliestFullChainAnalysis;
+}
+
+
+/**
+ * 蓝方最早完成一次全链路传输分析结果结构体
+ */
+export interface EarliestFullChainAnalysis {
+  /** 蓝方最佳全链路信号发射发起时刻 (Unix Timestamp, 秒) */
+  optimalStartTime: number;
+
+  /** 蓝方最佳全链路信号发射发起时刻相对推演分钟数 (T+X min) */
+  optimalStartMin: number;
+
+  /** 受到对抗打压后，实际最早完成全链路接收的时刻 (Unix Timestamp, 秒) */
+  earliestFinishTime: number;
+
+  /** 实际最早完成全链路接收的相对推演分钟数 (T+Y min) */
+  earliestFinishMin: number;
+
+  /** 在无武器攻击的未受影响基准情况下，最早完成全链路接收的时刻 (Unix Timestamp, 秒) */
+  baselineFinishTime: number;
+
+  /** 未受影响基准情况下的相对推演分钟数 (T+Z min) */
+  baselineFinishMin: number;
+
+  /** 未受影响基准下的全链路总开销耗时 (秒) */
+  totalBaselineOverhead: number;
+
+  /** 受到对抗打压后的全链路实际总耗时 (秒) */
+  actualDelay: number;
+
+  /** 受武器影响而增加的时间差额：Delay_Delta = actualDelay - totalBaselineOverhead (秒) */
+  delayDelta: number;
+
+  /** 构成该最早全链路的完整节点路径序列 (例: [Sat_ID, Station_ID, Cmd_ID]) */
+  pathNodes: string[];
+
+  /** 构成该最早全链路的节点名称序列 */
+  pathNodeNames: string[];
+
+  /** 构成该最早全链路的单跳链路连线对 ID 标识列表 */
+  pathLinkIds: string[];
+
+  /** 在全链路传输过程中受红方武器打击影响的时间点与延时归因列表 */
+  attributions: FullChainAttribution[];
+}
+/**
+ * 3D 拓扑图节点类型
+ */
+export interface GraphNode extends Partial<Asset> {
+  id: string;
+  name?: string;
+  x?: number;
+  y?: number;
+  z?: number;
+  vx?: number;
+  vy?: number;
+  vz?: number;
+  fx?: number | null;
+  fy?: number | null;
+  fz?: number | null;
+  __threeObj?: unknown;
+}
+
+/**
+ * 3D 拓扑图连线类型
+ */
+export interface GraphLink {
+  id: string;
+  source: string | GraphNode;
+  target: string | GraphNode;
+  window_start: number;
+  window_end: number;
+  routing_converge_delay: number;
+  link_status: LinkStatus;
+  scenario_id?: string;
+  source_id?: string;
+  target_id?: string;
+}
+/**
+ * 武器智能打击分配矩阵行
+ */
+export interface WeaponAssignmentRow {
+  weapon_id: string;
+  weapon_name: string;
+  weapon_category: WeaponCategory;
+  kill_type: KillType;
+  action_cost: number;
+  max_range: number;
+  window_id: string;
+  target_source_id: string;
+  target_dest_id: string;
+  window_start: number;
+  window_end: number;
+  theoretical_delay: number;
+  cost_benefit_ratio: number;
+  recommended: boolean;
+}
+
