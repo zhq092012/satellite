@@ -843,9 +843,12 @@ const loadMockScenario = async () => {
     addLog('接收到重置操作，已停止正在运行的交战推演', 'warning')
   }
 
-  // 重置时间轴到初始 0 分钟
+  // 重置时间轴到初始 0 分钟，并复原清空全链路高亮节点与连线集合
   simMinutes.value = 0
   simTime.value = baseStartTime.value
+  highlightNodeIds.value = []
+  highlightLinkIds.value = []
+  matrixData.value = null
 
   addLog('初始化数据...', 'info')
   try {
