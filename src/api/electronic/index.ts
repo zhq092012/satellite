@@ -108,6 +108,20 @@ export interface SatelliteMatrix {
   stationWindows: StationWindow[];
 }
 
+// 单个时间窗口结构
+export interface BattleWindow {
+  startTime: string;
+  endTime: string;
+}
+
+// 战斗矩阵（BattleMatrix）单项结构
+export interface BattleMatrixItem {
+  norad: number;
+  name: string;
+  satType: string;
+  gjNum: number;
+  windows: BattleWindow[];
+}
 // ==================== 根数据结构 ====================
 
 export interface MatrixResult {
@@ -115,6 +129,7 @@ export interface MatrixResult {
   initRelationList: StationRelationList;//初始状态下的站与站之间的拓扑关联映射
   satelliteMatrixList: SatelliteMatrix[];//卫星矩阵（包含攻击/干扰及延迟信息）
   stationRelationList: StationRelationList;//站与站之间的拓扑关联映射
+  battleMatrixList: BattleMatrixItem[];//
   series: string;//时间序列
 }
 
