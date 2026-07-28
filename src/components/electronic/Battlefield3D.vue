@@ -176,6 +176,7 @@ onMounted(() => {
     })
     .backgroundColor('rgba(8, 12, 22, 0.0)')
     .showNavInfo(false)
+    .linkLabel((link: any) => link.delayLabel || '')
     .nodeLabel(() => '') // We use SpriteText instead of native tooltip for always-on labels
     .linkColor((link: any) => {
       if (isLinkHighlighted(link)) return 'rgba(255, 204, 0, 0.95)' // 亮金流光色
@@ -477,7 +478,7 @@ onMounted(() => {
       mesh.rotation.x = Math.PI / 2
     } else if (node.asset_class === 'COMMAND_CENTER') {
       mesh = new THREE.Mesh(new THREE.BoxGeometry(8, 8, 8), material)
-    } else if (node.id.startsWith('weapon-')) {
+    } else if (node.asset_class === 'WEAPON' || node.id.startsWith('weapon-')) {
       mesh = new THREE.Mesh(new THREE.ConeGeometry(6, 14, 4), material)
       mesh.rotation.x = -Math.PI / 2
     } else {

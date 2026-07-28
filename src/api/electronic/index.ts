@@ -66,14 +66,35 @@ export interface StationRelationList {
   relations: RelationMap[];// 站与站之间的拓扑关联映射
 }
 
-// 卫星矩阵中的地面站接收窗口
+/**
+ * 卫星矩阵中的地面站接收窗口数据结构。
+ *
+ * 数据来源：后端算法矩阵接口返回数据中的 satelliteMatrixList[].stationWindows 元素。
+ *
+ * 字段说明：
+ * - receiveId: 接收站 ID
+ * - receiveName: 接收站名称
+ * - peakWindow: 开始过境时间窗口
+ * - endWindow: 结束过境时间窗口
+ * - strikeStatus: 打击状态（0-未打击，1-被打击）
+ * - delayMin: 单个接收站过境/过基站延迟（分钟，可选）
+ * - weapons: 针对该窗口的武器/拦截系统配置列表
+ */
 export interface StationWindow {
-  receiveId: string;//接收站Id
-  receiveName: string;//接收站名称
-  peakWindow: string;//开始过境时间窗口
-  endWindow: string;//结束过境时间窗口
-  strikeStatus: number;//打击状态 0-未打击 1-被打击
-  weapons: Weapon[]; // 兼容数据中可能出现的 null 值 武器/拦截系统配置
+  /** 接收站 Id */
+  receiveId: string;
+  /** 接收站名称 */
+  receiveName: string;
+  /** 开始过境时间窗口 */
+  peakWindow: string;
+  /** 结束过境时间窗口 */
+  endWindow: string;
+  /** 打击状态 0-未打击 1-被打击 */
+  strikeStatus: number;
+  /** 单个接收窗口延时（分钟，可选） */
+  delayMin?: number;
+  /** 兼容数据中可能出现的 null 值 武器/拦截系统配置 */
+  weapons: Weapon[];
 }
 
 // 卫星矩阵元素（包含攻击/干扰及延迟信息）
@@ -100,9 +121,12 @@ export interface MatrixResult {
 
 /**
  * 获取过境、过基站、延迟、打击四个矩阵的数据
+ * @param norad 卫星id
+ * @param taskId 任务id
+ * @param intensityLevel 交战烈度 LOW:低烈度（软杀伤） MEDIUM:中烈度（软/定向能） HIGH:高烈度（动能全开）
  * @returns
  */
-export const getMatrixList = (data: { norad: number, taskId: string }) => {
+export const getMatrixList = (data: { norad: number, taskId: string, intensityLevel: string }) => {
   let url = `/api/algorithm/calSeriesChain`
   return requestAPI.post<AxiosResponseType<MatrixResult>>(url, data)
 }
