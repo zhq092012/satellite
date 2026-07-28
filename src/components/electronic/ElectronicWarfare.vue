@@ -38,6 +38,11 @@
       </div>
 
       <div class="header-right">
+        <!-- 卫星系列 (series) 展示 -->
+        <div class="header-right-item" v-if="matrixData?.series">
+          <span class="label-text">卫星系列:</span>
+          <span class="digital-font time-value glow-text-cyan">{{ matrixData.series }}</span>
+        </div>
         <div class="header-right-item">
           <span class="label-text">当前任务:</span>
           <span class="digital-font time-value glow-text-cyan">{{ store.activedTask?.name || '实时推演场景' }}</span>
@@ -70,14 +75,42 @@ type IntensityLevelType = '高烈度' | '中烈度' | '低烈度'
 const intensityOptions: IntensityLevelType[] = ['高烈度', '中烈度', '低烈度']
 const currentIntensity = ref<IntensityLevelType>('高烈度')
 
-// 四大矩阵Tab类型
+// [类型用途]
+// 四大矩阵 Tab 视图类型定义
+//
+// [数据来源]
+// 用于 ElectronicWarfare 顶部 3D 拓扑视图切换 Tab
+//
+// [取值规则]
+// - INIT_PASS: 初始过境窗口
+// - INIT_RELATION: 初始拓扑关联
+// - SAT_MATRIX: 卫星打压延迟
+// - STATION_RELATION: 最终拓扑关联
 type MatrixTabType = 'INIT_PASS' | 'INIT_RELATION' | 'SAT_MATRIX' | 'STATION_RELATION'
+
+// [变量用途]
+// 四大矩阵 Tab 视图切换选项配置数组
+//
+// [数据来源]
+// 前端 UI 预设四大矩阵选项
+//
+// [取值规则]
+// 包含初始过境窗口、初始拓扑关联、卫星打压延迟、最终拓扑关联
 const matrixTabOptions: { key: MatrixTabType; name: string }[] = [
   { key: 'INIT_PASS', name: '初始过境窗口' },
   { key: 'INIT_RELATION', name: '初始拓扑关联' },
   { key: 'SAT_MATRIX', name: '卫星打压延迟' },
   { key: 'STATION_RELATION', name: '最终拓扑关联' },
 ]
+
+// [变量用途]
+// 当前选中的矩阵 Tab key
+//
+// [数据来源]
+// 默认设为 'INIT_PASS'
+//
+// [取值规则]
+// MatrixTabType 枚举值
 const currentMatrixTab = ref<MatrixTabType>('INIT_PASS')
 
 // 矩阵数据与加载状态
@@ -410,7 +443,8 @@ onMounted(() => {
 
 .full-screen-cema {
   width: 100%;
-  height: 100vh;
+  height: 100%;
+  max-height: calc(100vh - 45px);
   display: flex;
   flex-direction: column;
   background-color: #080c16;
@@ -492,6 +526,7 @@ onMounted(() => {
 .header-right {
   display: flex;
   align-items: center;
+  gap: 16px;
   .header-right-item {
     font-size: 13px;
     color: #a0aec0;

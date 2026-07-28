@@ -345,11 +345,22 @@ onMounted(() => {
     },
   ]
 
-  const planeHalfSize = 250
+  // [变量用途]
+  // 三层拓扑网格平面的半尺寸 (单边长度 170，全宽 340)
+  //
+  // [数据来源]
+  // 匹配天基卫星、地面接收站及武器节点的坐标分布范围 (约 -60 ~ +60)
+  //
+  // [取值规则]
+  // 170 为最佳紧凑比例，既可使网格完整覆盖实体节点，又能确保左右两侧图层标签(✦信号源/链路层/终端层)完全处于屏幕可视区域内
+  //
+  // [修改约束]
+  // 请勿改回 250，避免左下角标签超出视口被裁剪
+  const planeHalfSize = 170
 
   gridConfigs.forEach((config) => {
     // 1. 三层网格平面
-    const grid = new THREE.GridHelper(planeHalfSize * 2, 30, config.color, config.color)
+    const grid = new THREE.GridHelper(planeHalfSize * 2, 24, config.color, config.color)
     grid.position.z = config.z
     grid.rotation.x = Math.PI / 2
 
@@ -378,11 +389,8 @@ onMounted(() => {
     scene.add(borderLine)
 
     // 3. 在每层平面边缘添加 3D 名称标注标牌 (SpriteText)
-    // 左前边缘标注标牌 (-250, -250)
-    const labelLeft = new SpriteText(
-      // `✦ ${config.name} (${config.enName})\nZ: ${config.z > 0 ? '+' : ''}${config.z}m | ${config.desc}`
-      `✦ ${config.name}`
-    )
+    // 左前边缘标注标牌 (-170, -170)
+    const labelLeft = new SpriteText(`✦ ${config.name}`)
     labelLeft.color = config.color
     labelLeft.textHeight = 8.5
     labelLeft.backgroundColor = 'rgba(6, 12, 24, 0.88)'
@@ -390,10 +398,10 @@ onMounted(() => {
     labelLeft.borderWidth = 1.0
     labelLeft.borderRadius = 4
     labelLeft.padding = [3, 6]
-    labelLeft.position.set(-planeHalfSize - 15, -planeHalfSize - 15, config.z + 4)
+    labelLeft.position.set(-planeHalfSize - 10, -planeHalfSize - 10, config.z + 4)
     scene.add(labelLeft)
 
-    // 右前边缘标注标牌 (250, -250)
+    // 右前边缘标注标牌 (170, -170)
     const labelRight = new SpriteText(`${config.desc}`)
     labelRight.color = config.color
     labelRight.textHeight = 7.0
@@ -402,7 +410,7 @@ onMounted(() => {
     labelRight.borderWidth = 0.8
     labelRight.borderRadius = 3
     labelRight.padding = [2, 5]
-    labelRight.position.set(planeHalfSize + 15, -planeHalfSize - 15, config.z + 4)
+    labelRight.position.set(planeHalfSize + 10, -planeHalfSize - 10, config.z + 4)
     scene.add(labelRight)
 
     // 4. 四角垂直结构导轨线 (立体空间连接导轨)
@@ -503,10 +511,21 @@ onMounted(() => {
     return group
   })
 
-  const FIXED_VIEW_MODE = true
+  // [变量用途]
+  // 3D 拓扑视角最佳初始化相机位置与视角 Target 目标点配置。
+  //
+  // [数据来源]
+  // 三维拓扑坐标系，Layer 2(z=150) -> Layer 1(z=0) -> Layer 0(z=-150)
+  //
+  // [取值规则]
+  // position: { x: 0, y: -680, z: 45 } 保持正中居中视角
+  // target: { x: 0, y: 0, z: -15 } 聚焦整体拓扑中心
+  //
+  // [修改约束]
+  // 保证左右两侧标注对称居中呈现在视口内
   const BEST_VIEW = {
-    position: { x: -20.5, y: -814.25, z: 61.04 },
-    target: { x: 0, y: 0, z: 0 },
+    position: { x: 0, y: -680, z: 45 },
+    target: { x: 0, y: 0, z: -15 },
   }
 
   const camera = Graph!.camera()
@@ -515,37 +534,20 @@ onMounted(() => {
   if (camera && controls) {
     camera.up.set(0, 0, 1)
 
-    if (FIXED_VIEW_MODE) {
-      controls.enableRotate = false
-      controls.enablePan = false
-      controls.enableZoom = true
+    // 解除 3D 拓扑图的旋转、平移限制
+    controls.enableRotate = true
+    controls.enablePan = true
+    controls.enableZoom = true
+    // 开启屏幕空间平移模式 (使鼠标右键/中键拖拽能在屏幕方向自由上下、左右平移 3D 拓扑图)
+    controls.screenSpacePanning = true
+    controls.enableDamping = true
+    controls.dampingFactor = 0.05
 
-      Graph.cameraPosition(BEST_VIEW.position, BEST_VIEW.target, 0)
-    } else {
-      controls.enablePan = true
-      controls.enableRotate = true
-      controls.enableZoom = true
+    // 取消俯仰极角限制，允许 360 度自由旋转
+    controls.minPolarAngle = 0
+    controls.maxPolarAngle = Math.PI
 
-      controls.minPolarAngle = Math.PI / 6
-      controls.maxPolarAngle = Math.PI / 2.1
-
-      controls.enableDamping = true
-      controls.dampingFactor = 0.05
-
-      Graph.cameraPosition(BEST_VIEW.position, BEST_VIEW.target, 1000)
-
-      controls.addEventListener('change', () => {
-        const polar = controls.getPolarAngle()
-        const azimuthal = controls.getAzimuthalAngle()
-        console.log(
-          `[最佳视角调试器]\n` +
-            `  - cameraPosition: { x: ${camera.position.x.toFixed(2)}, y: ${camera.position.y.toFixed(2)}, z: ${camera.position.z.toFixed(2)} }\n` +
-            `  - target: { x: ${controls.target.x.toFixed(2)}, y: ${controls.target.y.toFixed(2)}, z: ${controls.target.z.toFixed(2)} }\n` +
-            `  - 极角 (纬度 phi): ${((polar * 180) / Math.PI).toFixed(2)}° (${polar.toFixed(4)} rad)\n` +
-            `  - 方位角 (经度 theta): ${((azimuthal * 180) / Math.PI).toFixed(2)}° (${azimuthal.toFixed(4)} rad)`
-        )
-      })
-    }
+    Graph.cameraPosition(BEST_VIEW.position, BEST_VIEW.target, 0)
     controls.update()
   }
 

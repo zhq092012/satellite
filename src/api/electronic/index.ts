@@ -108,41 +108,113 @@ export interface SatelliteMatrix {
   stationWindows: StationWindow[];
 }
 
-// 单个时间窗口结构
+/**
+ * [类型用途]
+ * 战场过境单个时间窗口数据结构。
+ *
+ * [数据来源]
+ * 后端算法矩阵接口返回数据中的 battleMatrixList[].windows 元素。
+ *
+ * [字段规则]
+ * - startTime: 开始过境时间字符串
+ * - endTime: 结束过境时间字符串
+ *
+ * [使用约束]
+ * 保持时间格式一致性。
+ */
 export interface BattleWindow {
+  /** 开始过境时间 */
   startTime: string;
+  /** 结束过境时间 */
   endTime: string;
 }
 
-// 战斗矩阵（BattleMatrix）单项结构
+/**
+ * [类型用途]
+ * 卫星过境战场矩阵（BattleMatrix）单项数据结构。
+ *
+ * [数据来源]
+ * 后端算法接口 getMatrixList 返回的 battleMatrixList 节点。
+ *
+ * [字段规则]
+ * - norad: 卫星 NORAD 唯一编号
+ * - name: 卫星名称
+ * - satType: 卫星类型
+ * - gjNum: 过境/过基站次数
+ * - windows: 战场过境时间窗口列表
+ *
+ * [使用约束]
+ * 勿随意修改字段类型，以兼容 3D 拓扑图节点提取。
+ */
 export interface BattleMatrixItem {
+  /** 卫星 NORAD 编号 */
   norad: number;
+  /** 卫星名称 */
   name: string;
+  /** 卫星类型 */
   satType: string;
+  /** 过境次数 */
   gjNum: number;
+  /** 过境时间窗口列表 */
   windows: BattleWindow[];
 }
+
 // ==================== 根数据结构 ====================
 
+/**
+ * [类型用途]
+ * 算法矩阵根接口返回数据结构。
+ *
+ * [数据来源]
+ * /api/algorithm/calSeriesChain 接口返回 data 结构。
+ *
+ * [字段规则]
+ * - battleMatrixList: 卫星过境战场矩阵列表
+ * - initMatrixList: 初始状态下的过境时间窗口列表
+ * - initRelationList: 初始状态下的站站拓扑映射
+ * - satelliteMatrixList: 卫星矩阵（包含攻击/干扰及延迟信息）
+ * - stationRelationList: 最终拓扑关联映射
+ * - series: 卫星系列名称
+ *
+ * [使用约束]
+ * 新增字段必须包含注释并明确类型。
+ */
 export interface MatrixResult {
-  initMatrixList: InitMatrix[];//初始状态下的过境时间窗口
-  initRelationList: StationRelationList;//初始状态下的站与站之间的拓扑关联映射
-  satelliteMatrixList: SatelliteMatrix[];//卫星矩阵（包含攻击/干扰及延迟信息）
-  stationRelationList: StationRelationList;//站与站之间的拓扑关联映射
-  battleMatrixList: BattleMatrixItem[];//
-  series: string;//时间序列
+  /** 卫星过境战场矩阵 */
+  battleMatrixList: BattleMatrixItem[];
+  /** 初始状态下的过境时间窗口 */
+  initMatrixList: InitMatrix[];
+  /** 初始状态下的站与站之间的拓扑关联映射 */
+  initRelationList: StationRelationList;
+  /** 卫星矩阵（包含攻击/干扰及延迟信息） */
+  satelliteMatrixList: SatelliteMatrix[];
+  /** 站与站之间的拓扑关联映射 */
+  stationRelationList: StationRelationList;
+  /** 卫星系列 */
+  series: string;
 }
 
-
 /**
- * 获取过境、过基站、延迟、打击四个矩阵的数据
- * @param norad 卫星id
- * @param taskId 任务id
- * @param intensityLevel 交战烈度 LOW:低烈度（软杀伤） MEDIUM:中烈度（软/定向能） HIGH:高烈度（动能全开）
- * @returns
+ * [功能]
+ * 获取过境、过基站、延迟、打击以及战场矩阵的数据。
+ *
+ * [处理规则]
+ * 向后端算法计算接口发送 POST 请求并返回 MatrixResult。
+ *
+ * [副作用]
+ * 发送网络 HTTP 请求。
+ *
+ * [异常处理]
+ * 异常由调用方 Axios 拦截器与 catch 逻辑捕获处理。
+ *
+ * [修改约束]
+ * 保持请求参数 data 格式一致。
+ *
+ * @param data 请求参数对象 (norad, taskId, intensityLevel)
+ * @returns 包含 MatrixResult 的 Axios 响应 Promise
  */
-export const getMatrixList = (data: { norad: number, taskId: string, intensityLevel: string }) => {
-  let url = `/api/algorithm/calSeriesChain`
+export const getMatrixList = (data: { norad: number; taskId: string; intensityLevel: string }) => {
+  const url = `/api/algorithm/calSeriesChain`
   return requestAPI.post<AxiosResponseType<MatrixResult>>(url, data)
 }
 

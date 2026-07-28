@@ -21,6 +21,8 @@ declare module "three/examples/jsm/controls/OrbitControls" {
     enablePan: boolean;
     enableZoom: boolean;
     enableRotate: boolean;
+    /** 是否开启屏幕空间平移模式 (true 为沿屏幕平移，false 为沿正交平面平移) */
+    screenSpacePanning: boolean;
     minDistance?: number;
     maxDistance?: number;
     minPolarAngle?: number;

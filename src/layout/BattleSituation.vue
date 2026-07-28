@@ -3,8 +3,12 @@
     <main class="main">
       <div class="tabs-bar">
         <div class="tabs">
-          <div v-for="tab in visibleTabs" :key="tab.value" :class="{ active: store.activetab === tab.value }"
-            @click="switchTab(tab.value)">
+          <div
+            v-for="tab in visibleTabs"
+            :key="tab.value"
+            :class="{ active: store.activetab === tab.value }"
+            @click="switchTab(tab.value)"
+          >
             {{ tab.label }}
           </div>
         </div>
@@ -24,19 +28,39 @@
       <div v-if="store.activetab === '战场态势视图'" class="battle-grid">
         <!-- 己方侧边栏 -->
         <div class="battle-grid__side battle-grid__side--left">
-          <BattleCampPanel v-if="redCampCard" :camp-key="redCampCard.key" :title="redCampCard.label"
-            :theme="redCampCard.theme" :total="redCampCard.total" :total-label="redCampCard.totalLabel"
-            :duration-text="redCampCard.durationText" :summary-rows="redCampCard.summaryRows"
-            :ring-style="redCampCard.ringStyle" :focus-list="redCampCard.focusList"
-            :satellite-rows="redCampCard.satelliteRows" :weapon-rows="redCampCard.weaponRows"
-            @focus-satellite="handleFocusSatellite" />
+          <BattleCampPanel
+            v-if="redCampCard"
+            :camp-key="redCampCard.key"
+            :title="redCampCard.label"
+            :theme="redCampCard.theme"
+            :total="redCampCard.total"
+            :total-label="redCampCard.totalLabel"
+            :duration-text="redCampCard.durationText"
+            :summary-rows="redCampCard.summaryRows"
+            :ring-style="redCampCard.ringStyle"
+            :focus-list="redCampCard.focusList"
+            :satellite-rows="redCampCard.satelliteRows"
+            :weapon-rows="redCampCard.weaponRows"
+            @focus-satellite="handleFocusSatellite"
+          />
         </div>
         <!-- 中间地球 -->
         <div class="battle-grid__center">
           <div class="battle-grid__earth">
-            <component v-if="activeTabComponent" :is="activeTabComponent" :key="store.activetab" :ref="setRef"
-              @threatAnalysis="threatAnalysis" @changeEffectModel="handleChangeEffectModel" :tab-key="store.activetab"
-              :has-nav="true" :has-legend="false" :show-sat-msg="true" :showTimeLine="true" :showAnimation="true" />
+            <component
+              v-if="activeTabComponent"
+              :is="activeTabComponent"
+              :key="store.activetab"
+              :ref="setRef"
+              @threatAnalysis="threatAnalysis"
+              @changeEffectModel="handleChangeEffectModel"
+              :tab-key="store.activetab"
+              :has-nav="true"
+              :has-legend="false"
+              :show-sat-msg="true"
+              :showTimeLine="true"
+              :showAnimation="true"
+            />
           </div>
           <!-- 卫星列表 -->
           <Transition name="slidet">
@@ -48,8 +72,13 @@
                 <div style="font-size: 12px">共{{ satellite_loadnum }}/{{ satellite_total }}颗卫星</div>
               </div>
               <div class="satellite-list">
-                <el-table :data="satelliteList" style="width: 100%; height: 240px" fit
-                  :cell-style="{ fontSize: '12px' }" :default-sort="{ prop: 'norad', order: 'ascending' }">
+                <el-table
+                  :data="satelliteList"
+                  style="width: 100%; height: 240px"
+                  fit
+                  :cell-style="{ fontSize: '12px' }"
+                  :default-sort="{ prop: 'norad', order: 'ascending' }"
+                >
                   <el-table-column prop="norad" label="编号" sortable> </el-table-column>
                   <el-table-column prop="int_id" label="国际编号"> </el-table-column>
                   <el-table-column prop="name_en" label="英文名称"> </el-table-column>
@@ -86,8 +115,12 @@
                   </el-table-column>
                 </el-table>
                 <div class="page-box">
-                  <el-pagination :page-size="10" layout="total, prev, pager, next" :total="satellite_total"
-                    @current-change="handleCurrentChange" />
+                  <el-pagination
+                    :page-size="10"
+                    layout="total, prev, pager, next"
+                    :total="satellite_total"
+                    @current-change="handleCurrentChange"
+                  />
                 </div>
               </div>
             </div>
@@ -95,20 +128,40 @@
         </div>
         <!-- 敌方侧边栏 -->
         <div class="battle-grid__side battle-grid__side--right">
-          <BattleCampPanel v-if="blueCampCard" :camp-key="blueCampCard.key" :title="blueCampCard.label"
-            :theme="blueCampCard.theme" :total="blueCampCard.total" :total-label="blueCampCard.totalLabel"
-            :duration-text="blueCampCard.durationText" :summary-rows="blueCampCard.summaryRows"
-            :ring-style="blueCampCard.ringStyle" :focus-list="blueCampCard.focusList"
-            :satellite-rows="blueCampCard.satelliteRows" :weapon-rows="blueCampCard.weaponRows"
-            @focus-satellite="handleFocusSatellite" />
+          <BattleCampPanel
+            v-if="blueCampCard"
+            :camp-key="blueCampCard.key"
+            :title="blueCampCard.label"
+            :theme="blueCampCard.theme"
+            :total="blueCampCard.total"
+            :total-label="blueCampCard.totalLabel"
+            :duration-text="blueCampCard.durationText"
+            :summary-rows="blueCampCard.summaryRows"
+            :ring-style="blueCampCard.ringStyle"
+            :focus-list="blueCampCard.focusList"
+            :satellite-rows="blueCampCard.satelliteRows"
+            :weapon-rows="blueCampCard.weaponRows"
+            @focus-satellite="handleFocusSatellite"
+          />
         </div>
       </div>
       <div v-else class="map-box">
         <div class="tab-content">
           <keep-alive include="EvaluationReport,ThreatAnalysis,SatelliteAttackabilityView,ElectronicWarfare">
-            <component v-if="activeTabComponent" :is="activeTabComponent" :key="store.activetab" :ref="setRef"
-              @threatAnalysis="threatAnalysis" @changeEffectModel="handleChangeEffectModel" :tab-key="store.activetab"
-              :has-nav="true" :has-legend="true" :show-sat-msg="true" :showTimeLine="true" :showAnimation="true" />
+            <component
+              v-if="activeTabComponent"
+              :is="activeTabComponent"
+              :key="store.activetab"
+              :ref="setRef"
+              @threatAnalysis="threatAnalysis"
+              @changeEffectModel="handleChangeEffectModel"
+              :tab-key="store.activetab"
+              :has-nav="true"
+              :has-legend="true"
+              :show-sat-msg="true"
+              :showTimeLine="true"
+              :showAnimation="true"
+            />
           </keep-alive>
         </div>
       </div>
@@ -125,7 +178,7 @@ import SatelliteAttackabilityView from '@/components/cesium/SatelliteAttackabili
 import EvaluationReport from '@/components/cesium/EvaluationReport.vue'
 import StationReport from '@/components/cesium/StationReport.vue'
 import ConfrontView from '@/components/cesium/ConfrontationAnalysis.vue'
-import ElectronicWarfare from '@/components/cesium/ElectronicWarfare.vue'
+import ElectronicWarfare from '@/components/electronic/ElectronicWarfare.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import { useAuthStore } from '@/store/modules/auth'
 import { getSatelliteList, getSituationDataOfTask, getStrikeSatellites, type SituationData } from '@/api/dashboard'
@@ -630,7 +683,7 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
           }
         }
 
-        &>div.active {
+        & > div.active {
           background: $bs-accent-active;
           color: $bs-text-strong;
         }
@@ -739,6 +792,7 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
 
       .tab-content {
         height: 100%;
+        overflow: hidden;
       }
     }
 
@@ -907,7 +961,7 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
           gap: 10px;
           padding: 5px;
 
-          &>div {
+          & > div {
             background: $bs-surface-bg-muted;
             flex: 1;
             padding: 5px;
@@ -915,12 +969,12 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
             flex-direction: column;
             align-items: center;
 
-            &>span:first-child {
+            & > span:first-child {
               font-size: 18px;
               font-weight: bold;
             }
 
-            &>span:last-child {
+            & > span:last-child {
               font-size: 14px;
               color: $bs-text-muted;
             }
@@ -948,7 +1002,7 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
             grid-template-columns: 1.5fr 1fr;
 
             .task-item__left {
-              &>div {
+              & > div {
                 text-align: left;
               }
             }
@@ -997,14 +1051,14 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
               display: grid;
               grid-template-columns: 1.2fr 2fr;
 
-              &>span:first-child {
+              & > span:first-child {
                 align-self: center;
                 text-align: right;
                 padding-right: 10px;
                 color: $bs-text-muted;
               }
 
-              &>span:last-child {
+              & > span:last-child {
                 text-align: left;
                 align-self: center;
                 white-space: normal;
