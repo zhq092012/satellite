@@ -25,12 +25,7 @@
           <span class="label-text">推演时钟:</span>
           <span class="digital-font time-value glow-text-cyan">{{ formatTime(simTime) }}</span>
         </div>
-        <div class="header-right-item">
-          <span class="label-text">红方预算消耗:</span>
-          <span class="digital-font budget-value glow-text-red"
-            >${{ formatNumber(budgetSpent) }} / ${{ formatNumber(maxBudget) }}</span
-          >
-        </div>
+
         <div class="header-right-item">
           <span class="label-text">数据库状态:</span>
           <span class="db-status-container">
@@ -65,18 +60,6 @@
                   <span>分钟</span>
                 </template>
               </el-input-number>
-            </el-form-item>
-            <el-form-item label="代价上限:" class="form-item-budget">
-              <el-input v-model="maxBudget" size="small" class="form-input-full" placeholder="输入预算">
-                <template #prefix>$</template>
-              </el-input>
-            </el-form-item>
-            <el-form-item label="目标卫星:" class="form-item-redline">
-              <el-select v-model="politicalRedline" size="small" class="form-input-full">
-                <el-option label="军用(严格)" value="STRICT" />
-                <el-option label="军用(有限民用)" value="LOCAL" />
-                <el-option label="全部(不计代价)" value="TOTAL" />
-              </el-select>
             </el-form-item>
             <el-form-item label="步长跨幅:" class="form-item-step">
               <el-select v-model="stepMode" size="small" class="form-input-full">
@@ -382,6 +365,7 @@ import SqlSandboxDialog from '@/components/electronic/SqlSandboxDialog.vue'
 import TacticalMatrixView from '@/components/electronic/TacticalMatrixView.vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { useLayoutStore } from '@/store/modules/layout'
+import { getMatrixList } from '@/api/electronic'
 const store = useLayoutStore()
 // App state variables
 const isDbInitialized = ref(false)
@@ -453,47 +437,6 @@ const openMatrixView = () => {
 // 战场范围多边形 3D 转换数据
 const battleAreaPolygon = ref<{ x: number; y: number }[]>([])
 
-function mapLonLatToXY(lng: number, lat: number) {
-  let x = 0
-  let y = 0
-  if (lng >= 118.0 && lng <= 124.0 && lat >= 21.0 && lat <= 27.0) {
-    x = ((lng - 121.0) / 3.0) * 100
-    y = ((lat - 24.0) / 3.0) * 100
-  } else if (lng >= 70.0 && lng < 118.0) {
-    x = -110 - ((118.0 - lng) / 48.0) * 60
-    y = ((lat - 35.0) / 20.0) * 70
-  } else {
-    x = (lng / 180.0) * 170
-    y = (lat / 90.0) * 150
-  }
-  const CLAMP_BOUND = 190
-  x = Math.max(-CLAMP_BOUND, Math.min(CLAMP_BOUND, x))
-  y = Math.max(-CLAMP_BOUND, Math.min(CLAMP_BOUND, y))
-  return { x, y }
-}
-
-const updateBattleAreaPolygon = () => {
-  const areaBounds = store.battleAreaBounds
-  let rawPoints: { lon: number; lat: number }[] = []
-
-  if (areaBounds && Array.isArray(areaBounds.lonlats) && areaBounds.lonlats.length >= 3) {
-    rawPoints = areaBounds.lonlats
-  } else {
-    const minLng = areaBounds?.min_lng ?? 119.0
-    const maxLng = areaBounds?.max_lng ?? 123.0
-    const minLat = areaBounds?.min_lat ?? 22.0
-    const maxLat = areaBounds?.max_lat ?? 26.0
-    rawPoints = [
-      { lon: minLng, lat: minLat },
-      { lon: maxLng, lat: minLat },
-      { lon: maxLng, lat: maxLat },
-      { lon: minLng, lat: maxLat },
-    ]
-  }
-
-  battleAreaPolygon.value = rawPoints.map((p) => mapLonLatToXY(p.lon, p.lat))
-}
-
 // 实时延时开销矩阵数据
 const overheadRealtimeData = ref<any[]>([])
 
@@ -510,8 +453,6 @@ const openTacticalMatrix = () => {
 // Forms
 const conflictIntensity = ref<'LOW' | 'MEDIUM' | 'HIGH'>('LOW') //推演烈度
 const suppressionTime = ref(50) //压制总时长(分钟)
-const maxBudget = ref(600000) //最大预算
-const politicalRedline = ref<'STRICT' | 'LOCAL' | 'TOTAL'>('STRICT') //政治红线
 const playSpeedMs = ref(1000) //播放速度
 const stepMode = ref<'AUTO' | number>('AUTO') // 步长计算模式
 
@@ -825,7 +766,6 @@ const refreshData = async () => {
         [simTime.value]
       )
       matrixProbeAttacks.value = activeAttacks
-      updateBattleAreaPolygon()
     } else {
       isScenarioLoaded.value = false
       hasOrbitData.value = false
@@ -850,20 +790,42 @@ const loadMockScenario = async () => {
   highlightLinkIds.value = []
   matrixData.value = null
 
-  addLog('初始化数据...', 'info')
+  addLog('请求后端 API 算法矩阵中...', 'info')
   try {
     const areaBounds = store.battleAreaBounds
-    await seedMockData(sqliteClient, suppressionTime.value, baseStartTime.value, areaBounds)
-    updateBattleAreaPolygon()
-    addLog('导入基础场景数据完成！正在进行初始轨道视算...', 'info')
-    await sqliteClient.calculateWindows('scen-001')
-    addLog('初始轨道视算完成！星地链路已生成。', 'success')
+    const currentTaskIdStr = String(store.activedTask?.id || 'scen-001')
+
+    // 1. 调用后端 API 接口获取算法数据
+    const matrixRes = await getMatrixList({ norad: 57693, taskId: currentTaskIdStr })
+    if (matrixRes.code !== 200 || !matrixRes.data) {
+      addLog(`获取算法矩阵数据失败: ${matrixRes.msg || '网络异常'}`, 'error')
+      ElMessage.error(`获取算法矩阵数据失败: ${matrixRes.msg || '网络异常'}`)
+      return
+    }
+
+    matrixData.value = matrixRes.data
+
+    addLog('解析 API 算法矩阵并动态播种多层战场网络...', 'info')
+    // 2. 将 API 数据注入数据库播种
+    await seedMockData(
+      sqliteClient,
+      suppressionTime.value,
+      baseStartTime.value,
+      areaBounds,
+      currentTaskIdStr,
+      store.activedTask?.name,
+      matrixRes.data
+    )
+
+    addLog('API 场景节点建立完成！正在进行 SGP4 实时视算...', 'info')
+    await sqliteClient.calculateWindows(currentTaskIdStr)
+    addLog('初始轨道视算完成！星地拓扑链路已生成。', 'success')
     logs.value = []
     await refreshData()
 
     ElNotification({
-      title: '⚡ 战术场景初始化成功',
-      message: '战场实体拓扑与基准星地链路视算解析完成！',
+      title: '⚡ API 算法场景加载成功',
+      message: '战场实体拓扑与基准星地链路已基于后端数据构建完成！',
       type: 'success',
       duration: 3500,
     })
@@ -922,7 +884,7 @@ const savePlan = async () => {
 
     // 3. 计算最终效能评估得分
     const blockScore = blockRate
-    const controlScore = Math.max(30, Math.round(100 - (budgetSpent.value / maxBudget.value) * 50))
+    const controlScore = Math.max(30, Math.round(100 - (budgetSpent.value / 600000) * 50))
     const costEfficiency = Math.min(95, Math.round((totalDelay.value / (budgetSpent.value + 100)) * 6000))
     const selfInterference = Math.max(20, Math.round(100 - (budgetSpent.value > 50000 ? 40 : 15)))
     const final_score = Math.round((blockScore + controlScore + costEfficiency + selfInterference) / 4)
@@ -1118,7 +1080,6 @@ const updateSmallRadar = async () => {
   const blockRate = tot > 0 ? Math.round((blk / tot) * 100) : 0
 
   const blockScore = blockRate
-  const controlScore = Math.max(30, Math.round(100 - (budgetSpent.value / maxBudget.value) * 50))
   const costEfficiency = Math.min(95, Math.round((totalDelay.value / (budgetSpent.value + 100)) * 6000))
   const selfInterference = Math.max(20, Math.round(100 - (budgetSpent.value > 50000 ? 40 : 15)))
 
@@ -1142,7 +1103,7 @@ const updateSmallRadar = async () => {
         type: 'radar',
         data: [
           {
-            value: [blockScore, controlScore, costEfficiency, selfInterference],
+            value: [blockScore, costEfficiency, selfInterference],
             name: '当前推演方案',
             areaStyle: { color: 'rgba(0, 225, 255, 0.3)' },
             lineStyle: { width: 2 },
