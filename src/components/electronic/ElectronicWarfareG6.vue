@@ -693,7 +693,7 @@ const demoMatrixData: MatrixResult = {
         receiveId: '6a66d00a1ce9af52c9cd82b3',
         receiveName: '澳大利亚达博',
         receiveLatLon: '32.250,148.610',
-        receiveStatus: 0,
+        receiveStatus: 1,
       },
       {
         receiveId: '6a66d0dd1ce9af52c9cd82b4',
@@ -1196,16 +1196,26 @@ const buildG6GraphData = () => {
   satNodeCount.value = satList.length
 
   // 2. Layer 2: 地面接收站层 (Ground Stations)
+  // 当 receiveStatus === 1 时表示接收站受毁伤/打击，根据视图模式汇总状态
   const receiveMap = new Map<string, { receiveId: string; receiveName: string; status: number }>()
-  const relLists = [data.initRelationList, data.stationRelationList].filter(Boolean)
+  const relLists = currentViewMode.value === 'PRE_STRIKE'
+    ? [data.initRelationList].filter(Boolean)
+    : [data.stationRelationList, data.initRelationList].filter(Boolean)
+
   relLists.forEach((rl) => {
     ;(rl.receiveObjList || []).forEach((rec) => {
+      const recStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : (rec.receiveStatus || 0)
       if (!receiveMap.has(rec.receiveId)) {
         receiveMap.set(rec.receiveId, {
           receiveId: rec.receiveId,
           receiveName: rec.receiveName || rec.receiveId,
-          status: rec.receiveStatus || 0,
+          status: recStatus,
         })
+      } else {
+        const existing = receiveMap.get(rec.receiveId)!
+        if (recStatus === 1) {
+          existing.status = 1
+        }
       }
     })
   })
@@ -1213,15 +1223,22 @@ const buildG6GraphData = () => {
   receiveNodeCount.value = receiveList.length
 
   // 3. Layer 3: 中心云数据中心层 (Data Centers)
+  // 当 stationStatus === 1 时表示数据中心受毁伤/打击，根据视图模式汇总状态
   const stationMap = new Map<string, { stationId: string; stationName: string; status: number }>()
   relLists.forEach((rl) => {
     ;(rl.stationObjList || []).forEach((st) => {
+      const stStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : (st.stationStatus || 0)
       if (!stationMap.has(st.stationId)) {
         stationMap.set(st.stationId, {
           stationId: st.stationId,
           stationName: st.stationName || st.stationId,
-          status: st.stationStatus || 0,
+          status: stStatus,
         })
+      } else {
+        const existing = stationMap.get(st.stationId)!
+        if (stStatus === 1) {
+          existing.status = 1
+        }
       }
     })
   })
@@ -1308,6 +1325,7 @@ const buildG6GraphData = () => {
   receiveList.forEach((rec, i) => {
     nodeSet.add(rec.receiveId)
     const x = startX + (availableW / (receiveList.length + 1)) * (i + 1)
+    // [逻辑说明] receiveStatus = 1 时，把接收站的边框颜色改为红色 (#ff4d4f)
     const isStruck = rec.status === 1
     const bgFill = isStruck ? '#2d1215' : '#0a2e2b'
     const strokeColor = isStruck ? '#ff4d4f' : '#00f2fe'
@@ -1328,8 +1346,10 @@ const buildG6GraphData = () => {
       style: {
         fill: bgFill,
         stroke: strokeColor,
-        lineWidth: 1.8,
+        lineWidth: isStruck ? 2.2 : 1.8,
         radius: 6,
+        shadowColor: isStruck ? 'rgba(255, 77, 79, 0.4)' : undefined,
+        shadowBlur: 10,
       },
       labelCfg: {
         style: {
@@ -1376,9 +1396,11 @@ const buildG6GraphData = () => {
   stationList.forEach((st, i) => {
     nodeSet.add(st.stationId)
     const x = startX + (availableW / (stationList.length + 1)) * (i + 1)
-    const bgFill = '#10244c'
-    const strokeColor = '#3b82f6'
-    const textColor = '#93c5fd'
+    // [逻辑说明] stationStatus = 1 时，把数据中心的边框颜色改为红色 (#ff4d4f)
+    const isStruck = st.status === 1
+    const bgFill = isStruck ? '#2d1215' : '#10244c'
+    const strokeColor = isStruck ? '#ff4d4f' : '#3b82f6'
+    const textColor = isStruck ? '#ff7875' : '#93c5fd'
 
     nodes.push({
       id: st.stationId,
@@ -1395,8 +1417,10 @@ const buildG6GraphData = () => {
       style: {
         fill: bgFill,
         stroke: strokeColor,
-        lineWidth: 2,
+        lineWidth: isStruck ? 2.2 : 2,
         radius: 8,
+        shadowColor: isStruck ? 'rgba(255, 77, 79, 0.4)' : 'rgba(59, 130, 246, 0.3)',
+        shadowBlur: 10,
       },
       labelCfg: {
         style: {
