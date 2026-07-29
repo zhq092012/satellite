@@ -236,12 +236,12 @@ const tabDefs = [
     component: 'ConfrontView',
     permissionCode: 'battle:confront',
   },
-  {
-    label: '电子对抗分析',
-    value: '电子对抗分析',
-    component: 'ElectronicWarfare',
-    permissionCode: 'battle:electronicWarfare',
-  },
+  // {
+  //   label: '电子对抗分析',
+  //   value: '电子对抗分析',
+  //   component: 'ElectronicWarfare',
+  //   permissionCode: 'battle:electronicWarfare',
+  // },
   {
     label: '三层拓扑毁伤分析',
     value: '三层拓扑毁伤分析',
