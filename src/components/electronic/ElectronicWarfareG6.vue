@@ -167,10 +167,11 @@
       </div>
 
       <!-- 排序过境/打击窗口列表条 -->
-      <div class="windows-cards-scroll">
+      <div ref="windowsScrollRef" class="windows-cards-scroll">
         <div
           v-for="(win, idx) in allWindowsList"
           :key="win.id || idx"
+          :ref="(el) => setCardRef(el, win.id)"
           class="window-card"
           :class="{
             'card-struck': win.strikeStatus === 1,
@@ -301,6 +302,69 @@ const currentTimestamp = ref<number>(0)
 // [变量用途]
 // 时间轴进度条 0 - 100 百分比
 const currentTimeProgress = ref<number>(0)
+
+// [变量用途]
+// 时间轴下方过境/打击窗口列表条 DOM ref
+const windowsScrollRef = ref<HTMLDivElement | null>(null)
+
+// [变量用途]
+// 存储每个过境窗口卡片的 DOM ref 映射
+const cardRefs = ref<Map<string, HTMLElement>>(new Map())
+
+// [变量用途]
+// 记录上一次已自动滚动的窗口卡片 ID，防止重复触发滚动动画抖动
+let lastAutoScrolledId: string | null = null
+
+/**
+ * [功能说明]
+ * 动态记录过境窗口卡片的 DOM 引用。
+ *
+ * @param el DOM 节点
+ * @param id 窗口卡片 ID
+ */
+const setCardRef = (el: any, id: string) => {
+  if (el) {
+    cardRefs.value.set(id, el as HTMLElement)
+  }
+}
+
+/**
+ * [功能说明]
+ * 时间轴推进或高亮变动时，同步向右平滑滚动窗口卡片列表，保持当前正在打击/过境的窗口卡片在屏幕可视区域内居中显示。
+ *
+ * [修改约束]
+ * - 当活跃卡片未改变时不做重复 scrollIntoView 避免界面频繁动画抖动。
+ * - 支持用户手动点击卡片或跳转时通过 force 参数强制滚动定位。
+ *
+ * @param force 是否强制执行滚动
+ */
+const scrollToActiveCard = (force = false) => {
+  if (!windowsScrollRef.value || allWindowsList.value.length === 0) return
+
+  // 1. 优先获取当前时间戳处于活跃 (正在打击/过境) 状态的窗口卡片
+  let targetWin = allWindowsList.value.find((w) => isWindowActiveAtCurrentTime(w))
+
+  // 2. 若当前没有活跃窗口，则获取与当前推演时刻时间间隔最近的窗口卡片
+  if (!targetWin) {
+    targetWin = allWindowsList.value.reduce((prev, curr) => {
+      return Math.abs(curr.startTimestamp - currentTimestamp.value) < Math.abs(prev.startTimestamp - currentTimestamp.value)
+        ? curr
+        : prev
+    })
+  }
+
+  if (targetWin && (force || lastAutoScrolledId !== targetWin.id)) {
+    lastAutoScrolledId = targetWin.id
+    const cardEl = cardRefs.value.get(targetWin.id)
+    if (cardEl) {
+      cardEl.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      })
+    }
+  }
+}
 
 // [数据来源]
 // 接口真实参考数据（当 API 无响应或本地调试时作为兜底使用）
@@ -1125,6 +1189,9 @@ const selectWindowItem = (win: WindowItemWrapper) => {
       graph.setItemState(edge, 'highlight', false)
     }
   })
+
+  // 强制滚动居中当前点击选中的窗口卡片
+  scrollToActiveCard(true)
 }
 
 /**
@@ -1161,6 +1228,9 @@ const highlightActiveElements = () => {
       graph.setItemState(node, 'active', false)
     }
   })
+
+  // 时间轴推进时自动向右平滑滚动卡片列表条
+  scrollToActiveCard()
 }
 
 // ==================== G6 拓扑构建与布局算法 ====================
