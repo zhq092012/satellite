@@ -101,7 +101,7 @@
           <div class="layer-sidebar-item layer-2-item">
             <span class="layer-icon">📡</span>
             <div class="layer-text">
-              <span class="layer-title">第二层：地面站层</span>
+              <span class="layer-title">第二层：接收站</span>
               <span class="layer-sub">Ground Stations Layer</span>
             </div>
           </div>
