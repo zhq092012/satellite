@@ -86,25 +86,27 @@
         </div>
       </div>
 
-      <!-- G6 画布容器 -->
-      <div ref="g6Container" class="g6-chart-container" v-loading="loading">
-        <!-- 图层标注 Overlay -->
-        <div class="layer-labels-overlay">
-          <div class="layer-tag layer-1-tag">
+      <!-- 左右分栏主体区域 -->
+      <div class="topo-main-body">
+        <!-- 左侧：图层标注独立一栏 -->
+        <div class="layer-sidebar">
+          <div class="layer-sidebar-item layer-1-item">
             <span class="layer-icon">🛰️</span>
             <div class="layer-text">
               <span class="layer-title">第一层：卫星层</span>
               <span class="layer-sub">Satellites Layer</span>
             </div>
           </div>
-          <div class="layer-tag layer-2-tag">
+
+          <div class="layer-sidebar-item layer-2-item">
             <span class="layer-icon">📡</span>
             <div class="layer-text">
               <span class="layer-title">第二层：地面站层</span>
               <span class="layer-sub">Ground Stations Layer</span>
             </div>
           </div>
-          <div class="layer-tag layer-3-tag">
+
+          <div class="layer-sidebar-item layer-3-item">
             <span class="layer-icon">🏢</span>
             <div class="layer-text">
               <span class="layer-title">第三层：数据中心层</span>
@@ -112,6 +114,9 @@
             </div>
           </div>
         </div>
+
+        <!-- 右侧：G6 画布容器 (独立分栏，节点绝对不会重叠左侧) -->
+        <div ref="g6Container" class="g6-chart-container" v-loading="loading"></div>
       </div>
     </div>
 
@@ -183,14 +188,14 @@
 
           <div class="card-body">
             <div class="win-link-info">
-              <span class="sat-name">🛰️ {{ win.satName }}</span>
+              <span class="sat-name" :title="win.satName">🛰️ {{ win.satName }}</span>
               <span class="arrow-icon">➔</span>
-              <span class="rec-name">📡 {{ win.receiveName }}</span>
+              <span class="rec-name" :title="win.receiveName">📡 {{ win.receiveName }}</span>
             </div>
 
             <div class="win-meta-info" v-if="win.strikeStatus === 1">
               <span class="delay-tag" v-if="win.delayMin">延时: +{{ win.delayMin }}m</span>
-              <span class="weapon-tag" v-if="win.weapons && win.weapons.length > 0">
+              <span class="weapon-tag" v-if="win.weapons && win.weapons.length > 0" :title="win.weapons[0].name">
                 🎯 {{ win.weapons[0].name }} ({{ win.weapons[0].type }})
               </span>
             </div>
@@ -1223,10 +1228,10 @@ const buildG6GraphData = () => {
   const stationList = Array.from(stationMap.values())
   stationNodeCount.value = stationList.length
 
-  // 计算节点在 3 层的坐标布局 (Layer 1: y=90, Layer 2: y=280, Layer 3: y=470)
-  const containerW = g6Container.value ? g6Container.value.clientWidth : 1100
-  const startX = 220
-  const availableW = Math.max(containerW - startX - 80, 600)
+  // 计算节点在 3 层的坐标布局 (Layer 1: y=60, Layer 2: y=200, Layer 3: y=340)
+  const containerW = g6Container.value ? g6Container.value.clientWidth : 950
+  const startX = 30
+  const availableW = Math.max(containerW - startX - 30, 400)
 
   // 排布 Layer 1 卫星
   satList.forEach((sat, i) => {
@@ -1575,7 +1580,7 @@ const initOrUpdateGraph = () => {
       fitView: true,
       fitViewPadding: [20, 40, 20, 40],
       modes: {
-        default: ['drag-canvas', 'zoom-canvas', 'drag-node', 'activate-relations'],
+        default: ['activate-relations'],
       },
       defaultNode: {
         type: 'rect',
@@ -1796,76 +1801,84 @@ onUnmounted(() => {
   }
 }
 
-.g6-chart-container {
+.topo-main-body {
   flex: 1;
   width: 100%;
+  display: flex;
   position: relative;
+  overflow: hidden;
 }
 
-.layer-labels-overlay {
-  position: absolute;
-  top: 40px;
-  left: 20px;
+.layer-sidebar {
+  width: 175px;
+  min-width: 175px;
+  background: rgba(8, 14, 28, 0.95);
+  border-right: 1px solid rgba(0, 225, 255, 0.18);
   display: flex;
   flex-direction: column;
-  gap: 125px;
-  pointer-events: none;
-  z-index: 10;
+  justify-content: space-around;
+  padding: 15px 12px;
+  z-index: 20;
+
+  .layer-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(13, 24, 46, 0.85);
+    border: 1px solid rgba(0, 225, 255, 0.25);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+    .layer-icon {
+      font-size: 20px;
+    }
+
+    .layer-text {
+      display: flex;
+      flex-direction: column;
+      .layer-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #00e1ff;
+      }
+      .layer-sub {
+        font-size: 10px;
+        color: #64748b;
+      }
+    }
+
+    &.layer-2-item {
+      border-color: rgba(0, 242, 254, 0.3);
+      .layer-title {
+        color: #00f2fe;
+      }
+    }
+
+    &.layer-3-item {
+      border-color: rgba(59, 130, 246, 0.3);
+      .layer-title {
+        color: #60a5fa;
+      }
+    }
+  }
 }
 
-.layer-tag {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 14px;
-  border-radius: 6px;
-  background: rgba(10, 20, 38, 0.85);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(0, 225, 255, 0.25);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-
-  .layer-icon {
-    font-size: 18px;
-  }
-
-  .layer-text {
-    display: flex;
-    flex-direction: column;
-    .layer-title {
-      font-size: 13px;
-      font-weight: 700;
-      color: #00e1ff;
-    }
-    .layer-sub {
-      font-size: 10px;
-      color: #64748b;
-    }
-  }
-
-  &.layer-2-tag {
-    border-color: rgba(0, 242, 254, 0.3);
-    .layer-title {
-      color: #00f2fe;
-    }
-  }
-
-  &.layer-3-tag {
-    border-color: rgba(59, 130, 246, 0.3);
-    .layer-title {
-      color: #60a5fa;
-    }
-  }
+.g6-chart-container {
+  flex: 1;
+  height: 100%;
+  position: relative;
 }
 
 /* 底部时间轴样式 */
 .cema-timeline-footer {
-  height: 175px;
+  height: 215px;
   background: rgba(9, 16, 30, 0.95);
   border-top: 1px solid rgba(0, 225, 255, 0.2);
   display: flex;
   flex-direction: column;
-  padding: 8px 16px;
-  gap: 6px;
+  padding: 10px 16px;
+  gap: 8px;
 }
 
 .timeline-ctrl-bar {
@@ -1907,12 +1920,14 @@ onUnmounted(() => {
 
 .windows-cards-scroll {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 8px;
+  flex: 1;
+  align-items: stretch;
 
   &::-webkit-scrollbar {
-    height: 5px;
+    height: 6px;
   }
   &::-webkit-scrollbar-thumb {
     background: rgba(0, 225, 255, 0.3);
@@ -1921,40 +1936,38 @@ onUnmounted(() => {
 }
 
 .window-card {
-  min-width: 220px;
-  max-width: 240px;
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(0, 225, 255, 0.15);
+  min-width: 260px;
+  max-width: 280px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(0, 225, 255, 0.18);
   border-radius: 6px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   transition: all 0.2s ease;
-
-  &:hover {
-    border-color: #00e1ff;
-    transform: translateY(-2px);
-  }
 
   &.card-active {
     border-color: #00e1ff;
-    background: rgba(0, 225, 255, 0.12);
-    box-shadow: 0 0 10px rgba(0, 225, 255, 0.2);
+    background: rgba(0, 225, 255, 0.14);
+    box-shadow: 0 0 10px rgba(0, 225, 255, 0.25);
   }
 
   &.card-selected {
     border-color: #ff4d4f;
-    box-shadow: 0 0 12px rgba(255, 77, 79, 0.4);
+    box-shadow: 0 0 12px rgba(255, 77, 79, 0.45);
   }
 
   &.card-struck {
-    border-color: rgba(255, 77, 79, 0.4);
+    border-color: rgba(255, 77, 79, 0.45);
   }
 
   .card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 
     .win-time {
       font-size: 11px;
@@ -1982,38 +1995,58 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
+    font-size: 11.5px;
+    margin: 3px 0;
 
     .sat-name {
       color: #38bdf8;
       font-weight: 600;
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .arrow-icon {
       color: #64748b;
     }
     .rec-name {
       color: #34d399;
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
 
   .win-meta-info {
-    margin-top: 4px;
+    margin-top: 6px;
     display: flex;
+    align-items: center;
     gap: 6px;
-    font-size: 10px;
+    font-size: 10.5px;
+    flex-wrap: wrap;
 
     .delay-tag {
       color: #fbbf24;
-      background: rgba(251, 191, 36, 0.1);
-      padding: 1px 4px;
-      border-radius: 2px;
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      padding: 2px 6px;
+      border-radius: 3px;
+      white-space: nowrap;
+      font-weight: 500;
     }
 
     .weapon-tag {
       color: #f87171;
-      background: rgba(248, 113, 113, 0.1);
-      padding: 1px 4px;
-      border-radius: 2px;
+      background: rgba(248, 113, 113, 0.15);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 500;
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
 }
