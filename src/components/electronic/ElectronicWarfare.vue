@@ -1,61 +1,74 @@
 <template>
   <div class="cema-dashboard dark-theme full-screen-cema">
-    <!-- Top Navigation Header -->
-    <div class="cema-header">
-      <div class="header-left">
-        <span class="header-title glow-text">战术算法矩阵3D拓扑</span>
+    <!-- 当切换为 G6 视图模式时直接渲染 G6 视图组件 -->
+    <ElectronicWarfareG6 v-if="viewMode === 'G6'" />
+
+    <!-- 3D 视图模式 -->
+    <template v-else>
+      <!-- Top Navigation Header -->
+      <div class="cema-header">
+        <div class="header-left">
+          <span class="header-title glow-text">战术算法矩阵3D拓扑</span>
+          <!-- 3D vs G6 视图模式切换按钮 -->
+          <div class="view-mode-toggle" style="margin-left: 15px;">
+            <el-radio-group v-model="viewMode" size="small">
+              <el-radio-button value="3D">3D 矩阵拓扑</el-radio-button>
+              <el-radio-button value="G6">G6 三层拓扑与时间轴</el-radio-button>
+            </el-radio-group>
+          </div>
+        </div>
+
+        <!-- 烈度控制与四个矩阵Tab控制 -->
+        <div class="header-center">
+          <!-- 1. 交战烈度切换按钮组 (高中低烈度参数) -->
+          <div class="intensity-group">
+            <button
+              v-for="level in intensityOptions"
+              :key="level"
+              class="nav-tab-btn"
+              :class="{ active: currentIntensity === level }"
+              @click="handleIntensityChange(level)"
+            >
+              {{ level }}
+            </button>
+          </div>
+
+          <div class="v-divider"></div>
+
+          <!-- 2. 四大矩阵视图切换 Tab 按钮组 -->
+          <div class="matrix-tab-group">
+            <button
+              v-for="tab in matrixTabOptions"
+              :key="tab.key"
+              class="nav-tab-btn tab-matrix"
+              :class="{ active: currentMatrixTab === tab.key }"
+              @click="currentMatrixTab = tab.key"
+            >
+              {{ tab.name }}
+            </button>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <!-- 卫星系列 (series) 展示 -->
+          <div class="header-right-item" v-if="matrixData?.series">
+            <span class="label-text">卫星系列:</span>
+            <span class="digital-font time-value glow-text-cyan">{{ matrixData.series }}</span>
+          </div>
+          <div class="header-right-item">
+            <span class="label-text">当前任务:</span>
+            <span class="digital-font time-value glow-text-cyan">{{ store.activedTask?.name || '实时推演场景' }}</span>
+          </div>
+        </div>
       </div>
 
-      <!-- 烈度控制与四个矩阵Tab控制 -->
-      <div class="header-center">
-        <!-- 1. 交战烈度切换按钮组 (高中低烈度参数) -->
-        <div class="intensity-group">
-          <button
-            v-for="level in intensityOptions"
-            :key="level"
-            class="nav-tab-btn"
-            :class="{ active: currentIntensity === level }"
-            @click="handleIntensityChange(level)"
-          >
-            {{ level }}
-          </button>
-        </div>
-
-        <div class="v-divider"></div>
-
-        <!-- 2. 四大矩阵视图切换 Tab 按钮组 -->
-        <div class="matrix-tab-group">
-          <button
-            v-for="tab in matrixTabOptions"
-            :key="tab.key"
-            class="nav-tab-btn tab-matrix"
-            :class="{ active: currentMatrixTab === tab.key }"
-            @click="currentMatrixTab = tab.key"
-          >
-            {{ tab.name }}
-          </button>
-        </div>
+      <!-- Central Main View: Full-screen 3D 3-Layer Topology -->
+      <div class="cema-workspace single-workspace">
+        <section class="main-3d-sandbox full-sandbox">
+          <Battlefield3D :nodes="activeNodes" :links="activeLinks" />
+        </section>
       </div>
-
-      <div class="header-right">
-        <!-- 卫星系列 (series) 展示 -->
-        <div class="header-right-item" v-if="matrixData?.series">
-          <span class="label-text">卫星系列:</span>
-          <span class="digital-font time-value glow-text-cyan">{{ matrixData.series }}</span>
-        </div>
-        <div class="header-right-item">
-          <span class="label-text">当前任务:</span>
-          <span class="digital-font time-value glow-text-cyan">{{ store.activedTask?.name || '实时推演场景' }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Central Main View: Full-screen 3D 3-Layer Topology -->
-    <div class="cema-workspace single-workspace">
-      <section class="main-3d-sandbox full-sandbox">
-        <Battlefield3D :nodes="activeNodes" :links="activeLinks" />
-      </section>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -66,9 +79,14 @@ import { useLayoutStore } from '@/store/modules/layout'
 import { getMatrixList } from '@/api/electronic'
 import type { MatrixResult, Weapon } from '@/api/electronic'
 import Battlefield3D from '@/components/electronic/Battlefield3D.vue'
+import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue'
 import { parseLatLon } from '@/db/matrixAdapter'
 
 const store = useLayoutStore()
+
+// [变量用途]
+// 拓扑视图类型 (3D 矩阵拓扑 vs G6 三层拓扑与时间轴)
+const viewMode = ref<'3D' | 'G6'>('3D')
 
 // 交战烈度类型
 type IntensityLevelType = '高烈度' | '中烈度' | '低烈度'

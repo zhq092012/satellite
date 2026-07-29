@@ -179,6 +179,7 @@ import EvaluationReport from '@/components/cesium/EvaluationReport.vue'
 import StationReport from '@/components/cesium/StationReport.vue'
 import ConfrontView from '@/components/cesium/ConfrontationAnalysis.vue'
 import ElectronicWarfare from '@/components/electronic/ElectronicWarfare.vue'
+import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import { useAuthStore } from '@/store/modules/auth'
 import { getSatelliteList, getSituationDataOfTask, getStrikeSatellites, type SituationData } from '@/api/dashboard'
@@ -197,6 +198,7 @@ const compMap = {
   StationReport,
   ConfrontView,
   ElectronicWarfare,
+  ElectronicWarfareG6,
 }
 /**
  * 定义tab对象数组
@@ -238,6 +240,12 @@ const tabDefs = [
     label: '电子对抗分析',
     value: '电子对抗分析',
     component: 'ElectronicWarfare',
+    permissionCode: 'battle:electronicWarfare',
+  },
+  {
+    label: '三层拓扑毁伤分析',
+    value: '三层拓扑毁伤分析',
+    component: 'ElectronicWarfareG6',
     permissionCode: 'battle:electronicWarfare',
   },
 ] as const
