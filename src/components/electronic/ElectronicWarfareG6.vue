@@ -56,23 +56,33 @@
       <div class="topo-summary-bar">
         <div class="stat-badge">
           <span class="stat-dot dot-sat"></span>
-          <span>卫星节点: <strong>{{ satNodeCount }}</strong> 颗</span>
+          <span
+            >卫星节点: <strong>{{ satNodeCount }}</strong> 颗</span
+          >
         </div>
         <div class="stat-badge">
           <span class="stat-dot dot-rec"></span>
-          <span>地面站节点: <strong>{{ receiveNodeCount }}</strong> 个</span>
+          <span
+            >地面站节点: <strong>{{ receiveNodeCount }}</strong> 个</span
+          >
         </div>
         <div class="stat-badge">
           <span class="stat-dot dot-station"></span>
-          <span>数据中心: <strong>{{ stationNodeCount }}</strong> 个</span>
+          <span
+            >数据中心: <strong>{{ stationNodeCount }}</strong> 个</span
+          >
         </div>
         <div class="stat-badge">
           <span class="stat-dot dot-normal-link"></span>
-          <span>正常链路: <strong>{{ normalLinkCount }}</strong> 条</span>
+          <span
+            >正常链路: <strong>{{ normalLinkCount }}</strong> 条</span
+          >
         </div>
         <div class="stat-badge alert-stat">
           <span class="stat-dot dot-struck-link"></span>
-          <span>打压/中断链路: <strong>{{ struckLinkCount }}</strong> 条 (红色 ✖ 标识)</span>
+          <span
+            >打压/中断链路: <strong>{{ struckLinkCount }}</strong> 条 (红色 ✖ 标识)</span
+          >
         </div>
       </div>
 
@@ -109,12 +119,8 @@
     <div class="cema-timeline-footer" v-if="allWindowsList.length > 0">
       <div class="timeline-ctrl-bar">
         <div class="ctrl-left">
-          <span class="timeline-title">
-            <i class="el-icon-timer"></i> 打击/过境时间轴
-          </span>
-          <span class="time-range-text">
-            [{{ timeRangeText.start }} ~ {{ timeRangeText.end }}]
-          </span>
+          <span class="timeline-title"> <i class="el-icon-timer"></i> 打击/过境时间轴 </span>
+          <span class="time-range-text"> [{{ timeRangeText.start }} ~ {{ timeRangeText.end }}] </span>
         </div>
 
         <div class="ctrl-center">
@@ -128,11 +134,11 @@
           </el-button-group>
 
           <!-- 播放倍速切换 -->
-          <el-select v-model="playSpeed" size="small" style="width: 85px; margin-left: 10px;">
-            <el-option label="1x Speed" :value="1" />
-            <el-option label="2x Speed" :value="2" />
-            <el-option label="5x Speed" :value="5" />
-            <el-option label="10x Speed" :value="10" />
+          <el-select v-model="playSpeed" size="small" style="width: 85px; margin-left: 10px">
+            <el-option label="1x 速度" :value="1" />
+            <el-option label="2x 速度" :value="2" />
+            <el-option label="5x 速度" :value="5" />
+            <el-option label="10x 速度" :value="10" />
           </el-select>
         </div>
 
@@ -164,16 +170,13 @@
           :class="{
             'card-struck': win.strikeStatus === 1,
             'card-active': isWindowActiveAtCurrentTime(win),
-            'card-selected': selectedWindowId === win.id
+            'card-selected': selectedWindowId === win.id,
           }"
           @click="selectWindowItem(win)"
         >
           <div class="card-header">
             <span class="win-time">{{ win.startTimeShort }} ~ {{ win.endTimeShort }}</span>
-            <span
-              class="win-status-badge"
-              :class="win.strikeStatus === 1 ? 'badge-danger' : 'badge-success'"
-            >
+            <span class="win-status-badge" :class="win.strikeStatus === 1 ? 'badge-danger' : 'badge-success'">
               {{ win.strikeStatus === 1 ? '受毁伤打压' : '正常过境' }}
             </span>
           </div>
@@ -255,20 +258,20 @@ let graph: any = null
 // [类型用途]
 // 时间轴过境/打击窗口统一包装结构
 interface WindowItemWrapper {
-  id: string;
-  satName: string;
-  satNorad: number;
-  receiveName: string;
-  receiveId: string;
-  startTime: string;
-  endTime: string;
-  startTimeShort: string;
-  endTimeShort: string;
-  startTimestamp: number;
-  endTimestamp: number;
-  strikeStatus: number;
-  delayMin?: number;
-  weapons?: Weapon[] | null;
+  id: string
+  satName: string
+  satNorad: number
+  receiveName: string
+  receiveId: string
+  startTime: string
+  endTime: string
+  startTimeShort: string
+  endTimeShort: string
+  startTimestamp: number
+  endTimestamp: number
+  strikeStatus: number
+  delayMin?: number
+  weapons?: Weapon[] | null
 }
 
 // [变量用途]
@@ -388,21 +391,86 @@ const demoMatrixData: MatrixResult = {
   ],
   initRelationList: {
     receiveObjList: [
-      { receiveId: '6a66d27f1ce9af52c9cd82b9', receiveName: '加拿大伊努维克', receiveLatLon: '68.350,133.500', receiveStatus: 0 },
-      { receiveId: '6a66d48f1ce9af52c9cd82bb', receiveName: '加州特拉西', receiveLatLon: '37.760,121.430', receiveStatus: 0 },
-      { receiveId: '6a6037d76a3f9e9695ef4716', receiveName: '俄勒冈Oregon', receiveLatLon: '45.210,123.110', receiveStatus: 0 },
-      { receiveId: '6a66d1e61ce9af52c9cd82b7', receiveName: '新西兰阿瓦鲁阿', receiveLatLon: '46.540,168.220', receiveStatus: 0 },
-      { receiveId: '6a66cf9e1ce9af52c9cd82b2', receiveName: '爱尔兰Ireland', receiveLatLon: '53.300,8.150', receiveStatus: 0 },
-      { receiveId: '6a66d1971ce9af52c9cd82b6', receiveName: '智利蓬塔阿雷纳斯', receiveLatLon: '53.160,70.910', receiveStatus: 0 },
-      { receiveId: '6a66d00a1ce9af52c9cd82b3', receiveName: '澳大利亚达博', receiveLatLon: '32.250,148.610', receiveStatus: 0 },
-      { receiveId: '6a66d0dd1ce9af52c9cd82b4', receiveName: '斯瓦尔巴SvalSat', receiveLatLon: '78.223,15.620', receiveStatus: 0 },
-      { receiveId: '6a66cf0f1ce9af52c9cd82b1', receiveName: '夏威夷Kapolei', receiveLatLon: '21.3368,158.0900', receiveStatus: 0 },
-      { receiveId: '6a66d2391ce9af52c9cd82b8', receiveName: '南非开普敦', receiveLatLon: '33.970,18.420', receiveStatus: 0 },
-      { receiveId: '6a66d4011ce9af52c9cd82ba', receiveName: '美国蒙大拿', receiveLatLon: '45.680,111.040', receiveStatus: 0 },
-      { receiveId: '6a66d13d1ce9af52c9cd82b5', receiveName: '南极TrollSat', receiveLatLon: '72.010,2.530', receiveStatus: 0 },
+      {
+        receiveId: '6a66d27f1ce9af52c9cd82b9',
+        receiveName: '加拿大伊努维克',
+        receiveLatLon: '68.350,133.500',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d48f1ce9af52c9cd82bb',
+        receiveName: '加州特拉西',
+        receiveLatLon: '37.760,121.430',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a6037d76a3f9e9695ef4716',
+        receiveName: '俄勒冈Oregon',
+        receiveLatLon: '45.210,123.110',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d1e61ce9af52c9cd82b7',
+        receiveName: '新西兰阿瓦鲁阿',
+        receiveLatLon: '46.540,168.220',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66cf9e1ce9af52c9cd82b2',
+        receiveName: '爱尔兰Ireland',
+        receiveLatLon: '53.300,8.150',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d1971ce9af52c9cd82b6',
+        receiveName: '智利蓬塔阿雷纳斯',
+        receiveLatLon: '53.160,70.910',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d00a1ce9af52c9cd82b3',
+        receiveName: '澳大利亚达博',
+        receiveLatLon: '32.250,148.610',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d0dd1ce9af52c9cd82b4',
+        receiveName: '斯瓦尔巴SvalSat',
+        receiveLatLon: '78.223,15.620',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66cf0f1ce9af52c9cd82b1',
+        receiveName: '夏威夷Kapolei',
+        receiveLatLon: '21.3368,158.0900',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d2391ce9af52c9cd82b8',
+        receiveName: '南非开普敦',
+        receiveLatLon: '33.970,18.420',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d4011ce9af52c9cd82ba',
+        receiveName: '美国蒙大拿',
+        receiveLatLon: '45.680,111.040',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d13d1ce9af52c9cd82b5',
+        receiveName: '南极TrollSat',
+        receiveLatLon: '72.010,2.530',
+        receiveStatus: 0,
+      },
     ],
     stationObjList: [
-      { stationId: '6a66d7d71ce9af52c9cd82bc', stationName: '亚马逊AWS北美云集群', stationLatLon: '37.7751,122.4194', stationStatus: 0 },
+      {
+        stationId: '6a66d7d71ce9af52c9cd82bc',
+        stationName: '亚马逊AWS北美云集群',
+        stationLatLon: '37.7751,122.4194',
+        stationStatus: 0,
+      },
     ],
     relations: [
       { from: '6a6037d76a3f9e9695ef4716', to: '6a66d7d71ce9af52c9cd82bc' },
@@ -428,7 +496,14 @@ const demoMatrixData: MatrixResult = {
       satelliteStatus: 0,
       weapons: [],
       stationWindows: [
-        { receiveId: '6a66cf9e1ce9af52c9cd82b2', receiveName: '爱尔兰Ireland', peakWindow: '2026-07-28 00:23:41', endWindow: '2026-07-28 00:32:39', strikeStatus: 0, weapons: null as any },
+        {
+          receiveId: '6a66cf9e1ce9af52c9cd82b2',
+          receiveName: '爱尔兰Ireland',
+          peakWindow: '2026-07-28 00:23:41',
+          endWindow: '2026-07-28 00:32:39',
+          strikeStatus: 0,
+          weapons: null as any,
+        },
       ],
     },
     {
@@ -439,7 +514,14 @@ const demoMatrixData: MatrixResult = {
       satelliteStatus: 0,
       weapons: [],
       stationWindows: [
-        { receiveId: '6a66cf0f1ce9af52c9cd82b1', receiveName: '夏威夷Kapolei', peakWindow: '2026-07-28 05:40:48', endWindow: '2026-07-28 05:47:38', strikeStatus: 0, weapons: null as any },
+        {
+          receiveId: '6a66cf0f1ce9af52c9cd82b1',
+          receiveName: '夏威夷Kapolei',
+          peakWindow: '2026-07-28 05:40:48',
+          endWindow: '2026-07-28 05:47:38',
+          strikeStatus: 0,
+          weapons: null as any,
+        },
       ],
     },
     {
@@ -450,7 +532,14 @@ const demoMatrixData: MatrixResult = {
       satelliteStatus: 0,
       weapons: [],
       stationWindows: [
-        { receiveId: '6a6037d76a3f9e9695ef4716', receiveName: '俄勒冈Oregon', peakWindow: '2026-07-28 01:32:57', endWindow: '2026-07-28 01:40:27', strikeStatus: 0, weapons: null as any },
+        {
+          receiveId: '6a6037d76a3f9e9695ef4716',
+          receiveName: '俄勒冈Oregon',
+          peakWindow: '2026-07-28 01:32:57',
+          endWindow: '2026-07-28 01:40:27',
+          strikeStatus: 0,
+          weapons: null as any,
+        },
       ],
     },
     {
@@ -460,13 +549,49 @@ const demoMatrixData: MatrixResult = {
       delayMin: 2835.6,
       satelliteStatus: 1,
       weapons: [
-        { id: '2', name: 'ASAT导弹基地', country: '中国', type: '动能', latitude: 20.017, longitude: 110.349, range: 1500.0 },
+        {
+          id: '2',
+          name: 'ASAT导弹基地',
+          country: '中国',
+          type: '动能',
+          latitude: 20.017,
+          longitude: 110.349,
+          range: 1500.0,
+        },
       ],
       stationWindows: [
-        { receiveId: '6a66d00a1ce9af52c9cd82b3', receiveName: '澳大利亚达博', peakWindow: '2026-07-28 00:43:24', endWindow: '2026-07-28 00:49:36', strikeStatus: 1, weapons: null as any },
-        { receiveId: '6a6037d76a3f9e9695ef4716', receiveName: '俄勒冈Oregon', peakWindow: '2026-07-28 02:17:28', endWindow: '2026-07-28 02:23:20', strikeStatus: 1, weapons: null as any },
-        { receiveId: '6a66cf0f1ce9af52c9cd82b1', receiveName: '夏威夷Kapolei', peakWindow: '2026-07-28 05:41:52', endWindow: '2026-07-28 05:47:46', strikeStatus: 1, weapons: null as any },
-        { receiveId: '6a66cf9e1ce9af52c9cd82b2', receiveName: '爱尔兰Ireland', peakWindow: '2026-07-28 11:40:48', endWindow: '2026-07-28 11:44:57', strikeStatus: 1, weapons: null as any },
+        {
+          receiveId: '6a66d00a1ce9af52c9cd82b3',
+          receiveName: '澳大利亚达博',
+          peakWindow: '2026-07-28 00:43:24',
+          endWindow: '2026-07-28 00:49:36',
+          strikeStatus: 1,
+          weapons: null as any,
+        },
+        {
+          receiveId: '6a6037d76a3f9e9695ef4716',
+          receiveName: '俄勒冈Oregon',
+          peakWindow: '2026-07-28 02:17:28',
+          endWindow: '2026-07-28 02:23:20',
+          strikeStatus: 1,
+          weapons: null as any,
+        },
+        {
+          receiveId: '6a66cf0f1ce9af52c9cd82b1',
+          receiveName: '夏威夷Kapolei',
+          peakWindow: '2026-07-28 05:41:52',
+          endWindow: '2026-07-28 05:47:46',
+          strikeStatus: 1,
+          weapons: null as any,
+        },
+        {
+          receiveId: '6a66cf9e1ce9af52c9cd82b2',
+          receiveName: '爱尔兰Ireland',
+          peakWindow: '2026-07-28 11:40:48',
+          endWindow: '2026-07-28 11:44:57',
+          strikeStatus: 1,
+          weapons: null as any,
+        },
       ],
     },
     {
@@ -476,33 +601,134 @@ const demoMatrixData: MatrixResult = {
       delayMin: 2788.7,
       satelliteStatus: 1,
       weapons: [
-        { id: '2', name: 'ASAT导弹基地', country: '中国', type: '动能', latitude: 20.017, longitude: 110.349, range: 1500.0 },
+        {
+          id: '2',
+          name: 'ASAT导弹基地',
+          country: '中国',
+          type: '动能',
+          latitude: 20.017,
+          longitude: 110.349,
+          range: 1500.0,
+        },
       ],
       stationWindows: [
-        { receiveId: '6a6037d76a3f9e9695ef4716', receiveName: '俄勒冈Oregon', peakWindow: '2026-07-28 01:30:18', endWindow: '2026-07-28 01:38:27', strikeStatus: 1, weapons: null as any },
-        { receiveId: '6a66d00a1ce9af52c9cd82b3', receiveName: '澳大利亚达博', peakWindow: '2026-07-28 03:19:06', endWindow: '2026-07-28 03:27:09', strikeStatus: 1, weapons: null as any },
-        { receiveId: '6a66cf0f1ce9af52c9cd82b1', receiveName: '夏威夷Kapolei', peakWindow: '2026-07-28 03:23:28', endWindow: '2026-07-28 03:30:37', strikeStatus: 1, weapons: null as any },
-        { receiveId: '6a66cf9e1ce9af52c9cd82b2', receiveName: '爱尔兰Ireland', peakWindow: '2026-07-28 06:15:47', endWindow: '2026-07-28 06:23:15', strikeStatus: 1, weapons: null as any },
+        {
+          receiveId: '6a6037d76a3f9e9695ef4716',
+          receiveName: '俄勒冈Oregon',
+          peakWindow: '2026-07-28 01:30:18',
+          endWindow: '2026-07-28 01:38:27',
+          strikeStatus: 1,
+          weapons: null as any,
+        },
+        {
+          receiveId: '6a66d00a1ce9af52c9cd82b3',
+          receiveName: '澳大利亚达博',
+          peakWindow: '2026-07-28 03:19:06',
+          endWindow: '2026-07-28 03:27:09',
+          strikeStatus: 1,
+          weapons: null as any,
+        },
+        {
+          receiveId: '6a66cf0f1ce9af52c9cd82b1',
+          receiveName: '夏威夷Kapolei',
+          peakWindow: '2026-07-28 03:23:28',
+          endWindow: '2026-07-28 03:30:37',
+          strikeStatus: 1,
+          weapons: null as any,
+        },
+        {
+          receiveId: '6a66cf9e1ce9af52c9cd82b2',
+          receiveName: '爱尔兰Ireland',
+          peakWindow: '2026-07-28 06:15:47',
+          endWindow: '2026-07-28 06:23:15',
+          strikeStatus: 1,
+          weapons: null as any,
+        },
       ],
     },
   ],
   stationRelationList: {
     receiveObjList: [
-      { receiveId: '6a66d27f1ce9af52c9cd82b9', receiveName: '加拿大伊努维克', receiveLatLon: '68.350,133.500', receiveStatus: 0 },
-      { receiveId: '6a66d48f1ce9af52c9cd82bb', receiveName: '加州特拉西', receiveLatLon: '37.760,121.430', receiveStatus: 0 },
-      { receiveId: '6a6037d76a3f9e9695ef4716', receiveName: '俄勒冈Oregon', receiveLatLon: '45.210,123.110', receiveStatus: 0 },
-      { receiveId: '6a66d1e61ce9af52c9cd82b7', receiveName: '新西兰阿瓦鲁阿', receiveLatLon: '46.540,168.220', receiveStatus: 0 },
-      { receiveId: '6a66cf9e1ce9af52c9cd82b2', receiveName: '爱尔兰Ireland', receiveLatLon: '53.300,8.150', receiveStatus: 0 },
-      { receiveId: '6a66d1971ce9af52c9cd82b6', receiveName: '智利蓬塔阿雷纳斯', receiveLatLon: '53.160,70.910', receiveStatus: 0 },
-      { receiveId: '6a66d00a1ce9af52c9cd82b3', receiveName: '澳大利亚达博', receiveLatLon: '32.250,148.610', receiveStatus: 0 },
-      { receiveId: '6a66d0dd1ce9af52c9cd82b4', receiveName: '斯瓦尔巴SvalSat', receiveLatLon: '78.223,15.620', receiveStatus: 0 },
-      { receiveId: '6a66cf0f1ce9af52c9cd82b1', receiveName: '夏威夷Kapolei', receiveLatLon: '21.3368,158.0900', receiveStatus: 0 },
-      { receiveId: '6a66d2391ce9af52c9cd82b8', receiveName: '南非开普敦', receiveLatLon: '33.970,18.420', receiveStatus: 0 },
-      { receiveId: '6a66d4011ce9af52c9cd82ba', receiveName: '美国蒙大拿', receiveLatLon: '45.680,111.040', receiveStatus: 0 },
-      { receiveId: '6a66d13d1ce9af52c9cd82b5', receiveName: '南极TrollSat', receiveLatLon: '72.010,2.530', receiveStatus: 0 },
+      {
+        receiveId: '6a66d27f1ce9af52c9cd82b9',
+        receiveName: '加拿大伊努维克',
+        receiveLatLon: '68.350,133.500',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d48f1ce9af52c9cd82bb',
+        receiveName: '加州特拉西',
+        receiveLatLon: '37.760,121.430',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a6037d76a3f9e9695ef4716',
+        receiveName: '俄勒冈Oregon',
+        receiveLatLon: '45.210,123.110',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d1e61ce9af52c9cd82b7',
+        receiveName: '新西兰阿瓦鲁阿',
+        receiveLatLon: '46.540,168.220',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66cf9e1ce9af52c9cd82b2',
+        receiveName: '爱尔兰Ireland',
+        receiveLatLon: '53.300,8.150',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d1971ce9af52c9cd82b6',
+        receiveName: '智利蓬塔阿雷纳斯',
+        receiveLatLon: '53.160,70.910',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d00a1ce9af52c9cd82b3',
+        receiveName: '澳大利亚达博',
+        receiveLatLon: '32.250,148.610',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d0dd1ce9af52c9cd82b4',
+        receiveName: '斯瓦尔巴SvalSat',
+        receiveLatLon: '78.223,15.620',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66cf0f1ce9af52c9cd82b1',
+        receiveName: '夏威夷Kapolei',
+        receiveLatLon: '21.3368,158.0900',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d2391ce9af52c9cd82b8',
+        receiveName: '南非开普敦',
+        receiveLatLon: '33.970,18.420',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d4011ce9af52c9cd82ba',
+        receiveName: '美国蒙大拿',
+        receiveLatLon: '45.680,111.040',
+        receiveStatus: 0,
+      },
+      {
+        receiveId: '6a66d13d1ce9af52c9cd82b5',
+        receiveName: '南极TrollSat',
+        receiveLatLon: '72.010,2.530',
+        receiveStatus: 0,
+      },
     ],
     stationObjList: [
-      { stationId: '6a66d7d71ce9af52c9cd82bc', stationName: '亚马逊AWS北美云集群', stationLatLon: '37.7751,122.4194', stationStatus: 0 },
+      {
+        stationId: '6a66d7d71ce9af52c9cd82bc',
+        stationName: '亚马逊AWS北美云集群',
+        stationLatLon: '37.7751,122.4194',
+        stationStatus: 0,
+      },
     ],
     relations: [
       { from: '6a6037d76a3f9e9695ef4716', to: '6a66d7d71ce9af52c9cd82bc' },
@@ -596,7 +822,7 @@ const registerCustomG6Edge = () => {
           return shape
         },
       },
-      'cubic-vertical',
+      'cubic-vertical'
     )
   } catch (err) {
     // 允许重复注册场景吃掉注册警告
@@ -712,7 +938,9 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
     const windows = sat.initWindows || []
     windows.forEach((win, index) => {
       const winId = `win-init-${sat.norad}-${win.receiveId}-${index}`
-      const exists = list.some((item) => item.satNorad === sat.norad && item.receiveId === win.receiveId && item.startTime === win.peakWindow)
+      const exists = list.some(
+        (item) => item.satNorad === sat.norad && item.receiveId === win.receiveId && item.startTime === win.peakWindow
+      )
       if (!exists) {
         const startTs = parseToTimestamp(win.peakWindow)
         const endTs = parseToTimestamp(win.endWindow)
@@ -1008,6 +1236,9 @@ const buildG6GraphData = () => {
     nodeSet.add(id)
     const x = startX + (availableW / (satList.length + 1)) * (i + 1)
     const isStruck = sat.status === 1
+    const bgFill = isStruck ? '#2d1215' : '#092638'
+    const strokeColor = isStruck ? '#ff4d4f' : '#00e1ff'
+    const textColor = isStruck ? '#ff7875' : '#e6f7ff'
 
     nodes.push({
       id,
@@ -1017,9 +1248,13 @@ const buildG6GraphData = () => {
       y: 90,
       type: 'rect',
       size: [130, 42],
+      anchorPoints: [
+        [0.5, 0], // 0: 上边中心
+        [0.5, 1], // 1: 下边中心
+      ],
       style: {
-        fill: isStruck ? '#2d1215' : '#092638',
-        stroke: isStruck ? '#ff4d4f' : '#00e1ff',
+        fill: bgFill,
+        stroke: strokeColor,
         lineWidth: 2,
         radius: 6,
         shadowColor: isStruck ? 'rgba(255, 77, 79, 0.4)' : 'rgba(0, 225, 255, 0.3)',
@@ -1027,9 +1262,40 @@ const buildG6GraphData = () => {
       },
       labelCfg: {
         style: {
-          fill: isStruck ? '#ff7875' : '#e6f7ff',
+          fill: textColor,
           fontSize: 12,
           fontWeight: 600,
+        },
+      },
+      stateStyles: {
+        active: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 3,
+          shadowColor: strokeColor,
+          shadowBlur: 16,
+        },
+        highlight: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 3,
+          shadowColor: strokeColor,
+          shadowBlur: 20,
+        },
+        hover: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 2.5,
+        },
+        selected: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 3,
+        },
+        inactive: {
+          fill: bgFill,
+          stroke: strokeColor,
+          opacity: 0.6,
         },
       },
     })
@@ -1040,6 +1306,9 @@ const buildG6GraphData = () => {
     nodeSet.add(rec.receiveId)
     const x = startX + (availableW / (receiveList.length + 1)) * (i + 1)
     const isStruck = rec.status === 1
+    const bgFill = isStruck ? '#2d1215' : '#0a2e2b'
+    const strokeColor = isStruck ? '#ff4d4f' : '#00f2fe'
+    const textColor = isStruck ? '#ff7875' : '#e6f7ff'
 
     nodes.push({
       id: rec.receiveId,
@@ -1049,17 +1318,52 @@ const buildG6GraphData = () => {
       y: 280,
       type: 'rect',
       size: [120, 38],
+      anchorPoints: [
+        [0.5, 0], // 0: 上边中心
+        [0.5, 1], // 1: 下边中心
+      ],
       style: {
-        fill: isStruck ? '#2d1215' : '#0a2e2b',
-        stroke: isStruck ? '#ff4d4f' : '#00f2fe',
+        fill: bgFill,
+        stroke: strokeColor,
         lineWidth: 1.8,
         radius: 6,
       },
       labelCfg: {
         style: {
-          fill: isStruck ? '#ff7875' : '#e6f7ff',
+          fill: textColor,
           fontSize: 11,
           fontWeight: 500,
+        },
+      },
+      stateStyles: {
+        active: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 3,
+          shadowColor: strokeColor,
+          shadowBlur: 16,
+        },
+        highlight: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 3,
+          shadowColor: strokeColor,
+          shadowBlur: 20,
+        },
+        hover: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 2.5,
+        },
+        selected: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 3,
+        },
+        inactive: {
+          fill: bgFill,
+          stroke: strokeColor,
+          opacity: 0.6,
         },
       },
     })
@@ -1069,6 +1373,9 @@ const buildG6GraphData = () => {
   stationList.forEach((st, i) => {
     nodeSet.add(st.stationId)
     const x = startX + (availableW / (stationList.length + 1)) * (i + 1)
+    const bgFill = '#10244c'
+    const strokeColor = '#3b82f6'
+    const textColor = '#93c5fd'
 
     nodes.push({
       id: st.stationId,
@@ -1078,17 +1385,52 @@ const buildG6GraphData = () => {
       y: 470,
       type: 'rect',
       size: [170, 44],
+      anchorPoints: [
+        [0.5, 0], // 0: 上边中心
+        [0.5, 1], // 1: 下边中心
+      ],
       style: {
-        fill: '#10244c',
-        stroke: '#3b82f6',
+        fill: bgFill,
+        stroke: strokeColor,
         lineWidth: 2,
         radius: 8,
       },
       labelCfg: {
         style: {
-          fill: '#93c5fd',
+          fill: textColor,
           fontSize: 12,
           fontWeight: 600,
+        },
+      },
+      stateStyles: {
+        active: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 3,
+          shadowColor: strokeColor,
+          shadowBlur: 16,
+        },
+        highlight: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 3,
+          shadowColor: strokeColor,
+          shadowBlur: 20,
+        },
+        hover: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 2.5,
+        },
+        selected: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 3,
+        },
+        inactive: {
+          fill: bgFill,
+          stroke: strokeColor,
+          opacity: 0.6,
         },
       },
     })
@@ -1113,6 +1455,8 @@ const buildG6GraphData = () => {
             id: edgeId,
             source: satId,
             target: win.receiveId,
+            sourceAnchor: 1, // 源节点下边中心
+            targetAnchor: 0, // 目标节点上边中心
             type: 'struck-cubic',
             isStruck: false,
             style: {
@@ -1143,6 +1487,8 @@ const buildG6GraphData = () => {
             id: edgeId,
             source: satId,
             target: win.receiveId,
+            sourceAnchor: 1, // 源节点下边中心
+            targetAnchor: 0, // 目标节点上边中心
             type: 'struck-cubic',
             isStruck,
             style: {
@@ -1184,6 +1530,8 @@ const buildG6GraphData = () => {
         id: edgeId,
         source: rel.from,
         target: rel.to,
+        sourceAnchor: 1, // 源节点下边中心
+        targetAnchor: 0, // 目标节点上边中心
         type: 'struck-cubic',
         isStruck: isSevered,
         style: {
@@ -1236,6 +1584,40 @@ const initOrUpdateGraph = () => {
       },
       defaultEdge: {
         type: 'struck-cubic',
+      },
+      nodeStateStyles: {
+        active: {
+          lineWidth: 3,
+          shadowBlur: 15,
+        },
+        highlight: {
+          lineWidth: 3,
+          shadowBlur: 18,
+        },
+        hover: {
+          lineWidth: 2.5,
+        },
+        selected: {
+          lineWidth: 3,
+        },
+        inactive: {
+          opacity: 0.75,
+        },
+      },
+      edgeStateStyles: {
+        active: {
+          lineWidth: 3.5,
+          shadowColor: '#00e1ff',
+          shadowBlur: 10,
+        },
+        highlight: {
+          lineWidth: 3.5,
+          shadowColor: '#00e1ff',
+          shadowBlur: 12,
+        },
+        inactive: {
+          opacity: 0.35,
+        },
       },
     })
   }
@@ -1393,11 +1775,23 @@ onUnmounted(() => {
     height: 8px;
     border-radius: 50%;
   }
-  .dot-sat { background: #00e1ff; box-shadow: 0 0 6px #00e1ff; }
-  .dot-rec { background: #00f2fe; }
-  .dot-station { background: #3b82f6; }
-  .dot-normal-link { background: #38bdf8; }
-  .dot-struck-link { background: #ff4d4f; box-shadow: 0 0 6px #ff4d4f; }
+  .dot-sat {
+    background: #00e1ff;
+    box-shadow: 0 0 6px #00e1ff;
+  }
+  .dot-rec {
+    background: #00f2fe;
+  }
+  .dot-station {
+    background: #3b82f6;
+  }
+  .dot-normal-link {
+    background: #38bdf8;
+  }
+  .dot-struck-link {
+    background: #ff4d4f;
+    box-shadow: 0 0 6px #ff4d4f;
+  }
 
   .alert-stat {
     color: #ff7875;
@@ -1452,12 +1846,16 @@ onUnmounted(() => {
 
   &.layer-2-tag {
     border-color: rgba(0, 242, 254, 0.3);
-    .layer-title { color: #00f2fe; }
+    .layer-title {
+      color: #00f2fe;
+    }
   }
 
   &.layer-3-tag {
     border-color: rgba(59, 130, 246, 0.3);
-    .layer-title { color: #60a5fa; }
+    .layer-title {
+      color: #60a5fa;
+    }
   }
 }
 
