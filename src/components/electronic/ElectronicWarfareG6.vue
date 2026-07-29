@@ -204,11 +204,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import G6 from '@antv/g6'
-import { ElMessage } from 'element-plus'
 import { VideoPlay, VideoPause, RefreshRight, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import { getMatrixList } from '@/api/electronic'
-import type { MatrixResult, Weapon, StationWindow, BattleWindow } from '@/api/electronic'
+import type { MatrixResult, Weapon } from '@/api/electronic'
 
 const store = useLayoutStore()
 
@@ -1103,7 +1102,6 @@ const selectWindowItem = (win: WindowItemWrapper) => {
   // 高亮对应的 Satellite 节点、Ground Station 节点及 Edge
   const satId = `sat-${win.satNorad}`
   const recId = win.receiveId
-  const targetEdgeId = `edge-${satId}-${recId}`
 
   graph.getNodes().forEach((node: any) => {
     const id = node.get('id')
