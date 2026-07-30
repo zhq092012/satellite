@@ -624,9 +624,9 @@ const timeBounds = computed<{ minTs: number; maxTs: number }>(() => {
     maxTs = now + 86400
   }
 
-  // 前后充余 30 分钟
-  minTs -= 1800
-  maxTs += 1800
+  // 前补充10分钟 后补充2小时
+  minTs -= 10 * 60
+  maxTs += 2 * 3600
   return { minTs, maxTs }
 })
 
@@ -636,7 +636,7 @@ const timeBounds = computed<{ minTs: number; maxTs: number }>(() => {
  */
 const ganttCanvasWidth = computed<number>(() => {
   const durationSec = timeBounds.value.maxTs - timeBounds.value.minTs
-  // 基准: 每小时 300px * timeScaleFactor
+  // 基准: 每小时 300px * timeScaleFactor 最少4小时
   const hours = Math.max(durationSec / 3600, 4)
   return Math.max(Math.floor(hours * 300 * timeScaleFactor.value), 1200)
 })
@@ -1200,7 +1200,7 @@ watch(
               justify-content: center;
               position: sticky;
               left: 0;
-              z-index: 5;
+              z-index: 8;
 
               .sat-main-label {
                 display: flex;
