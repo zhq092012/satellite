@@ -7,22 +7,7 @@
         <div class="render-loading__text">正在加载卫星数据...</div>
       </div>
     </div>
-    <div class="toolbox" v-show="cesiumInitialized" v-if="props.hasNav">
-      <el-switch
-        v-model="store.effectModel"
-        active-action-icon="View"
-        inactive-action-icon="Hide"
-        active-text="惯性参考系"
-        @change="handleChangeEffectModel"
-      />
-      <el-switch
-        v-model="store.showSatelliteList"
-        active-action-icon="View"
-        inactive-action-icon="Hide"
-        active-text="卫星列表"
-        @change="store.toggleShowSatelliteList"
-      />
-    </div>
+
     <div v-if="selectedConstellation" class="constellation-toolbar">
       <span class="constellation-toolbar__badge">{{
         selectedConstellation.chineseName || selectedConstellation.name
@@ -241,9 +226,6 @@ const initViewer = async () => {
       // 设置每帧最大渲染时间，避免单帧过长导致界面卡顿（根据实际情况调整，单位：秒）
       viewer.scene.maximumRenderTimeChange = 0.1
 
-      // 转换参考系：使用组件级单例 rotationController，避免重复创建多个实例
-      rotationController.value = new EarthRotationController(viewer)
-      rotationController.value.enable()
       // 设置时间系统
       if (props.showTimeLine) {
         if (store.activedTask) {
@@ -780,12 +762,6 @@ function handleViewerClickEvent() {
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
 }
 
-const handleChangeEffectModel = (value: boolean) => {
-  store.toggleEffectModel(value)
-  showPaths.value = false
-
-  emit('changeEffectModel', value)
-}
 const getSatelliteColorByType = (type: string) => {
   if (type) {
     if (type.includes('军事')) {

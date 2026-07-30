@@ -3,7 +3,7 @@
     <!-- 顶部导航与控制栏 Header -->
     <div class="cema-header">
       <div class="header-left">
-        <span class="header-title glow-text">三层链路拓扑毁伤分析 (AntV G6)</span>
+        <span class="header-title glow-text">三层链路拓扑毁伤分析</span>
       </div>
 
       <!-- 烈度与视图模式切换选项 -->
@@ -347,7 +347,8 @@ const scrollToActiveCard = (force = false) => {
   // 2. 若当前没有活跃窗口，则获取与当前推演时刻时间间隔最近的窗口卡片
   if (!targetWin) {
     targetWin = allWindowsList.value.reduce((prev, curr) => {
-      return Math.abs(curr.startTimestamp - currentTimestamp.value) < Math.abs(prev.startTimestamp - currentTimestamp.value)
+      return Math.abs(curr.startTimestamp - currentTimestamp.value) <
+        Math.abs(prev.startTimestamp - currentTimestamp.value)
         ? curr
         : prev
     })
@@ -1268,13 +1269,14 @@ const buildG6GraphData = () => {
   // 2. Layer 2: 地面接收站层 (Ground Stations)
   // 当 receiveStatus === 1 时表示接收站受毁伤/打击，根据视图模式汇总状态
   const receiveMap = new Map<string, { receiveId: string; receiveName: string; status: number }>()
-  const relLists = currentViewMode.value === 'PRE_STRIKE'
-    ? [data.initRelationList].filter(Boolean)
-    : [data.stationRelationList, data.initRelationList].filter(Boolean)
+  const relLists =
+    currentViewMode.value === 'PRE_STRIKE'
+      ? [data.initRelationList].filter(Boolean)
+      : [data.stationRelationList, data.initRelationList].filter(Boolean)
 
   relLists.forEach((rl) => {
     ;(rl.receiveObjList || []).forEach((rec) => {
-      const recStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : (rec.receiveStatus || 0)
+      const recStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : rec.receiveStatus || 0
       if (!receiveMap.has(rec.receiveId)) {
         receiveMap.set(rec.receiveId, {
           receiveId: rec.receiveId,
@@ -1297,7 +1299,7 @@ const buildG6GraphData = () => {
   const stationMap = new Map<string, { stationId: string; stationName: string; status: number }>()
   relLists.forEach((rl) => {
     ;(rl.stationObjList || []).forEach((st) => {
-      const stStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : (st.stationStatus || 0)
+      const stStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : st.stationStatus || 0
       if (!stationMap.has(st.stationId)) {
         stationMap.set(st.stationId, {
           stationId: st.stationId,
