@@ -3,17 +3,21 @@
     <!-- 当切换为 G6 视图模式时直接渲染 G6 视图组件 -->
     <ElectronicWarfareG6 v-if="viewMode === 'G6'" />
 
+    <!-- 当切换为甘特图模式时直接渲染甘特图组件 -->
+    <SatelliteGantt v-else-if="viewMode === 'GANTT'" :matrix-data="matrixData" />
+
     <!-- 3D 视图模式 -->
     <template v-else>
       <!-- Top Navigation Header -->
       <div class="cema-header">
         <div class="header-left">
           <span class="header-title glow-text">战术算法矩阵3D拓扑</span>
-          <!-- 3D vs G6 视图模式切换按钮 -->
-          <div class="view-mode-toggle" style="margin-left: 15px;">
+          <!-- 3D vs G6 vs GANTT 视图模式切换按钮 -->
+          <div class="view-mode-toggle" style="margin-left: 15px">
             <el-radio-group v-model="viewMode" size="small">
               <el-radio-button value="3D">3D 矩阵拓扑</el-radio-button>
-              <el-radio-button value="G6">G6 三层拓扑与时间轴</el-radio-button>
+              <el-radio-button value="G6">G6 三层拓扑</el-radio-button>
+              <el-radio-button value="GANTT">卫星击毁甘特图</el-radio-button>
             </el-radio-group>
           </div>
         </div>
@@ -80,13 +84,14 @@ import { getMatrixList } from '@/api/electronic'
 import type { MatrixResult, Weapon } from '@/api/electronic'
 import Battlefield3D from '@/components/electronic/Battlefield3D.vue'
 import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue'
+import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import { parseLatLon } from '@/db/matrixAdapter'
 
 const store = useLayoutStore()
 
 // [变量用途]
-// 拓扑视图类型 (3D 矩阵拓扑 vs G6 三层拓扑与时间轴)
-const viewMode = ref<'3D' | 'G6'>('3D')
+// 拓扑视图类型 (3D 矩阵拓扑 vs G6 三层拓扑 vs 甘特图矩阵)
+const viewMode = ref<'3D' | 'G6' | 'GANTT'>('3D')
 
 // 交战烈度类型
 type IntensityLevelType = '高烈度' | '中烈度' | '低烈度'
@@ -141,10 +146,9 @@ const loading = ref(false)
 const fetchMatrixData = async () => {
   loading.value = true
   try {
-    const currentTaskIdStr = String(store.activedTask?.id || 'scen-001')
     const matrixRes = await getMatrixList({
       norad: 57693,
-      taskId: currentTaskIdStr,
+      taskId: store.activedTask?.id || 0,
       intensityLevel: currentIntensity.value,
     })
 

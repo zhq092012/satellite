@@ -50,8 +50,13 @@
       </div>
     </div>
 
+    <!-- 当切换为甘特图模式时，渲染卫星击毁甘特图组件 -->
+    <div v-if="currentViewMode === 'GANTT'" class="cema-workspace" style="height: calc(100vh - 60px); padding: 0">
+      <SatelliteGantt :matrix-data="matrixData" />
+    </div>
+
     <!-- 中间主视图与拓扑画布区域 -->
-    <div class="cema-workspace">
+    <div v-else class="cema-workspace">
       <!-- 状态与统计看板小条 -->
       <div class="topo-summary-bar">
         <div class="stat-badge">
@@ -121,7 +126,7 @@
     </div>
 
     <!-- 底部时间轴控制与过境窗口面板 -->
-    <div class="cema-timeline-footer" v-if="allWindowsList.length > 0">
+    <div class="cema-timeline-footer" v-if="currentViewMode !== 'GANTT' && allWindowsList.length > 0">
       <div class="timeline-ctrl-bar">
         <div class="ctrl-left">
           <span class="timeline-title"> <i class="el-icon-timer"></i> 打击/过境时间轴 </span>
@@ -214,6 +219,7 @@ import { VideoPlay, VideoPause, RefreshRight, DArrowLeft, DArrowRight } from '@e
 import { useLayoutStore } from '@/store/modules/layout'
 import { getMatrixList } from '@/api/electronic'
 import type { MatrixResult, Weapon } from '@/api/electronic'
+import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 
 const store = useLayoutStore()
 
@@ -228,7 +234,7 @@ const currentIntensity = ref<IntensityLevelType>('高烈度')
 
 // [类型用途]
 // 拓扑视图显示模式选项
-type ViewModeType = 'COMBINED' | 'PRE_STRIKE' | 'POST_STRIKE'
+type ViewModeType = 'COMBINED' | 'PRE_STRIKE' | 'POST_STRIKE' | 'GANTT'
 
 // [变量用途]
 // 拓扑视图切换选项列表
@@ -236,6 +242,7 @@ const viewModeOptions: { key: ViewModeType; name: string }[] = [
   { key: 'COMBINED', name: '打击前后全景对比' },
   { key: 'PRE_STRIKE', name: '打击前拓扑(未打击)' },
   { key: 'POST_STRIKE', name: '打击后拓扑(毁伤分析)' },
+  { key: 'GANTT', name: '打击过境甘特图矩阵' },
 ]
 
 // [变量用途]
@@ -905,10 +912,9 @@ const registerCustomG6Edge = () => {
 const fetchMatrixData = async () => {
   loading.value = true
   try {
-    const currentTaskIdStr = String(store.activedTask?.id || 'scen-001')
     const matrixRes = await getMatrixList({
       norad: 57693,
-      taskId: currentTaskIdStr,
+      taskId: store.activedTask?.id || 0,
       intensityLevel: currentIntensity.value,
     })
 

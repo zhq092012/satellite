@@ -10,14 +10,12 @@ import '@/styles/dark/index.scss'
 // 引入 cesium 样式
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 window.CESIUM_BASE_URL = '/cesium/'
-import ganttastic from '@infectoone/vue-ganttastic'
 
 let app: ReturnType<typeof createApp> | null = null
 
 app = createApp(App)
 app.use(store)
 app.use(router)
-app.use(ganttastic)
 
 // 注册所有图标组件
 for (const [key, component] of Object.entries(ElementPlusIcons)) {

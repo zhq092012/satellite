@@ -213,7 +213,7 @@ export interface MatrixResult {
  * @param data 请求参数对象 (norad, taskId, intensityLevel)
  * @returns 包含 MatrixResult 的 Axios 响应 Promise
  */
-export const getMatrixList = (data: { norad: number; taskId: string; intensityLevel: string }) => {
+export const getMatrixList = (data: { norad: number; taskId: number; intensityLevel: string }) => {
   const url = `/api/algorithm/calSeriesChain`
   return requestAPI.post<AxiosResponseType<MatrixResult>>(url, data)
 }
