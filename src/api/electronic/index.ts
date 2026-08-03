@@ -59,12 +59,50 @@ export interface InitMatrix {
   initWindows: InitWindow[];//卫星过境时间窗口
 }
 
-// 拓扑关系列表（统一适用于 initRelationList 和 stationRelationList）
 export interface StationRelationList {
   receiveObjList: ReceiveObj[];// 接收站列表
   stationObjList: StationObj[];// 中心站列表
   relations: RelationMap[];// 站与站之间的拓扑关联映射
 }
+/**
+ * [类型用途]
+ * 星间中继拓扑关联单项映射结构。
+ *
+ * [数据来源]
+ * 后端算法矩阵接口返回数据中的 relayRelation.relations 元素。
+ *
+ * [字段规则]
+ * - from: 发起卫星 ID / NORAD (如 "48643")
+ * - to: 目标中继卫星 ID / NORAD (如 "22314")
+ */
+export interface RelayRelationMap {
+  /** 发起方卫星 NORAD/Id 字符串 */
+  from: string;
+  /** 接收方中继卫星 NORAD/Id 字符串 */
+  to: string;
+}
+
+/**
+ * [类型用途]
+ * 星间中继拓扑关系结构。
+ *
+ * [数据来源]
+ * 后端算法矩阵接口返回数据中的 relayRelation 节点。
+ *
+ * [字段规则]
+ * - relayList: 中继卫星 NORAD 编号列表 (如 [22314])
+ * - satelliteList: 普通/观测卫星 NORAD 编号列表 (如 [48643, 57693, 58136])
+ * - relations: 星间中继拓扑链路映射列表
+ */
+export interface RelayRelation {
+  /** 中继卫星 NORAD 编号数组 */
+  relayList: number[];
+  /** 普通/观测卫星 NORAD 编号数组 */
+  satelliteList: number[];
+  /** 星间中继拓扑链路映射列表 */
+  relations: RelayRelationMap[];
+}
+
 
 /**
  * 卫星矩阵中的地面站接收窗口数据结构。
@@ -190,6 +228,8 @@ export interface MatrixResult {
   satelliteMatrixList: SatelliteMatrix[];
   /** 站与站之间的拓扑关联映射 */
   stationRelationList: StationRelationList;
+  /** 星间中继拓扑关系映射 (可选) */
+  relayRelation?: RelayRelation;
   /** 卫星系列 */
   series: string;
 }

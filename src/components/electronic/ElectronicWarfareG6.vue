@@ -98,24 +98,24 @@
           <div class="layer-sidebar-item layer-1-item">
             <span class="layer-icon">🛰️</span>
             <div class="layer-text">
-              <span class="layer-title">第一层：卫星层</span>
-              <span class="layer-sub">Satellites Layer</span>
+              <span class="layer-title">第一层：普通卫星</span>
+              <span class="layer-sub">Ordinary Satellites</span>
             </div>
           </div>
 
           <div class="layer-sidebar-item layer-2-item">
-            <span class="layer-icon">📡</span>
+            <span class="layer-icon">🛰️</span>
             <div class="layer-text">
-              <span class="layer-title">第二层：接收站</span>
-              <span class="layer-sub">Ground Stations Layer</span>
+              <span class="layer-title">第二层：中继卫星</span>
+              <span class="layer-sub">Relay Satellites</span>
             </div>
           </div>
 
           <div class="layer-sidebar-item layer-3-item">
-            <span class="layer-icon">🏢</span>
+            <span class="layer-icon">📡</span>
             <div class="layer-text">
-              <span class="layer-title">第三层：数据中心层</span>
-              <span class="layer-sub">Data Centers Layer</span>
+              <span class="layer-title">第三层：接收站/数据中心</span>
+              <span class="layer-sub">Ground & Data Layer</span>
             </div>
           </div>
         </div>
@@ -448,6 +448,23 @@ const demoMatrixData: MatrixResult = {
       ],
     },
     {
+      norad: 22314,
+      name: 'TDRS-6',
+      satType: '通信/数据中继',
+      line1: '1 22314U 93003B   26190.86332351 -.00000293  00000-0  00000+0 0  9990',
+      line2: '2 22314  14.1831 356.8885 0008000 183.3729  12.1505  1.00281718122632',
+      initWindows: [
+        {
+          receiveId: '6a66d2391ce9af52c9cd82b8',
+          receiveName: '南非开普敦',
+          receiveLat: 33.97,
+          receiveLon: 18.42,
+          peakWindow: '2026-07-28 05:02:45',
+          endWindow: '2026-07-28 19:25:22',
+        },
+      ],
+    },
+    {
       norad: 57693,
       name: 'CAPELLA-11',
       satType: '地球观测',
@@ -465,6 +482,15 @@ const demoMatrixData: MatrixResult = {
       ],
     },
   ],
+  relayRelation: {
+    relayList: [22314],
+    satelliteList: [48643, 57693, 58136],
+    relations: [
+      { from: '48643', to: '22314' },
+      { from: '57693', to: '22314' },
+      { from: '58136', to: '22314' },
+    ],
+  },
   initRelationList: {
     receiveObjList: [
       {
@@ -1217,6 +1243,17 @@ const highlightActiveElements = () => {
     activeEdgeKeys.add(`${satId}::${w.receiveId}`)
   })
 
+  // [逻辑说明] 当关联卫星处于活跃过境状态时，同步保持星间中继拓扑链路与中继卫星的高亮与连接活跃
+  const relayRels = matrixData.value?.relayRelation?.relations || []
+  relayRels.forEach((rel) => {
+    const fromId = `sat-${rel.from}`
+    const toId = `sat-${rel.to}`
+    if (activeNodeIds.has(fromId)) {
+      activeNodeIds.add(toId)
+      activeEdgeKeys.add(`${fromId}::${toId}`)
+    }
+  })
+
   graph.getEdges().forEach((edge: any) => {
     const model = edge.getModel()
     const key = `${model.source}::${model.target}`
@@ -1260,7 +1297,7 @@ const buildG6GraphData = () => {
   const edges: any[] = []
   const nodeSet = new Set<string>()
 
-  // 1. Layer 1: 卫星层 (Satellites)
+  // 1. 提取普通卫星 (Layer 1) 与 中继卫星 (Layer 2)
   const satMap = new Map<number, { norad: number; name: string; satType: string; status: number }>()
   ;(data.initMatrixList || []).forEach((s) => {
     satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: 0 })
@@ -1268,12 +1305,29 @@ const buildG6GraphData = () => {
   ;(data.satelliteMatrixList || []).forEach((s) => {
     satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: s.satelliteStatus || 0 })
   })
+  // [逻辑说明] 提取星间中继拓扑关系中的中继卫星节点
+  if (data.relayRelation) {
+    (data.relayRelation.relayList || []).forEach((norad) => {
+      if (!satMap.has(norad)) {
+        satMap.set(norad, { norad, name: `TDRS-${norad}`, satType: '通信/数据中继', status: 0 })
+      }
+    })
+  }
 
   const satList = Array.from(satMap.values())
   satNodeCount.value = satList.length
 
-  // 2. Layer 2: 地面接收站层 (Ground Stations)
-  // 当 receiveStatus === 1 时表示接收站受毁伤/打击，根据视图模式汇总状态
+  // 判断是否为中继卫星 (satType 包含 "中继" 或在 relayRelation.relayList 中)
+  const isRelaySat = (s: { satType?: string; norad: number }) => {
+    const isRelayType = (s.satType || '').includes('中继')
+    const inRelayList = (data.relayRelation?.relayList || []).includes(s.norad)
+    return isRelayType || inRelayList
+  }
+
+  const normalSatList = satList.filter((s) => !isRelaySat(s))
+  const relaySatList = satList.filter((s) => isRelaySat(s))
+
+  // 2. Layer 3: 地面接收站 (Ground Stations)
   const receiveMap = new Map<string, { receiveId: string; receiveName: string; status: number }>()
   const relLists =
     currentViewMode.value === 'PRE_STRIKE'
@@ -1300,8 +1354,7 @@ const buildG6GraphData = () => {
   const receiveList = Array.from(receiveMap.values())
   receiveNodeCount.value = receiveList.length
 
-  // 3. Layer 3: 中心云数据中心层 (Data Centers)
-  // 当 stationStatus === 1 时表示数据中心受毁伤/打击，根据视图模式汇总状态
+  // 3. Layer 3: 中心云数据中心 (Data Centers)
   const stationMap = new Map<string, { stationId: string; stationName: string; status: number }>()
   relLists.forEach((rl) => {
     ;(rl.stationObjList || []).forEach((st) => {
@@ -1323,16 +1376,16 @@ const buildG6GraphData = () => {
   const stationList = Array.from(stationMap.values())
   stationNodeCount.value = stationList.length
 
-  // 计算节点在 3 层的坐标布局 (Layer 1: y=60, Layer 2: y=200, Layer 3: y=340)
+  // 计算 3 层节点的坐标布局 (Layer 1 普通卫星: y=80, Layer 2 中继卫星: y=230, Layer 3 接收站: y=380, Layer 3 数据中心: y=490)
   const containerW = g6Container.value ? g6Container.value.clientWidth : 950
   const startX = 30
   const availableW = Math.max(containerW - startX - 30, 400)
 
-  // 排布 Layer 1 卫星
-  satList.forEach((sat, i) => {
+  // 排布 Layer 1 普通卫星 (y = 80)
+  normalSatList.forEach((sat, i) => {
     const id = `sat-${sat.norad}`
     nodeSet.add(id)
-    const x = startX + (availableW / (satList.length + 1)) * (i + 1)
+    const x = startX + (availableW / (normalSatList.length + 1)) * (i + 1)
     const isStruck = sat.status === 1
     const bgFill = isStruck ? '#2d1215' : '#092638'
     const strokeColor = isStruck ? '#ff4d4f' : '#00e1ff'
@@ -1343,7 +1396,7 @@ const buildG6GraphData = () => {
       label: `${sat.name}\n[${sat.satType}]`,
       layer: 1,
       x,
-      y: 90,
+      y: 80,
       type: 'rect',
       size: [130, 42],
       anchorPoints: [
@@ -1399,11 +1452,81 @@ const buildG6GraphData = () => {
     })
   })
 
-  // 排布 Layer 2 地面站
+  // 排布 Layer 2 中继卫星 (y = 230)
+  relaySatList.forEach((sat, i) => {
+    const id = `sat-${sat.norad}`
+    nodeSet.add(id)
+    const x = startX + (availableW / (relaySatList.length + 1)) * (i + 1)
+    const isStruck = sat.status === 1
+    const bgFill = isStruck ? '#2d1215' : '#1e112a'
+    const strokeColor = isStruck ? '#ff4d4f' : '#a855f7'
+    const textColor = isStruck ? '#ff7875' : '#e9d5ff'
+
+    nodes.push({
+      id,
+      label: `${sat.name}\n[${sat.satType}]`,
+      layer: 2,
+      x,
+      y: 230,
+      type: 'rect',
+      size: [135, 42],
+      anchorPoints: [
+        [0.5, 0], // 0: 上边中心
+        [0.5, 1], // 1: 下边中心
+      ],
+      style: {
+        fill: bgFill,
+        stroke: strokeColor,
+        lineWidth: 2,
+        radius: 6,
+        shadowColor: isStruck ? 'rgba(255, 77, 79, 0.4)' : 'rgba(168, 85, 247, 0.4)',
+        shadowBlur: 10,
+      },
+      labelCfg: {
+        style: {
+          fill: textColor,
+          fontSize: 12,
+          fontWeight: 600,
+        },
+      },
+      stateStyles: {
+        active: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 3,
+          shadowColor: strokeColor,
+          shadowBlur: 16,
+        },
+        highlight: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 3,
+          shadowColor: strokeColor,
+          shadowBlur: 20,
+        },
+        hover: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 2.5,
+        },
+        selected: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 3,
+        },
+        inactive: {
+          fill: bgFill,
+          stroke: strokeColor,
+          opacity: 0.6,
+        },
+      },
+    })
+  })
+
+  // 排布 Layer 3 地面站 (y = 380)
   receiveList.forEach((rec, i) => {
     nodeSet.add(rec.receiveId)
     const x = startX + (availableW / (receiveList.length + 1)) * (i + 1)
-    // [逻辑说明] receiveStatus = 1 时，把接收站的边框颜色改为红色 (#ff4d4f)
     const isStruck = rec.status === 1
     const bgFill = isStruck ? '#2d1215' : '#0a2e2b'
     const strokeColor = isStruck ? '#ff4d4f' : '#00f2fe'
@@ -1412,9 +1535,9 @@ const buildG6GraphData = () => {
     nodes.push({
       id: rec.receiveId,
       label: rec.receiveName,
-      layer: 2,
+      layer: 3,
       x,
-      y: 280,
+      y: 380,
       type: 'rect',
       size: [120, 38],
       anchorPoints: [
@@ -1470,11 +1593,10 @@ const buildG6GraphData = () => {
     })
   })
 
-  // 排布 Layer 3 数据中心
+  // 排布 Layer 3 数据中心 (y = 490)
   stationList.forEach((st, i) => {
     nodeSet.add(st.stationId)
     const x = startX + (availableW / (stationList.length + 1)) * (i + 1)
-    // [逻辑说明] stationStatus = 1 时，把数据中心的边框颜色改为红色 (#ff4d4f)
     const isStruck = st.status === 1
     const bgFill = isStruck ? '#2d1215' : '#10244c'
     const strokeColor = isStruck ? '#ff4d4f' : '#3b82f6'
@@ -1485,7 +1607,7 @@ const buildG6GraphData = () => {
       label: st.stationName,
       layer: 3,
       x,
-      y: 470,
+      y: 490,
       type: 'rect',
       size: [170, 44],
       anchorPoints: [
@@ -1650,6 +1772,42 @@ const buildG6GraphData = () => {
             fill: isSevered ? '#ff4d4f' : '#60a5fa',
             fontSize: 10,
             background: { fill: isSevered ? '#300a0e' : '#061938', padding: [2, 4], radius: 3 },
+          },
+        },
+      })
+    }
+  })
+
+  // 3. Layer 1 -> Layer 2 边 (星间数据中继拓扑关系: 普通卫星 -> 数据中继卫星)
+  const relayRels = data.relayRelation?.relations || []
+  relayRels.forEach((rel) => {
+    const sourceSatId = `sat-${rel.from}`
+    const targetSatId = `sat-${rel.to}`
+    const edgeId = `edge-relay-${rel.from}-${rel.to}`
+
+    if (!edgeSet.has(edgeId) && nodeSet.has(sourceSatId) && nodeSet.has(targetSatId)) {
+      edgeSet.add(edgeId)
+      normalCount++
+
+      edges.push({
+        id: edgeId,
+        source: sourceSatId,
+        target: targetSatId,
+        sourceAnchor: 1, // 源节点下边中心 (Layer 1)
+        targetAnchor: 0, // 目标节点上边中心 (Layer 2)
+        type: 'struck-cubic',
+        isStruck: false,
+        style: {
+          stroke: '#a855f7',
+          lineWidth: 2,
+          lineDash: [4, 4],
+        },
+        label: '📡 星间中继',
+        labelCfg: {
+          style: {
+            fill: '#c084fc',
+            fontSize: 10,
+            background: { fill: '#1e112a', padding: [2, 4], radius: 3 },
           },
         },
       })

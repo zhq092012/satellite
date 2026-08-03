@@ -452,6 +452,25 @@ const activeLinks = computed(() => {
     })
   }
 
+  // 3. Layer 2 -> Layer 2 连线 (星间数据中继拓扑关系: 卫星 -> 中继卫星)
+  if (data.relayRelation && data.relayRelation.relations) {
+    data.relayRelation.relations.forEach((rel) => {
+      const sourceSatId = `sat-${rel.from}`
+      const targetSatId = `sat-${rel.to}`
+      const linkId = `${sourceSatId}::${targetSatId}`
+      if (!linkSet.has(linkId)) {
+        linkSet.add(linkId)
+        linkList.push({
+          id: linkId,
+          source: sourceSatId,
+          target: targetSatId,
+          delayLabel: '星间数据中继',
+          link_status: 'TRANSMITTING',
+        })
+      }
+    })
+  }
+
   return linkList
 })
 
