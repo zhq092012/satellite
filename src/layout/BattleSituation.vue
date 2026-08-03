@@ -233,12 +233,6 @@ const tabDefs = [
     component: 'ElectronicWarfareG6',
     permissionCode: 'battle:electronicWarfare',
   },
-  {
-    label: '卫星过境与打击态势甘特图',
-    value: '卫星过境与打击态势甘特图',
-    component: 'SatelliteGantt',
-    permissionCode: 'battle:electronicWarfare',
-  },
 ] as const
 
 /**

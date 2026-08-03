@@ -85,18 +85,44 @@ import { bindInfoBoxButton, createInfoBoxActionButton, unbindInfoBoxButton } fro
 import { CallbackProperty } from 'cesium'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 
+// 全局布局状态管理 store
 const store = useLayoutStore()
+// 卫星详情弹窗 composable，用于打开卫星档案对话框
 const { openSatelliteProfile } = useSatelliteProfileDialog()
-const showPaths = ref(false) // 默认不显示卫星轨迹
+// 是否显示卫星轨迹路径，默认关闭（避免大量实体导致性能下降）
+const showPaths = ref(false)
+// 地图瓦片服务地址（来自环境变量）
 const MATERIAL_URL = import.meta.env.VITE_MATERIAL_URL
+// Cesium 容器 DOM 引用
 const cesiumContainer = useTemplateRef('cesiumContainer')
+// Cesium credit 容器 DOM 引用（避免多个 Viewer 实例抢占同一 id）
 const creditEl = ref<HTMLElement | null>(null)
+
+/**
+ * 组件对外暴露的事件定义
+ *
+ * [事件说明]
+ * - threatAnalysis: 触发威胁分析面板
+ * - changeEffectModel: 切换惯性系/地固系效果模式，payload 为是否启用效果模式
+ */
 interface Emits {
   (e: 'threatAnalysis'): void
   (e: 'changeEffectModel', payload: boolean): void
 }
 const emit = defineEmits<Emits>()
 
+/**
+ * 组件 Props 定义
+ *
+ * [字段说明]
+ * - tabKey: 父组件 tab 标识，用于区分不同 Viewer 实例
+ * - hasNav: 是否显示导航
+ * - position: 相机初始定位坐标（经度、纬度、高度，单位：度/米）
+ * - showSatMsg: 是否显示卫星信息面板
+ * - showTimeLine: 是否显示时间轴控件
+ * - showAnimation: 是否显示动画控件
+ * - matrixData: 算法矩阵数据（包含地面站、中继卫星、过境窗口与打压状态）
+ */
 const props = defineProps<{
   tabKey?: string | number
   hasNav?: boolean
@@ -111,16 +137,31 @@ const props = defineProps<{
   /** 算法矩阵数据（包含地面站、中继卫星、过境窗口与打压状态） */
   matrixData?: MatrixResult | null
 }>()
+
+// Cesium Viewer 实例（全局唯一），未初始化时为 undefined
 let viewer: Cesium.Viewer
+// 容器尺寸监听器，用于在容器尺寸变化时同步 Viewer 渲染
 let resizeObserver: ResizeObserver | null = null
+// 防止 initViewer 并发调用的互斥锁
 let viewerInitializing = false
-// cesium 是否加载完成
+// Cesium 是否已完成首次初始化（用于外部判断是否可以操作 Viewer）
 const cesiumInitialized = ref(false)
-// 地球自转控制器实例
+// 地球自转控制器实例（惯性系模式时启用，地固系模式时禁用）
 const rotationController = ref<EarthRotationController | null>(null)
+
+// 卫星类型展示顺序（用于战场态势统计图表的固定排序）
 const SATELLITE_TYPE_ORDER = ['导弹预警', '侦察', '通信', '导航', '太空目标监视与攻防'] as const
+// 武器类型展示顺序（用于战场态势武器统计图表的固定排序）
 const weaponTypeOrder = ['动能', '定向能', '电子干扰', '天基武器', '其他'] as const
 
+/**
+ * 战场态势面板中四个 ECharts 图表实例缓存
+ *
+ * [说明]
+ * - 使用对象集中管理，组件销毁时统一 dispose 防止内存泄漏
+ * - key 含义：redSatelliteType（红方卫星类型柱状图）、blueSatelliteType（蓝方卫星类型柱状图）
+ *           redWeaponType（红方武器分类饼图）、blueWeaponType（蓝方武器分类饼图）
+ */
 const chartInstances = {
   redSatelliteType: null as echarts.ECharts | null,
   blueSatelliteType: null as echarts.ECharts | null,
@@ -128,11 +169,35 @@ const chartInstances = {
   blueWeaponType: null as echarts.ECharts | null,
 }
 
+/**
+ * [功能]
+ * 检查容器 DOM 元素是否具有有效尺寸（宽高均大于 0）
+ *
+ * [处理规则]
+ * - 容器尺寸为 0 时 Cesium 会创建 0 宽高纹理导致 WebGL 报错，必须先检查
+ *
+ * @param el 容器 DOM 元素
+ * @returns 是否具有有效尺寸
+ */
 const hasValidContainerSize = (el: HTMLElement | null) => {
   if (!el) return false
   return el.clientWidth > 0 && el.clientHeight > 0
 }
 
+/**
+ * [功能]
+ * 等待 Cesium 容器 DOM 具有有效尺寸（宽高大于 0）
+ *
+ * [处理规则]
+ * - 每帧检查一次，最多等待 maxFrames 帧（默认 180 帧 ≈ 3 秒）
+ * - 适用于容器可能因 Tab 切换、CSS display:none 等原因暂时无尺寸的场景
+ *
+ * [修改约束]
+ * - 不要改为同步等待，requestAnimationFrame 保证与渲染帧同步
+ *
+ * @param maxFrames 最大等待帧数，默认 180
+ * @returns 是否在超时前获得有效尺寸
+ */
 const waitForContainerReady = async (maxFrames = 180) => {
   for (let i = 0; i < maxFrames; i += 1) {
     if (hasValidContainerSize(cesiumContainer.value || null)) {
@@ -144,6 +209,18 @@ const waitForContainerReady = async (maxFrames = 180) => {
   return false
 }
 
+/**
+ * [功能]
+ * 根据当前容器尺寸，同步 Cesium Viewer 的渲染循环开关
+ *
+ * [处理规则]
+ * - 容器尺寸有效时开启渲染循环，并强制 resize + 请求渲染
+ * - 容器尺寸为 0 时暂停渲染，避免 Cesium 创建 0×0 纹理导致 WebGL 报错
+ *
+ * [副作用]
+ * - 修改 viewer.useDefaultRenderLoop
+ * - 触发 viewer.scene.requestRender()
+ */
 const syncViewerRenderLoopWithContainer = () => {
   if (!viewer || !cesiumContainer.value) return
   const canRender = hasValidContainerSize(cesiumContainer.value)
@@ -154,6 +231,18 @@ const syncViewerRenderLoopWithContainer = () => {
   viewer.scene.requestRender()
 }
 
+/**
+ * [功能]
+ * 启动容器尺寸变化监听（ResizeObserver）
+ *
+ * [处理规则]
+ * - 已存在监听器时直接返回，避免重复注册
+ * - 容器尺寸从 0 变为有效值且 Viewer 尚未初始化时，自动触发 initViewer
+ * - 已初始化时同步渲染循环开关
+ *
+ * [修改约束]
+ * - 必须与 stopContainerSizeObserver 配对调用，防止内存泄漏
+ */
 const startContainerSizeObserver = () => {
   if (!cesiumContainer.value || resizeObserver) return
   resizeObserver = new ResizeObserver(() => {
@@ -166,6 +255,13 @@ const startContainerSizeObserver = () => {
   resizeObserver.observe(cesiumContainer.value)
 }
 
+/**
+ * [功能]
+ * 停止并销毁容器尺寸变化监听器
+ *
+ * [副作用]
+ * - 断开 ResizeObserver 并置空引用
+ */
 const stopContainerSizeObserver = () => {
   if (!resizeObserver) return
   resizeObserver.disconnect()
@@ -196,8 +292,8 @@ const initViewer = async () => {
         fullscreenButton: false, // 关闭全屏按钮
         baseLayerPicker: false, // 关闭底图选择器
         baseLayer: false, // 不使用默认底图
-        infoBox: true, // 打开消息框（点击实体时显示信息）
-        selectionIndicator: false, // 关闭选中指示器（我们自定义点击事件）
+        infoBox: false, // 打开消息框（点击实体时显示信息）
+        selectionIndicator: true, // 关闭选中指示器（我们自定义点击事件）
       })
       // 关闭默认双击追踪（保持相机不动）
       viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
@@ -286,7 +382,17 @@ const initViewer = async () => {
   }
 }
 
-// 清空viewer
+/**
+ * [功能]
+ * 清空 Viewer 中所有实体、集合和状态，通常在任务切换时调用
+ *
+ * [副作用]
+ * - 移除时钟 Tick 监听器
+ * - 清理电子信息网络实体
+ * - 清空所有 Cesium 实体和原语集合
+ * - 重置内存中的映射表（不释放 viewer）
+ * - 关闭卫星面板
+ */
 const clearViewer = () => {
   if (!viewer) return
   if (clockTickRemoveListener) {
@@ -305,10 +411,22 @@ const clearViewer = () => {
   store.closeSatPanel()
 }
 
-//所有卫星实体
+// 以 NORAD 编号为 key，存储当前渲染的所有卫星实体
 let satelliteEntities = new Map<number, Cesium.Entity>()
 
-// 存储每个卫星的多周期轨道数据（基于 TLE / satellite.js 计算出来的采样轨道）
+/**
+ * 每颗卫星的多周期轨道采样数据
+ *
+ * [数据来源]
+ * 基于 TLE 两行数据，通过 satellite.js 计算得到的采样轨道
+ *
+ * [取值规则]
+ * - key 为 NORAD 编号
+ * - samples: 采样点数组，每个元素包含时间、位置、所属周期索引
+ * - singleOrbitPeriod: 单圈周期（秒）
+ * - totalPeriods: 总周期数
+ * - startTime: 轨道计算开始时刻
+ */
 const satelliteOrbitData = new Map<
   number,
   {
@@ -319,17 +437,36 @@ const satelliteOrbitData = new Map<
   }
 >()
 
-// 缓存每颗卫星的 SampledPositionProperty（避免反复重建）
+/**
+ * 每颗卫星的 SampledPositionProperty 缓存
+ *
+ * [说明]
+ * 避免切换筛选条件时反复重建，显著减少内存分配和计算开销
+ */
 const satellitePositionPropertyCache = new Map<number, Cesium.SampledPositionProperty>()
 
-// 缓存每颗卫星的 TLE 数据，避免重复请求/解析
+/**
+ * 每颗卫星的 TLE 数据缓存
+ *
+ * [说明]
+ * - key 为 NORAD 编号
+ * - 避免对同一卡号的卫星重复请求接口
+ * - 任务切换时会主动清除，防止旧数据污染
+ */
 const satelliteTleCache = new Map<number, any>()
 
-// 缓存当前任务（taskId）的卫星列表，避免重复请求
+/**
+ * 当前任务的卫星列表缓存
+ *
+ * [取值规则]
+ * - 首次请求成功后填充，同一任务内不重复请求接口
+ * - 任务切换时清空（cachedTaskId 不匹配时）
+ */
 let cachedSatelliteList: SatelliteData[] | null = null
+// 当前缓存对应的任务 ID
 let cachedTaskId: number | null = null
 
-// 记录当前渲染任务的 taskId，切换任务时清理缓存
+// 当前渲染任务的 taskId，用于切换任务时检测是否需要清理缓存
 let currentRenderTaskId: number | null = null
 
 // 存储电子信息网络基础设施实体 ID (地面站、中心云站)
@@ -337,8 +474,11 @@ const electronicNodeEntityIds = new Set<string>()
 // 存储电子信息网络动态连线实体 ID (星地过境、星中中继、地地网)
 const electronicDynamicLinkEntityIds = new Set<string>()
 
+// 电子信息战录 composable：解析地面站、中继卡号集和过境窗口判断工具
 const { infrastructureNodes, relayNoradSet, isTimeInWindow } = useElectronicCesiumBridge(toRef(props, 'matrixData'))
+// 时间轴同步：将 Cesium 时钟时间同步到全局仿真时间状态
 const { updateSimulationTime } = useTimelineSync()
+// Cesium 时钟 onTick 监听器的移除函数（组件销毁时必须调用）
 let clockTickRemoveListener: Cesium.Event.RemoveCallback | null = null
 
 /**
@@ -733,17 +873,33 @@ watch(
   { deep: true }
 )
 
-// point + label 集合（用于大量卫星展示，避免反复新建）
+/**
+ * 占点和标签原语集合（Primitive Collection）
+ *
+ * [说明]
+ * - 大量卫星展示时使用 Primitive 替代 Entity，性能显著优于每颗单独创建 Entity
+ * - pointCollection: 占点集合，复用旧实例避免重建
+ * - labelCollection: 标签集合，远距离隱藏防止 2w+ 标签性能问题
+ */
 let pointCollection: Cesium.PointPrimitiveCollection | null = null
-let labelCollection: Cesium.LabelCollection | null = null // 调度渲染帧，避免在渲染中销毁 GPU 资源导致的 "对象已销毁" 错误
+let labelCollection: Cesium.LabelCollection | null = null
+// 以 NORAD 编号为 key，存储每颗卫星对应的 PointPrimitive
 const satellitePointPrimitives = new Map<number, Cesium.PointPrimitive>()
+// 以 NORAD 编号为 key，存储每颗卫星对应的 Label
 const satelliteLabelPrimitives = new Map<number, Cesium.Label>()
+// 以 NORAD 编号为 key，存储 Primitive 模式下附加的辅助 Entity
 const satellitePrimitiveEntities = new Map<number, Cesium.Entity>()
-let scheduledRenderHandle: number | null = null // 时间控制变量
+// 调度渲染帧句柄，用于延迟释放 GPU 资源（避免渲染中销毁导致“对象已销毁”报错）
+let scheduledRenderHandle: number | null = null
+// 卫星渲染导忙状态，为 true 时显示 Loading 蒙层
 const satelliteRenderBusy = ref(false)
+// 渲染任务版本号，每次启动新渲染时自增，旧任务检测到 token 不匹配时主动中止
 let satelliteRenderToken = 0
+// 时间轴回放速度（倍速），默认 20 倍
 const playbackSpeed = ref(20.0)
+// 当前选中的卡座（为 null 表示未选中）
 const selectedConstellation = ref<SatelliteConstellation | null>(null)
+// 是否显示卡座内部星间连线
 const showConstellationLinks = ref(true)
 
 const CONSTELLATION_CLOSE_VIEW_HEIGHT = 12_000_000
@@ -758,6 +914,18 @@ let cameraMoveEndListener: (() => void) | null = null
 // 卫星星座列表
 const satelliteConstellations = ref<SatelliteConstellation[]>([])
 // 获取卫星星座列表
+/**
+ * [功能]
+ * 加载卡座列表并初始化 NORAD 和颜色映射表
+ *
+ * [处理规则]
+ * - 已存在列表时直接返回，避免重复请求
+ * - 成功后构建 constellationNoradMap 和 constellationColorMap
+ *
+ * [副作用]
+ * - 修改 satelliteConstellations.value
+ * - 修改 constellationNoradMap 和 constellationColorMap
+ */
 const loadSatelliteConstellations = async () => {
   if (satelliteConstellations.value.length) return
   const res = await getSatelliteConstellations()
@@ -778,8 +946,27 @@ const loadSatelliteConstellations = async () => {
   }
 }
 
+/**
+ * [功能]
+ * 根据 NORAD 编号查询卡座信息
+ *
+ * @param norad 卡座内卫星的 NORAD 编号
+ * @returns 卡座对象，未找到时返回 null
+ */
 const getConstellationByNorad = (norad: number) => constellationNoradMap.get(Number(norad)) ?? null
 
+/**
+ * [功能]
+ * 获取卫星的展示颜色
+ *
+ * [处理规则]
+ * - 如果该卫星属于卡座，返回卡座对应的固定颜色
+ * - 如果不属于任何卡座，按卡座类型返回默认颜色
+ *
+ * @param satellite 卫星信息对象
+ * @param norad NORAD 编号
+ * @returns Cesium 颜色
+ */
 const getConstellationColor = (satellite: SatelliteInfo, norad: number) => {
   const constellation = getConstellationByNorad(norad)
   if (constellation) {
@@ -788,14 +975,36 @@ const getConstellationColor = (satellite: SatelliteInfo, norad: number) => {
   return Cesium.Color.clone(getSatelliteColorByType(satellite.sat_type), new Cesium.Color())
 }
 
+/**
+ * [功能]
+ * 判断当前相机是否处于卡座近视状态
+ *
+ * [说明]
+ * 当相机高度小于阔值时，卡座内卫星标签和连线才会显示
+ *
+ * @returns 是否为近视模式
+ */
 const isConstellationCloseView = () => {
   if (!viewer) return false
   return viewer.camera.positionCartographic.height <= CONSTELLATION_CLOSE_VIEW_HEIGHT
 }
 
+/**
+ * [功能]
+ * 获取当前选中卡座所有 NORAD 编号的 Set
+ *
+ * @returns NORAD 编号的 Set，未选中时返回空 Set
+ */
 const getSelectedConstellationNoradSet = () =>
   new Set((selectedConstellation.value?.noradIds ?? []).map((noradId) => Number(noradId)))
 
+/**
+ * [功能]
+ * 清除卡座叠加层实体（星间连线、包络线、中心标签）
+ *
+ * [副作用]
+ * - 从 viewer.entities 中移除并清空 constellationOverlayEntityIds
+ */
 const clearConstellationOverlayEntities = () => {
   if (!viewer) return
   constellationOverlayEntityIds.forEach((entityId) => {
@@ -807,6 +1016,20 @@ const clearConstellationOverlayEntities = () => {
   constellationOverlayEntityIds.clear()
 }
 
+/**
+ * [功能]
+ * 根据卡座内卫星的空间位置计算凸包络位置序列
+ *
+ * [业务目的]
+ * 通过中心点投影到局部 ENU 坐标系，按极角排序得到顺时针的卡座包络多边形
+ *
+ * [关键规则]
+ * - 位置数小于 2 时返回空数组
+ * - 最后将第一个点加到末尾以闭合多边形
+ *
+ * @param positions 卡座内所有卫星的三维坐标点数组
+ * @returns 按角度排序后的位置序列（闭合多边形）
+ */
 const buildConstellationEnvelopePositions = (positions: Cesium.Cartesian3[]) => {
   if (positions.length < 2) return [] as Cesium.Cartesian3[]
 
@@ -944,7 +1167,19 @@ const updateConstellationOverlayEntities = () => {
 
   viewer.scene.requestRender()
 }
-
+/**
+ * [功能]
+ * 应用卡座的可视化状态：根据卡座选中状态和相机远近更新所有占点和标签的外观
+ *
+ * [业务目的]
+ * - 卡座选中时：卡座内卫星亮度正常，卡座外变暗、变小
+ * - 未选中时：所有卫星按类型/卡座颜色展示
+ * - 近视时才显示标签，远视则隐藏
+ *
+ * [关键规则]
+ * - 展示大小和透明度根据卡座选中状态和远近实时计算
+ * - 不要删除所有 primitive 和 label 的更新逻辑
+ */
 const applyConstellationVisualState = () => {
   if (!viewer) return
 
@@ -978,11 +1213,24 @@ const applyConstellationVisualState = () => {
   viewer.scene.requestRender()
 }
 
+/**
+ * [功能]
+ * 清除卡座选中状态，并重置所有卫星的视觉应用
+ */
 const clearConstellationSelection = () => {
   selectedConstellation.value = null
   applyConstellationVisualState()
 }
 
+/**
+ * [功能]
+ * 根据 NORAD 编号选择其所属卡座，并应用卡座视觉状态
+ *
+ * [处理规则]
+ * - 如果该卫星不属于任何卡座，则清除选择
+ *
+ * @param norad 点击的卫星 NORAD 编号
+ */
 const selectConstellationByNorad = (norad: number) => {
   const constellation = getConstellationByNorad(norad)
   if (!constellation) {
@@ -993,6 +1241,16 @@ const selectConstellationByNorad = (norad: number) => {
   applyConstellationVisualState()
 }
 
+/**
+ * [功能]
+ * 外部接口：根据卡座名称聚焦到指定卡座
+ *
+ * [处理规则]
+ * - 传入为空或未找到卡座时，清除卡座选择
+ * - 支持中英文卡座名匹配
+ *
+ * @param constellationName 卡座名称（英文或中文）
+ */
 const focusConstellationByName = async (constellationName?: string | null) => {
   await loadSatelliteConstellations()
 
@@ -1014,12 +1272,27 @@ const focusConstellationByName = async (constellationName?: string | null) => {
   applyConstellationVisualState()
 }
 
+/**
+ * [功能]
+ * 展卡座星间连线开关切换事件处理器
+ */
 const handleConstellationLinkToggle = () => {
   updateConstellationOverlayEntities()
 }
 /**
- * 添加卫星实体
- * @param satellites
+ * [功能]
+ * 以 Primitive 方式渲染卡座/全局卫星，适用于大量卫星展示场景
+ *
+ * [处理规则]
+ * - 每次调用先取消已排队的渲染帧，防止满足已销毁资源
+ * - 使用 renderToken 实现并发安全，旧任务自动中止
+ * - 每 400 颗卫星退让一个渲染帧，避免单帧进行大量计算巫卡 UI
+ *
+ * [副作用]
+ * - 修改 pointCollection / labelCollection、satellitePointPrimitives 等映射表
+ * - 修改 satelliteRenderBusy 状态
+ *
+ * @param satellites 需要渲染的卫星信息数组
  */
 const renderSatellitePathWithPrimitive = async (satellites: SatelliteInfo[]) => {
   // 取消之前计划的渲染，避免在组件卸载/视图重建时调用已销毁资源
@@ -1171,16 +1444,28 @@ function handleViewerClickEvent() {
     if (!Number.isFinite(norad)) return
 
     selectConstellationByNorad(Number(norad))
-    const res = await getSatelliteDetail({ norad: Number(norad) })
-    if (res.code === 200) {
-      const satellite = res.data
-      if (satellite) {
-        highlightSatellite({ norad_id: String(norad) })
-      }
-    }
+    // const res = await getSatelliteDetail({ norad: Number(norad) })
+    // if (res.code === 200) {
+    //   const satellite = res.data
+    //   if (satellite) {
+    //     highlightSatellite({ norad_id: String(norad) })
+    //   }
+    // }
+    highlightSatellite({ norad_id: String(norad) })
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
 }
 
+/**
+ * [功能]
+ * 根据卡座类型返回对应的 Cesium 颜色
+ *
+ * [处理规则]
+ * - 匹配顺序从上到下，标屁属一种类型
+ * - 未匹配时返回默认蛇蓝色
+ *
+ * @param type 卡座类型字符串（如"军事"、"通信"等）
+ * @returns Cesium 颜色对象
+ */
 const getSatelliteColorByType = (type: string) => {
   if (type) {
     if (type.includes('军事')) {
@@ -1214,8 +1499,20 @@ const getSatelliteColorByType = (type: string) => {
   return Cesium.Color.ROYALBLUE
 }
 
+/**
+ * [功能]
+ * 根据卡座所属国家返回红/蓝/白颜色
+ *
+ * [处理规则]
+ * - 属于假方（meCountry）返回 RED
+ * - 属于敌方（enemyCountry）返回 BLUE
+ * - 其他国家返回 WHITE
+ *
+ * @param country 卡座所属国家字符串
+ * @returns Cesium 颜色对象
+ */
 function getSatelliteColor(country: string) {
-  // 国家
+  // 根据当前任务的我方/敌方国家列表判断属局颜色
   const ourCountries = store.activedTask?.meCountry.split(',')
   const enemyCountries = store.activedTask?.enemyCountry.split(',')
   const color = ourCountries?.includes(country)
@@ -1226,6 +1523,13 @@ function getSatelliteColor(country: string) {
   return color
 }
 
+/**
+ * [功能]
+ * 将逗号分隔的国家字符串解析为国家名数组
+ *
+ * @param value 逗号分隔的国家字符串
+ * @returns 去除空白后的国家名数组
+ */
 const normalizeCountryList = (value?: string) =>
   String(value ?? '')
     .split(',')
@@ -1453,11 +1757,25 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
   }
 }
 
+/**
+ * [功能]
+ * 打开卡座详情对话框
+ *
+ * @param norad 卡座 NORAD 编号
+ */
 function showDetail(norad: number) {
   if (isFinite(norad)) {
     openSatelliteProfile(norad)
   }
 }
+
+/**
+ * [功能]
+ * 在 Cesium 地图上标记战场区域
+ *
+ * [副作用]
+ * - 调用工具函数 markBattleArea 修改 viewer.entities
+ */
 function markBattle() {
   markBattleArea(viewer, store.battle)
 }
@@ -1472,10 +1790,6 @@ const highlightSatellite = (sate: { norad_id: string }) => {
     entity.point!.outlineColor = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
     entity.point!.pixelSize = new Cesium.ConstantProperty(12)
     entity.path!.show = new CallbackProperty(() => true, false)
-    viewer.flyTo(entity, {
-      duration: 1.5, // 飞行动画持续时间
-      offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-30), 30000000), // 视角偏移，调整为合适的高度和角度
-    })
   }
 }
 
@@ -1496,17 +1810,34 @@ const resetHighlightSatellites = () => {
   }
   applyConstellationVisualState()
 }
-// 加载战场态势数据（如果有）
+// 战场态势数据（展示红蓝对比数据，为 null 表示未加载）
 const battleSituationData = ref<SituationData | null>(null)
 
+/**
+ * 格式化数量为字符串，缺省值为 0
+ * @param value 数量値
+ * @returns 字符串数量
+ */
 const formatCount = (value?: number) => `${Number(value ?? 0)}`
 
+/**
+ * 格式化时长为字符串，不是有限数时返回 '0'
+ * @param value 时长数値（分钟）
+ * @returns 字符串时长
+ */
 const formatDuration = (value?: number) => {
   const duration = Number(value ?? 0)
   if (!Number.isFinite(duration)) return '0'
   return `${duration}`
 }
 
+/**
+ * 取对象中数值最大的前 N 个条目，用于展示地区过境 TopN 数据
+ *
+ * @param source 键为地区名、值为计数的对象
+ * @param limit 返回最大条目数，默认 4
+ * @returns 按值降序排序的 { name, value } 数组
+ */
 const toTopRows = (source?: Record<string, number>, limit = 4) => {
   return Object.entries(source ?? {})
     .sort((a, b) => b[1] - a[1])
@@ -1514,6 +1845,12 @@ const toTopRows = (source?: Record<string, number>, limit = 4) => {
     .map(([name, value]) => ({ name, value: formatCount(value) }))
 }
 
+/**
+ * 按卡座类型固定顺序输出据据行，确保图表 X 轴顺序不变
+ *
+ * @param source 键为卡座类型名称、值为数量的对象
+ * @returns 按 SATELLITE_TYPE_ORDER 顺序排列的 { name, value } 数组
+ */
 const getFixedSatelliteTypeRows = (source?: Record<string, number>) => {
   return SATELLITE_TYPE_ORDER.map((name) => ({
     name,
@@ -1521,6 +1858,12 @@ const getFixedSatelliteTypeRows = (source?: Record<string, number>) => {
   }))
 }
 
+/**
+ * 将原始武器类型字符串归一化为碰 weaponTypeOrder 中定义的标准类型
+ *
+ * @param type 原始武器类型字符串
+ * @returns 标准化后的类型字符串
+ */
 const normalizeWeaponType = (type?: string) => {
   const text = String(type ?? '').trim()
   if (!text) return '其他'
@@ -1531,6 +1874,15 @@ const normalizeWeaponType = (type?: string) => {
   return '其他'
 }
 
+/**
+ * 统计武器列表中各类型数量，按 weaponTypeOrder 顺序输出
+ *
+ * [处理规则]
+ * - '其他' 分类为 0 时不展示
+ *
+ * @param list 武器列表，每项包含 type 字符串
+ * @returns 按顺序排列的 { name, value } 数组
+ */
 const getWeaponTypeRows = (list?: Array<{ type?: string }>) => {
   const counts = new Map<string, number>()
   for (const item of list ?? []) {
@@ -1542,12 +1894,29 @@ const getWeaponTypeRows = (list?: Array<{ type?: string }>) => {
     .filter((item) => item.value > 0 || item.name !== '其他')
 }
 
+/**
+ * 安全销毁 ECharts 实例，避免重复销毁报错
+ *
+ * @param chart ECharts 实例或 null
+ */
 const disposeChart = (chart: echarts.ECharts | null) => {
   if (chart && !chart.isDisposed()) {
     chart.dispose()
   }
 }
 
+/**
+ * [功能]
+ * 渲染红/蓝方阵营卡座类型柱状图和武器分类饼图
+ *
+ * [处理规则]
+ * - 先 dispose 旧实例再初始化，避免内存泄漏
+ * - DOM 元素不存在时直接返回
+ *
+ * @param campKey 阵营标识: 'red' | 'blue'
+ * @param satelliteRows 卡座类型据据行
+ * @param weaponRows 武器分类据据行
+ */
 const renderCampCharts = (
   campKey: 'red' | 'blue',
   satelliteRows: Array<{ name: string; value: number }>,
@@ -1629,6 +1998,15 @@ const renderCampCharts = (
   })
 }
 
+/**
+ * [功能]
+ * 渲染战场态势折线卫星类型和武器分类图表
+ *
+ * [处理规则]
+ * - 等待 nextTick 确保 DOM 已更新再初始化图表
+ * - battleSituationData 为 null 时直接返回
+ * - 渲染完成后派发 resize 事件触发 ECharts 自适应
+ */
 const renderSituationCharts = async () => {
   await nextTick()
   const data = battleSituationData.value
@@ -1646,6 +2024,13 @@ const renderSituationCharts = async () => {
   window.dispatchEvent(new Event('resize'))
 }
 
+/**
+ * [功能]
+ * 调整战场态势面板内所有 ECharts 实例的大小
+ *
+ * [说明]
+ * 建议在容器尺寸改变时（如标签切换、Tab resize）后调用
+ */
 const resizeSituationCharts = () => {
   chartInstances.redSatelliteType?.resize()
   chartInstances.blueSatelliteType?.resize()
@@ -1653,6 +2038,17 @@ const resizeSituationCharts = () => {
   chartInstances.blueWeaponType?.resize()
 }
 
+/**
+ * [功能]
+ * 战场态势面板红蓝阵营卡片数据计算（computed）
+ *
+ * [数据来源]
+ * 从 battleSituationData 计算得到红蓝方卡座总数、过境时长、地区分布和样式
+ *
+ * [取值规则]
+ * - battleSituationData 为 null 时返回空数组
+ * - ringStyle 用于环形占比可视化（conic-gradient）
+ */
 const battleCampCards = computed(() => {
   const data = battleSituationData.value
   if (!data) return []
@@ -1688,6 +2084,13 @@ const battleCampCards = computed(() => {
   ]
 })
 
+/**
+ * 组件挂载完成时初始化 Cesium Viewer 并绑定相机移动监听器
+ *
+ * [处理规刖]
+ * - 等待 initViewer 完成后再绑定事件
+ * - 相机移动结束时自动重新应用卡座视觉状态
+ */
 onMounted(async () => {
   await initViewer()
   if (viewer) {
@@ -1699,6 +2102,7 @@ onMounted(async () => {
   startContainerSizeObserver()
 })
 
+// 监听战场态势数据变化，自动重渲染图表
 watch(
   battleSituationData,
   async () => {
@@ -1707,6 +2111,7 @@ watch(
   { deep: true }
 )
 
+// 监听 Tab 切换，在战场态势视图激活时重新渲染和调整图表大小
 watch(
   () => store.activetab,
   async (tab) => {
@@ -1716,6 +2121,20 @@ watch(
     resizeSituationCharts()
   }
 )
+/**
+ * 组件卸载前清理所有 Cesium 资源
+ *
+ * [关键规则]
+ * - 必须先能的停止卡座动画，防止 GPU 线程在 destroy 后仍在违行
+ * - 增加 renderToken 确保所有异步渲染任务应尽尽止
+ * - 必须移除相机监听器和 InfoBox 事件委托
+ * - 销毁全部 ECharts 实例防止内存泄漏
+ * - 最后调用 viewer.destroy() 释放 GPU 资源
+ *
+ * [AI 修改约束]
+ * - 不要改变资源释放顺序
+ * - 不要删除 renderToken++ 逻辑
+ */
 onBeforeUnmount(() => {
   stopContainerSizeObserver()
   try {
@@ -1762,6 +2181,20 @@ onBeforeUnmount(() => {
     viewer.destroy && viewer.destroy()
   }
 })
+/**
+ * 对外暴露的公共方法，供父组件调用
+ *
+ * [方法说明]
+ * - renderSatellitePathWithPrimitive: Primitive 模式渲染卡座（全局卡座/复杂展示）
+ * - clearViewer: 清空所有实体（任务切换时使用）
+ * - focusConstellationByName: 按名称展示卡座
+ * - renderSateliitePathWithEntity: Entity 模式渲染卡座（任务模式）
+ * - markBattle: 标记战场区域
+ * - highlightSatellite: 高亮指定卡座
+ * - flyToView: 快速定位到指定视角
+ * - toggleRadarFrustums: 显隐雷达探测包络视椒
+ * - toggleRedSatellites: 显隐我方卡座
+ */
 defineExpose({
   renderSatellitePathWithPrimitive,
   clearViewer,
