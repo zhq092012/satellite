@@ -63,7 +63,10 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
+import type { MatrixResult, StationWindow } from '@/api/electronic'
+import { useElectronicCesiumBridge } from '@/composables/useElectronicCesiumBridge'
+import { useTimelineSync } from '@/composables/useTimelineSync'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, useTemplateRef, watch } from 'vue'
 import * as Cesium from 'cesium'
 import * as echarts from 'echarts'
 import {
@@ -81,6 +84,7 @@ import { EarthRotationController } from '@/utils/cesium/earthRotaion'
 import { bindInfoBoxButton, createInfoBoxActionButton, unbindInfoBoxButton } from '@/utils/cesium/infoBox'
 import { CallbackProperty } from 'cesium'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
+
 const store = useLayoutStore()
 const { openSatelliteProfile } = useSatelliteProfileDialog()
 const showPaths = ref(false) // 默认不显示卫星轨迹
@@ -104,6 +108,8 @@ const props = defineProps<{
   showSatMsg?: boolean
   showTimeLine: boolean
   showAnimation: boolean
+  /** 算法矩阵数据（包含地面站、中继卫星、过境窗口与打压状态） */
+  matrixData?: MatrixResult | null
 }>()
 let viewer: Cesium.Viewer
 let resizeObserver: ResizeObserver | null = null
@@ -252,6 +258,13 @@ const initViewer = async () => {
         }
       }
 
+      // 绑定时钟 Tick 监听更新动态过境与中继连线
+      if (!clockTickRemoveListener) {
+        clockTickRemoveListener = viewer.clock.onTick.addEventListener(() => {
+          updateElectronicDynamicLinks()
+        })
+      }
+
       // 绑定自定义的相机监听（用于显示相机位置/角度等）
       // listenCameraLocaion(viewer)
       // 监控鼠标点击事件
@@ -276,6 +289,11 @@ const initViewer = async () => {
 // 清空viewer
 const clearViewer = () => {
   if (!viewer) return
+  if (clockTickRemoveListener) {
+    clockTickRemoveListener()
+    clockTickRemoveListener = null
+  }
+  clearElectronicNetworkEntities()
   viewer.entities.removeAll()
   viewer.scene.primitives.removeAll()
   satellitePointPrimitives.clear()
@@ -313,6 +331,413 @@ let cachedTaskId: number | null = null
 
 // 记录当前渲染任务的 taskId，切换任务时清理缓存
 let currentRenderTaskId: number | null = null
+
+// 存储电子信息网络基础设施实体 ID (地面站、中心云站)
+const electronicNodeEntityIds = new Set<string>()
+// 存储电子信息网络动态连线实体 ID (星地过境、星中中继、地地网)
+const electronicDynamicLinkEntityIds = new Set<string>()
+
+const { infrastructureNodes, relayNoradSet, isTimeInWindow } = useElectronicCesiumBridge(toRef(props, 'matrixData'))
+const { updateSimulationTime } = useTimelineSync()
+let clockTickRemoveListener: Cesium.Event.RemoveCallback | null = null
+
+/**
+ * [功能]
+ * 清理电子信息网络相关的 3D 实体与连线
+ */
+const clearElectronicNetworkEntities = () => {
+  if (!viewer) return
+  electronicNodeEntityIds.forEach((id) => {
+    const entity = viewer.entities.getById(id)
+    if (entity) viewer.entities.remove(entity)
+  })
+  electronicNodeEntityIds.clear()
+
+  electronicDynamicLinkEntityIds.forEach((id) => {
+    const entity = viewer.entities.getById(id)
+    if (entity) viewer.entities.remove(entity)
+  })
+  electronicDynamicLinkEntityIds.clear()
+}
+
+/**
+ * [功能]
+ * 平滑飞赴敌方信息网络集群区域
+ */
+const flyToEnemyNetwork = () => {
+  if (!viewer || !infrastructureNodes.value.length) return
+
+  let sumLon = 0
+  let sumLat = 0
+  infrastructureNodes.value.forEach((n) => {
+    sumLon += n.longitude
+    sumLat += n.latitude
+  })
+  const avgLon = sumLon / infrastructureNodes.value.length
+  const avgLat = sumLat / infrastructureNodes.value.length
+
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(avgLon, avgLat, 5000000),
+    orientation: {
+      heading: Cesium.Math.toRadians(0),
+      pitch: Cesium.Math.toRadians(-60),
+      roll: 0,
+    },
+    duration: 2.0,
+  })
+}
+
+/**
+ * [功能]
+ * 渲染敌方地面接收站与数据中心 3D 实体与地面圆环
+ */
+const renderElectronicInfrastructureNodes = () => {
+  if (!viewer || !infrastructureNodes.value.length) return
+
+  infrastructureNodes.value.forEach((node) => {
+    const entityId = `infra-node-${node.type}-${node.id}`
+    if (viewer.entities.getById(entityId)) return
+
+    const position = Cesium.Cartesian3.fromDegrees(node.longitude, node.latitude, node.altitude)
+    const isReceive = node.type === 'RECEIVE'
+    const isStruck = node.status === 1
+
+    const nodeColor = isStruck ? Cesium.Color.RED : isReceive ? Cesium.Color.CYAN : Cesium.Color.DODGERBLUE
+
+    const labelText = `[敌方${isReceive ? '地面接收站' : '数据中心'}]\n${node.name}${isStruck ? ' (毁伤中断)' : ''}`
+
+    // 1. 地表高亮波纹圆环
+    viewer.entities.add({
+      id: `${entityId}-ring`,
+      position,
+      ellipse: {
+        semiMinorAxis: isReceive ? 80000 : 120000,
+        semiMajorAxis: isReceive ? 80000 : 120000,
+        material: nodeColor.withAlpha(0.25),
+        outline: true,
+        outlineColor: nodeColor,
+        height: 0,
+      },
+    })
+    electronicNodeEntityIds.add(`${entityId}-ring`)
+
+    // 2. 节点主体 3D 标示与标签
+    viewer.entities.add({
+      id: entityId,
+      position,
+      point: {
+        pixelSize: isReceive ? 12 : 14,
+        color: nodeColor,
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 3,
+        heightReference: Cesium.HeightReference.NONE,
+      },
+      label: {
+        text: labelText,
+        font: 'bold 13px sans-serif',
+        fillColor: nodeColor,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        showBackground: true,
+        backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
+        pixelOffset: new Cesium.Cartesian2(0, -28),
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 20_000_000),
+      },
+    })
+    electronicNodeEntityIds.add(entityId)
+
+    // 3. 渲染 3D 地面站雷达包络视椎 (Radar Envelope Frustum Cone)
+    if (isReceive) {
+      const coneLength = 500000 // 500km 高度
+      const coneCenterPos = Cesium.Cartesian3.fromDegrees(node.longitude, node.latitude, coneLength / 2)
+      viewer.entities.add({
+        id: `${entityId}-frustum`,
+        position: coneCenterPos,
+        cylinder: {
+          length: coneLength,
+          topRadius: 320000, // 320km 顶部辐射半径
+          bottomRadius: 2000,
+          material: isStruck
+            ? new Cesium.Color(1, 0, 0, 0.08)
+            : new Cesium.Color(0, 0.88, 1, 0.12),
+          outline: true,
+          outlineColor: isStruck
+            ? new Cesium.Color(1, 0, 0, 0.35)
+            : new Cesium.Color(0, 0.88, 1, 0.35),
+          outlineWidth: 1.0,
+        },
+      })
+      electronicNodeEntityIds.add(`${entityId}-frustum`)
+    }
+  })
+
+  // 4. 渲染敌方天基中继卫星 TDRS-6 (Norad 22314) 3D 实体
+  const relayNorad = 22314
+  const relayEntityId = `sat-node-${relayNorad}`
+  if (!viewer.entities.getById(relayEntityId)) {
+    const relayPos = Cesium.Cartesian3.fromDegrees(-45.1, 12.4, 35786000)
+    viewer.entities.add({
+      id: relayEntityId,
+      position: relayPos,
+      point: {
+        pixelSize: 16,
+        color: Cesium.Color.PURPLE,
+        outlineColor: Cesium.Color.GOLD,
+        outlineWidth: 3,
+      },
+      label: {
+        text: '[敌方数据中继卫星]\nTDRS-6 (GEO高轨中继)',
+        font: 'bold 13px sans-serif',
+        fillColor: Cesium.Color.MEDIUMPURPLE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        showBackground: true,
+        backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
+        pixelOffset: new Cesium.Cartesian2(0, -28),
+      },
+    })
+    electronicNodeEntityIds.add(relayEntityId)
+  }
+
+  // 渲染完敌方节点后自动平滑飞赴
+  flyToEnemyNetwork()
+}
+
+/**
+ * [功能]
+ * 视角快速定位
+ */
+const flyToView = (target: 'GLOBAL' | 'SPACE' | 'GROUND') => {
+  if (!viewer) return
+  if (target === 'GLOBAL') {
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(100, 30, 20000000),
+      duration: 1.8,
+    })
+  } else if (target === 'SPACE') {
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(100, 20, 10000000),
+      duration: 1.8,
+    })
+  } else if (target === 'GROUND') {
+    flyToEnemyNetwork()
+  }
+}
+
+/**
+ * [功能]
+ * 控制 3D 雷达探测包络视椎显隐
+ */
+const toggleRadarFrustums = (show: boolean) => {
+  if (!viewer) return
+  electronicNodeEntityIds.forEach((id) => {
+    if (id.endsWith('-frustum')) {
+      const entity = viewer.entities.getById(id)
+      if (entity) entity.show = show
+    }
+  })
+}
+
+const showRedSatellites = ref(false)
+
+/**
+ * [功能]
+ * 控制我方 (红方) 天基卫星显隐 (电子对抗模式默认隐藏非目标红方卫星，保持地图干净)
+ */
+const toggleRedSatellites = (show: boolean) => {
+  showRedSatellites.value = show
+  if (!pointCollection) return
+  const matrixSats = props.matrixData?.initMatrixList || props.matrixData?.satelliteMatrixList || []
+  const enemyNoradSet = new Set(matrixSats.map((s) => s.norad))
+
+  for (let i = 0; i < pointCollection.length; i++) {
+    const point = pointCollection.get(i)
+    if (point) {
+      const norad = (point as any).noradId
+      if (!showRedSatellites.value && norad && !enemyNoradSet.has(Number(norad))) {
+        point.show = false
+      } else {
+        point.show = true
+      }
+    }
+  }
+}
+
+
+
+const satelliteCoordMap = new Map<number, [number, number, number]>([
+  [60419, [-8.15, 53.3, 500000]],
+  [48643, [-158.09, 21.33, 550000]],
+  [59444, [-123.11, 45.21, 500000]],
+  [58136, [15.65, 78.22, 550000]],
+  [57693, [-121.42, 37.73, 500000]],
+  [22314, [-45.1, 12.4, 35786000]],
+])
+
+const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null => {
+  const primitive = satellitePointPrimitives.get(norad)
+  if (primitive && primitive.position) {
+    return primitive.position
+  }
+  const entity = viewer?.entities?.getById(`sat-node-${norad}`)
+  if (entity && entity.position) {
+    return entity.position.getValue(viewer.clock.currentTime) || null
+  }
+  const fallbackCoords = satelliteCoordMap.get(norad)
+  if (fallbackCoords) {
+    return Cesium.Cartesian3.fromDegrees(fallbackCoords[0], fallbackCoords[1], fallbackCoords[2])
+  }
+  return null
+}
+
+/**
+ * [功能]
+ * 根据当前 Cesium 时钟时间更新敌方星地过境连线、星中中继连线与地地光纤网
+ */
+const updateElectronicDynamicLinks = () => {
+  if (!viewer || !props.matrixData) return
+
+  const currentTime = Cesium.JulianDate.toDate(viewer.clock.currentTime)
+  updateSimulationTime(currentTime)
+
+  const activeLinkKeys = new Set<string>()
+
+  // 1. 遍历敌方卫星矩阵解析星地过境窗口连线
+  const satelliteMatrixList = props.matrixData.satelliteMatrixList || []
+  satelliteMatrixList.forEach((satItem) => {
+    const norad = satItem.norad
+    const satPos = getSatellitePositionInCesium(norad)
+    if (!satPos) return
+
+    const stationWindows = satItem.stationWindows || []
+    stationWindows.forEach((win: StationWindow) => {
+      const active = isTimeInWindow(currentTime, win.peakWindow, win.endWindow)
+      if (!active) return
+
+      const infraNode = infrastructureNodes.value.find((n) => n.id === win.receiveId)
+      if (!infraNode) return
+      const recPos = Cesium.Cartesian3.fromDegrees(infraNode.longitude, infraNode.latitude, infraNode.altitude)
+
+      const linkKey = `link-transit-${norad}-${win.receiveId}`
+      activeLinkKeys.add(linkKey)
+
+      const isStruck = win.strikeStatus === 1
+
+      const existingEntity = viewer.entities.getById(linkKey)
+      if (!existingEntity) {
+        viewer.entities.add({
+          id: linkKey,
+          polyline: {
+            positions: [satPos, recPos],
+            width: isStruck ? 3.0 : 2.5,
+            material: isStruck
+              ? new Cesium.PolylineDashMaterialProperty({
+                  color: Cesium.Color.YELLOW,
+                  dashLength: 16.0,
+                })
+              : new Cesium.PolylineGlowMaterialProperty({
+                  glowPower: 0.25,
+                  taperPower: 0.6,
+                  color: Cesium.Color.CYAN,
+                }),
+          },
+        })
+        electronicDynamicLinkEntityIds.add(linkKey)
+      }
+    })
+  })
+
+  // 2. 解析敌方星中中继链路 (Relay Satellites)
+  const relayRelation = props.matrixData.relayRelation
+  if (relayRelation && relayRelation.relations) {
+    relayRelation.relations.forEach((rel) => {
+      const fromNorad = Number(rel.from)
+      const toNorad = Number(rel.to)
+      const fromPos = getSatellitePositionInCesium(fromNorad)
+      const toPos = getSatellitePositionInCesium(toNorad)
+
+      if (fromPos && toPos) {
+        const linkKey = `link-relay-${fromNorad}-${toNorad}`
+        activeLinkKeys.add(linkKey)
+
+        if (!viewer.entities.getById(linkKey)) {
+          viewer.entities.add({
+            id: linkKey,
+            polyline: {
+              positions: [fromPos, toPos],
+              width: 2.2,
+              material: new Cesium.PolylineGlowMaterialProperty({
+                glowPower: 0.2,
+                color: Cesium.Color.GOLD,
+              }),
+            },
+          })
+          electronicDynamicLinkEntityIds.add(linkKey)
+        }
+      }
+    })
+  }
+
+  // 3. 解析地面站 -> 中心云站地地传输网 (Station Relations)
+  const stationRelationList = props.matrixData.stationRelationList
+  if (stationRelationList && stationRelationList.relations) {
+    stationRelationList.relations.forEach((rel) => {
+      const fromNode = infrastructureNodes.value.find((n) => n.id === rel.from)
+      const toNode = infrastructureNodes.value.find((n) => n.id === rel.to)
+
+      if (fromNode && toNode) {
+        const linkKey = `link-ground-${rel.from}-${rel.to}`
+        activeLinkKeys.add(linkKey)
+
+        if (!viewer.entities.getById(linkKey)) {
+          const fromPos = Cesium.Cartesian3.fromDegrees(fromNode.longitude, fromNode.latitude, fromNode.altitude)
+          const toPos = Cesium.Cartesian3.fromDegrees(toNode.longitude, toNode.latitude, toNode.altitude)
+
+          viewer.entities.add({
+            id: linkKey,
+            polyline: {
+              positions: [fromPos, toPos],
+              width: 2.0,
+              material: new Cesium.PolylineGlowMaterialProperty({
+                glowPower: 0.15,
+                color: Cesium.Color.MAGENTA,
+              }),
+            },
+          })
+          electronicDynamicLinkEntityIds.add(linkKey)
+        }
+      }
+    })
+  }
+
+  // 清理非激活动态连线
+  electronicDynamicLinkEntityIds.forEach((linkId) => {
+    if (!activeLinkKeys.has(linkId)) {
+      const entity = viewer.entities.getById(linkId)
+      if (entity) viewer.entities.remove(entity)
+      electronicDynamicLinkEntityIds.delete(linkId)
+    }
+  })
+}
+
+/**
+ * [功能]
+ * 监听矩阵数据变化，触发 3D 电子信息网络与连线更新
+ */
+watch(
+  () => props.matrixData,
+  (newData) => {
+    if (!viewer) return
+    clearElectronicNetworkEntities()
+    if (newData) {
+      renderElectronicInfrastructureNodes()
+      updateElectronicDynamicLinks()
+    }
+  },
+  { deep: true }
+)
 
 // point + label 集合（用于大量卫星展示，避免反复新建）
 let pointCollection: Cesium.PointPrimitiveCollection | null = null
@@ -1343,6 +1768,9 @@ defineExpose({
   renderSateliitePathWithEntity,
   markBattle,
   highlightSatellite,
+  flyToView,
+  toggleRadarFrustums,
+  toggleRedSatellites,
 })
 </script>
 <style lang="scss" scoped>

@@ -258,3 +258,281 @@ export const getMatrixList = (data: { norad: number; taskId: number; intensityLe
   return requestAPI.post<AxiosResponseType<MatrixResult>>(url, data)
 }
 
+/**
+ * [功能]
+ * 当后端接口未返回或数据为空时提供完整的电子信息网络算法矩阵默认兜底数据。
+ * 包含天基观测卫星、数据中继卫星 (TDRS-6)、12 个地基接收站与 3 个中心云数据中心。
+ */
+export const getDefaultMatrixData = (): MatrixResult => {
+  return {
+    series: 'Capella-Constellation',
+    initMatrixList: [
+      {
+        norad: 60419,
+        name: 'CAPELLA-13',
+        satType: '地球观测',
+        line1: '1 60419U 24142A   26133.49944190  .00002381  00000-0  28492-3 0  9990',
+        line2: '2 60419  53.0044 208.9792 0001302  86.0099 274.1029 14.87644116 95240',
+        initWindows: [
+          {
+            receiveId: 'REC_IRL',
+            receiveName: '爱尔兰Ireland',
+            receiveLat: 53.3,
+            receiveLon: -8.15,
+            peakWindow: '2026-08-03 16:20:00',
+            endWindow: '2026-08-03 16:50:00',
+          },
+        ],
+      },
+      {
+        norad: 48643,
+        name: 'STARLINK-V1-0-L28-6',
+        satType: '通信',
+        line1: '1 48643U 21044F   26133.48239236  .00000525  00000-0  28691-4 0  9990',
+        line2: '2 48643  53.0543 147.6710 0001476  94.2486 265.8679 15.06411200272183',
+        initWindows: [
+          {
+            receiveId: 'REC_HWI',
+            receiveName: '夏威夷Kapolei',
+            receiveLat: 21.33,
+            receiveLon: -158.09,
+            peakWindow: '2026-08-03 16:00:00',
+            endWindow: '2026-08-03 16:30:00',
+          },
+        ],
+      },
+      {
+        norad: 59444,
+        name: 'CAPELLA-14',
+        satType: '地球观测',
+        line1: '1 59444U 24063A   26133.51231120  .00001920  00000-0  21021-3 0  9991',
+        line2: '2 59444  45.0123 120.4412 0001102  77.1023 282.4102 15.12019481 8121',
+        initWindows: [
+          {
+            receiveId: 'REC_ORE',
+            receiveName: '俄勒冈Oregon',
+            receiveLat: 45.21,
+            receiveLon: -123.11,
+            peakWindow: '2026-08-03 16:40:00',
+            endWindow: '2026-08-03 17:15:00',
+          },
+        ],
+      },
+      {
+        norad: 58136,
+        name: 'STARLINK-30776',
+        satType: '通信',
+        line1: '1 58136U 23160A   26133.41902120  .00000812  00000-0  31021-4 0  9992',
+        line2: '2 58136  53.2102 210.1192 0001201  66.1201 293.4102 15.01920192 4102',
+        initWindows: [
+          {
+            receiveId: 'REC_SVA',
+            receiveName: '斯瓦尔巴SvalSat',
+            receiveLat: 78.22,
+            receiveLon: 15.65,
+            peakWindow: '2026-08-03 16:15:00',
+            endWindow: '2026-08-03 16:45:00',
+          },
+        ],
+      },
+      {
+        norad: 57693,
+        name: 'CAPELLA-11',
+        satType: '地球观测',
+        line1: '1 57693U 23120A   26133.40192010  .00001410  00000-0  19021-3 0  9993',
+        line2: '2 57693  53.0102 190.4102 0001021  80.4102 279.1023 14.99120491 5192',
+        initWindows: [
+          {
+            receiveId: 'REC_TRA',
+            receiveName: '加州特拉西',
+            receiveLat: 37.73,
+            receiveLon: -121.42,
+            peakWindow: '2026-08-03 16:30:00',
+            endWindow: '2026-08-03 17:00:00',
+          },
+        ],
+      },
+      {
+        norad: 22314,
+        name: 'TDRS-6 [数据中继]',
+        satType: '通信/数据中继',
+        line1: '1 22314U 93003B   26133.50192010  .00000120  00000-0  10291-5 0  9994',
+        line2: '2 22314  12.4102  45.1029 0002102  12.4102 340.1029  1.00271029 9102',
+        initWindows: [],
+      },
+    ],
+    satelliteMatrixList: [
+      {
+        norad: 60419,
+        name: 'CAPELLA-13',
+        satType: '地球观测',
+        delayMin: 18.5,
+        satelliteStatus: 1,
+        weapons: [{ id: 'w1', name: '红方-电子打压车01', country: 'CN', type: '电子干扰', latitude: 35.0, longitude: 105.0, range: 2500 }],
+        stationWindows: [
+          {
+            receiveId: 'REC_IRL',
+            receiveName: '爱尔兰Ireland',
+            peakWindow: '2026-08-03 16:20:00',
+            endWindow: '2026-08-03 16:50:00',
+            strikeStatus: 1,
+            delayMin: 18.5,
+            weapons: [{ id: 'w1', name: '红方-电子打压车01', country: 'CN', type: '电子干扰', latitude: 35.0, longitude: 105.0, range: 2500 }],
+          },
+        ],
+      },
+      {
+        norad: 48643,
+        name: 'STARLINK-V1-0-L28-6',
+        satType: '通信',
+        delayMin: 0,
+        satelliteStatus: 0,
+        weapons: [],
+        stationWindows: [
+          {
+            receiveId: 'REC_HWI',
+            receiveName: '夏威夷Kapolei',
+            peakWindow: '2026-08-03 16:00:00',
+            endWindow: '2026-08-03 16:30:00',
+            strikeStatus: 0,
+            weapons: [],
+          },
+        ],
+      },
+      {
+        norad: 59444,
+        name: 'CAPELLA-14',
+        satType: '地球观测',
+        delayMin: 45.0,
+        satelliteStatus: 1,
+        weapons: [{ id: 'w2', name: '红方-动能ASAT-02', country: 'CN', type: '动能拦截', latitude: 30.0, longitude: 110.0, range: 3000 }],
+        stationWindows: [
+          {
+            receiveId: 'REC_ORE',
+            receiveName: '俄勒冈Oregon',
+            peakWindow: '2026-08-03 16:40:00',
+            endWindow: '2026-08-03 17:15:00',
+            strikeStatus: 1,
+            delayMin: 45.0,
+            weapons: [{ id: 'w2', name: '红方-动能ASAT-02', country: 'CN', type: '动能拦截', latitude: 30.0, longitude: 110.0, range: 3000 }],
+          },
+        ],
+      },
+      {
+        norad: 58136,
+        name: 'STARLINK-30776',
+        satType: '通信',
+        delayMin: 0,
+        satelliteStatus: 0,
+        weapons: [],
+        stationWindows: [
+          {
+            receiveId: 'REC_SVA',
+            receiveName: '斯瓦尔巴SvalSat',
+            peakWindow: '2026-08-03 16:15:00',
+            endWindow: '2026-08-03 16:45:00',
+            strikeStatus: 0,
+            weapons: [],
+          },
+        ],
+      },
+      {
+        norad: 57693,
+        name: 'CAPELLA-11',
+        satType: '地球观测',
+        delayMin: 22.0,
+        satelliteStatus: 1,
+        weapons: [{ id: 'w3', name: '红方-定向能激光站', country: 'CN', type: '定向能', latitude: 40.0, longitude: 90.0, range: 2000 }],
+        stationWindows: [
+          {
+            receiveId: 'REC_TRA',
+            receiveName: '加州特拉西',
+            peakWindow: '2026-08-03 16:30:00',
+            endWindow: '2026-08-03 17:00:00',
+            strikeStatus: 1,
+            delayMin: 22.0,
+            weapons: [{ id: 'w3', name: '红方-定向能激光站', country: 'CN', type: '定向能', latitude: 40.0, longitude: 90.0, range: 2000 }],
+          },
+        ],
+      },
+      {
+        norad: 22314,
+        name: 'TDRS-6 [数据中继]',
+        satType: '通信/数据中继',
+        delayMin: 0,
+        satelliteStatus: 0,
+        weapons: [],
+        stationWindows: [],
+      },
+    ],
+    relayRelation: {
+      relayList: [22314],
+      satelliteList: [60419, 48643, 59444, 58136, 57693],
+      relations: [
+        { from: '60419', to: '22314' },
+        { from: '48643', to: '22314' },
+        { from: '57693', to: '22314' },
+      ],
+    },
+    initRelationList: {
+      receiveObjList: [
+        { receiveId: 'REC_IRL', receiveName: '爱尔兰Ireland', receiveLatLon: '53.300, -8.150', receiveStatus: 1 },
+        { receiveId: 'REC_HWI', receiveName: '夏威夷Kapolei', receiveLatLon: '21.330, -158.090', receiveStatus: 0 },
+        { receiveId: 'REC_ORE', receiveName: '俄勒冈Oregon', receiveLatLon: '45.210, -123.110', receiveStatus: 1 },
+        { receiveId: 'REC_SVA', receiveName: '斯瓦尔巴SvalSat', receiveLatLon: '78.220, 15.650', receiveStatus: 0 },
+        { receiveId: 'REC_TRA', receiveName: '加州特拉西', receiveLatLon: '37.730, -121.420', receiveStatus: 1 },
+        { receiveId: 'REC_AK', receiveName: '阿拉斯加Inuvik', receiveLatLon: '68.350, -133.500', receiveStatus: 0 },
+        { receiveId: 'REC_NOR', receiveName: '挪威Tromso', receiveLatLon: '69.640, 18.950', receiveStatus: 0 },
+        { receiveId: 'REC_CHL', receiveName: '智利Santiago', receiveLatLon: '-33.440, -70.660', receiveStatus: 0 },
+        { receiveId: 'REC_ESP', receiveName: '西班牙Madrid', receiveLatLon: '40.410, -3.700', receiveStatus: 0 },
+        { receiveId: 'REC_DUB', receiveName: '澳洲Dubbo', receiveLatLon: '-32.250, 148.610', receiveStatus: 0 },
+        { receiveId: 'REC_JPN', receiveName: '日本Tokyo', receiveLatLon: '35.670, 139.650', receiveStatus: 0 },
+        { receiveId: 'REC_UK', receiveName: '英国Goonhilly', receiveLatLon: '50.040, -5.180', receiveStatus: 0 },
+      ],
+      stationObjList: [
+        { stationId: 'STA_01', stationName: '华盛顿云数据中心', stationLatLon: '38.900, -77.030', stationStatus: 0 },
+        { stationId: 'STA_02', stationName: '圣迭戈指挥中心', stationLatLon: '32.710, -117.160', stationStatus: 0 },
+        { stationId: 'STA_03', stationName: '伦敦备用中心', stationLatLon: '51.500, -0.120', stationStatus: 0 },
+      ],
+      relations: [
+        { from: 'REC_IRL', to: 'STA_01' },
+        { from: 'REC_HWI', to: 'STA_02' },
+        { from: 'REC_ORE', to: 'STA_02' },
+        { from: 'REC_SVA', to: 'STA_01' },
+        { from: 'REC_TRA', to: 'STA_02' },
+        { from: 'REC_AK', to: 'STA_01' },
+        { from: 'REC_NOR', to: 'STA_03' },
+        { from: 'REC_UK', to: 'STA_03' },
+      ],
+    },
+    stationRelationList: {
+      receiveObjList: [
+        { receiveId: 'REC_IRL', receiveName: '爱尔兰Ireland', receiveLatLon: '53.300, -8.150', receiveStatus: 1 },
+        { receiveId: 'REC_HWI', receiveName: '夏威夷Kapolei', receiveLatLon: '21.330, -158.090', receiveStatus: 0 },
+        { receiveId: 'REC_ORE', receiveName: '俄勒冈Oregon', receiveLatLon: '45.210, -123.110', receiveStatus: 1 },
+        { receiveId: 'REC_SVA', receiveName: '斯瓦尔巴SvalSat', receiveLatLon: '78.220, 15.650', receiveStatus: 0 },
+        { receiveId: 'REC_TRA', receiveName: '加州特拉西', receiveLatLon: '37.730, -121.420', receiveStatus: 1 },
+        { receiveId: 'REC_AK', receiveName: '阿拉斯加Inuvik', receiveLatLon: '68.350, -133.500', receiveStatus: 0 },
+        { receiveId: 'REC_NOR', receiveName: '挪威Tromso', receiveLatLon: '69.640, 18.950', receiveStatus: 0 },
+        { receiveId: 'REC_CHL', receiveName: '智利Santiago', receiveLatLon: '-33.440, -70.660', receiveStatus: 0 },
+        { receiveId: 'REC_ESP', receiveName: '西班牙Madrid', receiveLatLon: '40.410, -3.700', receiveStatus: 0 },
+        { receiveId: 'REC_DUB', receiveName: '澳洲Dubbo', receiveLatLon: '-32.250, 148.610', receiveStatus: 0 },
+        { receiveId: 'REC_JPN', receiveName: '日本Tokyo', receiveLatLon: '35.670, 139.650', receiveStatus: 0 },
+        { receiveId: 'REC_UK', receiveName: '英国Goonhilly', receiveLatLon: '50.040, -5.180', receiveStatus: 0 },
+      ],
+      stationObjList: [
+        { stationId: 'STA_01', stationName: '华盛顿云数据中心', stationLatLon: '38.900, -77.030', stationStatus: 0 },
+        { stationId: 'STA_02', stationName: '圣迭戈指挥中心', stationLatLon: '32.710, -117.160', stationStatus: 0 },
+        { stationId: 'STA_03', stationName: '伦敦备用中心', stationLatLon: '51.500, -0.120', stationStatus: 0 },
+      ],
+      relations: [
+        { from: 'REC_HWI', to: 'STA_02' },
+        { from: 'REC_SVA', to: 'STA_01' },
+        { from: 'REC_AK', to: 'STA_01' },
+      ],
+    },
+    battleMatrixList: [],
+  }
+}
+
+

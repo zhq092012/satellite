@@ -26,25 +26,18 @@
         </div>
       </div>
       <div v-if="store.activetab === '战场态势视图'" class="battle-grid">
-        <!-- 己方侧边栏 -->
+        <!-- C2 战术控制与资产态势左侧边栏 -->
         <div class="battle-grid__side battle-grid__side--left">
-          <BattleCampPanel
-            v-if="redCampCard"
-            :camp-key="redCampCard.key"
-            :title="redCampCard.label"
-            :theme="redCampCard.theme"
-            :total="redCampCard.total"
-            :total-label="redCampCard.totalLabel"
-            :duration-text="redCampCard.durationText"
-            :summary-rows="redCampCard.summaryRows"
-            :ring-style="redCampCard.ringStyle"
-            :focus-list="redCampCard.focusList"
-            :satellite-rows="redCampCard.satelliteRows"
-            :weapon-rows="redCampCard.weaponRows"
-            @focus-satellite="handleFocusSatellite"
+          <C2LeftControlPanel
+            :matrix-data="matrixData"
+            @intensity-change="handleIntensityChange"
+            @toggle-radar-frustum="handleToggleRadarFrustum"
+            @toggle-orbit-trails="handleToggleOrbitTrails"
+            @toggle-red-satellites="handleToggleRedSatellites"
+            @fly-to-view="handleFlyToView"
           />
         </div>
-        <!-- 中间地球 -->
+        <!-- 中间 3D Cesium 地球 -->
         <div class="battle-grid__center">
           <div class="battle-grid__earth">
             <component
@@ -60,6 +53,7 @@
               :show-sat-msg="true"
               :showTimeLine="true"
               :showAnimation="true"
+              :matrix-data="matrixData"
             />
           </div>
           <!-- 卫星列表 -->
@@ -126,23 +120,9 @@
             </div>
           </Transition>
         </div>
-        <!-- 敌方侧边栏 -->
+        <!-- C2 战场态势 - 网络毁伤与脆弱度分析右侧边栏 -->
         <div class="battle-grid__side battle-grid__side--right">
-          <BattleCampPanel
-            v-if="blueCampCard"
-            :camp-key="blueCampCard.key"
-            :title="blueCampCard.label"
-            :theme="blueCampCard.theme"
-            :total="blueCampCard.total"
-            :total-label="blueCampCard.totalLabel"
-            :duration-text="blueCampCard.durationText"
-            :summary-rows="blueCampCard.summaryRows"
-            :ring-style="blueCampCard.ringStyle"
-            :focus-list="blueCampCard.focusList"
-            :satellite-rows="blueCampCard.satelliteRows"
-            :weapon-rows="blueCampCard.weaponRows"
-            @focus-satellite="handleFocusSatellite"
-          />
+          <C2RightAnalysisPanel :matrix-data="matrixData" />
         </div>
       </div>
       <div v-else class="map-box">
@@ -171,6 +151,8 @@
 <script setup lang="ts">
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
 import BattleCampPanel from '@/components/cesium/BattleCampPanel.vue'
+import C2LeftControlPanel from '@/components/cesium/C2LeftControlPanel.vue'
+import C2RightAnalysisPanel from '@/components/cesium/C2RightAnalysisPanel.vue'
 import SatelliteNetView from '@/components/cesium/SatelliteNetView.vue'
 import SatelliteUnReal from '@/components/cesium/SatelliteUnReal.vue'
 import SatelliteThreatView from '@/components/cesium/SatelliteThreatView.vue'
@@ -184,6 +166,7 @@ import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import { useAuthStore } from '@/store/modules/auth'
 import { getSatelliteList, getSituationDataOfTask, getStrikeSatellites, type SituationData } from '@/api/dashboard'
+import { getMatrixList, getDefaultMatrixData, type MatrixResult } from '@/api/electronic'
 import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 const store = useLayoutStore()
@@ -449,49 +432,55 @@ const blueFocusList = computed(() =>
   strikeSatelliteList.value.filter((sat) => !enemyCountrySet.value.has(String(sat.country).trim()))
 )
 
-const battleCampCards = computed(() => {
+const enemySpaceNodeCard = computed(() => {
   const data = battleSituationData.value
-  if (!data) return []
-
-  const redTotal = Number(data['红方']?.红方过境卫星总数 ?? 0)
+  if (!data) return null
   const blueTotal = Number(data['蓝方']?.蓝方过境卫星总数 ?? 0)
 
-  return [
-    {
-      key: 'red' as const,
-      label: '红方',
-      theme: 'is-red' as const,
-      total: redTotal,
-      totalLabel: `${redTotal}`,
-      durationText: formatDuration(data['红方']?.红方卫星过境总时长),
-      summaryRows: toTopRows(data['红方']?.红方各地区过境卫星数量, 3),
-      ringStyle: {
-        background: `conic-gradient(#8f6662 0 68%, rgba(255, 255, 255, 0.08) 68% 100%)`,
-      },
-      satelliteRows: getFixedSatelliteTypeRows(data['红方']?.红方过境卫星分类数量),
-      weaponRows: getWeaponTypeRows(data['红方']?.红方武器阵地列表),
-      focusList: redFocusList.value,
+  return {
+    key: 'blue' as const,
+    label: '敌方空间节点',
+    theme: 'is-blue' as const,
+    total: blueTotal,
+    totalLabel: `${blueTotal}`,
+    durationText: formatDuration(data['蓝方']?.蓝方卫星过境总时长),
+    summaryRows: toTopRows(data['蓝方']?.蓝方各地区过境卫星数量, 3),
+    ringStyle: {
+      background: `conic-gradient(var(--accent-color) 0 75%, rgba(255, 255, 255, 0.08) 75% 100%)`,
     },
-    {
-      key: 'blue' as const,
-      label: '蓝方',
-      theme: 'is-blue' as const,
-      total: blueTotal,
-      totalLabel: `${blueTotal}`,
-      durationText: formatDuration(data['蓝方']?.蓝方卫星过境总时长),
-      summaryRows: toTopRows(data['蓝方']?.蓝方各地区过境卫星数量, 3),
-      ringStyle: {
-        background: `conic-gradient(var(--accent-color) 0 66%, rgba(255, 255, 255, 0.08) 66% 100%)`,
-      },
-      satelliteRows: getFixedSatelliteTypeRows(data['蓝方']?.蓝方过境卫星分类数量),
-      weaponRows: getWeaponTypeRows(data['蓝方']?.蓝方武器阵地列表),
-      focusList: blueFocusList.value,
-    },
-  ]
+    satelliteRows: getFixedSatelliteTypeRows(data['蓝方']?.蓝方过境卫星分类数量),
+    weaponRows: getWeaponTypeRows(data['蓝方']?.蓝方武器阵地列表),
+    focusList: blueFocusList.value,
+  }
 })
 
-const redCampCard = computed(() => battleCampCards.value[0])
-const blueCampCard = computed(() => battleCampCards.value[1])
+const enemyNetworkDamageCard = computed(() => {
+  const data = battleSituationData.value
+  if (!data) return null
+  const blueTotal = Number(data['蓝方']?.蓝方过境卫星总数 ?? 0)
+
+  return {
+    key: 'blue' as const,
+    label: '敌方网络毁伤态势',
+    theme: 'is-blue' as const,
+    total: blueTotal,
+    totalLabel: `${blueTotal}`,
+    durationText: formatDuration(data['蓝方']?.蓝方卫星过境总时长),
+    summaryRows: [
+      { name: '受打压节点', value: '3 个接收站' },
+      { name: '受干扰链路', value: '5 条通信网' },
+      { name: '平均过站延时', value: '18.5 分钟' },
+    ],
+    ringStyle: {
+      background: `conic-gradient(#3a90ff 0 60%, #e6a23c 60% 85%, #f56c6c 85% 100%)`,
+    },
+    satelliteRows: getFixedSatelliteTypeRows(data['蓝方']?.蓝方过境卫星分类数量),
+    weaponRows: getWeaponTypeRows(data['蓝方']?.蓝方武器阵地列表),
+    focusList: blueFocusList.value,
+  }
+})
+
+const matrixData = ref<MatrixResult | null>(getDefaultMatrixData())
 
 async function loadSituationData(taskId: number) {
   const res = await getSituationDataOfTask(taskId)
@@ -507,8 +496,52 @@ async function loadStrikeList(taskId: number) {
   }
 }
 
+async function loadMatrixData(taskId: number, intensityLevel = '中度交战') {
+  try {
+    const res = await getMatrixList({ norad: 60419, taskId, intensityLevel })
+    if (res.code === 200 && res.data && (res.data.initMatrixList?.length || res.data.satelliteMatrixList?.length)) {
+      matrixData.value = res.data
+    } else {
+      matrixData.value = getDefaultMatrixData()
+    }
+  } catch (err) {
+    console.error('加载算法矩阵失败，使用默认矩阵:', err)
+    matrixData.value = getDefaultMatrixData()
+  }
+}
+
+const handleIntensityChange = (level: '高烈度' | '中烈度' | '低烈度') => {
+  if (store.activedTask?.id) {
+    loadMatrixData(store.activedTask.id, level)
+  }
+}
+
+const handleToggleRadarFrustum = (show: boolean) => {
+  if (cesiumViewerRef.value && (cesiumViewerRef.value as any).toggleRadarFrustums) {
+    ;(cesiumViewerRef.value as any).toggleRadarFrustums(show)
+  }
+}
+
+const handleToggleOrbitTrails = (show: boolean) => {
+  if (cesiumViewerRef.value && (cesiumViewerRef.value as any).toggleOrbitTrails) {
+    ;(cesiumViewerRef.value as any).toggleOrbitTrails(show)
+  }
+}
+
+const handleToggleRedSatellites = (show: boolean) => {
+  if (cesiumViewerRef.value && (cesiumViewerRef.value as any).toggleRedSatellites) {
+    ;(cesiumViewerRef.value as any).toggleRedSatellites(show)
+  }
+}
+
+const handleFlyToView = (target: 'GLOBAL' | 'SPACE' | 'GROUND') => {
+  if (cesiumViewerRef.value && (cesiumViewerRef.value as any).flyToView) {
+    ;(cesiumViewerRef.value as any).flyToView(target)
+  }
+}
+
 async function loadBattleSituationData(taskId: number) {
-  await Promise.all([loadSituationData(taskId), loadStrikeList(taskId)])
+  await Promise.all([loadSituationData(taskId), loadStrikeList(taskId), loadMatrixData(taskId)])
 }
 
 const handleFocusSatellite = (payload: { norad_id: string }) => {
@@ -849,10 +882,16 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
     }
 
     .battle-grid__side {
+      height: 100%;
+      max-height: 100%;
       min-height: 0;
       overflow: hidden;
       position: relative;
       z-index: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 6px;
+      box-sizing: border-box;
     }
 
     .battle-grid__side--left {
