@@ -458,13 +458,9 @@ const renderElectronicInfrastructureNodes = () => {
           length: coneLength,
           topRadius: 320000, // 320km 顶部辐射半径
           bottomRadius: 2000,
-          material: isStruck
-            ? new Cesium.Color(1, 0, 0, 0.08)
-            : new Cesium.Color(0, 0.88, 1, 0.12),
+          material: isStruck ? new Cesium.Color(1, 0, 0, 0.08) : new Cesium.Color(0, 0.88, 1, 0.12),
           outline: true,
-          outlineColor: isStruck
-            ? new Cesium.Color(1, 0, 0, 0.35)
-            : new Cesium.Color(0, 0.88, 1, 0.35),
+          outlineColor: isStruck ? new Cesium.Color(1, 0, 0, 0.35) : new Cesium.Color(0, 0.88, 1, 0.35),
           outlineWidth: 1.0,
         },
       })
@@ -564,8 +560,6 @@ const toggleRedSatellites = (show: boolean) => {
     }
   }
 }
-
-
 
 const satelliteCoordMap = new Map<number, [number, number, number]>([
   [60419, [-8.15, 53.3, 500000]],
@@ -1219,6 +1213,7 @@ const getSatelliteColorByType = (type: string) => {
   }
   return Cesium.Color.ROYALBLUE
 }
+
 function getSatelliteColor(country: string) {
   // 国家
   const ourCountries = store.activedTask?.meCountry.split(',')
@@ -1230,6 +1225,12 @@ function getSatelliteColor(country: string) {
       : Cesium.Color.WHITE
   return color
 }
+
+const normalizeCountryList = (value?: string) =>
+  String(value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
 
 // 渲染卫星轨迹（路径实体方式，支持大量卫星）
 const renderSateliitePathWithEntity = async (taskId: number, namespace?: string) => {
@@ -1270,9 +1271,9 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
   }
 
   if (!cachedSatelliteList) return
-
+  const enemyCountrySet = computed(() => new Set(normalizeCountryList(store.activedTask?.enemyCountry)))
   // 过滤条件应用
-  let satelliteList = cachedSatelliteList
+  let satelliteList = cachedSatelliteList.filter((s) => enemyCountrySet.value.has(s.country))
 
   // 需要渲染的卫星 ID 集合，用于隐藏未命中的实体
   const wantedNorads = new Set(satelliteList.map((s) => Number(s.norad_id)))
