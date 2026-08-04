@@ -197,6 +197,25 @@ export interface BattleMatrixItem {
   windows: BattleWindow[];
 }
 
+// 针对 windows 数组项的接口定义
+export interface WeaponWindow {
+  beginWindow: string; // 时间格式："YYYY-MM-DD HH:mm:ss"
+  endWindow: string;   // 时间格式："YYYY-MM-DD HH:mm:ss"
+}
+
+// 主数据项接口定义
+export interface WeaponAttackRecord {
+  weaponName: string;   // 武器名称
+  weaponType: string;   // 武器类型（如："网络病毒" | "电子干扰"）
+  beginTime: string;    // 开始时间
+  endTime: string;      // 结束时间
+  angle: number;        // 角度
+  windows: WeaponWindow[]; // 时间窗口列表
+  target: string;       // 目标名称
+  targetType: string;   // 目标类型（如："接收站"）
+}
+
+
 // ==================== 根数据结构 ====================
 
 /**
@@ -207,6 +226,7 @@ export interface BattleMatrixItem {
  * /api/algorithm/calSeriesChain 接口返回 data 结构。
  *
  * [字段规则]
+ * - attackPlanList: 攻击计划列表
  * - battleMatrixList: 卫星过境战场矩阵列表
  * - initMatrixList: 初始状态下的过境时间窗口列表
  * - initRelationList: 初始状态下的站站拓扑映射
@@ -218,6 +238,8 @@ export interface BattleMatrixItem {
  * 新增字段必须包含注释并明确类型。
  */
 export interface MatrixResult {
+  /** 攻击计划列表 */
+  attackPlanList: WeaponAttackRecord[];
   /** 卫星过境战场矩阵 */
   battleMatrixList: BattleMatrixItem[];
   /** 初始状态下的过境时间窗口 */
@@ -266,6 +288,23 @@ export const getMatrixList = (data: { norad: number; taskId: number; intensityLe
 export const getDefaultMatrixData = (): MatrixResult => {
   return {
     series: 'Capella-Constellation',
+    attackPlanList: [
+      {
+        weaponName: '网络病毒',
+        weaponType: '网络病毒',
+        beginTime: '2026-08-03 16:20:00',
+        endTime: '2026-08-03 16:50:00',
+        angle: 180,
+        windows: [
+          {
+            beginWindow: '2026-08-03 16:20:00',
+            endWindow: '2026-08-03 16:50:00',
+          },
+        ],
+        target: 'CAPELLA-13',
+        targetType: '地球观测',
+      },
+    ],
     initMatrixList: [
       {
         norad: 60419,

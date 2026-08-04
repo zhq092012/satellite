@@ -55,8 +55,13 @@
       <SatelliteGantt :matrix-data="matrixData" />
     </div>
 
+    <!-- 当切换为武器打击窗口列表模式时，渲染武器打击窗口列表组件 -->
+    <div v-show="currentViewMode === 'WEAPON_ATTACK'" class="cema-workspace" style="height: calc(100vh - 60px); padding: 0">
+      <WeaponAttackList :matrix-data="matrixData" />
+    </div>
+
     <!-- 中间主视图与拓扑画布区域 -->
-    <div v-show="currentViewMode !== 'GANTT'" class="cema-workspace">
+    <div v-show="currentViewMode !== 'GANTT' && currentViewMode !== 'WEAPON_ATTACK'" class="cema-workspace">
       <!-- 状态与统计看板小条 -->
       <div class="topo-summary-bar">
         <div class="stat-badge">
@@ -86,7 +91,7 @@
         <div class="stat-badge alert-stat">
           <span class="stat-dot dot-struck-link"></span>
           <span
-            >打压/中断链路: <strong>{{ struckLinkCount }}</strong> 条 (红色 ✖ 标识)</span
+            >打压/中断链路: <strong>{{ struckLinkCount }}</strong> 条 (红色虚线标识)</span
           >
         </div>
       </div>
@@ -126,7 +131,7 @@
     </div>
 
     <!-- 底部时间轴控制与过境窗口面板 -->
-    <div class="cema-timeline-footer" v-if="currentViewMode !== 'GANTT'">
+    <div class="cema-timeline-footer" v-if="currentViewMode !== 'GANTT' && currentViewMode !== 'WEAPON_ATTACK'">
       <div class="timeline-ctrl-bar">
         <div class="ctrl-left">
           <span class="timeline-title"> <i class="el-icon-timer"></i> 打击/过境时间轴 </span>
@@ -190,26 +195,26 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import G6 from '@antv/g6'
-import { VideoPlay, VideoPause, RefreshRight, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import { getMatrixList } from '@/api/electronic'
 import type { MatrixResult, Weapon } from '@/api/electronic'
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
+import WeaponAttackList from '@/components/electronic/WeaponAttackList.vue'
 
 const store = useLayoutStore()
 
 // [类型用途]
 // 交战烈度选项类型定义
 type IntensityLevelType = '高烈度' | '中烈度' | '低烈度'
-const intensityOptions: IntensityLevelType[] = ['高烈度', '中烈度', '低烈度']
+const intensityOptions: IntensityLevelType[] = ['低烈度', '中烈度', '高烈度']
 
 // [变量用途]
 // 当前选中的交战烈度
-const currentIntensity = ref<IntensityLevelType>('高烈度')
+const currentIntensity = ref<IntensityLevelType>('低烈度')
 
 // [类型用途]
 // 拓扑视图显示模式选项
-type ViewModeType = 'COMBINED' | 'PRE_STRIKE' | 'POST_STRIKE' | 'GANTT'
+type ViewModeType = 'COMBINED' | 'PRE_STRIKE' | 'POST_STRIKE' | 'GANTT' | 'WEAPON_ATTACK'
 
 // [变量用途]
 // 拓扑视图切换选项列表
@@ -218,6 +223,7 @@ const viewModeOptions: { key: ViewModeType; name: string }[] = [
   { key: 'PRE_STRIKE', name: '打击前拓扑(未打击)' },
   { key: 'POST_STRIKE', name: '打击后拓扑(毁伤分析)' },
   { key: 'GANTT', name: '打击过境甘特图矩阵' },
+  { key: 'WEAPON_ATTACK', name: '武器打击窗口列表' },
 ]
 
 // [变量用途]
@@ -370,6 +376,23 @@ const scrollToActiveCard = (force = false) => {
 // 接口真实参考数据（当 API 无响应或本地调试时作为兜底使用）
 const demoMatrixData: MatrixResult = {
   series: 'Capella',
+  attackPlanList: [
+    {
+      weaponName: '网络病毒',
+      weaponType: '网络病毒',
+      beginTime: '2026-08-03 16:20:00',
+      endTime: '2026-08-03 16:50:00',
+      angle: 180,
+      windows: [
+        {
+          beginWindow: '2026-08-03 16:20:00',
+          endWindow: '2026-08-03 16:50:00',
+        },
+      ],
+      target: 'CAPELLA-13',
+      targetType: '地球观测',
+    },
+  ],
   initMatrixList: [
     {
       norad: 60419,
@@ -843,11 +866,12 @@ const demoMatrixData: MatrixResult = {
 }
 
 /**
+ * [功能说明]
  * 注册 AntV G6 自定义边 `struck-cubic`
  *
- * 功能：
- * - 绘制 Layer 1 -> Layer 2 -> Layer 3 的平滑平滑三层连接曲线。
- * - 当边处于打击/毁伤状态 (isStruck === true) 时，自动在连线中点位置绘制红色 ✖ 徽章。
+ * [处理规则]
+ * - 绘制 Layer 1 -> Layer 2 -> Layer 3 的平滑三层连接曲线。
+ * - 当链路处于打击/毁伤状态 (isStruck === true) 时，通过红色虚线 (stroke: '#ff4d4f', lineDash: [6, 4]) 表达打压状态。
  */
 const registerCustomG6Edge = () => {
   try {
@@ -876,42 +900,6 @@ const registerCustomG6Edge = () => {
             },
             name: 'path-shape',
           })
-
-          // 打击/毁伤连线，在中点绘制红色 ✖ 徽章
-          if (cfg.isStruck) {
-            const midX = (startPoint.x + endPoint.x) / 2
-            const midY = (startPoint.y + endPoint.y) / 2
-
-            // 红色圆形底图
-            group.addShape('circle', {
-              attrs: {
-                x: midX,
-                y: midY,
-                r: 9,
-                fill: '#ff4d4f',
-                stroke: '#ffffff',
-                lineWidth: 1.5,
-                shadowColor: 'rgba(255, 77, 79, 0.6)',
-                shadowBlur: 8,
-              },
-              name: 'x-bg',
-            })
-
-            // ❌ 文本符
-            group.addShape('text', {
-              attrs: {
-                x: midX,
-                y: midY,
-                text: '✖',
-                fontSize: 10,
-                fontWeight: 'bold',
-                fill: '#ffffff',
-                textAlign: 'center',
-                textBaseline: 'middle',
-              },
-              name: 'x-text',
-            })
-          }
 
           return shape
         },
@@ -2066,7 +2054,7 @@ const updateGraphHighlightState = () => {
 // 监听拓扑视图模式改变
 // 当从甘特图矩阵模式 (GANTT) 切回拓扑视图模式时，在 DOM 更新 (nextTick) 后刷新 G6 画布并高亮当前活跃元素
 watch(currentViewMode, (mode) => {
-  if (mode !== 'GANTT') {
+  if (mode !== 'GANTT' && mode !== 'WEAPON_ATTACK') {
     nextTick(() => {
       initOrUpdateGraph()
       highlightActiveElements()
