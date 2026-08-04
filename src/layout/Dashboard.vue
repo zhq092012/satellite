@@ -40,7 +40,7 @@
         </div>
 
         <div class="header-right" v-show="route.name === 'Satellite'">
-          <el-button type="primary" size="small" plain round @click="router.go(-1)">返回态势分析</el-button>
+          <el-button type="primary" size="small" plain round @click="router.go(-1)">返回首页</el-button>
         </div>
       </el-header>
 
@@ -170,7 +170,7 @@ const homeMenu = computed<DashboardMenuNode[]>(() => [
   {
     path: '/home',
     meta: {
-      title: '态势分析',
+      title: '战场列表',
       icon: 'icon-situation',
       showInMenu: true,
     },

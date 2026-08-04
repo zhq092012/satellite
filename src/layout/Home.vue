@@ -5,86 +5,86 @@
       <Transition name="battleslide">
         <div class="left-panel" v-show="store.showAnalysisPanel">
           <div class="battle-box">
-            <div
-              class="title"
-              style="display: flex; padding: 5px; justify-content: space-between; background: var(--nav-bar-background)"
-            >
-              <span>全局战场</span>
-              <el-button
-                size="small"
-                icon="Plus"
-                type="primary"
-                plain
-                round
-                @click="handleCreateBattle"
-                style="margin-right: 20px"
-                >新建战场</el-button
-              >
+            <div class="title">
+              <span class="header-text">🌐 全局战场</span>
+              <el-button size="small" icon="Plus" type="primary" round @click="handleCreateBattle">
+                新建战场
+              </el-button>
             </div>
             <div class="battle-count">
-              <div>
-                <span>{{ store.satelliteTotal }}</span
-                ><span>卫星总数</span>
+              <div class="stat-card">
+                <span>{{ store.satelliteTotal }}</span>
+                <span>卫星总数</span>
               </div>
-              <div>
-                <span>{{ healthScore }}</span
-                ><span>态势健康分数</span>
+              <div class="stat-card">
+                <span class="score-num">{{ healthScore }}</span>
+                <span>态势健康分数</span>
               </div>
-              <div>
-                <span>{{ days }}天</span><span>监测天数</span>
+              <div class="stat-card">
+                <span>{{ days }}天</span>
+                <span>监测天数</span>
               </div>
             </div>
           </div>
-          <!-- 战场列表 -->
+          <!-- 自定义战场列表 -->
           <el-scrollbar class="left-panel-scroll">
-            <el-collapse v-model="activeNames">
-              <el-collapse-item
-                :name="battle.id"
-                class="collapse-item"
-                icon="CaretRight"
+            <div class="custom-battle-list">
+              <div
                 v-for="battle in battleList"
                 :key="battle.id"
+                class="battle-card-panel"
+                :class="{ 'is-expanded': isBattleExpanded(battle.id) }"
               >
-                <template #title>
-                  <div style="display: flex; justify-content: space-between; align-items: center">
-                    <span style="font-size: 16px; font-weight: bold; padding-left: 5px">{{ battle.name }}</span>
-                    <div style="padding-right: 10px">
-                      <el-tooltip effect="dark" content="编辑战场" placement="top">
-                        <el-button
-                          type="success"
-                          icon="Edit"
-                          size="small"
-                          @click.stop="handleEditBattle(battle)"
-                          plain
-                          round
-                        />
-                      </el-tooltip>
-                      <el-tooltip effect="dark" content="删除战场" placement="top">
-                        <el-button
-                          type="danger"
-                          icon="Delete"
-                          size="small"
-                          @click.stop="handleDeleteBattle(battle.id)"
-                          plain
-                          round
-                      /></el-tooltip>
-                    </div>
-                  </div>
-                </template>
-                <div class="title task-title">
-                  <span style="color: var(--accent-color); font-weight: bold">任务列表</span>
-                  <div style="display: flex; gap: 10px; padding-right: 10px">
-                    <el-button type="primary" icon="Plus" size="small" @click="handleCreateTask(battle)" plain round
-                      >新建任务</el-button
-                    >
+                <div class="battle-card-header" @click="toggleBattleExpand(battle.id)">
+                  <span class="battle-name">⚔️ {{ battle.name }}</span>
+                  <div class="battle-actions" @click.stop>
+                    <el-tooltip effect="dark" content="编辑战场" placement="top">
+                      <el-button
+                        type="success"
+                        icon="Edit"
+                        size="small"
+                        @click.stop="handleEditBattle(battle)"
+                        circle
+                      />
+                    </el-tooltip>
+                    <el-tooltip effect="dark" content="删除战场" placement="top">
+                      <el-button
+                        type="danger"
+                        icon="Delete"
+                        size="small"
+                        @click.stop="handleDeleteBattle(battle.id)"
+                        circle
+                      />
+                    </el-tooltip>
                   </div>
                 </div>
 
-                <div class="task-item" v-for="task in battle.tasks" :key="task.id ?? task.name">
-                  <div class="task-item__left">
-                    <div>{{ task.name }}</div>
-                    <div>时间：{{ task.beginDate }}-{{ task.endDate }}</div>
-                    <div>
+                <div v-show="isBattleExpanded(battle.id)" class="battle-card-body">
+                  <div class="task-title">
+                    <span class="task-label">📋 任务列表</span>
+                    <el-button type="primary" icon="Plus" size="small" @click="handleCreateTask(battle)" plain round>
+                      新建任务
+                    </el-button>
+                  </div>
+
+                  <div class="task-item" v-for="task in battle.tasks" :key="task.id ?? task.name">
+                    <div class="task-item__main">
+                      <div>
+                        <div class="task-name">{{ task.name }}</div>
+                        <div class="task-time">时间：{{ task.beginDate }} ~ {{ task.endDate }}</div>
+                      </div>
+                      <el-button
+                        type="primary"
+                        link
+                        size="small"
+                        :disabled="isTaskDetailDisabled(task)"
+                        @click="showTaskDetail(battle, task)"
+                      >
+                        查看详情 <el-icon :size="12"><DArrowRight /></el-icon>
+                      </el-button>
+                    </div>
+
+                    <div class="task-item__actions">
                       <el-button
                         type="success"
                         icon="Edit"
@@ -92,59 +92,49 @@
                         @click="handleEditTask(task, battle)"
                         round
                         plain
-                        >修改任务</el-button
                       >
-                      <el-button type="danger" icon="Delete" size="small" @click="handleDeleteTask(task)" round plain
-                        >删除任务</el-button
-                      >
+                        修改
+                      </el-button>
+                      <el-button type="danger" icon="Delete" size="small" @click="handleDeleteTask(task)" round plain>
+                        删除
+                      </el-button>
                       <el-button
                         type="primary"
                         icon="Aim"
                         size="small"
                         @click="handleElectronicWarfare(task, battle)"
                         round
-                        plain
-                        >电子对抗</el-button
                       >
+                        电子对抗
+                      </el-button>
                     </div>
-                  </div>
-                  <div class="task-item__right">
-                    <el-button
-                      type="primary"
-                      link
-                      :disabled="isTaskDetailDisabled(task)"
-                      @click="showTaskDetail(battle, task)"
-                    >
-                      查看详情
-                    </el-button>
-                    <el-icon :size="12">
-                      <DArrowRight />
-                    </el-icon>
-                  </div>
-                  <div v-if="getTaskProgress(task)" class="task-item__progress">
-                    <div class="task-item__progress-header">
-                      <span>当前进度</span>
-                      <el-tag
-                        :type="isTaskProgressComplete(getTaskProgress(task)) ? 'success' : 'warning'"
-                        size="small"
-                      >
-                        {{ isTaskProgressComplete(getTaskProgress(task)) ? '完成' : '进行中' }}
-                      </el-tag>
-                    </div>
-                    <el-progress
-                      :percentage="getTaskProgressPercent(getTaskProgress(task))"
-                      :status="isTaskProgressComplete(getTaskProgress(task)) ? 'success' : ''"
-                      :stroke-width="8"
-                    />
-                    <div class="task-item__progress-status">
-                      <span>总任务：{{ getTaskProgress(task)?.totalStatus || '--' }}</span>
-                      <span>过境：{{ getTaskProgress(task)?.transitStatus || '--' }}</span>
-                      <span>威胁打击：{{ getTaskProgress(task)?.threatAndStrikeStatus || '--' }}</span>
+
+                    <div v-if="getTaskProgress(task)" class="task-item__progress">
+                      <div class="task-item__progress-header">
+                        <span>当前进度</span>
+                        <el-tag
+                          :type="isTaskProgressComplete(getTaskProgress(task)) ? 'success' : 'warning'"
+                          size="small"
+                          round
+                        >
+                          {{ isTaskProgressComplete(getTaskProgress(task)) ? '完成' : '进行中' }}
+                        </el-tag>
+                      </div>
+                      <el-progress
+                        :percentage="getTaskProgressPercent(getTaskProgress(task))"
+                        :status="isTaskProgressComplete(getTaskProgress(task)) ? 'success' : ''"
+                        :stroke-width="6"
+                      />
+                      <div class="task-item__progress-status">
+                        <span>总任务：{{ getTaskProgress(task)?.totalStatus || '--' }}</span>
+                        <span>过境：{{ getTaskProgress(task)?.transitStatus || '--' }}</span>
+                        <span>威胁打击：{{ getTaskProgress(task)?.threatAndStrikeStatus || '--' }}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </el-collapse-item>
-            </el-collapse>
+              </div>
+            </div>
           </el-scrollbar>
         </div>
       </Transition>
@@ -942,7 +932,28 @@ const cesiumViewerRef = ref<{
   clearViewer: () => void
   focusConstellationByName: (constellationName?: string | null) => Promise<void>
 }>()
-const activeNames = ref<number[]>([])
+const activeNames = ref<any[]>([])
+
+/**
+ * [功能说明]
+ * 判断指定战场 ID 的卡片面板当前是否处于展开状态
+ */
+const isBattleExpanded = (id: any) => {
+  return activeNames.value.includes(id)
+}
+
+/**
+ * [功能说明]
+ * 切换指定战场 ID 的卡片面板展开 / 折叠状态
+ */
+const toggleBattleExpand = (id: any) => {
+  const index = activeNames.value.indexOf(id)
+  if (index > -1) {
+    activeNames.value.splice(index, 1)
+  } else {
+    activeNames.value.push(id)
+  }
+}
 
 // 查询战场下的任务列表
 watch(
@@ -2187,102 +2198,265 @@ async function getTaskTargetOptions() {
     }
 
     .left-panel {
-      background: var(--app-bg-color);
+      // AI:
+      // - 全局左侧面板美化：高质感暗黑毛玻璃悬浮科技风
+      // - 层次分明的战场概览、态势指标大屏卡片与战场/任务层叠列表
+      background: linear-gradient(180deg, rgba(8, 22, 40, 0.95) 0%, rgba(6, 17, 32, 0.98) 100%);
       position: absolute;
       left: 0;
       top: 0;
+      bottom: 0;
       z-index: 999;
-      width: 450px;
+      width: 440px;
+      border-right: 1px solid rgba(79, 147, 221, 0.25);
+      box-shadow: 8px 0 32px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
 
       .battle-box {
-        padding: 5px;
+        padding: 14px 16px;
+        background: rgba(12, 28, 48, 0.6);
+        border-bottom: none;
+
+        .title {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 12px;
+
+          .header-text {
+            font-size: 16px;
+            font-weight: 700;
+            color: #eaf3ff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: 0.5px;
+          }
+        }
 
         .battle-count {
-          display: flex;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
           gap: 10px;
-          padding: 5px;
 
-          & > div {
-            background: var(--surface-bg-color-soft);
-            flex: 1;
-            padding: 5px;
+          .stat-card {
+            background: linear-gradient(180deg, rgba(16, 36, 62, 0.8) 0%, rgba(10, 24, 44, 0.9) 100%);
+            border: 1px solid rgba(79, 147, 221, 0.2);
+            border-radius: 10px;
+            padding: 10px 8px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            transition: all 0.25s ease;
+
+            &:hover {
+              border-color: rgba(0, 225, 255, 0.45);
+              box-shadow: 0 0 12px rgba(0, 225, 255, 0.2);
+            }
 
             & > span:first-child {
-              font-size: 18px;
-              font-weight: bold;
+              font-size: 20px;
+              font-weight: 800;
+              color: #00e1ff;
+              font-family: 'DIN Alternate', 'Orbitron', monospace, sans-serif;
+              margin-bottom: 4px;
+
+              &.score-num {
+                color: #52c41a;
+              }
             }
 
             & > span:last-child {
-              font-size: 14px;
-              color: var(--text-color-secondary);
+              font-size: 11px;
+              color: #8eb3d6;
             }
           }
         }
       }
 
       .left-panel-scroll {
-        padding-right: 10px;
-        height: calc(100vh - 160px);
+        flex: 1;
+        padding: 12px 14px;
 
-        .collapse-item {
-          .title {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px;
-            background: var(--surface-bg-color-strong);
+        .custom-battle-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .battle-card-panel:first-child {
+          margin-top: 5px;
+        }
+        .battle-card-panel {
+          background: linear-gradient(180deg, rgba(14, 32, 56, 0.85) 0%, rgba(8, 20, 36, 0.92) 100%);
+          border: 1px solid rgba(79, 147, 221, 0.25);
+          border-radius: 10px;
+          overflow: hidden;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+          transition: all 0.25s ease;
+
+          &:hover {
+            border-color: rgba(0, 225, 255, 0.45);
+            box-shadow: 0 0 16px rgba(0, 225, 255, 0.2);
+            transform: translateY(-1px);
           }
 
-          .task-item {
-            background: var(--nav-bar-background);
-            padding: 10px 5px 20px 10px;
-            margin: 5px 0;
-            display: grid;
-            grid-template-columns: 2.4fr 1fr;
-            row-gap: 10px;
+          &.is-expanded {
+            border-color: rgba(0, 225, 255, 0.45);
+            background: linear-gradient(180deg, rgba(16, 38, 66, 0.9) 0%, rgba(10, 24, 44, 0.95) 100%);
 
-            .task-item__left {
-              & > div {
-                text-align: left;
-                padding-top: 5px;
-              }
+            .battle-card-header {
+              border-bottom: 1px dashed rgba(79, 147, 221, 0.22);
+            }
+          }
 
-              & > div:last-child {
-                font-size: 10px;
-              }
+          .battle-card-header {
+            height: 48px;
+            padding: 0 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s ease;
+
+            &:hover {
+              background: rgba(0, 225, 255, 0.05);
             }
 
-            .task-item__right {
+            .battle-name {
+              font-size: 15px;
+              font-weight: 700;
+              color: #eaf3ff;
+              letter-spacing: 0.3px;
+            }
+
+            .battle-actions {
               display: flex;
               align-items: center;
-              justify-content: end;
-              color: var(--accent-color);
-              gap: 2px;
+              gap: 6px;
+            }
+          }
+
+          .battle-card-body {
+            padding: 12px 14px 14px 14px;
+          }
+        }
+
+        .battle-collapse-title {
+          width: 100%;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-right: 8px;
+
+          .battle-name {
+            font-size: 15px;
+            font-weight: 700;
+            color: #eaf3ff;
+            letter-spacing: 0.3px;
+          }
+
+          .battle-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          }
+        }
+
+        .task-title {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 6px 0 10px 0;
+          border-bottom: 1px dashed rgba(79, 147, 221, 0.2);
+          margin-bottom: 10px;
+
+          .task-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #00e1ff;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+          }
+        }
+
+        .task-item {
+          background: linear-gradient(180deg, rgba(14, 32, 56, 0.85) 0%, rgba(8, 20, 36, 0.9) 100%);
+          border: 1px solid rgba(79, 147, 221, 0.2);
+          border-radius: 10px;
+          padding: 12px;
+          margin-bottom: 10px;
+          transition: all 0.25s ease;
+
+          &:hover {
+            border-color: rgba(0, 225, 255, 0.4);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+          }
+
+          .task-item__main {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 10px;
+
+            .task-name {
+              font-size: 14px;
+              font-weight: 700;
+              color: #f0f6ff;
+              margin-bottom: 4px;
+              text-align: left;
             }
 
-            .task-item__progress {
-              grid-column: 1 / -1;
+            .task-time {
+              font-size: 11px;
+              color: #8eb3d6;
+              text-align: left;
+            }
+          }
+
+          .task-item__actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(79, 147, 221, 0.12);
+          }
+
+          .task-item__progress {
+            margin-top: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(6, 16, 28, 0.6);
+            border: 1px solid rgba(79, 147, 221, 0.15);
+
+            .task-item__progress-header {
               display: flex;
-              flex-direction: column;
-              gap: 8px;
-              padding-right: 10px;
+              align-items: center;
+              justify-content: space-between;
+              color: #94a3b8;
+              font-size: 11px;
+              margin-bottom: 6px;
+            }
 
-              .task-item__progress-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                color: var(--text-color-secondary);
-                font-size: 12px;
-              }
+            .task-item__progress-status {
+              display: flex;
+              justify-content: space-between;
+              gap: 6px;
+              font-size: 10.5px;
+              color: #8eb3d6;
+              margin-top: 6px;
 
-              .task-item__progress-status {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 8px 12px;
-                font-size: 12px;
-                color: var(--text-color-secondary);
+              span {
+                background: rgba(79, 147, 221, 0.1);
+                padding: 2px 6px;
+                border-radius: 4px;
               }
             }
           }

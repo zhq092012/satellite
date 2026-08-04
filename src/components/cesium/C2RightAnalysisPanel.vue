@@ -9,131 +9,134 @@
       <span class="panel-badge badge-red">时效战果分析</span>
     </div>
 
-    <!-- 1. 网络脆弱点与高价值枢纽分析模块 -->
-    <div class="panel-section">
-      <div class="section-title">
-        <span class="title-icon">🎯</span>
-        <span>网络脆弱点与高价值枢纽</span>
+    <!-- 全面板纵向滚动容器 -->
+    <el-scrollbar class="panel-body-scroll">
+      <!-- 1. 网络脆弱点与高价值枢纽分析模块 -->
+      <div class="panel-section">
+        <div class="section-title">
+          <span class="title-icon">🎯</span>
+          <span>网络脆弱点与高价值枢纽</span>
+        </div>
+
+        <div class="hubs-list">
+          <div v-for="hub in highValueHubs" :key="hub.id" class="hub-card">
+            <div class="hub-header">
+              <span class="hub-icon">{{ hub.icon }}</span>
+              <span class="hub-name"
+                ><strong>{{ hub.name }}</strong></span
+              >
+              <span class="hub-tag" :class="hub.tagClass">{{ hub.tag }}</span>
+            </div>
+
+            <div class="hub-body">
+              <div class="hub-metric">
+                <span class="metric-label">1对N并发链路:</span>
+                <span class="metric-value digital-font glow-cyan">{{ hub.linkCount }} 条</span>
+              </div>
+              <div class="hub-metric">
+                <span class="metric-label">抗干扰解扩余量:</span>
+                <span class="metric-value digital-font" :class="hub.marginClass">{{ hub.margin }}</span>
+              </div>
+              <div class="hub-metric">
+                <span class="metric-label">单点失效风险:</span>
+                <span class="metric-value digital-font" :class="hub.riskClass">{{ hub.riskIndex }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="hubs-list">
-        <div v-for="hub in highValueHubs" :key="hub.id" class="hub-card">
-          <div class="hub-header">
-            <span class="hub-icon">{{ hub.icon }}</span>
-            <span class="hub-name"
-              ><strong>{{ hub.name }}</strong></span
+      <!-- 2. 累积时延战果与时效性损毁模块 -->
+      <div class="panel-section">
+        <div class="section-title">
+          <span class="title-icon">⏱️</span>
+          <span>累积时延战果与时效性损失</span>
+        </div>
+
+        <div class="stats-grid-row">
+          <!-- 累计时效损失 -->
+          <div class="stat-box box-amber">
+            <span class="stat-title">累计链路时效损失</span>
+            <div class="stat-num-box">
+              <span class="stat-num digital-font glow-amber">+{{ cumulativeDelayMin }}</span>
+              <span class="stat-unit">分钟</span>
+            </div>
+          </div>
+
+          <!-- 通信中断瘫痪率 -->
+          <div class="stat-box box-red">
+            <span class="stat-title">通信网络瘫痪率</span>
+            <div class="stat-num-box">
+              <span class="stat-num digital-font glow-red">{{ interruptionRate }}%</span>
+              <span class="stat-unit">毁伤链路</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 毁伤打压概览小条 -->
+        <div class="damage-summary-bar">
+          <div class="summary-item">
+            <span class="dot dot-red"></span>
+            <span
+              >受损地面站: <strong class="glow-red">{{ struckReceiveCount }}</strong> / {{ totalReceiveCount }} 个</span
             >
-            <span class="hub-tag" :class="hub.tagClass">{{ hub.tag }}</span>
           </div>
-
-          <div class="hub-body">
-            <div class="hub-metric">
-              <span class="metric-label">1对N并发链路:</span>
-              <span class="metric-value digital-font glow-cyan">{{ hub.linkCount }} 条</span>
-            </div>
-            <div class="hub-metric">
-              <span class="metric-label">抗干扰解扩余量:</span>
-              <span class="metric-value digital-font" :class="hub.marginClass">{{ hub.margin }}</span>
-            </div>
-            <div class="hub-metric">
-              <span class="metric-label">单点失效风险:</span>
-              <span class="metric-value digital-font" :class="hub.riskClass">{{ hub.riskIndex }}</span>
-            </div>
+          <div class="summary-item">
+            <span class="dot dot-amber"></span>
+            <span
+              >打压/毁伤卫星: <strong class="glow-amber">{{ struckSatCount }}</strong> / {{ totalSatCount }} 颗</span
+            >
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. 累积时延战果与时效性损毁模块 -->
-    <div class="panel-section">
-      <div class="section-title">
-        <span class="title-icon">⏱️</span>
-        <span>累积时延战果与时效性损失</span>
-      </div>
-
-      <div class="stats-grid-row">
-        <!-- 累计时效损失 -->
-        <div class="stat-box box-amber">
-          <span class="stat-title">累计链路时效损失</span>
-          <div class="stat-num-box">
-            <span class="stat-num digital-font glow-amber">+{{ cumulativeDelayMin }}</span>
-            <span class="stat-unit">分钟</span>
-          </div>
-        </div>
-
-        <!-- 通信中断瘫痪率 -->
-        <div class="stat-box box-red">
-          <span class="stat-title">通信网络瘫痪率</span>
-          <div class="stat-num-box">
-            <span class="stat-num digital-font glow-red">{{ interruptionRate }}%</span>
-            <span class="stat-unit">毁伤链路</span>
+          <div class="summary-item">
+            <span class="dot dot-blue"></span>
+            <span
+              >切断骨干链路: <strong class="glow-cyan">{{ severedLinkCount }}</strong> 条</span
+            >
           </div>
         </div>
       </div>
 
-      <!-- 毁伤打压概览小条 -->
-      <div class="damage-summary-bar">
-        <div class="summary-item">
-          <span class="dot dot-red"></span>
-          <span
-            >受损地面站: <strong class="glow-red">{{ struckReceiveCount }}</strong> / {{ totalReceiveCount }} 个</span
+      <!-- 3. 实时全链路通信过境窗口明细 -->
+      <div class="panel-section">
+        <div class="section-title">
+          <span class="title-icon">📡</span>
+          <span>过境通信窗口与毁伤明细</span>
+          <span class="count-tag">{{ allWindowsList.length }} 个窗口</span>
+        </div>
+
+        <div class="windows-feed-list">
+          <div v-if="allWindowsList.length === 0" class="empty-feed">暂无过境窗口数据</div>
+          <div
+            v-for="(win, idx) in allWindowsList.slice(0, 10)"
+            :key="win.id || idx"
+            class="feed-card"
+            :class="{ 'card-struck': win.strikeStatus === 1 }"
           >
-        </div>
-        <div class="summary-item">
-          <span class="dot dot-amber"></span>
-          <span
-            >打压/毁伤卫星: <strong class="glow-amber">{{ struckSatCount }}</strong> / {{ totalSatCount }} 颗</span
-          >
-        </div>
-        <div class="summary-item">
-          <span class="dot dot-blue"></span>
-          <span
-            >切断骨干链路: <strong class="glow-cyan">{{ severedLinkCount }}</strong> 条</span
-          >
-        </div>
-      </div>
-    </div>
-
-    <!-- 3. 实时全链路通信过境窗口明细 -->
-    <div class="panel-section flex-1">
-      <div class="section-title">
-        <span class="title-icon">📡</span>
-        <span>过境通信窗口与毁伤明细</span>
-        <span class="count-tag">{{ allWindowsList.length }} 个窗口</span>
-      </div>
-
-      <div class="windows-feed-list">
-        <div v-if="allWindowsList.length === 0" class="empty-feed">暂无过境窗口数据</div>
-        <div
-          v-for="(win, idx) in allWindowsList.slice(0, 10)"
-          :key="win.id || idx"
-          class="feed-card"
-          :class="{ 'card-struck': win.strikeStatus === 1 }"
-        >
-          <div class="feed-header">
-            <span class="feed-time digital-font">{{ win.startTimeShort }} ~ {{ win.endTimeShort }}</span>
-            <span class="feed-status" :class="win.strikeStatus === 1 ? 'status-red' : 'status-green'">
-              {{ win.strikeStatus === 1 ? '受毁伤打压' : '正常过境' }}
-            </span>
-          </div>
-
-          <div class="feed-body">
-            <div class="link-route">
-              <span class="sat-text">🛰️ {{ win.satName }}</span>
-              <span class="arrow">➔</span>
-              <span class="rec-text">📡 {{ win.receiveName }}</span>
-            </div>
-
-            <div class="feed-meta" v-if="win.strikeStatus === 1">
-              <span class="meta-tag tag-amber" v-if="win.delayMin">延时: +{{ win.delayMin }}m</span>
-              <span class="meta-tag tag-red" v-if="win.weapons && win.weapons.length > 0" :title="win.weapons[0].name">
-                🎯 {{ win.weapons[0].name }} ({{ win.weapons[0].type }})
+            <div class="feed-header">
+              <span class="feed-time digital-font">{{ win.startTimeShort }} ~ {{ win.endTimeShort }}</span>
+              <span class="feed-status" :class="win.strikeStatus === 1 ? 'status-red' : 'status-green'">
+                {{ win.strikeStatus === 1 ? '受毁伤打压' : '正常过境' }}
               </span>
             </div>
+
+            <div class="feed-body">
+              <div class="link-route">
+                <span class="sat-text">🛰️ {{ win.satName }}</span>
+                <span class="arrow">➔</span>
+                <span class="rec-text">📡 {{ win.receiveName }}</span>
+              </div>
+
+              <div class="feed-meta" v-if="win.strikeStatus === 1">
+                <span class="meta-tag tag-amber" v-if="win.delayMin">延时: +{{ win.delayMin }}m</span>
+                <span class="meta-tag tag-red" v-if="win.weapons && win.weapons.length > 0" :title="win.weapons[0].name">
+                  🎯 {{ win.weapons[0].name }} ({{ win.weapons[0].type }})
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </el-scrollbar>
   </aside>
 </template>
 
@@ -397,6 +400,23 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
   font-weight: 700;
 }
 
+.panel-body-scroll {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+
+  :deep(.el-scrollbar__wrap) {
+    overflow-x: hidden;
+  }
+
+  :deep(.el-scrollbar__view) {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 4px;
+  }
+}
+
 .panel-section {
   display: flex;
   flex-direction: column;
@@ -448,7 +468,18 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
 .hubs-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  max-height: 185px;
+  overflow-y: auto;
+  padding-right: 2px;
+
+  &::-webkit-scrollbar {
+    width: 3px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 225, 255, 0.3);
+    border-radius: 2px;
+  }
 }
 
 .hub-card {
