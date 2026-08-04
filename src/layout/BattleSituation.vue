@@ -228,8 +228,8 @@ const tabDefs = [
   //   permissionCode: 'battle:electronicWarfare',
   // },
   {
-    label: '三层拓扑毁伤分析',
-    value: '三层拓扑毁伤分析',
+    label: '电磁对抗分析',
+    value: '电磁对抗分析',
     component: 'ElectronicWarfareG6',
     permissionCode: 'battle:electronicWarfare',
   },

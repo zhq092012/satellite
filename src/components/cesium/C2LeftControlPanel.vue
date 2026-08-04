@@ -4,7 +4,7 @@
     <div class="panel-header">
       <div class="header-title-box">
         <span class="header-icon">🛰️</span>
-        <span class="header-title glow-text-cyan">C2 战术控制与资产态势</span>
+        <span class="header-title glow-text-cyan">战术控制与资产态势</span>
       </div>
       <span class="panel-badge">即时推演</span>
     </div>
@@ -45,7 +45,11 @@
           <span class="toggle-text">🛰️ 卫星运行真实轨道轨迹</span>
         </label>
         <label class="toggle-item">
-          <input type="checkbox" v-model="showRedSatellites" @change="$emit('toggle-red-satellites', showRedSatellites)" />
+          <input
+            type="checkbox"
+            v-model="showRedSatellites"
+            @change="$emit('toggle-red-satellites', showRedSatellites)"
+          />
           <span class="checkbox-custom"></span>
           <span class="toggle-text">🇨🇳 显示我方(红方)天基卫星</span>
         </label>
@@ -171,7 +175,6 @@ const satList = computed(() => {
     const isRelay = (s.satType || '').includes('中继') || relayList.includes(s.norad)
     map.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: 0, isRelay })
   })
-
   ;(data.satelliteMatrixList || []).forEach((s: SatelliteMatrix) => {
     const isRelay = (s.satType || '').includes('中继') || relayList.includes(s.norad)
     map.set(s.norad, {

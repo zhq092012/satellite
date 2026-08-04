@@ -4,7 +4,7 @@
     <div class="panel-header">
       <div class="header-title-box">
         <span class="header-icon">📊</span>
-        <span class="header-title glow-text-cyan">C2 战场态势 - 网络毁伤态势</span>
+        <span class="header-title glow-text-cyan">战场态势 - 网络毁伤态势</span>
       </div>
       <span class="panel-badge badge-red">时效战果分析</span>
     </div>
@@ -20,7 +20,9 @@
         <div v-for="hub in highValueHubs" :key="hub.id" class="hub-card">
           <div class="hub-header">
             <span class="hub-icon">{{ hub.icon }}</span>
-            <span class="hub-name"><strong>{{ hub.name }}</strong></span>
+            <span class="hub-name"
+              ><strong>{{ hub.name }}</strong></span
+            >
             <span class="hub-tag" :class="hub.tagClass">{{ hub.tag }}</span>
           </div>
 
@@ -73,15 +75,21 @@
       <div class="damage-summary-bar">
         <div class="summary-item">
           <span class="dot dot-red"></span>
-          <span>受损地面站: <strong class="glow-red">{{ struckReceiveCount }}</strong> / {{ totalReceiveCount }} 个</span>
+          <span
+            >受损地面站: <strong class="glow-red">{{ struckReceiveCount }}</strong> / {{ totalReceiveCount }} 个</span
+          >
         </div>
         <div class="summary-item">
           <span class="dot dot-amber"></span>
-          <span>打压/毁伤卫星: <strong class="glow-amber">{{ struckSatCount }}</strong> / {{ totalSatCount }} 颗</span>
+          <span
+            >打压/毁伤卫星: <strong class="glow-amber">{{ struckSatCount }}</strong> / {{ totalSatCount }} 颗</span
+          >
         </div>
         <div class="summary-item">
           <span class="dot dot-blue"></span>
-          <span>切断骨干链路: <strong class="glow-cyan">{{ severedLinkCount }}</strong> 条</span>
+          <span
+            >切断骨干链路: <strong class="glow-cyan">{{ severedLinkCount }}</strong> 条</span
+          >
         </div>
       </div>
     </div>
@@ -158,7 +166,11 @@ const highValueHubs = computed(() => {
   // 提取多路并发地面站
   const recList = data.stationRelationList?.receiveObjList || data.initRelationList?.receiveObjList || []
   recList.forEach((rec) => {
-    if (rec.receiveName.includes('斯瓦尔巴') || rec.receiveName.includes('加州') || rec.receiveName.includes('爱尔兰')) {
+    if (
+      rec.receiveName.includes('斯瓦尔巴') ||
+      rec.receiveName.includes('加州') ||
+      rec.receiveName.includes('爱尔兰')
+    ) {
       const isStruck = rec.receiveStatus === 1
       list.push({
         id: rec.receiveId,
