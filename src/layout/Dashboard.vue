@@ -12,7 +12,7 @@
         </div>
 
         <div class="header-right actions-bar">
-          <div v-show="route.name === 'Home'" class="menus">
+          <!-- <div v-show="route.name === 'Home'" class="menus">
             <el-switch
               v-model="layoutStore.showAnalysisPanel"
               active-action-icon="View"
@@ -27,7 +27,7 @@
               active-text="卫星列表"
               @change="layoutStore.toggleShowSatelliteList"
             />
-          </div>
+          </div> -->
 
           <div class="user-panel">
             <el-avatar :size="32" icon="UserFilled" />

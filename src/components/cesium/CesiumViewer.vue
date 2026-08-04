@@ -317,8 +317,8 @@ const initViewer = async () => {
         })
       }
 
-      // 最低 800 km（米为单位，想再高点就调大）
-      viewer.scene.screenSpaceCameraController.minimumZoomDistance = 8000000
+      // 设置最小缩放高度（单位：米），允许滚轮拉近观察细节
+      viewer.scene.screenSpaceCameraController.minimumZoomDistance = 100000
 
       // 禁止相机跑到地面以下
       viewer.scene.globe.depthTestAgainstTerrain = false
@@ -358,6 +358,22 @@ const initViewer = async () => {
       if (!clockTickRemoveListener) {
         clockTickRemoveListener = viewer.clock.onTick.addEventListener(() => {
           updateElectronicDynamicLinks()
+        })
+      }
+
+      // 绑定相机移动监听，实现高处视角聚合与低处视角具体 Label 的动态无缝切换
+      let lastIsCloseView: boolean | null = null
+      if (!cameraMoveEndListener) {
+        viewer.camera.percentageChanged = 0.05
+        cameraMoveEndListener = viewer.camera.changed.addEventListener(() => {
+          if (selectedConstellation.value) {
+            const currentCloseView = isConstellationCloseView()
+            // 只有当高度临界状态改变（低处 ↔ 高处）时，才触发视觉显隐更新，且跳过 Polyline 图层重绘，避免拖动地球时线路闪烁
+            if (lastIsCloseView === null || lastIsCloseView !== currentCloseView) {
+              lastIsCloseView = currentCloseView
+              applyConstellationVisualState(true)
+            }
+          }
         })
       }
 
@@ -902,14 +918,14 @@ const selectedConstellation = ref<SatelliteConstellation | null>(null)
 // 是否显示卡座内部星间连线
 const showConstellationLinks = ref(true)
 
-const CONSTELLATION_CLOSE_VIEW_HEIGHT = 12_000_000
+const CONSTELLATION_CLOSE_VIEW_HEIGHT = 10_000_000
 const CONSTELLATION_COLOR_PALETTE = ['#4ea6ff', '#58c9d1', '#7cd992', '#f0b35b', '#ef6b73', '#b15cff', '#8cc6ff']
 
 const constellationNoradMap = new Map<number, SatelliteConstellation>()
 const constellationColorMap = new Map<string, Cesium.Color>()
 const constellationOverlayEntityIds = new Set<string>()
 const renderedPrimitiveSatelliteMap = new Map<number, SatelliteInfo>()
-let cameraMoveEndListener: (() => void) | null = null
+let cameraMoveEndListener: Cesium.Event.RemoveCallback | null = null
 
 // 卫星星座列表
 const satelliteConstellations = ref<SatelliteConstellation[]>([])
@@ -1180,36 +1196,81 @@ const updateConstellationOverlayEntities = () => {
  * - 展示大小和透明度根据卡座选中状态和远近实时计算
  * - 不要删除所有 primitive 和 label 的更新逻辑
  */
-const applyConstellationVisualState = () => {
+/**
+ * [功能]
+ * 应用星座的可视化状态：根据星座选中状态及视角高度控制卫星点阵与 Label 标签的层级聚合显示
+ *
+ * [业务目的]
+ * - 星座选中时：仅在 Cesium 地图上展示该星座相关的卫星，隐藏所有其他无关卫星；
+ * - 聚合策略：高处视角只显示中心聚合 Tag 标签，隐藏极其密集的单颗具体 Label；拉近至低处时才展现具体卫星的 Label 名称。
+ * - 未选中时：恢复全量卫星的展示
+ */
+const applyConstellationVisualState = (skipOverlayUpdate = false) => {
   if (!viewer) return
 
   const selectedNorads = getSelectedConstellationNoradSet()
   const hasSelectedConstellation = Boolean(selectedConstellation.value)
   const closeView = isConstellationCloseView()
 
+  // 1. 更新卫星占点 (PointPrimitive)
   satellitePointPrimitives.forEach((pointPrimitive, norad) => {
     const satellite = renderedPrimitiveSatelliteMap.get(norad)
     if (!satellite) return
 
-    const baseColor = getConstellationColor(satellite, norad)
     const isSelected = selectedNorads.has(norad)
-    pointPrimitive.color = hasSelectedConstellation ? (isSelected ? baseColor : baseColor.withAlpha(0.18)) : baseColor
-    pointPrimitive.outlineColor =
-      hasSelectedConstellation && !isSelected ? Cesium.Color.WHITE.withAlpha(0.12) : Cesium.Color.WHITE
-    pointPrimitive.pixelSize = hasSelectedConstellation ? (isSelected ? (closeView ? 9 : 7) : 3) : closeView ? 5 : 4
+    if (hasSelectedConstellation) {
+      // 选中星座时：仅渲染展示所属星座的卫星，隐藏其他无关卫星
+      pointPrimitive.show = isSelected
+      if (isSelected) {
+        const baseColor = getConstellationColor(satellite, norad)
+        pointPrimitive.color = baseColor
+        pointPrimitive.outlineColor = Cesium.Color.WHITE
+        pointPrimitive.pixelSize = closeView ? 8 : 6
+      }
+    } else {
+      // 未选中星座时：全量恢复展示所有卫星
+      pointPrimitive.show = true
+      const baseColor = getConstellationColor(satellite, norad)
+      pointPrimitive.color = baseColor
+      pointPrimitive.outlineColor = Cesium.Color.WHITE
+      pointPrimitive.pixelSize = closeView ? 5 : 4
+    }
   })
 
+  // 2. 更新卫星名称标签 (LabelPrimitive)
   satelliteLabelPrimitives.forEach((labelPrimitive, norad) => {
     const satellite = renderedPrimitiveSatelliteMap.get(norad)
     if (!satellite) return
 
     const isSelected = selectedNorads.has(norad)
-    labelPrimitive.show = closeView && (!hasSelectedConstellation || isSelected)
-    labelPrimitive.fillColor =
-      hasSelectedConstellation && isSelected ? getConstellationColor(satellite, norad) : Cesium.Color.WHITE
+    if (hasSelectedConstellation) {
+      // 选中星座时：
+      // - 高处 (closeView 为 false)：隐藏单颗卫星具体 Label，防止成百上千个文本挤在一团，改为在中心展示星座聚合标签
+      // - 低处 (closeView 为 true)：拉近到低视角时展示每颗具体卫星的名称 Label
+      labelPrimitive.show = isSelected && closeView
+      if (isSelected && closeView) {
+        labelPrimitive.text = satellite.name_en || String(norad)
+        labelPrimitive.fillColor = Cesium.Color.WHITE
+        labelPrimitive.outlineColor = Cesium.Color.BLACK
+        labelPrimitive.outlineWidth = 2
+        labelPrimitive.style = Cesium.LabelStyle.FILL_AND_OUTLINE
+        labelPrimitive.showBackground = true
+        labelPrimitive.backgroundColor = new Cesium.Color(0, 0, 0, 0.65)
+        labelPrimitive.distanceDisplayCondition = undefined as any
+      }
+    } else {
+      // 未选中星座时：恢复近距离控制模式
+      labelPrimitive.show = closeView
+      labelPrimitive.fillColor = Cesium.Color.WHITE
+      labelPrimitive.distanceDisplayCondition = new Cesium.DistanceDisplayCondition(0, 6_000_000) as any
+    }
   })
 
-  updateConstellationOverlayEntities()
+  // 拖拽/移动相机时跳过更新 Polyline 线路实体，避免重清重绘造成线路一闪一闪
+  if (!skipOverlayUpdate) {
+    updateConstellationOverlayEntities()
+  }
+
   viewer.scene.requestRender()
 }
 
@@ -1226,9 +1287,6 @@ const clearConstellationSelection = () => {
  * [功能]
  * 根据 NORAD 编号选择其所属卡座，并应用卡座视觉状态
  *
- * [处理规则]
- * - 如果该卫星不属于任何卡座，则清除选择
- *
  * @param norad 点击的卫星 NORAD 编号
  */
 const selectConstellationByNorad = (norad: number) => {
@@ -1243,11 +1301,7 @@ const selectConstellationByNorad = (norad: number) => {
 
 /**
  * [功能]
- * 外部接口：根据卡座名称聚焦到指定卡座
- *
- * [处理规则]
- * - 传入为空或未找到卡座时，清除卡座选择
- * - 支持中英文卡座名匹配
+ * 外部接口：根据卡座名称聚焦到指定卡座，并自动调整视角飞行至星座中心
  *
  * @param constellationName 卡座名称（英文或中文）
  */
@@ -1270,6 +1324,34 @@ const focusConstellationByName = async (constellationName?: string | null) => {
 
   selectedConstellation.value = constellation
   applyConstellationVisualState()
+
+  // 视角平滑飞行到星座卫星簇的中心点
+  const selectedNorads = getSelectedConstellationNoradSet()
+  const selectedSatellitesPos = Array.from(renderedPrimitiveSatelliteMap.entries())
+    .filter(([norad]) => selectedNorads.has(norad))
+    .map(([, satellite]) =>
+      Cesium.Cartesian3.fromDegrees(
+        satellite.satellitePosition.longitude,
+        satellite.satellitePosition.latitude,
+        satellite.satellitePosition.altitude
+      )
+    )
+
+  if (selectedSatellitesPos.length > 0 && viewer) {
+    const center = selectedSatellitesPos.reduce(
+      (result, pos) => Cesium.Cartesian3.add(result, pos, result),
+      new Cesium.Cartesian3()
+    )
+    Cesium.Cartesian3.divideByScalar(center, selectedSatellitesPos.length, center)
+    const cartographic = Cesium.Cartographic.fromCartesian(center)
+    const targetLon = Cesium.Math.toDegrees(cartographic.longitude)
+    const targetLat = Cesium.Math.toDegrees(cartographic.latitude)
+
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 9_000_000),
+      duration: 1.5,
+    })
+  }
 }
 
 /**
@@ -1303,6 +1385,7 @@ const renderSatellitePathWithPrimitive = async (satellites: SatelliteInfo[]) => 
   const currentToken = ++satelliteRenderToken
   satelliteRenderBusy.value = true
 
+  // 加载卫星星座数据
   await loadSatelliteConstellations()
 
   await nextTick()
