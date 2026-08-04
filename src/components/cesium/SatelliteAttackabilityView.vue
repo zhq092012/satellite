@@ -403,7 +403,8 @@ onMounted(() => {
   gap: 20px;
   align-items: start;
   text-align: left;
-  height: calc(100vh - 260px);
+  // AI: 改为 min-height，允许超出浏览器高度时自然延伸并进行外层滚动
+  min-height: calc(100vh - 260px);
 }
 
 .section-header {

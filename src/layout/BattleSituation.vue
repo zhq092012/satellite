@@ -835,7 +835,29 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
 
       .tab-content {
         height: 100%;
-        overflow: hidden;
+        // AI:
+        // - 允许 Tab 页组件在内容超出容器高度时纵向滚动
+        // - 保持横向溢出隐藏，避免出现底部横向滚动条
+        overflow-y: auto;
+        overflow-x: hidden;
+
+        /* 自定义滚动条样式，使其与整体暗色暗青主题契合 */
+        &::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+          background: rgba(79, 147, 221, 0.3);
+          border-radius: 3px;
+
+          &:hover {
+            background: rgba(79, 147, 221, 0.6);
+          }
+        }
+
+        &::-webkit-scrollbar-track {
+          background: transparent;
+        }
       }
     }
 

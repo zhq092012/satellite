@@ -51,12 +51,12 @@
     </div>
 
     <!-- 当切换为甘特图模式时，渲染卫星击毁甘特图组件 -->
-    <div v-if="currentViewMode === 'GANTT'" class="cema-workspace" style="height: calc(100vh - 60px); padding: 0">
+    <div v-show="currentViewMode === 'GANTT'" class="cema-workspace" style="height: calc(100vh - 60px); padding: 0">
       <SatelliteGantt :matrix-data="matrixData" />
     </div>
 
     <!-- 中间主视图与拓扑画布区域 -->
-    <div v-else class="cema-workspace">
+    <div v-show="currentViewMode !== 'GANTT'" class="cema-workspace">
       <!-- 状态与统计看板小条 -->
       <div class="topo-summary-bar">
         <div class="stat-badge">
@@ -1690,10 +1690,6 @@ const buildG6GraphData = () => {
               stroke: '#00e1ff',
               lineWidth: 2,
             },
-            label: `过境: ${win.peakWindow.split(' ')[1] || ''}`,
-            labelCfg: {
-              style: { fill: '#7dd3fc', fontSize: 10, background: { fill: '#081325', padding: [2, 4], radius: 3 } },
-            },
           })
         }
       })
@@ -1722,15 +1718,6 @@ const buildG6GraphData = () => {
               stroke: isStruck ? '#ff4d4f' : '#00e1ff',
               lineWidth: isStruck ? 2.2 : 2,
               lineDash: isStruck ? [6, 4] : undefined,
-            },
-            label: isStruck ? `✖ 打击中断 (延时+${sat.delayMin || 45}m)` : `正常通信`,
-            labelCfg: {
-              style: {
-                fill: isStruck ? '#ff4d4f' : '#38bdf8',
-                fontSize: 10,
-                fontWeight: isStruck ? 600 : 400,
-                background: { fill: isStruck ? '#300a0e' : '#081325', padding: [2, 4], radius: 3 },
-              },
             },
           })
         }
@@ -1766,14 +1753,6 @@ const buildG6GraphData = () => {
           lineWidth: isSevered ? 2.2 : 2,
           lineDash: isSevered ? [6, 4] : undefined,
         },
-        label: isSevered ? `✖ 骨干链路打压切断` : `骨干传输`,
-        labelCfg: {
-          style: {
-            fill: isSevered ? '#ff4d4f' : '#60a5fa',
-            fontSize: 10,
-            background: { fill: isSevered ? '#300a0e' : '#061938', padding: [2, 4], radius: 3 },
-          },
-        },
       })
     }
   })
@@ -1802,14 +1781,6 @@ const buildG6GraphData = () => {
           lineWidth: 2,
           lineDash: [4, 4],
         },
-        label: '📡 星间中继',
-        labelCfg: {
-          style: {
-            fill: '#c084fc',
-            fontSize: 10,
-            background: { fill: '#1e112a', padding: [2, 4], radius: 3 },
-          },
-        },
       })
     }
   })
@@ -1821,7 +1792,13 @@ const buildG6GraphData = () => {
 }
 
 /**
+ * [功能说明]
  * 初始化或更新 AntV G6 画布
+ *
+ * [处理规则]
+ * - 当视图切回可见状态时，在 nextTick 后准确获取 DOM 容器宽高度 (clientWidth / clientHeight)。
+ * - 若 graph 尚未创建或已销毁，则新建 G6.Graph 实例并 render。
+ * - 若 graph 已存在，则调用 changeSize 动态调整画布尺寸，重新装载数据 (changeData) 并自适应全屏 (fitView)。
  */
 const initOrUpdateGraph = () => {
   if (!g6Container.value) return
@@ -1830,9 +1807,12 @@ const initOrUpdateGraph = () => {
   const width = g6Container.value.clientWidth || 1100
   const height = g6Container.value.clientHeight || 560
 
+  // 容器处于 display: none 不可见状态时直接返回，避免画布尺寸坍塌为 0
+  if (width === 0 || height === 0) return
+
   const data = buildG6GraphData()
 
-  if (!graph) {
+  if (!graph || graph.get('destroyed')) {
     graph = new G6.Graph({
       container: g6Container.value,
       width,
@@ -1883,15 +1863,26 @@ const initOrUpdateGraph = () => {
         },
       },
     })
+    graph.data(data)
+    graph.render()
+  } else {
+    // 拓扑图已有实例：重新计算画布大小并替换渲染数据
+    graph.changeSize(width, height)
+    graph.changeData(data)
+    graph.fitView([20, 40, 20, 40])
   }
-
-  graph.data(data)
-  graph.render()
 }
 
-// 监听视图模式改变重新渲染图
-watch(currentViewMode, () => {
-  initOrUpdateGraph()
+// [功能说明]
+// 监听拓扑视图模式改变
+// 当从甘特图矩阵模式 (GANTT) 切回拓扑视图模式时，在 DOM 更新 (nextTick) 后刷新 G6 画布并高亮当前活跃元素
+watch(currentViewMode, (mode) => {
+  if (mode !== 'GANTT') {
+    nextTick(() => {
+      initOrUpdateGraph()
+      highlightActiveElements()
+    })
+  }
 })
 
 onMounted(() => {

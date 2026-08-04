@@ -1517,6 +1517,10 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
 </script>
 <style lang="scss" scoped>
 .container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   font-size: 14px;
 
   .nav {
@@ -1569,7 +1573,11 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
     grid-template-columns: 300px 1fr 1fr 300px;
     grid-template-rows: 60px 1fr;
     gap: 5px;
+    // AI:
+    // - 锁定在固定的视口高度范围内，避免 Cesium Canvas 和 CSS Grid 循环触发 Resize 导致页面无限向下滚动
+    // - 内部侧边栏带有独立 overflow: auto 供列表滚动
     height: calc(100vh - 152px);
+    overflow: hidden;
 
     &.not-animating {
 

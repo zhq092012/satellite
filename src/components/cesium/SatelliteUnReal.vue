@@ -1479,8 +1479,8 @@ defineExpose({
   --accent-green: #7cd992;
   --accent-amber: #f0b35b;
   --accent-red: #ef6b73;
+  /* AI: 使用 min-height 允许页面超出高度时自然向下延伸滚动 */
   min-height: 100%;
-  height: 100%;
   display: flex;
   flex-direction: column;
   padding: 5px;
