@@ -340,9 +340,6 @@
                 <div class="card-header">
                   <div class="name-group">
                     <span class="chinese-name">{{ constellation.chineseName || constellation.name }}</span>
-                    <span class="english-name" v-if="constellation.name !== constellation.chineseName">
-                      {{ constellation.name }}
-                    </span>
                   </div>
                   <el-tag size="small" type="primary" effect="plain" round>
                     {{ constellation.satelliteCount }} 颗卫星
@@ -2032,6 +2029,7 @@ async function getTaskTargetOptions() {
                 color: var(--text-color-secondary, #909399);
                 width: 70px;
                 flex-shrink: 0;
+                text-align: end;
               }
 
               .value {
