@@ -126,55 +126,30 @@
     </div>
 
     <!-- 底部时间轴控制与过境窗口面板 -->
-    <div class="cema-timeline-footer" v-if="currentViewMode !== 'GANTT' && allWindowsList.length > 0">
+    <div class="cema-timeline-footer" v-if="currentViewMode !== 'GANTT'">
       <div class="timeline-ctrl-bar">
         <div class="ctrl-left">
           <span class="timeline-title"> <i class="el-icon-timer"></i> 打击/过境时间轴 </span>
           <span class="time-range-text"> [{{ timeRangeText.start }} ~ {{ timeRangeText.end }}] </span>
-        </div>
-
-        <div class="ctrl-center">
-          <el-button-group>
-            <el-button type="primary" size="small" :icon="DArrowLeft" @click="jumpToStart" title="跳转至起始窗口" />
-            <el-button type="primary" size="small" :icon="isPlaying ? VideoPause : VideoPlay" @click="togglePlay">
-              {{ isPlaying ? '暂停' : '播放推演' }}
-            </el-button>
-            <el-button type="primary" size="small" :icon="RefreshRight" @click="resetTimeline" title="重置" />
-            <el-button type="primary" size="small" :icon="DArrowRight" @click="jumpToEnd" title="跳转至结束窗口" />
-          </el-button-group>
-
-          <!-- 播放倍速切换 -->
-          <el-select v-model="playSpeed" size="small" style="width: 85px; margin-left: 10px">
-            <el-option label="1x 速度" :value="1" />
-            <el-option label="2x 速度" :value="2" />
-            <el-option label="5x 速度" :value="5" />
-            <el-option label="10x 速度" :value="10" />
-          </el-select>
-        </div>
-
-        <div class="ctrl-right">
-          <span class="current-time-display">
-            当前推演时刻: <strong class="digital-font time-value">{{ formattedCurrentTime }}</strong>
+          <!-- AI: 显示当前点击选中的节点提示及重置筛选按钮 -->
+          <span class="node-filter-tip" v-if="selectedNodeInfo">
+            已选择节点: <strong class="glow-text-cyan">{{ selectedNodeInfo.name }}</strong> (共
+            {{ displayedWindowsList.length }} 个过境窗口)
+            <el-button type="primary" link size="small" style="margin-left: 8px" @click="clearSelectedNode"
+              >重置筛选</el-button
+            >
           </span>
         </div>
       </div>
 
-      <!-- 时间轴进度滑块 -->
-      <div class="timeline-slider-box">
-        <el-slider
-          v-model="currentTimeProgress"
-          :min="0"
-          :max="100"
-          :step="0.1"
-          :format-tooltip="formatSliderTooltip"
-          @input="handleSliderChange"
-        />
-      </div>
-
-      <!-- 排序过境/打击窗口列表条 -->
+      <!-- 排序过境/打击窗口列表条 (即使无关联窗口也常驻保留底部横向滚动轴) -->
       <div ref="windowsScrollRef" class="windows-cards-scroll">
+        <div v-if="displayedWindowsList.length === 0" class="empty-window-card">
+          <span>暂无相关节点的过境/打击时间窗口数据</span>
+        </div>
         <div
-          v-for="(win, idx) in allWindowsList"
+          v-else
+          v-for="(win, idx) in displayedWindowsList"
           :key="win.id || idx"
           :ref="(el) => setCardRef(el, win.id)"
           class="window-card"
@@ -264,6 +239,23 @@ const g6Container = ref<HTMLDivElement | null>(null)
 // [变量用途]
 // AntV G6 Graph 实例引用
 let graph: any = null
+
+/**
+ * [类型用途]
+ * 拓扑图中点击选中的节点数据描述 (支持普通卫星、中继卫星、地面接收站、中心云数据中心)
+ */
+interface SelectedNodeMeta {
+  id: string
+  name: string
+  type: 'sat' | 'relay' | 'receive' | 'station'
+  norad?: number
+  receiveId?: string
+  stationId?: string
+}
+
+// [变量用途]
+// 当前点击选中的拓扑节点
+const selectedNodeInfo = ref<SelectedNodeMeta | null>(null)
 
 // ==================== 时间轴相关变量定义 ====================
 
@@ -1069,6 +1061,73 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
 })
 
 /**
+ * [功能说明]
+ * 根据当前选中的节点 (普通卫星 / 中继卫星 / 地面接收站 / 中心云数据中心) 联动过滤展示的时间窗口列表。
+ *
+ * [处理规则]
+ * - 结果严格保持按时间从早到晚 (startTimestamp 升序) 排列。
+ * - 当无任何节点被选中时，默认列出全量按时间升序排列的时间窗口。
+ */
+const displayedWindowsList = computed<WindowItemWrapper[]>(() => {
+  const all = allWindowsList.value
+  if (!selectedNodeInfo.value) {
+    return all
+  }
+
+  const node = selectedNodeInfo.value
+  let filtered: WindowItemWrapper[] = []
+
+  if (node.type === 'sat') {
+    // 1. 普通卫星: 筛选 satNorad 匹配的时间窗口
+    filtered = all.filter((w) => w.satNorad === node.norad)
+  } else if (node.type === 'relay') {
+    // 2. 中继卫星: 筛选中继卫星自身及所有由其提供转发服务的依赖卫星时间窗口
+    const relayRels = matrixData.value?.relayRelation?.relations || []
+    const relatedNorads = new Set<number>()
+    if (node.norad) relatedNorads.add(node.norad)
+
+    relayRels.forEach((rel) => {
+      if (Number(rel.to) === node.norad) {
+        relatedNorads.add(Number(rel.from))
+      }
+    })
+
+    filtered = all.filter((w) => relatedNorads.has(w.satNorad))
+  } else if (node.type === 'receive') {
+    // 3. 地面接收站: 筛选 receiveId 匹配的时间窗口
+    filtered = all.filter((w) => w.receiveId === node.receiveId)
+  } else if (node.type === 'station') {
+    // 4. 中心云数据中心: 筛选相连的所有地面接收站对应的时间窗口
+    const initRels = matrixData.value?.initRelationList?.relations || []
+    const stationRels = matrixData.value?.stationRelationList?.relations || []
+    const allRels = [...initRels, ...stationRels]
+
+    const connectedReceiveIds = new Set<string>()
+    allRels.forEach((rel) => {
+      if (rel.to === node.stationId) {
+        connectedReceiveIds.add(rel.from)
+      }
+    })
+
+    filtered = all.filter((w) => connectedReceiveIds.has(w.receiveId))
+  } else {
+    filtered = all
+  }
+
+  // 按过境开始时间从早到晚进行升序排序
+  return filtered.sort((a, b) => a.startTimestamp - b.startTimestamp)
+})
+
+/**
+ * [功能说明]
+ * 重置拓扑节点选中状态
+ */
+const clearSelectedNode = () => {
+  selectedNodeInfo.value = null
+  updateGraphHighlightState()
+}
+
+/**
  * 时间轴边界 (起始时间戳与结束时间戳)
  */
 const minTimestamp = computed(() => {
@@ -1307,7 +1366,7 @@ const buildG6GraphData = () => {
   })
   // [逻辑说明] 提取星间中继拓扑关系中的中继卫星节点
   if (data.relayRelation) {
-    (data.relayRelation.relayList || []).forEach((norad) => {
+    ;(data.relayRelation.relayList || []).forEach((norad) => {
       if (!satMap.has(norad)) {
         satMap.set(norad, { norad, name: `TDRS-${norad}`, satType: '通信/数据中继', status: 0 })
       }
@@ -1865,12 +1924,142 @@ const initOrUpdateGraph = () => {
     })
     graph.data(data)
     graph.render()
+
+    // 绑定拓扑图节点点击事件：选中节点并筛选联动时间轴时间窗口列表
+    graph.on('node:click', (evt: any) => {
+      const nodeItem = evt.item
+      if (!nodeItem) return
+      const model = nodeItem.getModel()
+      const nodeId = String(model.id)
+
+      if (selectedNodeInfo.value?.id === nodeId) {
+        selectedNodeInfo.value = null
+      } else {
+        parseAndSelectNode(model)
+      }
+      updateGraphHighlightState()
+    })
+
+    // 点击空白画布区重置选中节点
+    graph.on('canvas:click', () => {
+      selectedNodeInfo.value = null
+      updateGraphHighlightState()
+    })
   } else {
     // 拓扑图已有实例：重新计算画布大小并替换渲染数据
     graph.changeSize(width, height)
     graph.changeData(data)
     graph.fitView([20, 40, 20, 40])
+    updateGraphHighlightState()
   }
+}
+
+/**
+ * [功能说明]
+ * 解析 G6 节点 model 并存入 selectedNodeInfo 选中对象
+ */
+const parseAndSelectNode = (model: any) => {
+  const id = String(model.id)
+  const data = matrixData.value
+
+  if (id.startsWith('sat-')) {
+    const norad = Number(id.replace('sat-', ''))
+    const isRelay = (data?.relayRelation?.relayList || []).includes(norad)
+    const satObj =
+      (data?.satelliteMatrixList || []).find((s) => s.norad === norad) ||
+      (data?.initMatrixList || []).find((s) => s.norad === norad)
+    const name = satObj?.name || (model.label ? model.label.split('\n')[0] : `Sat-${norad}`)
+
+    selectedNodeInfo.value = {
+      id,
+      name,
+      type: isRelay ? 'relay' : 'sat',
+      norad,
+    }
+  } else {
+    // 判断节点是中心云数据中心还是地面接收站
+    const isStation =
+      (data?.stationRelationList?.stationObjList || []).some((st) => st.stationId === id) ||
+      (data?.initRelationList?.stationObjList || []).some((st) => st.stationId === id)
+
+    if (isStation) {
+      const stObj =
+        (data?.stationRelationList?.stationObjList || []).find((st) => st.stationId === id) ||
+        (data?.initRelationList?.stationObjList || []).find((st) => st.stationId === id)
+      selectedNodeInfo.value = {
+        id,
+        name: stObj?.stationName || model.label || id,
+        type: 'station',
+        stationId: id,
+      }
+    } else {
+      const recObj =
+        (data?.stationRelationList?.receiveObjList || []).find((r) => r.receiveId === id) ||
+        (data?.initRelationList?.receiveObjList || []).find((r) => r.receiveId === id)
+      selectedNodeInfo.value = {
+        id,
+        name: recObj?.receiveName || model.label || id,
+        type: 'receive',
+        receiveId: id,
+      }
+    }
+  }
+}
+
+/**
+ * [功能说明]
+ * 更新 G6 图节点的选中与关联高亮样式
+ */
+const updateGraphHighlightState = () => {
+  if (!graph || graph.get('destroyed')) return
+
+  if (!selectedNodeInfo.value) {
+    highlightActiveElements()
+    return
+  }
+
+  const selId = selectedNodeInfo.value.id
+
+  // 查找与当前选中节点相连的所有边和节点 ID 集合
+  const connectedNodeIds = new Set<string>([selId])
+  const connectedEdgeIds = new Set<string>()
+
+  graph.getEdges().forEach((edge: any) => {
+    const model = edge.getModel()
+    if (model.source === selId || model.target === selId) {
+      connectedEdgeIds.add(edge.get('id'))
+      connectedNodeIds.add(model.source)
+      connectedNodeIds.add(model.target)
+    }
+  })
+
+  graph.getNodes().forEach((node: any) => {
+    const id = node.get('id')
+    if (id === selId) {
+      graph.setItemState(node, 'selected', true)
+      graph.setItemState(node, 'inactive', false)
+      graph.setItemState(node, 'highlight', false)
+    } else if (connectedNodeIds.has(id)) {
+      graph.setItemState(node, 'selected', false)
+      graph.setItemState(node, 'highlight', true)
+      graph.setItemState(node, 'inactive', false)
+    } else {
+      graph.setItemState(node, 'selected', false)
+      graph.setItemState(node, 'highlight', false)
+      graph.setItemState(node, 'inactive', true)
+    }
+  })
+
+  graph.getEdges().forEach((edge: any) => {
+    const edgeId = edge.get('id')
+    if (connectedEdgeIds.has(edgeId)) {
+      graph.setItemState(edge, 'highlight', true)
+      graph.setItemState(edge, 'inactive', false)
+    } else {
+      graph.setItemState(edge, 'highlight', false)
+      graph.setItemState(edge, 'inactive', true)
+    }
+  })
 }
 
 // [功能说明]
@@ -2123,7 +2312,7 @@ onUnmounted(() => {
 
 /* 底部时间轴样式 */
 .cema-timeline-footer {
-  height: 215px;
+  height: 165px;
   background: rgba(9, 16, 30, 0.95);
   border-top: 1px solid rgba(0, 225, 255, 0.2);
   display: flex;
@@ -2159,31 +2348,44 @@ onUnmounted(() => {
   }
 }
 
-.timeline-slider-box {
-  padding: 0 10px;
-  :deep(.el-slider__bar) {
-    background-color: #00e1ff;
-  }
-  :deep(.el-slider__button) {
-    border-color: #00e1ff;
-  }
-}
-
 .windows-cards-scroll {
   display: flex;
   gap: 12px;
-  overflow-x: auto;
+  // AI: 使用 overflow-x: scroll，即便无数据或数据较少时也始终保留底部滚动轴轨迹
+  overflow-x: scroll;
   padding-bottom: 8px;
   flex: 1;
   align-items: stretch;
 
   &::-webkit-scrollbar {
-    height: 6px;
+    height: 8px;
   }
   &::-webkit-scrollbar-thumb {
-    background: rgba(0, 225, 255, 0.3);
-    border-radius: 3px;
+    background: rgba(0, 225, 255, 0.4);
+    border-radius: 4px;
+
+    &:hover {
+      background: rgba(0, 225, 255, 0.7);
+    }
   }
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 225, 255, 0.08);
+    border-radius: 4px;
+  }
+}
+
+.empty-window-card {
+  width: 100%;
+  min-width: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px dashed rgba(0, 225, 255, 0.25);
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 13px;
+  padding: 12px;
 }
 
 .window-card {
