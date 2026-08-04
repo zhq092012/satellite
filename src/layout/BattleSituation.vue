@@ -57,7 +57,7 @@
             />
           </div>
           <!-- 卫星列表 -->
-          <Transition name="slidet">
+          <!-- <Transition name="slidet">
             <div class="satellite-list-panel" v-show="store.showSatelliteList && store.activetab === '战场态势视图'">
               <div class="tabs-bar" style="padding: 0 5px">
                 <div class="tabs">
@@ -118,7 +118,7 @@
                 </div>
               </div>
             </div>
-          </Transition>
+          </Transition> -->
         </div>
         <!-- C2 战场态势 - 网络毁伤与脆弱度分析右侧边栏 -->
         <div class="battle-grid__side battle-grid__side--right">

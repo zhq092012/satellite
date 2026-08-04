@@ -71,7 +71,6 @@ import * as Cesium from 'cesium'
 import * as echarts from 'echarts'
 import {
   getSatelliteConstellations,
-  getSatelliteDetail,
   getSatelliteTLEData,
   getTLEDataByTaskId,
   type SatelliteConstellation,
@@ -80,7 +79,6 @@ import {
 import * as satellitejs from 'satellite.js'
 import { useLayoutStore } from '@/store/modules/layout'
 import { formatTimeLineAndAnimation, markBattleArea } from '@/utils/cesium/functionTool'
-import { EarthRotationController } from '@/utils/cesium/earthRotaion'
 import { bindInfoBoxButton, createInfoBoxActionButton, unbindInfoBoxButton } from '@/utils/cesium/infoBox'
 import { CallbackProperty } from 'cesium'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
@@ -146,8 +144,6 @@ let resizeObserver: ResizeObserver | null = null
 let viewerInitializing = false
 // Cesium 是否已完成首次初始化（用于外部判断是否可以操作 Viewer）
 const cesiumInitialized = ref(false)
-// 地球自转控制器实例（惯性系模式时启用，地固系模式时禁用）
-const rotationController = ref<EarthRotationController | null>(null)
 
 // 卫星类型展示顺序（用于战场态势统计图表的固定排序）
 const SATELLITE_TYPE_ORDER = ['导弹预警', '侦察', '通信', '导航', '太空目标监视与攻防'] as const
@@ -305,17 +301,17 @@ const initViewer = async () => {
         })
       )
       // 设置相机飞到中国上空 10 万米高度
-      if (props.position) {
-        const position = Cesium.Cartesian3.fromDegrees(props.position.lon, props.position.lat, props.position.alt) // 经度、纬度、高度（单位：米）
-        viewer.camera.setView({
-          destination: position,
-          orientation: {
-            heading: 0.0, // 方向
-            pitch: -Cesium.Math.PI_OVER_TWO, // 俯仰角
-            roll: 0.0, // 横滚角
-          },
-        })
-      }
+      // if (props.position) {
+      //   const position = Cesium.Cartesian3.fromDegrees(props.position.lon, props.position.lat, props.position.alt) // 经度、纬度、高度（单位：米）
+      //   viewer.camera.setView({
+      //     destination: position,
+      //     orientation: {
+      //       heading: 0.0, // 方向
+      //       pitch: -Cesium.Math.PI_OVER_TWO, // 俯仰角
+      //       roll: 0.0, // 横滚角
+      //     },
+      //   })
+      // }
 
       // 设置最小缩放高度（单位：米），允许滚轮拉近观察细节
       viewer.scene.screenSpaceCameraController.minimumZoomDistance = 100000
@@ -905,8 +901,7 @@ const satellitePointPrimitives = new Map<number, Cesium.PointPrimitive>()
 const satelliteLabelPrimitives = new Map<number, Cesium.Label>()
 // 以 NORAD 编号为 key，存储 Primitive 模式下附加的辅助 Entity
 const satellitePrimitiveEntities = new Map<number, Cesium.Entity>()
-// 调度渲染帧句柄，用于延迟释放 GPU 资源（避免渲染中销毁导致“对象已销毁”报错）
-let scheduledRenderHandle: number | null = null
+
 // 卫星渲染导忙状态，为 true 时显示 Loading 蒙层
 const satelliteRenderBusy = ref(false)
 // 渲染任务版本号，每次启动新渲染时自增，旧任务检测到 token 不匹配时主动中止
@@ -1377,11 +1372,6 @@ const handleConstellationLinkToggle = () => {
  * @param satellites 需要渲染的卫星信息数组
  */
 const renderSatellitePathWithPrimitive = async (satellites: SatelliteInfo[]) => {
-  // 取消之前计划的渲染，避免在组件卸载/视图重建时调用已销毁资源
-  if (scheduledRenderHandle !== null) {
-    cancelAnimationFrame(scheduledRenderHandle)
-    scheduledRenderHandle = null
-  }
   const currentToken = ++satelliteRenderToken
   satelliteRenderBusy.value = true
 
@@ -1489,8 +1479,7 @@ const renderSatellitePathWithPrimitive = async (satellites: SatelliteInfo[]) => 
     viewer.clock.multiplier = 100
     // 开启动画
     viewer.clock.shouldAnimate = true
-    // 将地球切换到惯性系
-    rotationController.value?.enable()
+
     applyConstellationVisualState()
     // 在 requestRenderMode 下显式触发渲染（不然会卡住）
     viewer.scene.requestRender()
@@ -1638,12 +1627,6 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
     satellitePositionPropertyCache.clear()
     satelliteEntities.clear()
     viewer.entities.removeAll()
-  }
-
-  if (store.effectModel) {
-    rotationController.value?.enable()
-  } else {
-    rotationController.value?.disable()
   }
 
   // 获取任务的卫星列表（只在第一次或任务切换时请求）
@@ -2222,17 +2205,10 @@ onBeforeUnmount(() => {
   stopContainerSizeObserver()
   try {
     viewer.clock.shouldAnimate = false
-    rotationController.value?.disable()
-    rotationController.value = null
   } catch (e) {
     console.warn('failed to disable rotationController on unmount', e)
   }
   if (viewer) {
-    // 取消可能遗留的点/标签引用，避免 destroy 后继续渲染
-    if (scheduledRenderHandle !== null) {
-      cancelAnimationFrame(scheduledRenderHandle)
-      scheduledRenderHandle = null
-    }
     satelliteRenderToken += 1
     satelliteRenderBusy.value = false
     pointCollection = null
