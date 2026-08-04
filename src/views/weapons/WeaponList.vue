@@ -39,6 +39,9 @@
         <el-form-item label="武器类型">
           <el-input v-model="queryForm.type" clearable placeholder="例如 导弹/火炮" />
         </el-form-item>
+        <el-form-item label="适用卫星类型">
+          <el-input v-model="queryForm.satellite_type" clearable placeholder="例如 低轨通信卫星" />
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
@@ -55,6 +58,7 @@
         <el-table-column prop="name" label="武器名称" min-width="180" show-overflow-tooltip />
         <el-table-column prop="country" label="所属国家/地区" min-width="160" />
         <el-table-column prop="type" label="武器类型" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="satellite_type" label="适用卫星类型" min-width="160" show-overflow-tooltip />
         <el-table-column prop="longitude" label="经度" width="110" />
         <el-table-column prop="latitude" label="纬度" width="110" />
         <el-table-column prop="range" label="打击高度(km)" width="130" />
@@ -95,6 +99,11 @@
           <el-col :span="12">
             <el-form-item label="武器类型" prop="type">
               <el-input v-model.trim="form.type" placeholder="请输入武器类型" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="适用卫星类型" prop="satellite_type">
+              <el-input v-model.trim="form.satellite_type" placeholder="请输入适用卫星类型" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -151,10 +160,22 @@ const countries = ref<string[]>([])
 const dialogVisible = ref(false)
 const formRef = ref<FormInstance>()
 
+// [变量用途]
+// 保存武器筛选表单的检索条件，包括关键词、所属国家/地区、武器类型以及适用卫星类型。
+//
+// [数据来源]
+// 用户在界面顶部搜索栏中输入的过滤参数。
+//
+// [取值规则]
+// 各属性默认为空字符串。
+//
+// [修改约束]
+// 修改时请保持与过滤匹配逻辑 (filteredWeapons) 同步。
 const queryForm = reactive({
   keyword: '',
   country: '',
   type: '',
+  satellite_type: '',
 })
 
 const page = reactive({
@@ -162,6 +183,11 @@ const page = reactive({
   size: 10,
 })
 
+/**
+ * 创建空白武器表单对象。
+ *
+ * @returns 包含默认初始值的 Weapon 实体对象
+ */
 const createEmptyForm = (): Weapon => ({
   name: '',
   country: '',
@@ -169,8 +195,17 @@ const createEmptyForm = (): Weapon => ({
   latitude: 0,
   longitude: 0,
   range: 0,
+  satellite_type: '',
 })
 
+// [变量用途]
+// 武器新增/编辑对话框中的响应式表单数据实体。
+//
+// [数据来源]
+// 新增时来自 createEmptyForm，编辑时来自表格行对象深拷贝。
+//
+// [修改约束]
+// 提交保存前需先通过 formRef 校验。
 const form = reactive<Weapon>(createEmptyForm())
 
 const rules = reactive<FormRules<Weapon>>({
@@ -189,16 +224,28 @@ const rules = reactive<FormRules<Weapon>>({
 const totalCount = computed(() => weapons.value.length)
 const countryCount = computed(() => new Set(weapons.value.map((item) => item.country).filter(Boolean)).size)
 
+/**
+ * 根据多条件组合过滤武器列表。
+ *
+ * 支持匹配：
+ * - 武器名称模糊匹配 (keyword)
+ * - 所属国家全等匹配 (country)
+ * - 武器类型模糊匹配 (type)
+ * - 适用卫星类型模糊匹配 (satellite_type)
+ */
 const filteredWeapons = computed(() => {
   const keyword = queryForm.keyword.trim().toLowerCase()
   const country = queryForm.country.trim()
   const type = queryForm.type.trim().toLowerCase()
+  const satelliteType = queryForm.satellite_type.trim().toLowerCase()
 
   return weapons.value.filter((weapon) => {
     const matchesKeyword = !keyword || weapon.name.toLowerCase().includes(keyword)
     const matchesCountry = !country || weapon.country === country
     const matchesType = !type || weapon.type.toLowerCase().includes(type)
-    return matchesKeyword && matchesCountry && matchesType
+    const matchesSatelliteType =
+      !satelliteType || (weapon.satellite_type && weapon.satellite_type.toLowerCase().includes(satelliteType))
+    return matchesKeyword && matchesCountry && matchesType && matchesSatelliteType
   })
 })
 
@@ -237,16 +284,30 @@ function handleSearch() {
   page.current = 1
 }
 
+/**
+ * 重置查询条件并重新从第一页开始显示。
+ */
 function resetQuery() {
-  ;(queryForm.keyword = ''), (queryForm.country = ''), (queryForm.type = '')
+  queryForm.keyword = ''
+  queryForm.country = ''
+  queryForm.type = ''
+  queryForm.satellite_type = ''
   page.current = 1
 }
 
+/**
+ * 打开新增武器对话框并重置表单对象。
+ */
 function openCreateDialog() {
   Object.assign(form, createEmptyForm())
   dialogVisible.value = true
 }
 
+/**
+ * 打开编辑武器对话框并将当前行数据填充至表单对象。
+ *
+ * @param row 当前选中的武器记录
+ */
 function openEditDialog(row: Weapon) {
   Object.assign(form, { ...row })
   dialogVisible.value = true

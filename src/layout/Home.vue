@@ -1970,6 +1970,9 @@ async function getTaskTargetOptions() {
         flex: 1;
         padding: 12px 14px;
 
+        .constellation-card:first-child {
+          margin-top: 5px;
+        }
         .constellation-card {
           background: var(--nav-bar-background, rgba(255, 255, 255, 0.04));
           border: 1px solid rgba(255, 255, 255, 0.08);

@@ -845,6 +845,7 @@ export type SituationData = {
       latitude: number
       longitude: number
       range: number
+      satellite_type?: string
     }[]
     红方各地区过境卫星数量: Record<string, number>
     红方过境卫星分类数量: Record<string, number>
@@ -860,6 +861,7 @@ export type SituationData = {
       latitude: number
       longitude: number
       range: number
+      satellite_type?: string
     }[]
     蓝方各地区过境卫星数量: Record<string, number>
     蓝方过境卫星分类数量: Record<string, number>
