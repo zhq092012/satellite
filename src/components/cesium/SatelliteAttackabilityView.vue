@@ -22,7 +22,7 @@
         <span class="btn-icon">⚙️</span>
         <span>权重参数配置</span>
       </button>
-      <span class="toolbar__status" :class="statusClass">{{ requestStatus }}</span>
+      <span class="toolbar__status" v-show="requestStatus" :class="statusClass">{{ requestStatus }}</span>
     </div>
 
     <div class="content-grid">
@@ -433,8 +433,8 @@ onMounted(() => {
 }
 
 .content-grid {
-  display: grid;
-  grid-template-columns: minmax(360px, 0.95fr) minmax(440px, 1.35fr);
+  display: flex;
+  flex-direction: column;
   gap: 20px;
   align-items: start;
   text-align: left;
@@ -445,6 +445,8 @@ onMounted(() => {
   padding: 20px;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .section-header {

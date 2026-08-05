@@ -38,15 +38,21 @@
               <div class="item_title">
                 <span>轨道类型权重</span> <span>{{ config.static_weights.orbit_type }}%</span>
               </div>
-              <el-slider v-model.number="config.static_weights.orbit_type" size="small"
-                @change="calcWeight('orbit_type')" />
+              <el-slider
+                v-model.number="config.static_weights.orbit_type"
+                size="small"
+                @change="calcWeight('orbit_type')"
+              />
             </div>
             <div>
               <div class="item_title">
                 <span>卫星类型权重</span> <span>{{ config.static_weights.sat_type }}%</span>
               </div>
-              <el-slider v-model.number="config.static_weights.sat_type" size="small"
-                @change="calcWeight('sat_type')" />
+              <el-slider
+                v-model.number="config.static_weights.sat_type"
+                size="small"
+                @change="calcWeight('sat_type')"
+              />
             </div>
           </div>
         </div>
@@ -57,22 +63,31 @@
               <div class="item_title">
                 <span>轨道相似权重</span> <span>{{ config.persistent_weights.orbit_similarity }}%</span>
               </div>
-              <el-slider v-model.number="config.persistent_weights.orbit_similarity" size="small"
-                @change="calcWeight('orbit_similarity')" />
+              <el-slider
+                v-model.number="config.persistent_weights.orbit_similarity"
+                size="small"
+                @change="calcWeight('orbit_similarity')"
+              />
             </div>
             <div>
               <div class="item_title">
                 <span>轨道共面权重</span> <span>{{ config.persistent_weights.orbital_coplanarity }}%</span>
               </div>
-              <el-slider v-model.number="config.persistent_weights.orbital_coplanarity" size="small"
-                @change="calcWeight('orbital_coplanarity')" />
+              <el-slider
+                v-model.number="config.persistent_weights.orbital_coplanarity"
+                size="small"
+                @change="calcWeight('orbital_coplanarity')"
+              />
             </div>
             <div>
               <div class="item_title">
                 <span>相位稳定权重</span> <span>{{ config.persistent_weights.phase_stability }}%</span>
               </div>
-              <el-slider v-model.number="config.persistent_weights.phase_stability" size="small"
-                @change="calcWeight('phase_stability')" />
+              <el-slider
+                v-model.number="config.persistent_weights.phase_stability"
+                size="small"
+                @change="calcWeight('phase_stability')"
+              />
             </div>
           </div>
         </div>
@@ -171,36 +186,51 @@
               <div class="config-item__cx">
                 <div>
                   <span>半长轴差bins(km)</span>
-                  <el-input v-model="config.persistent_scoring_rules.orbit_similarity.delta_sma_bins"
-                    placeholder="请输入数字，多个用逗号分割" class="input-value"></el-input>
+                  <el-input
+                    v-model="config.persistent_scoring_rules.orbit_similarity.delta_sma_bins"
+                    placeholder="请输入数字，多个用逗号分割"
+                    class="input-value"
+                  ></el-input>
                 </div>
                 <div>
                   <span>半长轴差分段得分</span>
-                  <el-input v-model="config.persistent_scoring_rules.orbit_similarity.delta_sma_scores"
-                    placeholder="请输入数字，多个用逗号分割" class="input-value"></el-input>
+                  <el-input
+                    v-model="config.persistent_scoring_rules.orbit_similarity.delta_sma_scores"
+                    placeholder="请输入数字，多个用逗号分割"
+                    class="input-value"
+                  ></el-input>
                 </div>
                 <div>
                   <span>倾角差bins(rad)</span>
-                  <el-input v-model="config.persistent_scoring_rules.orbit_similarity.delta_inc_bins"
-                    placeholder="请输入数字，多个用逗号分割" class="input-value"></el-input>
+                  <el-input
+                    v-model="config.persistent_scoring_rules.orbit_similarity.delta_inc_bins"
+                    placeholder="请输入数字，多个用逗号分割"
+                    class="input-value"
+                  ></el-input>
                 </div>
                 <div>
                   <span>倾角差分段得分</span>
-                  <el-input placeholder="请输入数字，多个用逗号分割"
+                  <el-input
+                    placeholder="请输入数字，多个用逗号分割"
                     v-model="config.persistent_scoring_rules.orbit_similarity.delta_inc_scores"
-                    class="input-value"></el-input>
+                    class="input-value"
+                  ></el-input>
                 </div>
                 <div>
                   <span>偏心率差 bins</span>
-                  <el-input placeholder="请输入数字，多个用逗号分割"
+                  <el-input
+                    placeholder="请输入数字，多个用逗号分割"
                     v-model="config.persistent_scoring_rules.orbit_similarity.delta_ecc_bins"
-                    class="input-value"></el-input>
+                    class="input-value"
+                  ></el-input>
                 </div>
                 <div>
                   <span>偏心率差分段得分 bins</span>
-                  <el-input placeholder="请输入数字，多个用逗号分割"
+                  <el-input
+                    placeholder="请输入数字，多个用逗号分割"
                     v-model="config.persistent_scoring_rules.orbit_similarity.delta_ecc_scores"
-                    class="input-value"></el-input>
+                    class="input-value"
+                  ></el-input>
                 </div>
               </div>
             </div>
@@ -209,15 +239,19 @@
               <div class="config-item__cx">
                 <div>
                   <span>轨道面距bins(deg)</span>
-                  <el-input placeholder="请输入数字，多个用逗号分割"
+                  <el-input
+                    placeholder="请输入数字，多个用逗号分割"
                     v-model="config.persistent_scoring_rules.orbital_coplanarity.plane_distance_bins"
-                    class="input-value"></el-input>
+                    class="input-value"
+                  ></el-input>
                 </div>
                 <div>
                   <span>轨道面距分段得分</span>
-                  <el-input placeholder="请输入数字，多个用逗号分割"
+                  <el-input
+                    placeholder="请输入数字，多个用逗号分割"
                     v-model="config.persistent_scoring_rules.orbital_coplanarity.plane_distance_scores"
-                    class="input-value"></el-input>
+                    class="input-value"
+                  ></el-input>
                 </div>
               </div>
             </div>
@@ -226,15 +260,19 @@
               <div class="config-item__cx">
                 <div>
                   <span>Δu标准差bins</span>
-                  <el-input placeholder="请输入数字，多个用逗号分割"
+                  <el-input
+                    placeholder="请输入数字，多个用逗号分割"
                     v-model="config.persistent_scoring_rules.phase_stability.delta_u_bins"
-                    class="input-value"></el-input>
+                    class="input-value"
+                  ></el-input>
                 </div>
                 <div>
                   <span>Δu分段得分</span>
-                  <el-input placeholder="请输入数字，多个用逗号分割"
+                  <el-input
+                    placeholder="请输入数字，多个用逗号分割"
                     v-model="config.persistent_scoring_rules.phase_stability.delta_u_scores"
-                    class="input-value"></el-input>
+                    class="input-value"
+                  ></el-input>
                 </div>
               </div>
             </div>
@@ -248,15 +286,19 @@
               <div class="config-item__cx">
                 <div>
                   <span>距离bins(km)</span>
-                  <el-input placeholder="请输入数字，多个用逗号分割"
+                  <el-input
+                    placeholder="请输入数字，多个用逗号分割"
                     v-model="config.instant_scoring_rules.close_encounter.distance_bins_km"
-                    class="input-value"></el-input>
+                    class="input-value"
+                  ></el-input>
                 </div>
                 <div>
                   <span>距离分段得分</span>
-                  <el-input placeholder="请输入数字，多个用逗号分割"
+                  <el-input
+                    placeholder="请输入数字，多个用逗号分割"
                     v-model="config.instant_scoring_rules.close_encounter.distance_scores"
-                    class="input-value"></el-input>
+                    class="input-value"
+                  ></el-input>
                 </div>
               </div>
             </div>
@@ -289,20 +331,35 @@
           <div class="product-query-fields">
             <div class="product-query-item product-query-item--search">
               <span>搜索</span>
-              <el-input v-model="productThreatForm.searchKeyword" size="small" placeholder="卫星名称 / NORAD / INT_ID / 国家"
-                clearable />
+              <el-input
+                v-model="productThreatForm.searchKeyword"
+                size="small"
+                placeholder="卫星名称 / NORAD / INT_ID / 国家"
+                clearable
+              />
             </div>
             <div class="product-query-item product-query-item--dataset">
               <span>数据集</span>
               <el-select v-model="searchForm.dataSet" class="select" size="small" @change="handleProductDatasetChange">
-                <el-option v-for="item in productDatasetOptions" :key="item.value" :label="item.label"
-                  :value="item.value" />
+                <el-option
+                  v-for="item in productDatasetOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
               </el-select>
             </div>
             <div class="product-query-item product-query-item--orbit">
               <span>轨道筛选</span>
-              <el-select v-model="productThreatForm.orbitTypes" class="select" size="small" multiple collapse-tags
-                collapse-tags-tooltip :max-collapse-tags="3">
+              <el-select
+                v-model="productThreatForm.orbitTypes"
+                class="select"
+                size="small"
+                multiple
+                collapse-tags
+                collapse-tags-tooltip
+                :max-collapse-tags="3"
+              >
                 <el-option v-for="item in productOrbitOptions" :key="item" :label="item" :value="item" />
               </el-select>
             </div>
@@ -317,19 +374,36 @@
             </div>
             <div class="product-query-item product-query-item--longitude">
               <span>目标区域经度</span>
-              <el-input-number v-model="productThreatForm.targetLongitudeDeg" :min="0" :max="360" :precision="2"
-                size="small" />
+              <el-input-number
+                v-model="productThreatForm.targetLongitudeDeg"
+                :min="0"
+                :max="360"
+                :precision="2"
+                size="small"
+              />
             </div>
 
             <div class="product-query-item product-query-item--key-factor">
               <span>重点国家因子</span>
-              <el-input-number v-model="productThreatForm.keyCountryFactor" :min="0" :max="2" :step="0.1" :precision="2"
-                size="small" />
+              <el-input-number
+                v-model="productThreatForm.keyCountryFactor"
+                :min="0"
+                :max="2"
+                :step="0.1"
+                :precision="2"
+                size="small"
+              />
             </div>
             <div class="product-query-item product-query-item--other-factor">
               <span>其他国家因子</span>
-              <el-input-number v-model="productThreatForm.otherCountryFactor" :min="0" :max="2" :step="0.1"
-                :precision="2" size="small" />
+              <el-input-number
+                v-model="productThreatForm.otherCountryFactor"
+                :min="0"
+                :max="2"
+                :step="0.1"
+                :precision="2"
+                size="small"
+              />
             </div>
 
             <div class="product-query-item product-query-item--sort">
@@ -344,8 +418,14 @@
             <div class="product-query-item product-query-item--view">
               <span>视图</span>
               <div>
-                <el-switch v-model="productThreatForm.viewMode" active-color="#13ce66" inactive-color="#ff4949"
-                  :active-value="'keyword'" :inactive-value="'full'" :inactive-text="'关键字段'"></el-switch>
+                <el-switch
+                  v-model="productThreatForm.viewMode"
+                  active-color="#13ce66"
+                  inactive-color="#ff4949"
+                  :active-value="'keyword'"
+                  :inactive-value="'full'"
+                  :inactive-text="'关键字段'"
+                ></el-switch>
               </div>
             </div>
 
@@ -358,8 +438,16 @@
           </div>
         </div>
         <div v-show="timeMode === '历史时间计算'" class="date-picker-btn task-time-banner">
-          <el-date-picker v-model="defaultTime" type="daterange" range-separator="至" start-placeholder="开始日期"
-            end-placeholder="结束日期" value-format="YYYY-MM-DD" disabled size="small" />
+          <el-date-picker
+            v-model="defaultTime"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            disabled
+            size="small"
+          />
           <button type="button" class="sci-btn btn-primary" @click="calc">
             <span class="btn-icon">🎯</span>
             <span>计算威胁度</span>
@@ -372,9 +460,13 @@
         <div v-show="timeMode === '按任务总时长计算'" class="date-picker-btn task-time-banner">
           <div class="task-time-info">
             <span class="time-label">⏱️ 任务时间跨度：</span>
-            <span class="time-value">开始时间: <strong>{{ store.activedTask?.beginDate || '未关联任务' }}</strong></span>
+            <span class="time-value"
+              >开始时间: <strong>{{ store.activedTask?.beginDate || '未关联任务' }}</strong></span
+            >
             <span class="time-sep">|</span>
-            <span class="time-value">结束时间: <strong>{{ store.activedTask?.endDate || '未关联任务' }}</strong></span>
+            <span class="time-value"
+              >结束时间: <strong>{{ store.activedTask?.endDate || '未关联任务' }}</strong></span
+            >
           </div>
           <button type="button" class="sci-btn btn-primary" @click="handleTaskTime">
             <span class="btn-icon">🎯</span>
@@ -384,9 +476,13 @@
         <div v-show="timeMode === '按任务阶段时长计算'" class="date-picker-btn task-time-banner">
           <div class="task-time-info" v-if="currentStep">
             <span class="time-label">🎯 阶段时间跨度：</span>
-            <span class="time-value">阶段开始: <strong>{{ stepStartTime }}</strong></span>
+            <span class="time-value"
+              >阶段开始: <strong>{{ stepStartTime }}</strong></span
+            >
             <span class="time-sep">|</span>
-            <span class="time-value">阶段结束: <strong>{{ stepEndTime }}</strong></span>
+            <span class="time-value"
+              >阶段结束: <strong>{{ stepEndTime }}</strong></span
+            >
           </div>
           <div class="step-btn-group">
             <button
@@ -421,8 +517,11 @@
               <div class="product-formula-card__title">非高轨公式</div>
               <div class="product-formula-card__orbit">低轨 / 中轨 / 大椭圆</div>
               <div class="product-formula-card__main">f = f1(x1) * f2(x2) * f3(x3) * f4(x4)</div>
-              <div v-for="item in productFormulaDescription.nonGeo" :key="`non-${item.title}`"
-                class="product-formula-item">
+              <div
+                v-for="item in productFormulaDescription.nonGeo"
+                :key="`non-${item.title}`"
+                class="product-formula-item"
+              >
                 <div class="product-formula-item__label">{{ item.title }}</div>
                 <div class="product-formula-item__text">{{ item.text }}</div>
               </div>
@@ -431,8 +530,11 @@
               <div class="product-formula-card__title">高轨公式</div>
               <div class="product-formula-card__orbit">高轨</div>
               <div class="product-formula-card__main">f = f1(x1) * f2(x2) * f3(x3) * f4(x4)</div>
-              <div v-for="item in productFormulaDescription.geo" :key="`geo-${item.title}`"
-                class="product-formula-item">
+              <div
+                v-for="item in productFormulaDescription.geo"
+                :key="`geo-${item.title}`"
+                class="product-formula-item"
+              >
                 <div class="product-formula-item__label">{{ item.title }}</div>
                 <div class="product-formula-item__text">{{ item.text }}</div>
               </div>
@@ -474,11 +576,23 @@
             <el-table-column header-align="center" align="center" prop="int_id" label="INT_ID" min-width="110" />
             <el-table-column header-align="center" align="center" prop="orbit_type" label="轨道类型" min-width="100" />
 
-            <el-table-column header-align="center" align="center" prop="name_en" label="英文名称" min-width="160"
-              show-overflow-tooltip />
+            <el-table-column
+              header-align="center"
+              align="center"
+              prop="name_en"
+              label="英文名称"
+              min-width="160"
+              show-overflow-tooltip
+            />
             <el-table-column header-align="center" align="center" prop="country" label="国家" min-width="100" />
-            <el-table-column header-align="center" align="center" prop="sat_type" label="卫星类型" min-width="180"
-              show-overflow-tooltip />
+            <el-table-column
+              header-align="center"
+              align="center"
+              prop="sat_type"
+              label="卫星类型"
+              min-width="180"
+              show-overflow-tooltip
+            />
             <el-table-column header-align="center" align="center" label="综合威胁分数" min-width="120">
               <template #default="scope">{{ scope.row.综合威胁分数.toFixed(4) }}</template>
             </el-table-column>
@@ -487,28 +601,81 @@
                 <el-tag :type="getProductThreatTagType(scope.row.威胁等级)" round>{{ scope.row.威胁等级 }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column v-if="productThreatForm.viewMode === 'full'" header-align="center" align="center"
-              prop="target_type" label="TARGET_TYPE" min-width="110" show-overflow-tooltip />
-            <el-table-column v-if="productThreatForm.viewMode === 'full'" header-align="center" align="center"
-              prop="orbit_status" label="轨道状态" min-width="90" />
-            <el-table-column v-if="productThreatForm.viewMode === 'full'" header-align="center" align="center"
-              prop="payload_status" label="载荷状态" min-width="90" />
-            <el-table-column v-if="productThreatForm.viewMode === 'full'" header-align="center" align="center"
-              prop="国别因子" label="国别因子" min-width="90" />
-            <el-table-column v-if="productThreatForm.viewMode === 'full'" header-align="center" align="center"
-              prop="可见性因子" label="可见性因子" min-width="100" />
-            <el-table-column v-if="productThreatForm.viewMode === 'full'" header-align="center" align="center"
-              label="过境次数" min-width="100">
+            <el-table-column
+              v-if="productThreatForm.viewMode === 'full'"
+              header-align="center"
+              align="center"
+              prop="target_type"
+              label="TARGET_TYPE"
+              min-width="110"
+              show-overflow-tooltip
+            />
+            <el-table-column
+              v-if="productThreatForm.viewMode === 'full'"
+              header-align="center"
+              align="center"
+              prop="orbit_status"
+              label="轨道状态"
+              min-width="90"
+            />
+            <el-table-column
+              v-if="productThreatForm.viewMode === 'full'"
+              header-align="center"
+              align="center"
+              prop="payload_status"
+              label="载荷状态"
+              min-width="90"
+            />
+            <el-table-column
+              v-if="productThreatForm.viewMode === 'full'"
+              header-align="center"
+              align="center"
+              prop="国别因子"
+              label="国别因子"
+              min-width="90"
+            />
+            <el-table-column
+              v-if="productThreatForm.viewMode === 'full'"
+              header-align="center"
+              align="center"
+              prop="可见性因子"
+              label="可见性因子"
+              min-width="100"
+            />
+            <el-table-column
+              v-if="productThreatForm.viewMode === 'full'"
+              header-align="center"
+              align="center"
+              label="过境次数"
+              min-width="100"
+            >
               <template #default="scope">{{ formatProductNullable(scope.row['Pass frequency']) }}</template>
             </el-table-column>
-            <el-table-column v-if="productThreatForm.viewMode === 'full'" header-align="center" align="center"
-              label="星下点经度" min-width="110">
+            <el-table-column
+              v-if="productThreatForm.viewMode === 'full'"
+              header-align="center"
+              align="center"
+              label="星下点经度"
+              min-width="110"
+            >
               <template #default="scope">{{ formatProductNullable(scope.row['Subpoint longitude (deg)']) }}</template>
             </el-table-column>
-            <el-table-column v-if="productThreatForm.viewMode === 'full'" header-align="center" align="center"
-              prop="发射年份" label="发射年份" min-width="90" />
-            <el-table-column v-if="productThreatForm.viewMode === 'full'" header-align="center" align="center"
-              prop="发射时间因子" label="发射时间因子" min-width="110" />
+            <el-table-column
+              v-if="productThreatForm.viewMode === 'full'"
+              header-align="center"
+              align="center"
+              prop="发射年份"
+              label="发射年份"
+              min-width="90"
+            />
+            <el-table-column
+              v-if="productThreatForm.viewMode === 'full'"
+              header-align="center"
+              align="center"
+              prop="发射时间因子"
+              label="发射时间因子"
+              min-width="110"
+            />
             <el-table-column header-align="center" align="center" label="威胁指数" min-width="100">
               <template #default="scope">{{ scope.row['威胁指数(0-100)'].toFixed(2) }}</template>
             </el-table-column>
@@ -517,9 +684,7 @@
       </div>
       <div v-if="timeMode === '历史时间计算'">
         <div class="main-title">
-          <el-icon>
-            <DataAnalysis />
-          </el-icon>卫星整体威胁度分析
+          <el-icon> <DataAnalysis /> </el-icon>卫星整体威胁度分析
         </div>
         <div class="product-stat-grid count-stat-grid-4">
           <div class="product-stat-card">
@@ -541,9 +706,7 @@
         </div>
         <div class="graph-container">
           <div class="graph-title">
-            <el-icon>
-              <Search />
-            </el-icon>单个卫星/关键词卫星威胁度分析
+            <el-icon> <Search /> </el-icon>单个卫星/关键词卫星威胁度分析
           </div>
           <div class="search-bar">
             <el-input class="search-input" v-model="searchInput" placeholder="请输入卫星编号/国家名称" clearable />
@@ -555,9 +718,7 @@
             威胁分析的时间演变趋势。可以观察到威胁水平在分析期间保持相对稳定，但在特定时间段出现了显著的威胁集中现象，这与地缘政治事件和卫星的活动模式高度相关。
           </div>
           <div class="graph-title">
-            <el-icon>
-              <Comment />
-            </el-icon>发现与建议措施
+            <el-icon> <Comment /> </el-icon>发现与建议措施
           </div>
           <div class="graph-desc">
             {{ suggestion }}
@@ -571,9 +732,7 @@
           </div>
 
           <div class="graph-title">
-            <el-icon>
-              <List />
-            </el-icon>卫星威胁度列表
+            <el-icon> <List /> </el-icon>卫星威胁度列表
           </div>
           <div class="graph-desc">
             <el-table style="width: 100%" :data="threatList">
@@ -609,7 +768,13 @@
           </div>
           <div class="search-item">
             <span class="item-label">数据集</span>
-            <el-select class="select" v-model="searchForm.dataSet" placeholder="请选择数据集" size="small" @change="getConfigOfTask">
+            <el-select
+              class="select"
+              v-model="searchForm.dataSet"
+              placeholder="请选择数据集"
+              size="small"
+              @change="getConfigOfTask"
+            >
               <el-option v-for="item in dataSetoptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </div>
@@ -650,16 +815,27 @@
             <div class="wb-l">
               <span>非高轨权重</span>
               <span class="orbit-label">低轨/大椭圆</span>
-              <div v-for="field in threatWeightMeta[currentThreatDataset].non_geo" :key="`non-${field.key}`"
-                class="weight-item">
-                <el-checkbox v-model="threatWeightLocks[currentThreatDataset].non_geo[field.key]" size="small"
-                  @change="handleWeightLockChange(currentThreatDataset, 'non_geo')">
+              <div
+                v-for="field in threatWeightMeta[currentThreatDataset].non_geo"
+                :key="`non-${field.key}`"
+                class="weight-item"
+              >
+                <el-checkbox
+                  v-model="threatWeightLocks[currentThreatDataset].non_geo[field.key]"
+                  size="small"
+                  @change="handleWeightLockChange(currentThreatDataset, 'non_geo')"
+                >
                   锁定
                 </el-checkbox>
                 <span>{{ field.label }}</span>
                 <div class="score-slider">
-                  <el-slider v-model="threatWeightGroups[currentThreatDataset].non_geo[field.key]" :min="0" :max="1"
-                    :step="0.01" :disabled="threatWeightLocks[currentThreatDataset].non_geo[field.key]" />
+                  <el-slider
+                    v-model="threatWeightGroups[currentThreatDataset].non_geo[field.key]"
+                    :min="0"
+                    :max="1"
+                    :step="0.01"
+                    :disabled="threatWeightLocks[currentThreatDataset].non_geo[field.key]"
+                  />
                   <span>{{ threatWeightGroups[currentThreatDataset].non_geo[field.key] }}</span>
                 </div>
               </div>
@@ -667,16 +843,27 @@
             <div class="wb-r">
               <span>高轨权重</span>
               <span class="orbit-label">高轨</span>
-              <div v-for="field in threatWeightMeta[currentThreatDataset].geo" :key="`geo-${field.key}`"
-                class="weight-item">
-                <el-checkbox v-model="threatWeightLocks[currentThreatDataset].geo[field.key]" size="small"
-                  @change="handleWeightLockChange(currentThreatDataset, 'geo')">
+              <div
+                v-for="field in threatWeightMeta[currentThreatDataset].geo"
+                :key="`geo-${field.key}`"
+                class="weight-item"
+              >
+                <el-checkbox
+                  v-model="threatWeightLocks[currentThreatDataset].geo[field.key]"
+                  size="small"
+                  @change="handleWeightLockChange(currentThreatDataset, 'geo')"
+                >
                   锁定
                 </el-checkbox>
                 <span>{{ field.label }}</span>
                 <div class="score-slider">
-                  <el-slider v-model="threatWeightGroups[currentThreatDataset].geo[field.key]" :min="0" :max="1"
-                    :step="0.01" :disabled="threatWeightLocks[currentThreatDataset].geo[field.key]" />
+                  <el-slider
+                    v-model="threatWeightGroups[currentThreatDataset].geo[field.key]"
+                    :min="0"
+                    :max="1"
+                    :step="0.01"
+                    :disabled="threatWeightLocks[currentThreatDataset].geo[field.key]"
+                  />
                   <span>{{ threatWeightGroups[currentThreatDataset].geo[field.key] }}</span>
                 </div>
               </div>
@@ -2305,6 +2492,9 @@ function dispose() {
 }
 </script>
 <style lang="scss" scoped>
+:deep(.atlas-app-switch) {
+  height: 24px;
+}
 .threat-container {
   --stv-surface-main: rgba(10, 24, 46, 0.95);
   --stv-surface-soft: rgba(12, 28, 52, 0.9);
@@ -2392,7 +2582,7 @@ function dispose() {
         gap: 14px;
         flex-wrap: wrap;
 
-        &>div {
+        & > div {
           display: flex;
           flex-direction: column;
           gap: 4px;
@@ -2604,35 +2794,36 @@ function dispose() {
           letter-spacing: 0.3px;
         }
 
-        :deep(.el-input__wrapper),
-        :deep(.el-select__wrapper) {
+        :deep(.atlas-app-input__wrapper),
+        :deep(.atlas-app-select__wrapper) {
           background: rgba(13, 27, 49, 0.8);
           border: 1px solid rgba(0, 225, 255, 0.2);
           box-shadow: none !important;
           border-radius: 6px;
           color: #ffffff;
 
-          &.is-focus, &:hover {
+          &.is-focus,
+          &:hover {
             border-color: #00e1ff;
             box-shadow: 0 0 10px rgba(0, 225, 255, 0.3) !important;
           }
         }
 
-        :deep(.el-input__inner) {
+        :deep(.atlas-app-input__inner) {
           color: #ffffff;
         }
 
-        :deep(.el-input-number) {
+        :deep(.atlas-app-input-number) {
           background: rgba(13, 27, 49, 0.8);
           border: 1px solid rgba(0, 225, 255, 0.2);
           border-radius: 6px;
-          .el-input-number__decrease,
-          .el-input-number__increase {
+          .atlas-app-input-number__decrease,
+          .atlas-app-input-number__increase {
             background: rgba(0, 225, 255, 0.1);
             border-color: rgba(0, 225, 255, 0.2);
             color: #00e1ff;
           }
-          .el-input__wrapper {
+          .atlas-app-input__wrapper {
             background: transparent;
             border: none;
           }
@@ -2771,7 +2962,11 @@ function dispose() {
       grid-template-columns: repeat(3, 1fr);
       gap: 14px;
     }
-
+    .count-stat-grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
     .product-stat-card {
       background: rgba(13, 27, 49, 0.8);
       border: 1px solid rgba(0, 225, 255, 0.2);
@@ -2916,15 +3111,14 @@ function dispose() {
           white-space: nowrap;
         }
 
-        .select,
-        :deep(.el-select),
-        :deep(.el-input) {
+        :deep(.atlas-app-select),
+        :deep(.atlas-app-input) {
           width: 100% !important;
           min-width: 150px;
         }
 
-        :deep(.el-input__wrapper),
-        :deep(.el-select__wrapper) {
+        :deep(.atlas-app-input__wrapper),
+        :deep(.atlas-app-select__wrapper) {
           background: rgba(13, 27, 49, 0.8);
           border: 1px solid rgba(0, 225, 255, 0.2);
           box-shadow: none !important;
@@ -2932,7 +3126,8 @@ function dispose() {
           color: #ffffff;
           height: 34px;
 
-          &.is-focus, &:hover {
+          &.is-focus,
+          &:hover {
             border-color: #00e1ff;
             box-shadow: 0 0 10px rgba(0, 225, 255, 0.3) !important;
           }
@@ -3043,7 +3238,7 @@ function dispose() {
               align-items: center;
               gap: 12px;
 
-              .el-slider {
+              .atlas-app-slider {
                 flex: 1;
               }
 
@@ -3067,23 +3262,23 @@ function dispose() {
       padding: 12px;
       overflow: hidden;
 
-      :deep(.el-table) {
-        --el-table-border-color: rgba(0, 225, 255, 0.12);
-        --el-table-header-bg-color: rgba(13, 27, 49, 0.9);
-        --el-table-bg-color: transparent;
-        --el-table-tr-bg-color: transparent;
-        --el-table-row-hover-bg-color: rgba(0, 225, 255, 0.1);
-        --el-text-color-regular: #cbd5e1;
-        --el-text-color-primary: #ffffff;
+      :deep(.atlas-app-table) {
+        --atlas-app-table-border-color: rgba(0, 225, 255, 0.12);
+        --atlas-app-table-header-bg-color: rgba(13, 27, 49, 0.9);
+        --atlas-app-table-bg-color: transparent;
+        --atlas-app-table-tr-bg-color: transparent;
+        --atlas-app-table-row-hover-bg-color: rgba(0, 225, 255, 0.1);
+        --atlas-app-text-color-regular: #cbd5e1;
+        --atlas-app-text-color-primary: #ffffff;
 
-        th.el-table__cell {
+        th.atlas-app-table__cell {
           color: #00e1ff;
           font-size: 12px;
           font-weight: 700;
           background: rgba(13, 27, 49, 0.9) !important;
         }
 
-        td.el-table__cell {
+        td.atlas-app-table__cell {
           border-bottom: 1px solid rgba(0, 225, 255, 0.08);
           font-size: 12px;
         }

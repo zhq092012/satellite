@@ -15,14 +15,22 @@
 
           <div class="plan-mode-switcher">
             <div class="plan-mode-switcher__buttons">
-              <el-button :type="selectedHistoricalPlanMode === 'threat_first' ? 'primary' : 'default'" size="small"
-                round :disabled="!selectedHistoricalPlan || isCurrentPlanLowOrMid"
-                @click="switchHistoricalPlanMode('threat_first')">
+              <el-button
+                :type="selectedHistoricalPlanMode === 'threat_first' ? 'primary' : 'default'"
+                size="small"
+                round
+                :disabled="!selectedHistoricalPlan || isCurrentPlanLowOrMid"
+                @click="switchHistoricalPlanMode('threat_first')"
+              >
                 威胁优先
               </el-button>
-              <el-button :type="selectedHistoricalPlanMode === 'max_targets' ? 'primary' : 'default'" size="small" round
+              <el-button
+                :type="selectedHistoricalPlanMode === 'max_targets' ? 'primary' : 'default'"
+                size="small"
+                round
                 :disabled="!selectedHistoricalPlan || isCurrentPlanLowOrMid"
-                @click="switchHistoricalPlanMode('max_targets')">
+                @click="switchHistoricalPlanMode('max_targets')"
+              >
                 数量优先
               </el-button>
             </div>
@@ -43,9 +51,14 @@
           </div>
 
           <div class="stage-list">
-            <button v-for="stage in stageList" :key="stage.name" class="stage-item"
-              :class="{ 'is-active': activeStageName === stage.name }" type="button"
-              @click="setActiveStage(stage.name)">
+            <button
+              v-for="stage in stageList"
+              :key="stage.name"
+              class="stage-item"
+              :class="{ 'is-active': activeStageName === stage.name }"
+              type="button"
+              @click="setActiveStage(stage.name)"
+            >
               <span class="stage-item__dot"></span>
               <span class="stage-item__name">{{ stage.name }}</span>
               <span class="stage-item__time">{{ stage.window }}</span>
@@ -62,8 +75,13 @@
             </div>
 
             <div class="layer-tags">
-              <span v-for="layer in layerOptions" :key="layer" class="layer-tag"
-                :class="{ 'is-active': activeLayerOption === layer }" @click="handleLayerOption(layer)">
+              <span
+                v-for="layer in layerOptions"
+                :key="layer"
+                class="layer-tag"
+                :class="{ 'is-active': activeLayerOption === layer }"
+                @click="handleLayerOption(layer)"
+              >
                 {{ layer }}
               </span>
             </div>
@@ -73,30 +91,43 @@
             <div v-show="!isCompareViewerLayer" ref="cesiumContainer" class="cesium-container">
               <div ref="credits" class="credits"></div>
             </div>
-            <div v-if="activeLayerOption === '方案对比' || activeLayerOption === '对比视图'" class="compare-viewer-grid">
-              <div v-if="activeLayerOption === '方案对比' && selectedComparePlanCards.length"
-                class="compare-viewer-grid__inner">
+            <div
+              v-if="activeLayerOption === '方案对比' || activeLayerOption === '对比视图'"
+              class="compare-viewer-grid"
+            >
+              <div
+                v-if="activeLayerOption === '方案对比' && selectedComparePlanCards.length"
+                class="compare-viewer-grid__inner"
+              >
                 <section v-for="(card, index) in selectedComparePlanCards" :key="card.key" class="compare-viewer-card">
                   <header class="compare-viewer-card__header">
                     <strong>{{ card.plan.name }}</strong>
                     <span>{{ card.plan.version }} · {{ getHistoricalPlanModeLabel(card.mode) }}</span>
                   </header>
-                  <div :ref="(element) => setCompareViewerContainer(element as Element | null, index)"
-                    class="compare-viewer-card__stage">
-                    <div :ref="(element) => setCompareViewerCredit(element as Element | null, index)" class="credits">
-                    </div>
+                  <div
+                    :ref="(element) => setCompareViewerContainer(element as Element | null, index)"
+                    class="compare-viewer-card__stage"
+                  >
+                    <div
+                      :ref="(element) => setCompareViewerCredit(element as Element | null, index)"
+                      class="credits"
+                    ></div>
                   </div>
                 </section>
               </div>
-              <div v-else-if="activeLayerOption === '对比视图' && selectedHistoricalPlanDetail"
-                class="compare-viewer-grid__inner">
+              <div
+                v-else-if="activeLayerOption === '对比视图' && selectedHistoricalPlanDetail"
+                class="compare-viewer-grid__inner"
+              >
                 <section class="compare-viewer-card">
                   <header class="compare-viewer-card__header">
                     <strong>打击前</strong>
                     <span>原始卫星态势视图</span>
                   </header>
-                  <div :ref="(element) => setCompareViewerContainer(element as Element | null, 0)"
-                    class="compare-viewer-card__stage">
+                  <div
+                    :ref="(element) => setCompareViewerContainer(element as Element | null, 0)"
+                    class="compare-viewer-card__stage"
+                  >
                     <div :ref="(element) => setCompareViewerCredit(element as Element | null, 0)" class="credits"></div>
                   </div>
                 </section>
@@ -105,8 +136,10 @@
                     <strong>打击后</strong>
                     <span>隐藏已打击卫星后的态势视图</span>
                   </header>
-                  <div :ref="(element) => setCompareViewerContainer(element as Element | null, 1)"
-                    class="compare-viewer-card__stage">
+                  <div
+                    :ref="(element) => setCompareViewerContainer(element as Element | null, 1)"
+                    class="compare-viewer-card__stage"
+                  >
                     <div :ref="(element) => setCompareViewerCredit(element as Element | null, 1)" class="credits"></div>
                   </div>
                 </section>
@@ -160,10 +193,13 @@
                     <strong>{{ strike.summary }}</strong>
                     <span>{{ strike.timeWindow }}</span>
                   </div>
-                  <span class="strike-item__status" :class="{
-                    'is-active': activeStrikeWindowIds.has(strike.id),
-                    'is-completed': completedStrikeWindowIds.has(strike.id),
-                  }">
+                  <span
+                    class="strike-item__status"
+                    :class="{
+                      'is-active': activeStrikeWindowIds.has(strike.id),
+                      'is-completed': completedStrikeWindowIds.has(strike.id),
+                    }"
+                  >
                     {{
                       activeStrikeWindowIds.has(strike.id)
                         ? '打击中'
@@ -190,9 +226,15 @@
         </div>
         <div class="history-plan-dialog__summary-actions">
           <span class="panel-badge">{{ filteredHistoricalPlanCards.length }} 个卡片</span>
-          <span v-if="isCompareSelectionMode" class="panel-badge">已勾选 {{ selectedHistoricalPlanKeys.length }}/4</span>
-          <el-button v-if="isCompareSelectionMode" type="primary" :disabled="!selectedComparePlanCards.length"
-            @click="applyComparePlans">
+          <span v-if="isCompareSelectionMode" class="panel-badge"
+            >已勾选 {{ selectedHistoricalPlanKeys.length }}/4</span
+          >
+          <el-button
+            v-if="isCompareSelectionMode"
+            type="primary"
+            :disabled="!selectedComparePlanCards.length"
+            @click="applyComparePlans"
+          >
             确认对比
           </el-button>
         </div>
@@ -201,8 +243,12 @@
       <div class="history-plan-dialog__search-panel">
         <div class="history-plan-dialog__field">
           <span class="history-plan-dialog__field-label">方案名称</span>
-          <el-input v-model="historicalPlanNameQuery" clearable placeholder="输入方案名称关键字"
-            class="history-plan-dialog__search-input" />
+          <el-input
+            v-model="historicalPlanNameQuery"
+            clearable
+            placeholder="输入方案名称关键字"
+            class="history-plan-dialog__search-input"
+          />
         </div>
 
         <div class="history-plan-dialog__field">
@@ -217,8 +263,13 @@
 
         <div class="history-plan-dialog__field">
           <span class="history-plan-dialog__field-label">打击卫星类型</span>
-          <el-select v-model="historicalPlanSatelliteTypeFilter" clearable filterable
-            class="history-plan-dialog__select" placeholder="全部类型">
+          <el-select
+            v-model="historicalPlanSatelliteTypeFilter"
+            clearable
+            filterable
+            class="history-plan-dialog__select"
+            placeholder="全部类型"
+          >
             <el-option v-for="type in historicalPlanSatelliteTypeOptions" :key="type" :label="type" :value="type" />
           </el-select>
         </div>
@@ -241,11 +292,17 @@
               <h3 class="history-plan-card__title">{{ card.plan.name }}</h3>
               <p class="history-plan-card__subline">{{ card.plan.version }}</p>
             </div>
-            <div class="history-plan-card__badges"
-              :class="{ 'history-plan-card__badges--selection': isCompareSelectionMode }">
-              <button v-if="isCompareSelectionMode" class="history-plan-card__selector"
-                :class="{ 'is-checked': isHistoricalPlanChecked(card.key) }" type="button"
-                @click.stop="toggleHistoricalPlanSelection(card.key)">
+            <div
+              class="history-plan-card__badges"
+              :class="{ 'history-plan-card__badges--selection': isCompareSelectionMode }"
+            >
+              <button
+                v-if="isCompareSelectionMode"
+                class="history-plan-card__selector"
+                :class="{ 'is-checked': isHistoricalPlanChecked(card.key) }"
+                type="button"
+                @click.stop="toggleHistoricalPlanSelection(card.key)"
+              >
                 <span class="history-plan-card__selector-box"></span>
                 <span>对比</span>
               </button>
@@ -288,8 +345,11 @@
           <div class="history-plan-card__section">
             <span class="history-plan-card__section-title">重点打击卫星</span>
             <div class="history-plan-card__chips" v-if="card.detail?.plan_summary.target_analysis?.length">
-              <span v-for="target in card.detail.plan_summary.target_analysis" :key="`${card.key}-${target.norad_id}`"
-                class="history-plan-card__chip history-plan-card__chip--target">
+              <span
+                v-for="target in card.detail.plan_summary.target_analysis"
+                :key="`${card.key}-${target.norad_id}`"
+                class="history-plan-card__chip history-plan-card__chip--target"
+              >
                 NORAD {{ target.norad_id }}
               </span>
             </div>
@@ -359,7 +419,8 @@
               </div>
 
               <div class="killchain-plan-card__footer">
-                <el-button type="primary" round @click="handleLoadKillChainPlan({ ...plan, plan: [subPlan] })"> 加载方案
+                <el-button type="primary" round @click="handleLoadKillChainPlan({ ...plan, plan: [subPlan] })">
+                  加载方案
                 </el-button>
               </div>
             </article>
@@ -401,15 +462,19 @@
               <div class="killchain-plan-card__section" v-if="subPlan.missileBases?.length">
                 <span class="killchain-plan-card__section-title">导弹基地</span>
                 <div class="killchain-plan-card__chips">
-                  <span v-for="base in subPlan.missileBases" :key="base.missileBaseId"
-                    class="killchain-plan-card__chip">
+                  <span
+                    v-for="base in subPlan.missileBases"
+                    :key="base.missileBaseId"
+                    class="killchain-plan-card__chip"
+                  >
                     {{ base.missileBaseName }} ({{ base.country }})
                   </span>
                 </div>
               </div>
 
               <div class="killchain-plan-card__footer">
-                <el-button type="primary" round @click="handleLoadKillChainPlan({ ...plan, plan: [subPlan] })"> 加载方案
+                <el-button type="primary" round @click="handleLoadKillChainPlan({ ...plan, plan: [subPlan] })">
+                  加载方案
                 </el-button>
               </div>
             </article>
@@ -450,12 +515,18 @@
               </div>
 
               <div class="killchain-plan-card__footer is-high">
-                <el-button type="primary" round
-                  @click="handleLoadKillChainPlan({ ...plan, plan: [subPlan] }, 'threat_first')">
+                <el-button
+                  type="primary"
+                  round
+                  @click="handleLoadKillChainPlan({ ...plan, plan: [subPlan] }, 'threat_first')"
+                >
                   加载 (威胁优先)
                 </el-button>
-                <el-button type="success" round
-                  @click="handleLoadKillChainPlan({ ...plan, plan: [subPlan] }, 'max_targets')">
+                <el-button
+                  type="success"
+                  round
+                  @click="handleLoadKillChainPlan({ ...plan, plan: [subPlan] }, 'max_targets')"
+                >
                   加载 (数量优先)
                 </el-button>
               </div>
@@ -478,7 +549,12 @@ import { formatTimeLineAndAnimation, markBattleArea } from '@/utils/cesium/funct
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import { bindInfoBoxButton, unbindInfoBoxButton } from '@/utils/cesium/infoBox'
 import { getSatelliteDetail } from '@/api/dashboard'
-import type { StrikePlanV2Extended, RespKillChainPlanLow, RespKillChainPlanMiddle, RespKillChainPlanHigh } from '@/api/strikePlan/satellite-strikeplan-api'
+import type {
+  StrikePlanV2Extended,
+  RespKillChainPlanLow,
+  RespKillChainPlanMiddle,
+  RespKillChainPlanHigh,
+} from '@/api/strikePlan/satellite-strikeplan-api'
 import { parseLatLonToCoords, parseMissionWindowDate } from './helpers/dateFormat'
 
 import { useSceneData } from './composables/useSceneData'
@@ -668,10 +744,7 @@ const resetOverviewAndClockAfterCompletion = () => {
   viewer.value.scene.requestRender()
 }
 
-const {
-  renderBattleEntities,
-  clearBattleEntities,
-} = useBattleEntities(
+const { renderBattleEntities, clearBattleEntities } = useBattleEntities(
   viewer,
   activeLayerOption,
   selectedPlanMissionWindows,
@@ -690,12 +763,14 @@ const {
   }
 )
 
-const isCompareViewerLayer = computed(() => activeLayerOption.value === '方案对比' || activeLayerOption.value === '对比视图')
+const isCompareViewerLayer = computed(
+  () => activeLayerOption.value === '方案对比' || activeLayerOption.value === '对比视图'
+)
 const layerOptions = computed(() => ['标注战场', '打击视图', '杀伤链', '关系卫星', '对比视图', '场景复位', '方案对比'])
 
 /**
  * 判断容器是否初始化完成
- * @param element 容器  
+ * @param element 容器
  */
 const hasValidContainerSize = (element: HTMLElement | null) => {
   if (!element) return false
@@ -726,7 +801,7 @@ const startResizeObserver = () => {
     if (viewer.value) {
       viewer.value.useDefaultRenderLoop = hasValidContainerSize(cesiumContainer.value)
       viewer.value.scene.requestRender()
-        ; (viewer.value as any).resize?.()
+      ;(viewer.value as any).resize?.()
     }
   })
   resizeObserver.observe(cesiumContainer.value)
@@ -819,7 +894,9 @@ const handleLayerOption = async (layer: string) => {
         viewer.value.clock.shouldAnimate = isPlaying.value
       } else {
         viewer.value.entities.removeAll()
-        viewer.value.clock.currentTime = Cesium.JulianDate.fromDate(parseMissionWindowDate(store.activedTask?.beginDate))
+        viewer.value.clock.currentTime = Cesium.JulianDate.fromDate(
+          parseMissionWindowDate(store.activedTask?.beginDate)
+        )
         viewer.value.clock.multiplier = 1
         await loadAllKillChainPlan()
         resetLoadedHistoricalPlanScene(true)
@@ -949,12 +1026,28 @@ const refreshSceneEntities = (fitScene = false, resetEntities = false) => {
       const stNames = new Set(uniqueStations.map((sd) => sd.stationName))
       const stIds = new Set(uniqueStations.map((sd) => sd.stationId))
       const filteredStations = baseStations.value.filter((bs) => stIds.has(bs._id || '') || stNames.has(bs.name))
-      const stationsToMap = filteredStations.length > 0 ? filteredStations : uniqueStations.map((sd) => ({
-        _id: sd.stationId, name: sd.stationName, country: sd.country, type: sd.type, latLon: sd.latLon
-      }))
+      const stationsToMap =
+        filteredStations.length > 0
+          ? filteredStations
+          : uniqueStations.map((sd) => ({
+              _id: sd.stationId,
+              name: sd.stationName,
+              country: sd.country,
+              type: sd.type,
+              latLon: sd.latLon,
+            }))
       blueSatellites.value = stationsToMap.map((sd) => {
         const coords = parseLatLonToCoords(sd.latLon || '')
-        return { noradId: sd._id || '', name: sd.name, country: sd.country || '', satType: sd.type || '雷达站', longitude: coords.longitude, latitude: coords.latitude, altitude: 100, stageName: '' }
+        return {
+          noradId: sd._id || '',
+          name: sd.name,
+          country: sd.country || '',
+          satType: sd.type || '雷达站',
+          longitude: coords.longitude,
+          latitude: coords.latitude,
+          altitude: 100,
+          stageName: '',
+        }
       })
     } else if (intensity === '中烈度') {
       const planMiddle = loadedKillChainPlan.value as RespKillChainPlanMiddle
@@ -967,19 +1060,35 @@ const refreshSceneEntities = (fitScene = false, resetEntities = false) => {
       const mbNames = new Set(uniqueBases.map((mb) => mb.missileBaseName))
       const mbIds = new Set(uniqueBases.map((mb) => mb.missileBaseId))
       const filteredMissileBases = missileBases.value.filter((mb) => mbIds.has(mb._id || '') || mbNames.has(mb.name))
-      const basesToMap = filteredMissileBases.length > 0 ? filteredMissileBases : uniqueBases.map((mb) => ({
-        _id: mb.missileBaseId, name: mb.missileBaseName, latLon: mb.latLon, country: mb.country
-      }))
+      const basesToMap =
+        filteredMissileBases.length > 0
+          ? filteredMissileBases
+          : uniqueBases.map((mb) => ({
+              _id: mb.missileBaseId,
+              name: mb.missileBaseName,
+              latLon: mb.latLon,
+              country: mb.country,
+            }))
       const basesMapped = basesToMap.map((mb) => {
         const coords = parseLatLonToCoords(mb.latLon || '')
-        return { id: mb._id, name: mb.name, country: mb.country || '', type: '导弹基地', latitude: coords.latitude, longitude: coords.longitude, range: 3000 }
+        return {
+          id: mb._id,
+          name: mb.name,
+          country: mb.country || '',
+          type: '导弹基地',
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          range: 3000,
+        }
       })
 
       // 加载当前任务下的定向能武器
       const allDirectedWindows = plans.flatMap((p) => p.directedWindows || [])
       const directedWeaponIds = new Set(allDirectedWindows.map((dw) => String(dw.weapon_id)))
       const directedWeaponNames = new Set(allDirectedWindows.map((dw) => dw.weapon_name))
-      const filteredDirectedWeapons = taskWeapons.value.filter((tw) => directedWeaponIds.has(String(tw.id)) || directedWeaponNames.has(tw.name))
+      const filteredDirectedWeapons = taskWeapons.value.filter(
+        (tw) => directedWeaponIds.has(String(tw.id)) || directedWeaponNames.has(tw.name)
+      )
 
       redWeapons.value = [...basesMapped, ...filteredDirectedWeapons]
 
@@ -990,12 +1099,28 @@ const refreshSceneEntities = (fitScene = false, resetEntities = false) => {
       const stNames = new Set(uniqueStations.map((sd) => sd.stationName))
       const stIds = new Set(uniqueStations.map((sd) => sd.stationId))
       const filteredStations = baseStations.value.filter((bs) => stIds.has(bs._id || '') || stNames.has(bs.name))
-      const stationsToMap = filteredStations.length > 0 ? filteredStations : uniqueStations.map((sd) => ({
-        _id: sd.stationId, name: sd.stationName, country: sd.country, type: sd.type, latLon: sd.latLon
-      }))
+      const stationsToMap =
+        filteredStations.length > 0
+          ? filteredStations
+          : uniqueStations.map((sd) => ({
+              _id: sd.stationId,
+              name: sd.stationName,
+              country: sd.country,
+              type: sd.type,
+              latLon: sd.latLon,
+            }))
       const stationsMapped = stationsToMap.map((sd) => {
         const coords = parseLatLonToCoords(sd.latLon || '')
-        return { noradId: sd._id || '', name: sd.name, country: sd.country || '', satType: sd.type || '基站', longitude: coords.longitude, latitude: coords.latitude, altitude: 100, stageName: '' }
+        return {
+          noradId: sd._id || '',
+          name: sd.name,
+          country: sd.country || '',
+          satType: sd.type || '基站',
+          longitude: coords.longitude,
+          latitude: coords.latitude,
+          altitude: 100,
+          stageName: '',
+        }
       })
 
       // 同时加载当前任务下的卫星轨迹数据（tle）
@@ -1037,7 +1162,11 @@ const setActiveStage = (name: string) => {
   isPlaying.value = true
   viewer.value.clock.clockStep = Cesium.ClockStep.SYSTEM_CLOCK_MULTIPLIER
   viewer.value.clock.shouldAnimate = true
-  viewer.value.clock.currentTime = Cesium.JulianDate.addSeconds(Cesium.JulianDate.fromDate(startDate), 1, new Cesium.JulianDate())
+  viewer.value.clock.currentTime = Cesium.JulianDate.addSeconds(
+    Cesium.JulianDate.fromDate(startDate),
+    1,
+    new Cesium.JulianDate()
+  )
   viewer.value.scene.requestRender()
   syncPlaybackCursorFromClock()
   syncStrikeRuntimeFromClock()
@@ -1223,9 +1352,14 @@ const initViewer = async () => {
     }
     newViewer.clock.onTick.addEventListener(clockTickListener)
 
-    await loadSceneData([], [], (resetEntities) => {
-      refreshSceneEntities(true, resetEntities)
-    }, true)
+    await loadSceneData(
+      [],
+      [],
+      (resetEntities) => {
+        refreshSceneEntities(true, resetEntities)
+      },
+      true
+    )
     void loadAllKillChainPlan()
   } catch (error) {
     console.error('初始化 Cesium Viewer 失败:', error)
@@ -1276,9 +1410,14 @@ watch(
       return
     }
 
-    await loadSceneData([], [], (resetEntities) => {
-      refreshSceneEntities(true, resetEntities)
-    }, true)
+    await loadSceneData(
+      [],
+      [],
+      (resetEntities) => {
+        refreshSceneEntities(true, resetEntities)
+      },
+      true
+    )
   },
   { immediate: true }
 )
@@ -1301,9 +1440,14 @@ watch(
     if (!viewer.value || !store.activedTask?.id || !activeStageName.value) return
     // 杀伤链图层的时钟跳转已由 setActiveStage 完成，无需重新加载场景数据（会清空实体）
     if (activeLayerOption.value === '杀伤链') return
-    await loadSceneData([], [], (resetEntities) => {
-      refreshSceneEntities(true, resetEntities)
-    }, false)
+    await loadSceneData(
+      [],
+      [],
+      (resetEntities) => {
+        refreshSceneEntities(true, resetEntities)
+      },
+      false
+    )
     viewer.value.clock.clockStep = Cesium.ClockStep.SYSTEM_CLOCK_MULTIPLIER
     viewer.value.clock.shouldAnimate = isPlaying.value
   },
@@ -1356,7 +1500,7 @@ watch(
       destroyCompareViewers()
       await nextTick()
       viewer.value?.scene.requestRender()
-        ; (viewer.value as any)?.resize?.()
+      ;(viewer.value as any)?.resize?.()
       return
     }
 
@@ -1377,8 +1521,6 @@ watch(isPlaying, () => {
   viewer.value.clock.shouldAnimate = isPlaying.value
   viewer.value.scene.requestRender()
 })
-
-
 
 watch(isCurrentPlan2D, (is2D) => {
   if (!viewer.value) return
@@ -1467,7 +1609,6 @@ const weaponLegendItems = computed(() => [
 defineExpose({
   resetLoadedHistoricalPlanScene,
 })
-
 </script>
 <style scoped>
 .simulation-page {
@@ -1589,7 +1730,7 @@ defineExpose({
   padding: 16px;
 }
 
-.panel--right>.panel-card--metrics {
+.panel--right > .panel-card--metrics {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -2478,7 +2619,6 @@ defineExpose({
 }
 
 @media (max-width: 1200px) {
-
   .workspace-grid,
   .panel--right {
     grid-template-columns: 1fr;
@@ -2567,6 +2707,7 @@ defineExpose({
   box-shadow: -1px 0 0 0 rgba(98, 213, 255, 0.72);
 }
 
+/* 杀伤链方案卡片列表容器：采用 Flex 垂直单列布局 */
 .killchain-plan-dialog__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));

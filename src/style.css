@@ -138,7 +138,11 @@ body {
   text-align: center;
   overflow: hidden;
 }
-
+.atlas-app-select,
+.atlas-app-input {
+  width: 100% !important;
+  min-width: 150px;
+}
 * {
   transition:
     background-color var(--transition-medium) ease,

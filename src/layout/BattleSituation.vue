@@ -414,8 +414,6 @@ const handleChangeEffectModel = () => {
   if (store.activetab === '战场态势视图') {
     loadOrbitSateList()
   }
-  // 标记战场
-  markBattleArea()
 }
 
 const loadOrbitSateList = () => {
@@ -433,8 +431,6 @@ onMounted(() => {
 
   nextTick(() => {
     loadOrbitSateList()
-    // 标记战场
-    markBattleArea()
   })
   // 卫星列表
   loadSatelliteList()
@@ -449,7 +445,6 @@ watch(
     if (tab === '战场态势视图') {
       nextTick(() => {
         loadOrbitSateList()
-        markBattleArea()
       })
       loadSatelliteList()
       if (store.activedTask?.id) {
@@ -469,12 +464,14 @@ watch(
     }
   }
 )
-
-function markBattleArea() {
-  if (store.activedTask) {
-    cesiumViewerRef.value?.markBattle()
-  }
-}
+/**
+ * 标记战场区域
+ */
+// function markBattleArea() {
+//   if (store.activedTask) {
+//     cesiumViewerRef.value?.markBattle()
+//   }
+// }
 </script>
 <style lang="scss" scoped>
 .battle-page-bg {
@@ -792,40 +789,40 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
           justify-content: end;
         }
 
-        :deep(.el-table) {
-          --el-table-border-color: var(--surface-border-color);
-          --el-table-header-bg-color: var(--surface-bg-color-strong);
-          --el-table-tr-bg-color: var(--surface-bg-color);
-          --el-table-row-hover-bg-color: var(--surface-hover-bg-color);
-          --el-table-current-row-bg-color: var(--surface-hover-bg-color);
-          --el-table-text-color: var(--text-color-primary);
-          --el-table-header-text-color: var(--text-color-secondary);
+        :deep(.atlas-app-table) {
+          --atlas-app-table-border-color: var(--surface-border-color);
+          --atlas-app-table-header-bg-color: var(--surface-bg-color-strong);
+          --atlas-app-table-tr-bg-color: var(--surface-bg-color);
+          --atlas-app-table-row-hover-bg-color: var(--surface-hover-bg-color);
+          --atlas-app-table-current-row-bg-color: var(--surface-hover-bg-color);
+          --atlas-app-table-text-color: var(--text-color-primary);
+          --atlas-app-table-header-text-color: var(--text-color-secondary);
           background: transparent;
           color: var(--text-color-primary);
         }
 
-        :deep(.el-table__header-wrapper th) {
+        :deep(.atlas-app-table__header-wrapper th) {
           background: var(--surface-bg-color-strong);
           color: var(--text-color-secondary);
           border-bottom: 1px solid var(--surface-border-color);
         }
 
-        :deep(.el-table__body tr) {
+        :deep(.atlas-app-table__body tr) {
           background: var(--surface-bg-color);
         }
 
-        :deep(.el-table__body td) {
+        :deep(.atlas-app-table__body td) {
           background: var(--surface-bg-color);
           border-bottom: 1px solid var(--surface-border-color);
         }
 
-        :deep(.el-table__body tr:hover > td) {
+        :deep(.atlas-app-table__body tr:hover > td) {
           background: var(--surface-hover-bg-color);
         }
 
-        :deep(.el-pagination) {
-          --el-text-color-primary: var(--text-color-primary);
-          --el-fill-color-blank: var(--surface-bg-color);
+        :deep(.atlas-app-pagination) {
+          --atlas-app-text-color-primary: var(--text-color-primary);
+          --atlas-app-fill-color-blank: var(--surface-bg-color);
         }
       }
     }

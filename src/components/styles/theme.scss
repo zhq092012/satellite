@@ -123,28 +123,28 @@ html, body {
 }
 
 // 元素重写以便适应深色科技风格
-.el-table {
+.atlas-app-table {
   background-color: transparent !important;
   color: $text-light !important;
-  --el-table-border-color: rgba(0, 225, 255, 0.1) !important;
-  --el-table-header-bg-color: rgba(13, 27, 49, 0.9) !important;
-  --el-table-row-hover-bg-color: rgba(0, 225, 255, 0.1) !important;
+  --atlas-app-table-border-color: rgba(0, 225, 255, 0.1) !important;
+  --atlas-app-table-header-bg-color: rgba(13, 27, 49, 0.9) !important;
+  --atlas-app-table-row-hover-bg-color: rgba(0, 225, 255, 0.1) !important;
   
   tr {
     background-color: transparent !important;
   }
   
-  th.el-table__cell {
+  th.atlas-app-table__cell {
     color: $border-cyan !important;
     font-size: 12px;
   }
   
-  td.el-table__cell {
+  td.atlas-app-table__cell {
     border-bottom: 1px solid rgba(0, 225, 255, 0.1) !important;
   }
 }
 
-.el-tabs__item {
+.atlas-app-tabs__item {
   color: $text-dim !important;
   
   &.is-active {
@@ -152,11 +152,11 @@ html, body {
   }
 }
 
-.el-tabs__active-bar {
+.atlas-app-tabs__active-bar {
   background-color: $border-cyan !important;
 }
 
-.el-input__wrapper, .el-textarea__inner {
+.atlas-app-input__wrapper, .atlas-app-textarea__inner {
   background-color: rgba(8, 12, 22, 0.8) !important;
   box-shadow: 0 0 0 1px $border-cyan-dim inset !important;
   color: $text-light !important;
@@ -166,7 +166,7 @@ html, body {
   }
 }
 
-.el-button {
+.atlas-app-button {
   background-color: rgba(13, 27, 49, 0.8) !important;
   border: 1px solid $border-cyan-dim !important;
   color: $border-cyan !important;
@@ -179,7 +179,7 @@ html, body {
     box-shadow: 0 0 10px $border-cyan;
   }
 
-  &.el-button--danger {
+  &.atlas-app-button--danger {
     color: $accent-red !important;
     border-color: rgba(255, 42, 95, 0.3) !important;
     background-color: rgba(49, 13, 27, 0.8) !important;

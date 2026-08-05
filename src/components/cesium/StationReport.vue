@@ -1356,7 +1356,7 @@ const saveStationPlan = async () => {
 
   /* Element Plus 内部样式覆盖 */
   :deep(.custom-radio-group) {
-    .el-radio {
+    .atlas-app-radio {
       background: rgba(8, 18, 33, 0.6);
       border-color: rgba(0, 225, 255, 0.2);
       color: #94a3b8;
@@ -1366,7 +1366,7 @@ const saveStationPlan = async () => {
       &.is-checked {
         background: rgba(0, 225, 255, 0.15);
         border-color: #00e1ff;
-        .el-radio__label {
+        .atlas-app-radio__label {
           color: #00e1ff;
           font-weight: 600;
         }
@@ -1375,46 +1375,46 @@ const saveStationPlan = async () => {
   }
 
   :deep(.custom-checkbox-group) {
-    .el-checkbox {
+    .atlas-app-checkbox {
       color: #94a3b8;
       margin-right: 12px;
-      &.is-checked .el-checkbox__label {
+      &.is-checked .atlas-app-checkbox__label {
         color: #00e1ff;
         font-weight: 600;
       }
     }
   }
 
-  :deep(.el-checkbox) {
+  :deep(.atlas-app-checkbox) {
     color: #cbd5e1;
-    .el-checkbox__inner {
+    .atlas-app-checkbox__inner {
       background-color: rgba(15, 30, 52, 0.8);
       border-color: rgba(0, 225, 255, 0.3);
     }
-    &.is-checked .el-checkbox__inner {
+    &.is-checked .atlas-app-checkbox__inner {
       background-color: #00e1ff;
       border-color: #00e1ff;
     }
-    &.is-checked .el-checkbox__label {
+    &.is-checked .atlas-app-checkbox__label {
       color: #38bdf8;
     }
   }
 
-  :deep(.el-collapse) {
+  :deep(.atlas-app-collapse) {
     border: none;
     background: transparent;
-    .el-collapse-item__header {
+    .atlas-app-collapse-item__header {
       background: rgba(8, 18, 33, 0.7);
       color: #38bdf8;
       border-bottom: 1px solid rgba(0, 225, 255, 0.15);
       padding: 0 12px;
       font-weight: 600;
     }
-    .el-collapse-item__wrap {
+    .atlas-app-collapse-item__wrap {
       background: transparent;
       border: none;
     }
-    .el-collapse-item__content {
+    .atlas-app-collapse-item__content {
       padding: 10px 0;
       color: #cbd5e1;
     }
