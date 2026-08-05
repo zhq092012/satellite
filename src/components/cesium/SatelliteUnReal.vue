@@ -1479,8 +1479,10 @@ defineExpose({
   --accent-green: #7cd992;
   --accent-amber: #f0b35b;
   --accent-red: #ef6b73;
-  /* AI: 使用 min-height 允许页面超出高度时自然向下延伸滚动 */
-  min-height: 100%;
+  /* [修改说明] 严格锁定页面总高度为 100% 容器高度，禁止页面随内容加载向外无限拉长超出屏幕 */
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   padding: 5px;
@@ -1553,6 +1555,10 @@ defineExpose({
 
 .panel-card--stage {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .workspace-grid {
@@ -1561,14 +1567,18 @@ defineExpose({
   gap: 5px;
   align-items: stretch;
   flex: 1;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .panel {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .panel--right {
@@ -1584,11 +1594,13 @@ defineExpose({
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .panel--right .metric-list {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
 }
 
 .panel-card__header {
@@ -1709,6 +1721,9 @@ defineExpose({
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .stage-item {

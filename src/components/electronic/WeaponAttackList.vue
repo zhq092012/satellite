@@ -77,7 +77,7 @@
             </div>
             <div class="meta-item">
               <span class="meta-label">⏱️ 总持续时长:</span>
-              <span class="meta-value duration-tag">{{ formatDuration(plan.beginTime, plan.endTime) }}</span>
+              <span class="meta-value duration-tag">{{ formatTotalWindowsDuration(plan) }}</span>
             </div>
           </div>
 
@@ -108,7 +108,6 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Search } from '@element-plus/icons-vue'
 import type { MatrixResult, WeaponAttackRecord } from '@/api/electronic'
 
 /**
@@ -192,19 +191,14 @@ const getBadgeClass = (type: string) => {
 
 /**
  * [功能说明]
- * 计算两个时间字符串之间的持续时长描述（如：30分钟、1小时15分钟）
+ * 将秒数差格式化为人类可读的时间字符串（如：30分钟、1小时15分钟）
  *
- * @param startStr 开始时间字符串
- * @param endStr 结束时间字符串
+ * @param diffSec 秒数差
+ * @returns 格式化后的时间字符串
  */
-const formatDuration = (startStr: string, endStr: string): string => {
-  if (!startStr || !endStr) return '未知'
-  const t1 = new Date(startStr.replace(/-/g, '/')).getTime()
-  const t2 = new Date(endStr.replace(/-/g, '/')).getTime()
+const formatSecondsToText = (diffSec: number): string => {
+  if (diffSec <= 0) return '0秒'
 
-  if (isNaN(t1) || isNaN(t2) || t2 <= t1) return '即时/未知'
-
-  const diffSec = Math.floor((t2 - t1) / 1000)
   const hours = Math.floor(diffSec / 3600)
   const mins = Math.floor((diffSec % 3600) / 60)
   const secs = diffSec % 60
@@ -216,6 +210,63 @@ const formatDuration = (startStr: string, endStr: string): string => {
     return secs > 0 ? `${mins}分${secs}秒` : `${mins}分钟`
   }
   return `${secs}秒`
+}
+
+/**
+ * [功能说明]
+ * 计算两个时间字符串之间的秒数差
+ *
+ * @param startStr 开始时间字符串
+ * @param endStr 结束时间字符串
+ * @returns 差异秒数，非法时间返回 0
+ */
+const calcSecondsSpan = (startStr: string, endStr: string): number => {
+  if (!startStr || !endStr) return 0
+  const t1 = new Date(startStr.replace(/-/g, '/')).getTime()
+  const t2 = new Date(endStr.replace(/-/g, '/')).getTime()
+  if (isNaN(t1) || isNaN(t2) || t2 <= t1) return 0
+  return Math.floor((t2 - t1) / 1000)
+}
+
+/**
+ * [功能说明]
+ * 计算单段时间字符串的持续时长描述
+ *
+ * @param startStr 开始时间字符串
+ * @param endStr 结束时间字符串
+ */
+const formatDuration = (startStr: string, endStr: string): string => {
+  const secs = calcSecondsSpan(startStr, endStr)
+  return secs > 0 ? formatSecondsToText(secs) : '即时/未知'
+}
+
+/**
+ * [功能说明]
+ * 计算某项武器打击计划中所有打击窗口 (windows) 时长的累加总和
+ *
+ * [处理规则]
+ * - 优先遍历 plan.windows 列表中每一个子窗口的 beginWindow ~ endWindow，计算时长秒数并求和。
+ * - 当 plan.windows 为空或无效时，兜底计算整体起止时间 beginTime ~ endTime 的时间差。
+ *
+ * @param plan 武器打击计划记录对象
+ * @returns 累加格式化后的总时长描述字符串
+ */
+const formatTotalWindowsDuration = (plan: WeaponAttackRecord): string => {
+  if (!plan) return '未知'
+
+  // 1. 优先累加所有子时间窗口的时长秒数
+  if (plan.windows && plan.windows.length > 0) {
+    let totalSecs = 0
+    plan.windows.forEach((win) => {
+      totalSecs += calcSecondsSpan(win.beginWindow, win.endWindow)
+    })
+    if (totalSecs > 0) {
+      return formatSecondsToText(totalSecs)
+    }
+  }
+
+  // 2. 若无子窗口数据，兜底计算全局 beginTime 到 endTime
+  return formatDuration(plan.beginTime, plan.endTime)
 }
 </script>
 
