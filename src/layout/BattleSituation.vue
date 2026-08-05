@@ -56,69 +56,6 @@
               :matrix-data="matrixData"
             />
           </div>
-          <!-- 卫星列表 -->
-          <!-- <Transition name="slidet">
-            <div class="satellite-list-panel" v-show="store.showSatelliteList && store.activetab === '战场态势视图'">
-              <div class="tabs-bar" style="padding: 0 5px">
-                <div class="tabs">
-                  <div :class="{ active: activetime === '卫星列表' }" @click="switchTime('卫星列表')">卫星列表</div>
-                </div>
-                <div style="font-size: 12px">共{{ satellite_loadnum }}/{{ satellite_total }}颗卫星</div>
-              </div>
-              <div class="satellite-list">
-                <el-table
-                  :data="satelliteList"
-                  style="width: 100%; height: 240px"
-                  fit
-                  :cell-style="{ fontSize: '12px' }"
-                  :default-sort="{ prop: 'norad', order: 'ascending' }"
-                >
-                  <el-table-column prop="norad" label="编号" sortable> </el-table-column>
-                  <el-table-column prop="int_id" label="国际编号"> </el-table-column>
-                  <el-table-column prop="name_en" label="英文名称"> </el-table-column>
-                  <el-table-column prop="country" label="国家/地区"> </el-table-column>
-                  <el-table-column prop="sat_type" label="卫星类型"> </el-table-column>
-                  <el-table-column prop="orbit_status" label="轨道状态">
-                    <template #default="scope">
-                      <span v-if="scope.row.orbit_status === 0">未知</span>
-                      <span v-if="scope.row.orbit_status === 1">在轨</span>
-                      <span v-if="scope.row.orbit_status === 2">离轨</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="orbit_type" label="轨道类型">
-                    <template #default="scope">
-                      <span v-if="scope.row.orbit_type === 0">未知</span>
-                      <span v-if="scope.row.orbit_type === 1">低轨</span>
-                      <span v-if="scope.row.orbit_type === 2">中轨</span>
-                      <span v-if="scope.row.orbit_type === 3">高轨</span>
-                      <span v-if="scope.row.orbit_type === 4">大椭圆</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="payload_status" label="载荷状态">
-                    <template #default="scope">
-                      <span v-if="scope.row.payload_status === 0">未知</span>
-                      <span v-if="scope.row.payload_status === 1">堪用</span>
-                      <span v-if="scope.row.payload_status === 2">失效</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="contractors" label="制造商" width="300"> </el-table-column>
-                  <el-table-column label="操作">
-                    <template #default="scope">
-                      <el-button type="primary" link @click="detail(scope.row.norad)">详情</el-button>
-                    </template>
-                  </el-table-column>
-                </el-table>
-                <div class="page-box">
-                  <el-pagination
-                    :page-size="10"
-                    layout="total, prev, pager, next"
-                    :total="satellite_total"
-                    @current-change="handleCurrentChange"
-                  />
-                </div>
-              </div>
-            </div>
-          </Transition> -->
         </div>
         <!-- C2 战场态势 - 网络毁伤与脆弱度分析右侧边栏 -->
         <div class="battle-grid__side battle-grid__side--right">
@@ -150,7 +87,6 @@
 </template>
 <script setup lang="ts">
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
-import BattleCampPanel from '@/components/cesium/BattleCampPanel.vue'
 import C2LeftControlPanel from '@/components/cesium/C2LeftControlPanel.vue'
 import C2RightAnalysisPanel from '@/components/cesium/C2RightAnalysisPanel.vue'
 import SatelliteNetView from '@/components/cesium/SatelliteNetView.vue'
@@ -171,7 +107,7 @@ import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 const store = useLayoutStore()
 const authStore = useAuthStore()
-const { openSatelliteProfile } = useSatelliteProfileDialog()
+useSatelliteProfileDialog()
 const compMap = {
   CesiumViewer,
   SatelliteNetView,
@@ -215,12 +151,12 @@ const tabDefs = [
     component: 'SatelliteUnReal',
     permissionCode: 'battle:unreal',
   },
-  {
-    label: '红蓝对抗分析',
-    value: '红蓝对抗分析',
-    component: 'ConfrontView',
-    permissionCode: 'battle:confront',
-  },
+  // {
+  //   label: '红蓝对抗分析',
+  //   value: '红蓝对抗分析',
+  //   component: 'ConfrontView',
+  //   permissionCode: 'battle:confront',
+  // },
   // {
   //   label: '电子对抗分析',
   //   value: '电子对抗分析',
@@ -361,118 +297,8 @@ const threatAnalysis = () => {
   switchTab('卫星威胁分析')
 }
 
-const SATELLITE_TYPE_ORDER = ['导弹预警', '侦察', '通信', '导航', '太空目标监视与攻防'] as const
-const weaponTypeOrder = ['动能', '定向能', '电子干扰', '天基武器', '其他'] as const
-
 const battleSituationData = ref<SituationData | null>(null)
 const strikeSatelliteList = ref<SatelliteStrike[]>([])
-
-const normalizeCountryList = (value?: string) =>
-  String(value ?? '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-
-const enemyCountrySet = computed(() => new Set(normalizeCountryList(store.activedTask?.enemyCountry)))
-
-const formatCount = (value?: number) => `${Number(value ?? 0)}`
-
-const formatDuration = (value?: number) => {
-  const duration = Number(value ?? 0)
-  if (!Number.isFinite(duration)) return '0'
-  return `${duration}`
-}
-
-const toTopRows = (source?: Record<string, number>, limit = 4) => {
-  return Object.entries(source ?? {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([name, value]) => ({ name, value: formatCount(value) }))
-}
-
-const getFixedSatelliteTypeRows = (source?: Record<string, number>) => {
-  return SATELLITE_TYPE_ORDER.map((name) => ({
-    name,
-    value: Number(source?.[name] ?? 0),
-  }))
-}
-
-const normalizeWeaponType = (type?: string) => {
-  const text = String(type ?? '').trim()
-  if (!text) return '其他'
-  if (text.includes('动能')) return '动能'
-  if (text.includes('定向能')) return '定向能'
-  if (text.includes('电子干扰') || text.includes('干扰')) return '电子干扰'
-  if (text.includes('天基')) return '天基武器'
-  return '其他'
-}
-
-const getWeaponTypeRows = (list?: Array<{ type?: string }>) => {
-  const counts = new Map<string, number>()
-  for (const item of list ?? []) {
-    const key = normalizeWeaponType(item?.type)
-    counts.set(key, (counts.get(key) ?? 0) + 1)
-  }
-  return weaponTypeOrder
-    .map((name) => ({ name, value: Number(counts.get(name) ?? 0) }))
-    .filter((item) => item.value > 0 || item.name !== '其他')
-}
-
-const redFocusList = computed(() =>
-  strikeSatelliteList.value.filter((sat) => enemyCountrySet.value.has(String(sat.country).trim()))
-)
-
-const blueFocusList = computed(() =>
-  strikeSatelliteList.value.filter((sat) => !enemyCountrySet.value.has(String(sat.country).trim()))
-)
-
-const enemySpaceNodeCard = computed(() => {
-  const data = battleSituationData.value
-  if (!data) return null
-  const blueTotal = Number(data['蓝方']?.蓝方过境卫星总数 ?? 0)
-
-  return {
-    key: 'blue' as const,
-    label: '敌方空间节点',
-    theme: 'is-blue' as const,
-    total: blueTotal,
-    totalLabel: `${blueTotal}`,
-    durationText: formatDuration(data['蓝方']?.蓝方卫星过境总时长),
-    summaryRows: toTopRows(data['蓝方']?.蓝方各地区过境卫星数量, 3),
-    ringStyle: {
-      background: `conic-gradient(var(--accent-color) 0 75%, rgba(255, 255, 255, 0.08) 75% 100%)`,
-    },
-    satelliteRows: getFixedSatelliteTypeRows(data['蓝方']?.蓝方过境卫星分类数量),
-    weaponRows: getWeaponTypeRows(data['蓝方']?.蓝方武器阵地列表),
-    focusList: blueFocusList.value,
-  }
-})
-
-const enemyNetworkDamageCard = computed(() => {
-  const data = battleSituationData.value
-  if (!data) return null
-  const blueTotal = Number(data['蓝方']?.蓝方过境卫星总数 ?? 0)
-
-  return {
-    key: 'blue' as const,
-    label: '敌方网络毁伤态势',
-    theme: 'is-blue' as const,
-    total: blueTotal,
-    totalLabel: `${blueTotal}`,
-    durationText: formatDuration(data['蓝方']?.蓝方卫星过境总时长),
-    summaryRows: [
-      { name: '受打压节点', value: '3 个接收站' },
-      { name: '受干扰链路', value: '5 条通信网' },
-      { name: '平均过站延时', value: '18.5 分钟' },
-    ],
-    ringStyle: {
-      background: `conic-gradient(#3a90ff 0 60%, #e6a23c 60% 85%, #f56c6c 85% 100%)`,
-    },
-    satelliteRows: getFixedSatelliteTypeRows(data['蓝方']?.蓝方过境卫星分类数量),
-    weaponRows: getWeaponTypeRows(data['蓝方']?.蓝方武器阵地列表),
-    focusList: blueFocusList.value,
-  }
-})
 
 const matrixData = ref<MatrixResult | null>(getDefaultMatrixData())
 
@@ -538,9 +364,6 @@ async function loadBattleSituationData(taskId: number) {
   await Promise.all([loadSituationData(taskId), loadStrikeList(taskId), loadMatrixData(taskId)])
 }
 
-const handleFocusSatellite = (payload: { norad_id: string }) => {
-  cesiumViewerRef.value?.highlightSatellite?.(payload)
-}
 /**
  * 切换tab页面
  * @param tab tab名称
@@ -571,23 +394,12 @@ watch(
   { immediate: true }
 )
 
-const activetime = ref('卫星列表')
-const switchTime = (tab: string) => {
-  activetime.value = tab
-}
 const satelliteList = ref<Satellite[]>([])
 const satellite_total = ref(0)
 const satellite_loadnum = ref(0)
 const pageNum = ref(1)
 const pageSize = ref(10)
-const handleCurrentChange = (num: number) => {
-  pageNum.value = num
-  loadSatelliteList()
-}
 
-const detail = (norad: number) => {
-  openSatelliteProfile(norad)
-}
 //卫星列表数据
 const loadSatelliteList = async () => {
   const res = await getSatelliteList(pageNum.value, pageSize.value, undefined, store.activedTask?.id!)

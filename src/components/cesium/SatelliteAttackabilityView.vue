@@ -2,49 +2,63 @@
   <div class="strike-view">
     <section class="hero-card panel-card">
       <div class="hero-card__content">
-        <h1 class="hero-card__title">可打击度计算展示页</h1>
+        <span class="hero-card__eyebrow">🎯 目标可打击度评估</span>
+        <h1 class="hero-card__title">卫星可打击度计算模型</h1>
         <p class="hero-card__desc">
-          页面上方用于展示可打击度规则，下方用于展示调用接口后的结果。 当前任务为{{
+          基于多维参数计算卫星目标的综合可打击度得分。当前评估任务：<span class="highlight-task">{{
             activeTaskName
-          }}，结果以接口返回值为准。
+          }}</span
+          >，综合系数基于实测轨道、武器匹配度与目标脆弱度推算。
         </p>
       </div>
     </section>
 
     <div class="toolbar">
-      <el-button type="primary" round @click="loadStrikeInfo" :loading="isStrikeLoading">计算可打击度</el-button>
+      <button type="button" class="sci-btn btn-primary btn-glow" @click="loadStrikeInfo" :disabled="isStrikeLoading">
+        <span class="btn-icon">🚀</span>
+        <span>{{ isStrikeLoading ? '计算中...' : '计算可打击度' }}</span>
+      </button>
+      <button type="button" class="sci-btn btn-config" @click="dialogSceneVisible = true">
+        <span class="btn-icon">⚙️</span>
+        <span>权重参数配置</span>
+      </button>
       <span class="toolbar__status" :class="statusClass">{{ requestStatus }}</span>
     </div>
 
     <div class="content-grid">
       <section class="rule-panel panel-card">
         <div class="section-header">
-          <h2>计算规则展示</h2>
+          <h2>📘 计算规则与公式</h2>
         </div>
-        <div class="formula-chip">strikeability_score = x1 * x2 * x3 * x4 * x5 * x6 * x7</div>
+        <div class="formula-chip">
+          <span class="formula-label">综合得分公式：</span>
+          <code class="formula-code">strikeability_score = x1 × x2 × x3 × x4 × x5 × x6 × x7</code>
+        </div>
 
-        <article v-for="card in ruleCards" :key="card.key" class="rule-card">
-          <h3>{{ card.title }}</h3>
-          <ul>
-            <li v-for="item in card.items" :key="item">{{ item }}</li>
-          </ul>
-        </article>
+        <div class="rule-cards-scroll">
+          <article v-for="card in ruleCards" :key="card.key" class="rule-card">
+            <h3>
+              <span class="rule-key-badge">{{ card.key }}</span> {{ card.title }}
+            </h3>
+            <ul>
+              <li v-for="item in card.items" :key="item">{{ item }}</li>
+            </ul>
+          </article>
+        </div>
       </section>
 
       <section class="result-panel panel-card">
         <div class="section-header">
-          <h2>结果展示</h2>
+          <h2>📊 计算结果分析</h2>
         </div>
 
         <div class="result-explain">
-          <h3>展示说明</h3>
-          <p>
-            页面会使用内置说明展示数据，并直接调用接口。为了让结果区更易读，统计卡片与结果表格均由返回数据实时生成。
-          </p>
-          <ul>
-            <li>展示项：卫星名称、国家、类型、轨道、x1 到 x7、可打击度。</li>
-            <li>统计项：返回卫星数、最高值、平均值、高轨数量、中低轨数量。</li>
-          </ul>
+          <h3>💡 展示说明</h3>
+          <p>通过多维矩阵接口获取各卫星在当前算力配置下的系数分值，用于辅助决策指挥层制定精准打击预案。</p>
+          <div class="explain-tags">
+            <span class="exp-tag">🛰️ 包含项：NORAD、卫星名称、国家、类型、轨道、x1~x7 细分得分、综合可打击度</span>
+            <span class="exp-tag">📈 统计项：卫星数、最高得分、平均得分、高轨/中低轨占比</span>
+          </div>
         </div>
 
         <div class="metric-grid">
@@ -55,36 +69,36 @@
         </div>
 
         <div class="table-shell">
-          <el-table :data="strikeRows" stripe border v-loading="isStrikeLoading" empty-text="暂无可打击度结果">
+          <el-table :data="strikeRows" stripe border v-loading="isStrikeLoading" empty-text="暂无可打击度结果数据">
             <el-table-column prop="norad_id" label="NORAD" min-width="92" />
-            <el-table-column prop="name" label="名称" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="name" label="卫星名称" min-width="140" show-overflow-tooltip />
             <el-table-column prop="country" label="国家" min-width="86" />
-            <el-table-column prop="sat_type" label="卫星类型" min-width="110" show-overflow-tooltip />
-            <el-table-column prop="orbit_type" label="轨道类型" min-width="90" />
-            <el-table-column label="x1" min-width="86">
+            <el-table-column prop="sat_type" label="类型" min-width="100" show-overflow-tooltip />
+            <el-table-column prop="orbit_type" label="轨道" min-width="86" />
+            <el-table-column label="x1" min-width="70">
               <template #default="scope">{{ formatScore(scope.row.x1) }}</template>
             </el-table-column>
-            <el-table-column label="x2" min-width="86">
+            <el-table-column label="x2" min-width="70">
               <template #default="scope">{{ formatScore(scope.row.x2) }}</template>
             </el-table-column>
-            <el-table-column label="x3" min-width="86">
+            <el-table-column label="x3" min-width="70">
               <template #default="scope">{{ formatScore(scope.row.x3) }}</template>
             </el-table-column>
-            <el-table-column label="x4" min-width="86">
+            <el-table-column label="x4" min-width="70">
               <template #default="scope">{{ formatScore(scope.row.x4) }}</template>
             </el-table-column>
-            <el-table-column label="x5" min-width="86">
+            <el-table-column label="x5" min-width="70">
               <template #default="scope">{{ formatScore(scope.row.x5) }}</template>
             </el-table-column>
-            <el-table-column label="x6" min-width="86">
+            <el-table-column label="x6" min-width="70">
               <template #default="scope">{{ formatScore(scope.row.x6) }}</template>
             </el-table-column>
-            <el-table-column label="x7" min-width="86">
+            <el-table-column label="x7" min-width="70">
               <template #default="scope">{{ formatScore(scope.row.x7) }}</template>
             </el-table-column>
             <el-table-column label="可打击度" min-width="110" fixed="right">
               <template #default="scope">
-                <span class="score-text score-text--strong">{{ formatScore(scope.row.strikeability_score) }}</span>
+                <span class="score-tag">{{ formatScore(scope.row.strikeability_score) }}</span>
               </template>
             </el-table-column>
           </el-table>
@@ -92,7 +106,7 @@
       </section>
     </div>
 
-    <el-dialog title="权重配置" v-model="dialogSceneVisible" width="600px">
+    <el-dialog title="⚙️ 权重参数配置" v-model="dialogSceneVisible" width="600px" class="weight-dialog">
       <div class="weight-explain">
         <h4>权重配置说明</h4>
         <ul>
@@ -101,7 +115,7 @@
           <li><strong>武器打击评分：</strong>范围 0-100；表示适配用于打击该卫星的武器数量与效果。</li>
         </ul>
       </div>
-      <el-form :model="formWeapon" label-width="120px">
+      <el-form :model="formWeapon" label-width="120px" size="default">
         <el-form-item label="可见性评分" prop="W_VIS">
           <el-input-number v-model.number="formWeapon.W_VIS" :min="0" :max="100" />
         </el-form-item>
@@ -115,7 +129,7 @@
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="dialogSceneVisible = false">取消</el-button>
-          <el-button type="primary" @click="setWeight">确定</el-button>
+          <el-button type="primary" @click="setWeight">保存配置</el-button>
         </div>
       </template>
     </el-dialog>
@@ -281,250 +295,308 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .strike-view {
+  padding: 20px;
+  background: transparent;
+  color: #e2e8f0;
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  min-height: 100%;
-  padding: 18px;
-  background:
-    radial-gradient(circle at top left, rgba(48, 117, 214, 0.24), transparent 28%),
-    radial-gradient(circle at right center, rgba(33, 80, 166, 0.22), transparent 24%),
-    linear-gradient(180deg, #06111f 0%, #0a1830 55%, #0b1d37 100%);
+  gap: 18px;
 }
 
 .panel-card {
-  background: linear-gradient(180deg, rgba(12, 28, 52, 0.92) 0%, rgba(8, 20, 38, 0.94) 100%);
-  border: 1px solid rgba(112, 170, 255, 0.18);
-  border-radius: 26px;
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(8, 20, 38, 0.85) 0%, rgba(12, 28, 52, 0.9) 100%);
+  border: 1px solid rgba(0, 225, 255, 0.22);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
 }
 
 .hero-card {
-  padding: 28px 30px;
+  padding: 20px 24px;
 }
 
 .hero-card__content {
-  max-width: 920px;
   text-align: left;
 }
 
 .hero-card__eyebrow {
   display: inline-flex;
   align-items: center;
-  padding: 7px 14px;
-  margin-bottom: 16px;
-  border-radius: 999px;
-  background: rgba(65, 125, 223, 0.18);
-  color: #8dc3ff;
+  gap: 4px;
+  padding: 4px 10px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  background: rgba(0, 225, 255, 0.15);
+  color: #00e1ff;
+  border: 1px solid rgba(0, 225, 255, 0.3);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-weight: 600;
 }
 
 .hero-card__title {
   margin: 0;
-  color: #f2f7ff;
-  font-size: 52px;
-  line-height: 1.1;
-  font-weight: 800;
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .hero-card__desc {
-  max-width: 1040px;
-  margin: 18px 0 24px;
-  color: #b7c9e7;
-  font-size: 15px;
-  line-height: 1.8;
-}
+  margin: 10px 0 0;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.6;
 
-.hero-card__formula {
-  padding: 18px 20px;
-  border-radius: 18px;
-  background: linear-gradient(90deg, rgba(18, 52, 99, 0.92), rgba(16, 68, 138, 0.86));
-  color: #dbeaff;
-  border: 1px solid rgba(110, 170, 255, 0.18);
-}
-
-.hero-card__formula-title {
-  margin-bottom: 6px;
-  font-size: 19px;
-  font-weight: 700;
-}
-
-.hero-card__formula p {
-  margin: 0;
-  font-size: 14px;
+  .highlight-task {
+    color: #00e1ff;
+    font-weight: 700;
+  }
 }
 
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-}
+  padding: 4px 0;
 
-.toolbar :deep(.el-button--primary) {
-  --el-button-bg-color: #1f5fb8;
-  --el-button-border-color: #1f5fb8;
-  --el-button-hover-bg-color: #2f74d3;
-  --el-button-hover-border-color: #2f74d3;
-}
+  .sci-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    border: 1px solid transparent;
+    user-select: none;
 
-.toolbar :deep(.el-button:not(.el-button--primary)) {
-  --el-button-bg-color: rgba(14, 37, 71, 0.92);
-  --el-button-border-color: rgba(101, 155, 233, 0.26);
-  --el-button-text-color: #d8e8ff;
-  --el-button-hover-bg-color: rgba(22, 51, 93, 0.96);
-  --el-button-hover-border-color: rgba(124, 181, 255, 0.38);
-  --el-button-hover-text-color: #ffffff;
+    .btn-icon {
+      font-size: 14px;
+    }
+
+    &.btn-primary {
+      background: linear-gradient(135deg, rgba(0, 102, 255, 0.6), rgba(0, 225, 255, 0.4));
+      border-color: rgba(0, 225, 255, 0.5);
+      color: #ffffff;
+
+      &:hover {
+        background: linear-gradient(135deg, rgba(0, 102, 255, 0.8), rgba(0, 225, 255, 0.6));
+        box-shadow: 0 0 14px rgba(0, 225, 255, 0.5);
+      }
+    }
+
+    &.btn-config {
+      background: rgba(15, 38, 68, 0.8);
+      border-color: rgba(0, 225, 255, 0.3);
+      color: #38bdf8;
+
+      &:hover {
+        background: rgba(0, 225, 255, 0.2);
+        color: #ffffff;
+        box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+      }
+    }
+
+    &.btn-glow {
+      box-shadow: 0 0 12px rgba(0, 225, 255, 0.3);
+    }
+  }
 }
 
 .toolbar__status {
   margin-left: auto;
-  font-size: 14px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
   font-weight: 600;
-}
+  background: rgba(8, 18, 33, 0.6);
+  border: 1px solid rgba(0, 225, 255, 0.2);
 
-.toolbar__status.is-success {
-  color: #78d6a3;
-}
+  &.is-success {
+    color: #34d399;
+    border-color: rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.15);
+  }
 
-.toolbar__status.is-error {
-  color: #ff8c8c;
-}
+  &.is-error {
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.15);
+  }
 
-.toolbar__status.is-pending {
-  color: #9ec3f7;
+  &.is-pending {
+    color: #38bdf8;
+    border-color: rgba(0, 225, 255, 0.3);
+  }
 }
 
 .content-grid {
   display: grid;
-  grid-template-columns: minmax(340px, 0.95fr) minmax(420px, 1.35fr);
+  grid-template-columns: minmax(360px, 0.95fr) minmax(440px, 1.35fr);
   gap: 20px;
   align-items: start;
   text-align: left;
-  // AI: 改为 min-height，允许超出浏览器高度时自然延伸并进行外层滚动
-  min-height: calc(100vh - 260px);
-}
-
-.section-header {
-  margin-bottom: 18px;
-}
-
-.section-header h2 {
-  margin: 0;
-  color: #f0f6ff;
-  font-size: 22px;
-  font-weight: 800;
 }
 
 .rule-panel,
 .result-panel {
-  padding: 22px;
-  min-height: 0;
+  padding: 20px;
   display: flex;
   flex-direction: column;
 }
 
-.formula-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 10px 18px;
+.section-header {
   margin-bottom: 16px;
-  border-radius: 14px;
-  background: linear-gradient(90deg, #12345d, #19457f);
-  color: #edf5ff;
-  font-size: 18px;
-  font-weight: 700;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+  h2 {
+    margin: 0;
+    color: #00e1ff;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    border-bottom: 1px dashed rgba(0, 225, 255, 0.15);
+    padding-bottom: 8px;
+  }
+}
+
+.formula-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  border-radius: 6px;
+  background: rgba(13, 27, 49, 0.8);
+  border: 1px solid rgba(0, 225, 255, 0.25);
+
+  .formula-label {
+    color: #94a3b8;
+    font-size: 12px;
+  }
+
+  .formula-code {
+    color: #00e1ff;
+    font-size: 14px;
+    font-weight: 700;
+  }
+}
+
+.rule-cards-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 340px);
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
 .rule-card {
-  padding: 18px 20px;
-  margin-bottom: 16px;
-  border: 1px solid rgba(116, 169, 245, 0.16);
-  border-radius: 18px;
-  background: rgba(10, 27, 50, 0.78);
-}
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 225, 255, 0.15);
+  border-radius: 8px;
+  background: rgba(10, 22, 40, 0.65);
+  border-left: 3px solid #00e1ff;
 
-.rule-card h3 {
-  margin: 0 0 12px;
-  color: #8cc8ff;
-  font-size: 18px;
-  font-weight: 800;
-}
+  h3 {
+    margin: 0 0 10px;
+    color: #f1f7ff;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 
-.rule-card ul,
-.result-explain ul,
-.weight-explain ul {
-  margin: 0;
-  padding-left: 20px;
-  color: #bdd0ec;
-  line-height: 1.85;
+    .rule-key-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(0, 225, 255, 0.15);
+      color: #00e1ff;
+      font-size: 11px;
+    }
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 18px;
+    color: #94a3b8;
+    line-height: 1.7;
+    font-size: 12px;
+
+    li {
+      margin-bottom: 4px;
+    }
+  }
 }
 
 .result-explain {
-  padding: 18px 20px;
-  border: 1px solid rgba(116, 169, 245, 0.16);
-  border-radius: 18px;
-  background: rgba(9, 25, 48, 0.8);
-}
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 225, 255, 0.15);
+  border-radius: 8px;
+  background: rgba(10, 22, 40, 0.65);
 
-.result-explain h3,
-.weight-explain h4 {
-  margin: 0 0 10px;
-  color: #f0f6ff;
-  font-size: 18px;
-  font-weight: 800;
-}
+  h3 {
+    margin: 0 0 8px;
+    color: #38bdf8;
+    font-size: 14px;
+    font-weight: 700;
+  }
 
-.result-explain p {
-  margin: 0 0 12px;
-  color: #bdd0ec;
-  line-height: 1.8;
+  p {
+    margin: 0 0 10px;
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .explain-tags {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .exp-tag {
+      font-size: 11px;
+      color: #cbd5e1;
+      background: rgba(13, 27, 49, 0.7);
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 225, 255, 0.1);
+    }
+  }
 }
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
-  gap: 12px;
-  margin: 18px 0;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
 }
 
 .metric-card {
-  padding: 16px 18px;
-  border: 1px solid rgba(116, 169, 245, 0.16);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(13, 35, 66, 0.92), rgba(8, 24, 47, 0.92));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 225, 255, 0.15);
+  border-radius: 8px;
+  background: rgba(13, 27, 49, 0.8);
 }
 
 .metric-card__label {
-  display: block;
-  margin-bottom: 10px;
-  color: #8eafd8;
-  font-size: 13px;
+  color: #94a3b8;
+  font-size: 11px;
 }
 
 .metric-card__value {
-  color: #f1f7ff;
+  color: #00e1ff;
   font-size: 22px;
-  font-weight: 800;
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
 }
 
 .table-shell {
-  padding: 10px;
-  border: 1px solid rgba(116, 169, 245, 0.16);
-  border-radius: 22px;
-  background: rgba(8, 22, 42, 0.94);
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  max-height: 100%;
-  overflow: hidden;
-}
-
-.table-shell :deep(.el-table) {
   --el-table-border-color: rgba(92, 139, 208, 0.18);
   --el-table-header-bg-color: #0f2b52;
   --el-table-bg-color: #091d39;

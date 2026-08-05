@@ -1,85 +1,109 @@
 <template>
   <div class="ev-container">
-    <form class="weapon-selection">
-      <div class="search-item-label">打击烈度选择：</div>
-      <div class="search-item-flex">
-        <el-radio-group v-model="searchForm.intensity">
-          <el-radio value="高烈度" size="small" border>高烈度</el-radio>
-          <el-radio value="中烈度" size="small" border>中烈度</el-radio>
-          <el-radio value="低烈度" size="small" border>低烈度</el-radio>
-        </el-radio-group>
-      </div>
-      <div class="search-item-label">卫星分类选择：</div>
-      <div class="search-item-flex">
-        <el-checkbox-group v-model="searchForm.types">
-          <el-checkbox v-for="type in satelliteTypes" :key="type" :value="type">{{ type }}</el-checkbox>
-        </el-checkbox-group>
-      </div>
-      <div class="search-item-label">评估参数版本：</div>
-      <div class="search-item-flex">
-        <div>
-          <el-select v-model="searchForm.schemaVersion" placeholder="请选择" style="width: 150px">
-            <el-option
-              v-for="schema in schemaList"
-              :key="schema.version"
-              :label="schema.version"
-              :value="schema.version"
-            ></el-option>
-          </el-select>
+    <form class="weapon-selection" @submit.prevent>
+      <!-- 顶部配置三栏网格卡片 -->
+      <div class="config-top-grid">
+        <div class="config-card">
+          <div class="config-card-header">
+            <span class="card-icon">⚡</span>
+            <span class="card-title">打击烈度选择</span>
+          </div>
+          <div class="config-card-body">
+            <el-radio-group v-model="searchForm.intensity" class="custom-radio-group">
+              <el-radio value="高烈度" border>高烈度</el-radio>
+              <el-radio value="中烈度" border>中烈度</el-radio>
+              <el-radio value="低烈度" border>低烈度</el-radio>
+            </el-radio-group>
+          </div>
+        </div>
+
+        <div class="config-card">
+          <div class="config-card-header">
+            <span class="card-icon">🛰️</span>
+            <span class="card-title">卫星分类选择</span>
+          </div>
+          <div class="config-card-body">
+            <el-checkbox-group v-model="searchForm.types" class="custom-checkbox-group">
+              <el-checkbox v-for="type in satelliteTypes" :key="type" :value="type">{{ type }}</el-checkbox>
+            </el-checkbox-group>
+          </div>
+        </div>
+
+        <div class="config-card config-card-sm">
+          <div class="config-card-header">
+            <span class="card-icon">⚙️</span>
+            <span class="card-title">评估参数版本</span>
+          </div>
+          <div class="config-card-body">
+            <el-select v-model="searchForm.schemaVersion" placeholder="请选择" class="custom-select">
+              <el-option
+                v-for="schema in schemaList"
+                :key="schema.version"
+                :label="schema.version"
+                :value="schema.version"
+              ></el-option>
+            </el-select>
+          </div>
         </div>
       </div>
-      <div class="search-item-label">打击武器选择：</div>
+
+      <!-- 打击武器分类选择区 -->
+      <div class="weapon-section-header">
+        <span class="section-icon">🎯</span>
+        <span class="section-title">打击武器配置选型</span>
+      </div>
+
       <div class="grid-box">
         <div class="search-item">
-          <div class="search-item-label">
-            <el-checkbox v-model="checkedKinetic" size="large" @change="toggleKinetic">全选</el-checkbox>
-            <span>【动能武器】</span>
+          <div class="weapon-category-header">
+            <span class="cat-title">💥 动能武器</span>
+            <el-checkbox v-model="checkedKinetic" size="default" @change="toggleKinetic">全选</el-checkbox>
           </div>
           <div class="checkbox-group">
             <el-checkbox-group v-model="kineticWeapons" class="content">
-              <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '动能')">{{
+              <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '动能')" :key="w.id || w.name">{{
                 w.name
               }}</el-checkbox>
             </el-checkbox-group>
           </div>
         </div>
+
         <div class="search-item">
-          <div class="search-item-label">
-            <el-checkbox v-model="checkedDirectedEnergy" size="large" @change="toggleDirectedEnergy">全选</el-checkbox>
-            <span>【定向能武器】</span>
+          <div class="weapon-category-header">
+            <span class="cat-title">⚡ 定向能武器</span>
+            <el-checkbox v-model="checkedDirectedEnergy" size="default" @change="toggleDirectedEnergy">全选</el-checkbox>
           </div>
           <div class="checkbox-group">
             <el-checkbox-group v-model="directedEnergyWeapons" class="content">
-              <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '定向能')">{{
+              <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '定向能')" :key="w.id || w.name">{{
                 w.name
               }}</el-checkbox>
             </el-checkbox-group>
           </div>
         </div>
-        <div class="search-item">
-          <div class="search-item-label">
-            <el-checkbox v-model="checkedElectronicJamming" size="large" @change="toggleElectronicJamming"
-              >全选</el-checkbox
-            >
-            <span>【电子干扰武器】</span>
-          </div>
 
+        <div class="search-item">
+          <div class="weapon-category-header">
+            <span class="cat-title">📡 电子干扰武器</span>
+            <el-checkbox v-model="checkedElectronicJamming" size="default" @change="toggleElectronicJamming">全选</el-checkbox>
+          </div>
           <div class="checkbox-group">
             <el-checkbox-group v-model="electronicJammingWeapons" class="content">
-              <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '电子干扰')">{{
+              <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '电子干扰')" :key="w.id || w.name">{{
                 w.name
               }}</el-checkbox>
             </el-checkbox-group>
           </div>
         </div>
+
         <div class="search-item">
-          <div class="search-item-label">
-            <el-checkbox v-model="checkedSpaceBased" size="large" @change="toggleSpaceBased">全选</el-checkbox>
-            <span>【天基武器】</span>
+          <div class="weapon-category-header">
+            <span class="cat-title">🌌 天基武器</span>
+            <el-checkbox v-model="checkedSpaceBased" size="default" @change="toggleSpaceBased">全选</el-checkbox>
           </div>
           <div class="checkbox-group">
             <el-checkbox-group v-model="spaceBasedWeapons" class="content">
-              <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '天基武器')">{{
+              <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '天基武器')" :key="w.id || w.name">{{
                 w.name
               }}</el-checkbox>
             </el-checkbox-group>
@@ -87,13 +111,35 @@
         </div>
       </div>
 
+      <!-- 操作按钮区域 -->
       <div class="btn-actions">
-        <el-button type="primary" @click="drawer = !drawer" round> 评估参数配置 </el-button>
-        <el-button type="success" round @click="selectAllWeapons"> 选择全部武器</el-button>
-        <el-button type="danger" round @click="clearAllWeapons">清空选择武器</el-button>
-        <el-button type="primary" round @click="generatePlan">生成打击方案</el-button>
-        <el-button type="primary" @click="savePlan" round>保存打击方案</el-button>
-        <el-button type="primary" @click="evaluatePlan" round>生成方案评估</el-button>
+        <button type="button" class="sci-btn btn-config" @click="drawer = !drawer">
+          <span class="btn-icon">⚙️</span>
+          <span>评估参数配置</span>
+        </button>
+        <button type="button" class="sci-btn btn-select-all" @click="selectAllWeapons">
+          <span class="btn-icon">✅</span>
+          <span>选择全部武器</span>
+        </button>
+        <button type="button" class="sci-btn btn-clear" @click="clearAllWeapons">
+          <span class="btn-icon">🧹</span>
+          <span>清空选择武器</span>
+        </button>
+
+        <div class="action-divider"></div>
+
+        <button type="button" class="sci-btn btn-primary btn-glow" @click="generatePlan">
+          <span class="btn-icon">🚀</span>
+          <span>生成打击方案</span>
+        </button>
+        <button type="button" class="sci-btn btn-primary" @click="savePlan">
+          <span class="btn-icon">💾</span>
+          <span>保存打击方案</span>
+        </button>
+        <button type="button" class="sci-btn btn-accent" @click="evaluatePlan">
+          <span class="btn-icon">📊</span>
+          <span>生成方案评估</span>
+        </button>
       </div>
     </form>
 
@@ -255,10 +301,10 @@
     <div class="evalute-report" v-if="evaluationPlanCards.length && !strikePlan">
       <div class="report-header panel-card">
         <div>
-          <p class="report-header__eyebrow">方案评估</p>
+          <span class="report-header__eyebrow">📊 方案评估报告</span>
           <h2>双方案评估对比</h2>
           <p class="report-header__desc">
-            左右并排展示威胁优先与数量优先两种评估方案，便于直接对照核心指标、校验结果和分析结论。
+            左右并排展示【威胁优先】与【数量优先】两种评估方案，便于直接对照核心指标、校验结果和分析结论。
           </p>
         </div>
       </div>
@@ -267,7 +313,7 @@
         <article v-for="card in evaluationPlanCards" :key="card.key" class="evaluation-card panel-card">
           <div class="evaluation-card__header">
             <div>
-              <p class="evaluation-card__eyebrow">评估方案</p>
+              <span class="evaluation-card__eyebrow">评估方案</span>
               <h3>{{ card.planName }}</h3>
               <p class="evaluation-card__meta">
                 请求编号 {{ card.report.request_id }} · 版本 {{ card.report.schema_version }} · 时间
@@ -276,12 +322,14 @@
             </div>
             <div class="report-header__status">
               <span class="report-header__status-label">总体状态</span>
-              <strong>{{ formatOverallStatus(card.report.data.analysis.overall_status) }}</strong>
+              <strong class="status-tag" :class="{ 'status-pass': formatOverallStatus(card.report.data.analysis.overall_status) === '通过' }">
+                {{ formatOverallStatus(card.report.data.analysis.overall_status) }}
+              </strong>
             </div>
           </div>
 
           <section class="report-section">
-            <h3>核心指标</h3>
+            <h4 class="report-section-title">⚡ 核心指标</h4>
             <div class="metric-grid metric-grid--report">
               <div class="metric-card metric-card--report">
                 <span>任务支撑度 MSI</span>
@@ -305,52 +353,86 @@
               </div>
               <div class="metric-card metric-card--report">
                 <span>任务可行性</span>
-                <strong>{{ card.report.data.summary.is_feasible ? '可行' : '不可行' }}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section class="report-section">
-            <h3>详细指标</h3>
-            <div class="detail-grid">
-              <div class="detail-card">
-                <span>任务支撑度 D 值</span>
-                <strong>
-                  通信 {{ card.report.data.details.D_values.communication }} · 空间监测
-                  {{ card.report.data.details.D_values.space_monitor }} · 导航
-                  {{ card.report.data.details.D_values.navigation }} · 侦察
-                  {{ card.report.data.details.D_values.reconnaissance }} · 导弹预警
-                  {{ card.report.data.details.D_values.missile_warning }}
-                </strong>
-              </div>
-              <div class="detail-card">
-                <span>任务完成度 T 值</span>
-                <strong>
-                  通信 {{ card.report.data.details.T_values.communication }} · 空间监测
-                  {{ card.report.data.details.T_values.space_monitor }} · 导航
-                  {{ card.report.data.details.T_values.navigation }} · 侦察
-                  {{ card.report.data.details.T_values.reconnaissance }} · 导弹预警
-                  {{ card.report.data.details.T_values.missile_warning }}
+                <strong class="feasible-tag" :class="{ 'feasible-yes': card.report.data.summary.is_feasible }">
+                  {{ card.report.data.summary.is_feasible ? '可行' : '不可行' }}
                 </strong>
               </div>
             </div>
           </section>
 
           <section class="report-section">
-            <h3>校验结果</h3>
+            <h4 class="report-section-title">📡 详细指标</h4>
             <div class="detail-grid">
               <div class="detail-card">
-                <span>是否通过校验</span>
-                <strong>{{ card.report.data.validation.is_valid ? '通过' : '不通过' }}</strong>
+                <span class="detail-card-label">任务支撑度 D 值</span>
+                <div class="indicator-chips">
+                  <div class="ind-chip">
+                    <span class="ind-name">通信</span>
+                    <strong class="ind-val">{{ card.report.data.details.D_values.communication }}</strong>
+                  </div>
+                  <div class="ind-chip">
+                    <span class="ind-name">空间监测</span>
+                    <strong class="ind-val">{{ card.report.data.details.D_values.space_monitor }}</strong>
+                  </div>
+                  <div class="ind-chip">
+                    <span class="ind-name">导航</span>
+                    <strong class="ind-val">{{ card.report.data.details.D_values.navigation }}</strong>
+                  </div>
+                  <div class="ind-chip">
+                    <span class="ind-name">侦察</span>
+                    <strong class="ind-val">{{ card.report.data.details.D_values.reconnaissance }}</strong>
+                  </div>
+                  <div class="ind-chip">
+                    <span class="ind-name">导弹预警</span>
+                    <strong class="ind-val">{{ card.report.data.details.D_values.missile_warning }}</strong>
+                  </div>
+                </div>
               </div>
-              <div class="detail-card detail-card--list">
-                <span>警告信息</span>
+              <div class="detail-card">
+                <span class="detail-card-label">任务完成度 T 值</span>
+                <div class="indicator-chips">
+                  <div class="ind-chip">
+                    <span class="ind-name">通信</span>
+                    <strong class="ind-val">{{ card.report.data.details.T_values.communication }}</strong>
+                  </div>
+                  <div class="ind-chip">
+                    <span class="ind-name">空间监测</span>
+                    <strong class="ind-val">{{ card.report.data.details.T_values.space_monitor }}</strong>
+                  </div>
+                  <div class="ind-chip">
+                    <span class="ind-name">导航</span>
+                    <strong class="ind-val">{{ card.report.data.details.T_values.navigation }}</strong>
+                  </div>
+                  <div class="ind-chip">
+                    <span class="ind-name">侦察</span>
+                    <strong class="ind-val">{{ card.report.data.details.T_values.reconnaissance }}</strong>
+                  </div>
+                  <div class="ind-chip">
+                    <span class="ind-name">导弹预警</span>
+                    <strong class="ind-val">{{ card.report.data.details.T_values.missile_warning }}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="report-section">
+            <h4 class="report-section-title">🔍 校验结果</h4>
+            <div class="detail-grid">
+              <div class="detail-card">
+                <span class="detail-card-label">是否通过校验</span>
+                <strong class="feasible-tag" :class="{ 'feasible-yes': card.report.data.validation.is_valid }">
+                  {{ card.report.data.validation.is_valid ? '通过' : '不通过' }}
+                </strong>
+              </div>
+              <div class="detail-card detail-card--list" v-if="card.report.data.validation.warnings && card.report.data.validation.warnings.length">
+                <span class="detail-card-label">⚠️ 警告信息</span>
                 <ul>
                   <li v-for="(w, i) in card.report.data.validation.warnings" :key="`${card.key}-w-${i}`">{{ w }}</li>
                 </ul>
               </div>
-              <div class="detail-card detail-card--list">
-                <span>错误信息</span>
+              <div class="detail-card detail-card--list" v-if="card.report.data.validation.errors && card.report.data.validation.errors.length">
+                <span class="detail-card-label">❌ 错误信息</span>
                 <ul>
                   <li v-for="(e, i) in card.report.data.validation.errors" :key="`${card.key}-e-${i}`">{{ e }}</li>
                 </ul>
@@ -359,30 +441,26 @@
           </section>
 
           <section class="report-section">
-            <h3>分析结论</h3>
+            <h4 class="report-section-title">📌 分析结论</h4>
             <div class="detail-grid">
               <div class="detail-card">
-                <span>一句话总结</span>
-                <strong>{{ card.report.data.analysis.summary }}</strong>
+                <span class="detail-card-label">一句话总结</span>
+                <strong class="summary-text">{{ card.report.data.analysis.summary }}</strong>
               </div>
-              <div class="detail-card">
-                <span>总体状态</span>
-                <strong>{{ formatOverallStatus(card.report.data.analysis.overall_status) }}</strong>
-              </div>
-              <div class="detail-card detail-card--list">
-                <span>分析细节</span>
+              <div class="detail-card detail-card--list" v-if="card.report.data.analysis.details && card.report.data.analysis.details.length">
+                <span class="detail-card-label">💡 分析细节</span>
                 <ul>
                   <li v-for="(d, i) in card.report.data.analysis.details" :key="`${card.key}-ad-${i}`">{{ d }}</li>
                 </ul>
               </div>
-              <div class="detail-card detail-card--list">
-                <span>优化建议</span>
+              <div class="detail-card detail-card--list" v-if="card.report.data.analysis.suggestions && card.report.data.analysis.suggestions.length">
+                <span class="detail-card-label">🚀 优化建议</span>
                 <ul>
                   <li v-for="(s, i) in card.report.data.analysis.suggestions" :key="`${card.key}-as-${i}`">{{ s }}</li>
                 </ul>
               </div>
-              <div class="detail-card detail-card--list">
-                <span>风险提示</span>
+              <div class="detail-card detail-card--list" v-if="card.report.data.analysis.risks && card.report.data.analysis.risks.length">
+                <span class="detail-card-label">⚠️ 风险提示</span>
                 <ul>
                   <li v-for="(r, i) in card.report.data.analysis.risks" :key="`${card.key}-ar-${i}`">{{ r }}</li>
                 </ul>
@@ -1270,61 +1348,114 @@ watch(drawer, (open) => {
   .weapon-selection {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    border-radius: 6px;
-    padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    gap: 16px;
+    border-radius: 12px;
+    padding: 20px;
+    background: linear-gradient(180deg, rgba(8, 20, 38, 0.85) 0%, rgba(12, 28, 52, 0.9) 100%);
+    border: 1px solid rgba(0, 225, 255, 0.22);
+    box-shadow:
+      0 12px 32px rgba(0, 0, 0, 0.4),
+      inset 0 0 20px rgba(0, 225, 255, 0.04);
     color: #dff6ff;
     text-align: left;
-    border: 1px solid rgba(143, 208, 234, 0.16);
+    backdrop-filter: blur(12px);
 
-    .search-item-flex {
-      box-shadow: 0 4px 14px rgba(3, 18, 25, 0.6);
-      border-radius: 6px;
-      padding: 10px 12px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 10px;
+    /* 顶部 3 卡片配置网格 */
+    .config-top-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr 0.8fr;
+      gap: 14px;
     }
 
-    .search-item-label {
+    .config-card {
+      background: rgba(13, 27, 49, 0.7);
+      border: 1px solid rgba(0, 225, 255, 0.18);
+      border-radius: 8px;
+      padding: 12px 14px;
       display: flex;
+      flex-direction: column;
       gap: 10px;
+      box-shadow: inset 0 0 10px rgba(0, 225, 255, 0.03);
+
+      .config-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .card-icon {
+          font-size: 14px;
+        }
+
+        .card-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: #00e1ff;
+          letter-spacing: 0.5px;
+        }
+      }
+
+      .config-card-body {
+        display: flex;
+        align-items: center;
+      }
+    }
+
+    /* 武器分类选型 Header */
+    .weapon-section-header {
+      display: flex;
       align-items: center;
-      font-size: 12px;
-      font-weight: bold;
-      color: #8fb9c7;
+      gap: 8px;
+      padding-top: 4px;
+      border-top: 1px dashed rgba(0, 225, 255, 0.15);
+
+      .section-icon {
+        font-size: 16px;
+      }
+
+      .section-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #00e1ff;
+        letter-spacing: 0.5px;
+      }
     }
 
     .grid-box {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
+      gap: 14px;
 
       .search-item {
-        display: grid;
-        box-shadow: 0 4px 14px rgba(3, 18, 25, 0.6);
-        border-radius: 6px;
-        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        background: rgba(10, 22, 40, 0.65);
+        border: 1px solid rgba(0, 225, 255, 0.15);
+        border-radius: 8px;
+        padding: 12px 16px;
+        box-shadow: 0 4px 14px rgba(3, 18, 25, 0.4);
+        transition: border-color 0.25s ease;
 
-        .search-item-label {
-          display: flex;
-          gap: 10px;
-          align-items: center;
-          padding-bottom: 10px;
-          font-size: 12px;
-          width: 100%;
+        &:hover {
+          border-color: rgba(0, 225, 255, 0.35);
         }
 
-        .actions {
+        .weapon-category-header {
           display: flex;
-          justify-content: flex-end;
+          justify-content: space-between;
+          align-items: center;
+          padding-bottom: 10px;
+          margin-bottom: 10px;
+          border-bottom: 1px solid rgba(0, 225, 255, 0.12);
+
+          .cat-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #f1f7ff;
+          }
         }
 
         .checkbox-group {
           display: flex;
-          justify-content: flex-start;
 
           .content {
             display: flex;
@@ -1335,133 +1466,297 @@ watch(drawer, (open) => {
       }
     }
 
+    /* 按钮组 */
     .btn-actions {
-      margin: 10px 0;
       display: flex;
+      align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: 12px;
       flex-wrap: wrap;
+      padding-top: 10px;
+      border-top: 1px solid rgba(0, 225, 255, 0.15);
+
+      .action-divider {
+        width: 1px;
+        height: 28px;
+        background: rgba(0, 225, 255, 0.25);
+        margin: 0 6px;
+      }
+
+      .sci-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 18px;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        border: 1px solid transparent;
+        user-select: none;
+
+        .btn-icon {
+          font-size: 14px;
+        }
+
+        &.btn-config {
+          background: rgba(15, 38, 68, 0.8);
+          border-color: rgba(0, 225, 255, 0.3);
+          color: #38bdf8;
+
+          &:hover {
+            background: rgba(0, 225, 255, 0.2);
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+          }
+        }
+
+        &.btn-select-all {
+          background: rgba(16, 185, 129, 0.18);
+          border-color: rgba(16, 185, 129, 0.4);
+          color: #34d399;
+
+          &:hover {
+            background: rgba(16, 185, 129, 0.35);
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+          }
+        }
+
+        &.btn-clear {
+          background: rgba(239, 68, 68, 0.18);
+          border-color: rgba(239, 68, 68, 0.4);
+          color: #f87171;
+
+          &:hover {
+            background: rgba(239, 68, 68, 0.35);
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+          }
+        }
+
+        &.btn-primary {
+          background: linear-gradient(135deg, rgba(0, 102, 255, 0.6), rgba(0, 225, 255, 0.4));
+          border-color: rgba(0, 225, 255, 0.5);
+          color: #ffffff;
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(0, 102, 255, 0.8), rgba(0, 225, 255, 0.6));
+            box-shadow: 0 0 14px rgba(0, 225, 255, 0.5);
+          }
+        }
+
+        &.btn-accent {
+          background: linear-gradient(135deg, rgba(168, 85, 247, 0.6), rgba(236, 72, 153, 0.5));
+          border-color: rgba(216, 180, 254, 0.5);
+          color: #ffffff;
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.8), rgba(236, 72, 153, 0.7));
+            box-shadow: 0 0 14px rgba(216, 180, 254, 0.5);
+          }
+        }
+
+        &.btn-glow {
+          box-shadow: 0 0 12px rgba(0, 225, 255, 0.3);
+        }
+      }
+    }
+  }
+
+  /* Element Plus 内部样式覆盖 */
+  :deep(.custom-radio-group) {
+    .el-radio {
+      background: rgba(8, 18, 33, 0.6);
+      border-color: rgba(0, 225, 255, 0.2);
+      color: #94a3b8;
+      border-radius: 4px;
+      margin-right: 8px;
+
+      &.is-checked {
+        background: rgba(0, 225, 255, 0.15);
+        border-color: #00e1ff;
+        .el-radio__label {
+          color: #00e1ff;
+          font-weight: 600;
+        }
+      }
+    }
+  }
+
+  :deep(.custom-checkbox-group) {
+    .el-checkbox {
+      color: #94a3b8;
+      margin-right: 12px;
+      &.is-checked .el-checkbox__label {
+        color: #00e1ff;
+        font-weight: 600;
+      }
+    }
+  }
+
+  :deep(.el-checkbox) {
+    color: #cbd5e1;
+    .el-checkbox__inner {
+      background-color: rgba(15, 30, 52, 0.8);
+      border-color: rgba(0, 225, 255, 0.3);
+    }
+    &.is-checked .el-checkbox__inner {
+      background-color: #00e1ff;
+      border-color: #00e1ff;
+    }
+    &.is-checked .el-checkbox__label {
+      color: #38bdf8;
+    }
+  }
+
+  :deep(.custom-select) {
+    .el-input__wrapper {
+      background-color: rgba(8, 18, 33, 0.8) !important;
+      border-color: rgba(0, 225, 255, 0.2) !important;
+      box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.2) inset !important;
+      border-radius: 4px;
+    }
+    .el-input__inner {
+      color: #00e1ff !important;
+      font-weight: 600;
     }
   }
 
   .strike-plan-results {
-    margin-top: 18px;
-    padding: 18px;
-    border-radius: 20px;
-    background: linear-gradient(180deg, rgba(10, 32, 54, 0.96), rgba(8, 24, 42, 0.98));
-    border: 1px solid rgba(92, 146, 214, 0.16);
-    box-shadow: 0 16px 32px rgba(2, 10, 20, 0.35);
+    margin-top: 20px;
+    padding: 22px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(8, 20, 38, 0.9) 0%, rgba(12, 28, 52, 0.95) 100%);
+    border: 1px solid rgba(0, 225, 255, 0.22);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(12px);
 
     .strike-plan-header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       gap: 18px;
-      margin-bottom: 18px;
+      margin-bottom: 20px;
       text-align: left;
+      border-bottom: 1px dashed rgba(0, 225, 255, 0.15);
+      padding-bottom: 14px;
 
       h2 {
         margin: 0;
-        font-size: 24px;
-        color: #f2f8ff;
+        font-size: 22px;
+        font-weight: 700;
+        color: #f1f7ff;
+        letter-spacing: 0.5px;
       }
 
       p {
-        margin: 8px 0 0;
-        color: #8fb9e5;
+        margin: 6px 0 0;
+        color: #94a3b8;
         font-size: 13px;
       }
     }
 
     .strike-plan-overview-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(130px, 1fr));
+      display: flex;
+      align-items: center;
       gap: 12px;
-      min-width: 420px;
     }
 
     .overview-chip {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(24, 64, 108, 0.9), rgba(17, 45, 79, 0.94));
-      border: 1px solid rgba(107, 164, 233, 0.18);
+      gap: 4px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: rgba(13, 27, 49, 0.8);
+      border: 1px solid rgba(0, 225, 255, 0.25);
+      box-shadow: inset 0 0 10px rgba(0, 225, 255, 0.05);
 
       span {
-        color: #83b8f3;
-        font-size: 12px;
+        color: #94a3b8;
+        font-size: 11px;
       }
 
       strong {
-        color: #f4f9ff;
+        color: #00e1ff;
         font-size: 18px;
+        font-weight: 700;
+        text-shadow: 0 0 8px rgba(0, 225, 255, 0.4);
       }
     }
 
     .plan-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(320px, 1fr));
-      gap: 18px;
+      gap: 20px;
     }
 
     .result-section {
       position: relative;
-      border: 1px solid rgba(114, 170, 235, 0.14);
-      border-radius: 0 24px 24px 0;
-      padding: 18px;
+      border: 1px solid rgba(0, 225, 255, 0.2);
+      border-radius: 12px;
+      padding: 20px;
       text-align: left;
-      background: linear-gradient(180deg, rgba(16, 45, 82, 0.95), rgba(12, 32, 58, 0.98));
-      box-shadow: 0 16px 26px rgba(4, 14, 29, 0.28);
+      background: linear-gradient(180deg, rgba(10, 24, 46, 0.9) 0%, rgba(7, 18, 36, 0.95) 100%);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
 
       &::before {
         content: '';
         position: absolute;
         inset: 0 auto 0 0;
         width: 4px;
-        border-radius: 24px 0 0 24px;
-        background: linear-gradient(180deg, rgba(96, 180, 255, 0.92), rgba(46, 109, 180, 0.92));
+        border-radius: 12px 0 0 12px;
+        background: linear-gradient(180deg, #00e1ff 0%, #0066ff 100%);
       }
 
       &.result-section--count::before {
-        background: linear-gradient(180deg, rgba(106, 210, 190, 0.92), rgba(37, 123, 122, 0.92));
+        background: linear-gradient(180deg, #10b981 0%, #059669 100%);
       }
     }
 
     .result-section__header {
       display: flex;
       justify-content: space-between;
+      align-items: flex-start;
       gap: 14px;
       margin-bottom: 18px;
+      border-bottom: 1px solid rgba(0, 225, 255, 0.12);
+      padding-bottom: 12px;
 
       h3 {
         margin: 0;
-        font-size: 22px;
-        color: #f6fbff;
+        font-size: 20px;
+        font-weight: 700;
+        color: #ffffff;
       }
 
       p {
-        margin: 6px 0 0;
-        color: #9dbfe2;
+        margin: 4px 0 0;
+        color: #94a3b8;
         line-height: 1.5;
-        font-size: 13px;
+        font-size: 12px;
       }
     }
 
     .result-section__badge {
       align-self: flex-start;
-      padding: 8px 14px;
-      border-radius: 999px;
-      color: #f7fbff;
-      background: linear-gradient(180deg, rgba(56, 123, 196, 0.95), rgba(34, 87, 146, 0.96));
+      padding: 5px 14px;
+      border-radius: 6px;
+      color: #ffffff;
+      background: linear-gradient(135deg, rgba(0, 102, 255, 0.4), rgba(0, 225, 255, 0.3));
+      border: 1px solid rgba(0, 225, 255, 0.4);
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 600;
       white-space: nowrap;
+      box-shadow: 0 0 10px rgba(0, 225, 255, 0.2);
     }
 
     .result-section--count .result-section__badge {
-      background: linear-gradient(180deg, rgba(46, 152, 143, 0.94), rgba(31, 112, 112, 0.96));
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.4), rgba(52, 211, 153, 0.3));
+      border-color: rgba(52, 211, 153, 0.4);
+      box-shadow: 0 0 10px rgba(52, 211, 153, 0.2);
     }
 
     .result-section__stats {
@@ -1474,40 +1769,45 @@ watch(drawer, (open) => {
     .stat-box {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      padding: 16px;
-      border-radius: 18px;
-      background: linear-gradient(180deg, rgba(20, 55, 94, 0.96), rgba(14, 39, 69, 0.98));
-      border: 1px solid rgba(107, 164, 233, 0.12);
+      gap: 6px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: rgba(13, 27, 49, 0.75);
+      border: 1px solid rgba(0, 225, 255, 0.15);
 
       span {
-        color: #8bb8ea;
+        color: #94a3b8;
         font-size: 12px;
       }
 
       strong {
-        color: #ffffff;
-        font-size: 30px;
+        color: #00e1ff;
+        font-size: 28px;
+        font-weight: 700;
         line-height: 1;
+        text-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
       }
 
       small {
-        color: #7f9dbd;
-        line-height: 1.5;
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.4;
       }
     }
 
     .result-block {
       margin-top: 14px;
-      padding: 16px;
-      border-radius: 18px;
-      background: rgba(8, 24, 42, 0.5);
-      border: 1px solid rgba(95, 150, 214, 0.1);
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: rgba(10, 22, 40, 0.6);
+      border: 1px solid rgba(0, 225, 255, 0.12);
 
       h4 {
-        margin: 0 0 14px;
-        color: #edf6ff;
-        font-size: 16px;
+        margin: 0 0 12px;
+        color: #38bdf8;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
       }
     }
 
@@ -1517,13 +1817,13 @@ watch(drawer, (open) => {
     .mission-list {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
 
     .mission-scroll {
-      max-height: 600px;
+      max-height: 500px;
       overflow-y: auto;
-      padding-right: 10px;
+      padding-right: 6px;
 
       .mission-item {
         margin-bottom: 10px;
@@ -1534,86 +1834,88 @@ watch(drawer, (open) => {
     .focus-item,
     .asset-item,
     .mission-item {
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(20, 55, 94, 0.86), rgba(14, 39, 69, 0.9));
-      border: 1px solid rgba(108, 165, 232, 0.1);
+      padding: 12px 14px;
+      border-radius: 6px;
+      background: rgba(13, 27, 49, 0.8);
+      border: 1px solid rgba(0, 225, 255, 0.12);
     }
 
     .summary-item {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
 
       span {
-        color: #8bb8ea;
+        color: #94a3b8;
         font-size: 12px;
       }
 
       strong {
-        color: #f2f8ff;
-        font-weight: 600;
+        color: #f1f7ff;
+        font-size: 13px;
+        font-weight: 500;
         line-height: 1.6;
       }
     }
 
     .distribution-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
     }
 
     .distribution-card {
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(20, 55, 94, 0.86), rgba(14, 39, 69, 0.9));
-      border: 1px solid rgba(108, 165, 232, 0.1);
+      padding: 12px 14px;
+      border-radius: 6px;
+      background: rgba(13, 27, 49, 0.8);
+      border: 1px solid rgba(0, 225, 255, 0.12);
 
       strong {
         display: block;
-        color: #f8fbff;
-        font-size: 15px;
-        margin-bottom: 10px;
+        color: #f1f7ff;
+        font-size: 13px;
+        margin-bottom: 8px;
       }
     }
 
     .distribution-card__items {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 6px;
     }
 
     .distribution-tag {
       display: inline-flex;
       align-items: center;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: rgba(20, 88, 154, 0.24);
-      color: #d9ebff;
-      border: 1px solid rgba(120, 180, 245, 0.18);
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(0, 225, 255, 0.12);
+      color: #7dd3fc;
+      border: 1px solid rgba(0, 225, 255, 0.25);
       font-size: 12px;
     }
 
     .empty-placeholder {
-      color: #8bb8ea;
-      font-size: 13px;
+      color: #64748b;
+      font-size: 12px;
     }
 
     .focus-item__title,
     .mission-item__header strong,
     .asset-item strong {
-      color: #f8fbff;
-      font-size: 16px;
+      color: #f8fafc;
+      font-size: 14px;
+      font-weight: 600;
     }
 
     .focus-item__meta,
     .mission-item__time,
     .mission-item__meta,
     .asset-item span {
-      margin-top: 8px;
-      color: #97b7d8;
+      margin-top: 6px;
+      color: #94a3b8;
       line-height: 1.6;
-      font-size: 13px;
+      font-size: 12px;
     }
 
     .mission-item__header {
@@ -1624,39 +1926,130 @@ watch(drawer, (open) => {
     }
   }
 
+  /* 抽屉/参数配置面板 (.drawer-box & .config-params) 美化 */
   .drawer-box {
+    :deep(.el-drawer) {
+      background: linear-gradient(180deg, #08162a 0%, #0a1f38 100%) !important;
+      color: #e2e8f0;
+      border-left: 1px solid rgba(0, 225, 255, 0.25);
+      box-shadow: -10px 0 30px rgba(0, 0, 0, 0.6);
+    }
+
+    :deep(.el-drawer__body) {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
     .upload-schema {
       display: flex;
       gap: 10px;
-      padding: 10px 0;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(0, 225, 255, 0.15);
+
+      :deep(.el-input__wrapper) {
+        background-color: rgba(8, 18, 33, 0.8) !important;
+        border-color: rgba(0, 225, 255, 0.2) !important;
+        box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.2) inset !important;
+      }
+
+      :deep(.el-button) {
+        background: linear-gradient(135deg, rgba(0, 102, 255, 0.6), rgba(0, 225, 255, 0.4)) !important;
+        border-color: rgba(0, 225, 255, 0.5) !important;
+        color: #ffffff !important;
+      }
     }
 
     .schema-box {
-      margin-bottom: 10px;
+      margin-bottom: 12px;
 
       .schema-list {
-        border: 1px solid rgba(255, 255, 255, 0.04);
-        border-radius: 6px;
-        height: 300px;
-        background: #04141a;
-        padding: 10px;
+        border: 1px solid rgba(0, 225, 255, 0.2);
+        border-radius: 8px;
+        max-height: 240px;
+        background: rgba(8, 18, 33, 0.7);
+        padding: 12px;
         text-align: left;
+
+        h3 {
+          margin: 0 0 10px;
+          font-size: 14px;
+          color: #00e1ff;
+        }
 
         .schema-list-item {
           display: block;
           padding: 10px;
           margin-bottom: 6px;
           cursor: pointer;
-          border-radius: 4px;
-          color: #dff6ff;
-          font-size: 14px;
+          border-radius: 6px;
+          color: #cbd5e1;
+          font-size: 13px;
+          background: rgba(15, 30, 52, 0.5);
+          border: 1px solid rgba(0, 225, 255, 0.1);
+          transition: all 0.2s ease;
 
-          div {
-            display: block;
-            gap: 6px;
-            margin-bottom: 6px;
+          &:hover {
+            border-color: rgba(0, 225, 255, 0.3);
+            background: rgba(0, 225, 255, 0.1);
+          }
+
+          &.selected {
+            background: linear-gradient(135deg, rgba(0, 102, 255, 0.4), rgba(0, 225, 255, 0.25)) !important;
+            border-color: #00e1ff !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 10px rgba(0, 225, 255, 0.25);
           }
         }
+      }
+    }
+  }
+
+  .config-params {
+    border: 1px solid rgba(0, 225, 255, 0.2);
+    border-radius: 8px;
+    padding: 16px;
+    background: rgba(8, 18, 33, 0.85);
+    color: #e2e8f0;
+    box-shadow: inset 0 0 15px rgba(0, 225, 255, 0.03);
+    text-align: left;
+
+    h3 {
+      margin: 0 0 14px;
+      font-size: 16px;
+      color: #00e1ff;
+      border-bottom: 1px solid rgba(0, 225, 255, 0.15);
+      padding-bottom: 8px;
+    }
+
+    .sub-section {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px dashed rgba(0, 225, 255, 0.12);
+    }
+
+    .sub-title {
+      color: #38bdf8;
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    :deep(.el-form-item__label) {
+      color: #94a3b8 !important;
+    }
+
+    :deep(.el-input-number) {
+      width: 100%;
+      .el-input__wrapper {
+        background-color: rgba(13, 27, 49, 0.8) !important;
+        border-color: rgba(0, 225, 255, 0.2) !important;
+        box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.2) inset !important;
+      }
+      .el-input__inner {
+        color: #00e1ff !important;
       }
     }
   }
@@ -1688,83 +2081,104 @@ watch(drawer, (open) => {
 
 <style scoped>
 .evalute-report {
-  padding: 18px;
-  margin-top: 18px;
-  border-radius: 20px;
-  background:
-    radial-gradient(circle at top left, rgba(46, 111, 206, 0.2), transparent 24%),
-    radial-gradient(circle at right center, rgba(19, 68, 133, 0.18), transparent 26%),
-    linear-gradient(180deg, #06111f 0%, #0a1830 55%, #0b1d37 100%);
-  border: 1px solid rgba(112, 170, 255, 0.16);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+  padding: 22px;
+  margin-top: 20px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(8, 20, 38, 0.95) 0%, rgba(12, 28, 52, 0.98) 100%);
+  border: 1px solid rgba(0, 225, 255, 0.22);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
   text-align: left;
 
   h2 {
     margin: 0;
-    color: #f2f7ff;
-    font-size: 34px;
-    font-weight: 800;
+    color: #f1f7ff;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
   }
 }
 
 .report-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 22px 24px;
-  border-radius: 24px;
-  margin-top: 14px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: rgba(13, 27, 49, 0.7);
+  border: 1px solid rgba(0, 225, 255, 0.18);
+  margin-top: 10px;
 }
 
 .report-header__eyebrow {
   display: inline-flex;
-  margin: 0 0 10px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(65, 125, 223, 0.18);
-  color: #8dc3ff;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: rgba(0, 225, 255, 0.15);
+  color: #00e1ff;
+  border: 1px solid rgba(0, 225, 255, 0.3);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-weight: 600;
 }
 
 .report-header__desc {
-  margin: 12px 0 0;
-  color: #b7c9e7;
-  line-height: 1.8;
+  margin: 8px 0 0;
+  color: #94a3b8;
+  line-height: 1.6;
+  font-size: 13px;
 }
 
 .report-header__status {
-  min-width: 220px;
-  padding: 16px 18px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(13, 35, 66, 0.92), rgba(8, 24, 47, 0.92));
-  border: 1px solid rgba(116, 169, 245, 0.16);
+  min-width: 140px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(10, 22, 40, 0.8);
+  border: 1px solid rgba(0, 225, 255, 0.2);
+  text-align: center;
 }
 
 .report-header__status-label {
   display: block;
-  margin-bottom: 10px;
-  color: #8eafd8;
-  font-size: 13px;
+  margin-bottom: 6px;
+  color: #94a3b8;
+  font-size: 11px;
 }
 
-.report-header__status strong {
-  color: #f1f7ff;
-  font-size: 22px;
-  font-weight: 800;
+.status-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(0, 225, 255, 0.15);
+  border: 1px solid rgba(0, 225, 255, 0.3);
+
+  &.status-pass {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.18);
+    border-color: rgba(16, 185, 129, 0.4);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
+  }
 }
 
 .evaluation-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 20px;
   margin-top: 18px;
 }
 
 .evaluation-card {
-  padding: 22px 24px;
+  padding: 20px;
+  background: linear-gradient(180deg, rgba(10, 24, 46, 0.9) 0%, rgba(7, 18, 36, 0.95) 100%);
+  border: 1px solid rgba(0, 225, 255, 0.2);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
 }
 
 .evaluation-card__header {
@@ -1773,114 +2187,167 @@ watch(drawer, (open) => {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 18px;
+  border-bottom: 1px solid rgba(0, 225, 255, 0.12);
+  padding-bottom: 12px;
 }
 
 .evaluation-card__eyebrow {
   display: inline-flex;
-  margin: 0 0 8px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(65, 125, 223, 0.18);
-  color: #8dc3ff;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  margin: 0 0 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(0, 225, 255, 0.12);
+  color: #38bdf8;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .evaluation-card__header h3 {
-  margin: 0;
-  color: #f2f7ff;
-  font-size: 24px;
-  font-weight: 800;
+  margin: 4px 0 0;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .evaluation-card__meta {
-  margin: 10px 0 0;
-  color: #b7c9e7;
-  font-size: 13px;
-  line-height: 1.8;
-}
-
-.evalute-report .panel-card {
-  background: linear-gradient(180deg, rgba(12, 28, 52, 0.94) 0%, rgba(8, 20, 38, 0.96) 100%);
-  border: 1px solid rgba(112, 170, 255, 0.16);
-  border-radius: 24px;
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .evalute-report .report-section {
-  padding: 22px 24px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: rgba(10, 22, 40, 0.65);
+  border: 1px solid rgba(0, 225, 255, 0.12);
 }
 
-.evalute-report .report-section h3 {
-  margin: 0 0 16px;
-  color: #f0f6ff;
-  font-size: 22px;
-  font-weight: 800;
+.report-section-title {
+  margin: 0 0 12px;
+  color: #00e1ff;
+  font-size: 14px;
+  font-weight: 700;
+  border-bottom: 1px dashed rgba(0, 225, 255, 0.15);
+  padding-bottom: 6px;
+  letter-spacing: 0.3px;
 }
 
 .metric-grid--report {
-  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
   margin: 0;
 }
 
 .metric-card--report {
-  min-height: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(13, 27, 49, 0.8);
+  border: 1px solid rgba(0, 225, 255, 0.15);
+
+  span {
+    color: #94a3b8;
+    font-size: 11px;
+  }
+
+  strong {
+    color: #00e1ff;
+    font-size: 22px;
+    font-weight: 700;
+    text-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
+  }
+}
+
+.feasible-tag {
+  color: #f87171 !important;
+  font-size: 16px !important;
+
+  &.feasible-yes {
+    color: #34d399 !important;
+  }
 }
 
 .detail-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
 .detail-card {
-  padding: 16px 18px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(13, 35, 66, 0.92), rgba(8, 24, 47, 0.92));
-  border: 1px solid rgba(116, 169, 245, 0.16);
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: rgba(13, 27, 49, 0.8);
+  border: 1px solid rgba(0, 225, 255, 0.12);
 }
 
-.detail-card span {
+.detail-card-label {
   display: block;
-  margin-bottom: 10px;
-  color: #8eafd8;
-  font-size: 13px;
+  margin-bottom: 8px;
+  color: #38bdf8;
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.detail-card strong {
+.indicator-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ind-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: rgba(8, 18, 33, 0.7);
+  border: 1px solid rgba(0, 225, 255, 0.18);
+  border-radius: 4px;
+
+  .ind-name {
+    color: #94a3b8;
+    font-size: 12px;
+  }
+
+  .ind-val {
+    color: #00e1ff;
+    font-weight: 700;
+    font-size: 13px;
+  }
+}
+
+.summary-text {
   color: #f1f7ff;
-  font-size: 15px;
-  line-height: 1.7;
-  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 500;
 }
 
 .detail-card--list ul {
   margin: 0;
-  padding-left: 18px;
-  color: #d7e6fa;
-  line-height: 1.8;
+  padding-left: 16px;
+  color: #cbd5e1;
+  line-height: 1.7;
+  font-size: 12px;
+
+  li {
+    margin-bottom: 4px;
+  }
 }
 
 .evalute-report ul {
-  list-style: none;
+  list-style: square;
   margin: 0;
-  padding-left: 0;
-}
-
-.evalute-report .p-label {
-  width: 110px;
-  display: inline-block;
-  color: #8fd0ea;
-}
-
-.evalute-report .p-val {
-  color: #dff6ff;
 }
 
 @media (max-width: 1200px) {
   .report-header {
     flex-direction: column;
+    align-items: flex-start;
   }
 
   .evaluation-grid,

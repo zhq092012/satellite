@@ -1,232 +1,211 @@
-el-checkbox<template>
+<template>
   <div class="ev-container">
-    <form class="weapon-selection">
-      <el-row :gutter="5">
-        <el-col :span="2">
-          <div class="search-item-label">打击烈度：</div>
-        </el-col>
-        <el-col :span="22">
-          <div class="search-item-flex">
-            <el-radio-group v-model="searchForm.intensity" @change="handleRadioChange">
-              <el-radio v-for="item in intensityOptions" :key="item" :value="item" size="small" border>{{ item
-              }}</el-radio>
+    <form class="weapon-selection" @submit.prevent>
+      <!-- 打击烈度选择 -->
+      <div class="config-top-grid">
+        <div class="config-card">
+          <div class="config-card-header">
+            <span class="card-icon">⚡</span>
+            <span class="card-title">打击烈度选择</span>
+          </div>
+          <div class="config-card-body">
+            <el-radio-group v-model="searchForm.intensity" @change="handleRadioChange" class="custom-radio-group">
+              <el-radio v-for="item in intensityOptions" :key="item" :value="item" border>{{ item }}</el-radio>
             </el-radio-group>
           </div>
-        </el-col>
-      </el-row>
-      <div v-if="searchForm.intensity === '高烈度'">
-        <el-row :gutter="5">
-          <el-col :span="2">
-            <div class="search-item-label">卫星分类选择：</div>
-          </el-col>
-          <el-col :span="22">
-            <div class="search-item-flex">
-              <el-checkbox-group v-model="searchForm.types">
-                <el-checkbox v-for="type in satelliteTypes" :key="type" :value="type">{{ type }}</el-checkbox>
+        </div>
+      </div>
+
+      <!-- 高烈度配置 -->
+      <div v-if="searchForm.intensity === '高烈度'" class="intensity-block">
+        <div class="config-card mb-12">
+          <div class="config-card-header">
+            <span class="card-icon">🛰️</span>
+            <span class="card-title">卫星分类选择</span>
+          </div>
+          <div class="config-card-body">
+            <el-checkbox-group v-model="searchForm.types" class="custom-checkbox-group">
+              <el-checkbox v-for="type in satelliteTypes" :key="type" :value="type">{{ type }}</el-checkbox>
+            </el-checkbox-group>
+          </div>
+        </div>
+
+        <div class="weapon-section-header">
+          <span class="section-icon">🎯</span>
+          <span class="section-title">高烈度武器配置选型</span>
+        </div>
+
+        <div class="grid-box">
+          <div class="search-item">
+            <div class="weapon-category-header">
+              <span class="cat-title">💥 动能武器</span>
+              <el-checkbox v-model="checkedKinetic" size="default" @change="toggleKinetic">全选</el-checkbox>
+            </div>
+            <div class="checkbox-group">
+              <el-checkbox-group v-model="kineticWeapons" class="content">
+                <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '动能')" :key="w.id || w.name">{{
+                  w.name
+                }}</el-checkbox>
               </el-checkbox-group>
             </div>
-          </el-col>
-        </el-row>
-        <el-row :gutter="5">
-          <el-col :span="2">
-            <div class="search-item-label">打击武器选择：</div>
-          </el-col>
-          <el-col :span="11">
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox v-model="checkedKinetic" size="large" @change="toggleKinetic">全选</el-checkbox>
-                  <span>【动能武器】</span>
-                </div>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox-group v-model="kineticWeapons" class="content">
-                    <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '动能')">{{ w.name
-                    }}</el-checkbox>
-                  </el-checkbox-group>
-                </div>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox v-model="checkedSpaceBased" size="large" @change="toggleSpaceBased">全选</el-checkbox>
-                  <span>【天基武器】</span>
-                </div>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox-group v-model="spaceBasedWeapons" class="content">
-                    <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '天基武器')">{{ w.name
-                    }}</el-checkbox>
-                  </el-checkbox-group>
-                </div>
-              </el-col>
-            </el-row>
-          </el-col>
+          </div>
 
-        </el-row>
-      </div>
-      <div v-if="searchForm.intensity === '中烈度'">
-        <el-row :gutter="5">
-          <el-col :span="2">
-            <div class="search-item-label">导弹阵地选择：</div>
-          </el-col>
-          <el-col :span="22">
-            <div class="search-item-flex">
-              <el-checkbox-group v-model="searchForm.missileBaseId">
-                <el-checkbox v-for="(missileBase, index) in missileBaseEntity" :key="missileBase._id"
-                  :value="missileBase._id">{{ missileBase.name }}</el-checkbox>
+          <div class="search-item">
+            <div class="weapon-category-header">
+              <span class="cat-title">🌌 天基武器</span>
+              <el-checkbox v-model="checkedSpaceBased" size="default" @change="toggleSpaceBased">全选</el-checkbox>
+            </div>
+            <div class="checkbox-group">
+              <el-checkbox-group v-model="spaceBasedWeapons" class="content">
+                <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '天基武器')" :key="w.id || w.name">{{
+                  w.name
+                }}</el-checkbox>
               </el-checkbox-group>
             </div>
-          </el-col>
-        </el-row>
-        <el-row :gutter="5">
-          <el-col :span="2">
-            <div class="search-item-label">军事基地选择：</div>
-          </el-col>
-          <el-col :span="11">
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox v-model="checkedRadar" size="large" @change="toggleRadar">全选</el-checkbox>
-                  <span>【雷达站】</span>
-                </div>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox-group v-model="radarBase" class="content">
-                    <el-checkbox :value="w.stationId"
-                      v-for="w in stationDistances.filter((s) => s.stationType === '接收站')">{{ w.stationName
-                      }}</el-checkbox>
-                  </el-checkbox-group>
-                </div>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox v-model="checkedDataCenter" size="large" @change="toggleDataCenter">全选</el-checkbox>
-                  <span>【数据中心】</span>
-                </div>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox-group v-model="dataCenter" class="content">
-                    <el-checkbox :value="w.stationId"
-                      v-for="w in stationDistances.filter((s) => s.stationType === '数据中心')">{{ w.stationName
-                      }}</el-checkbox>
-                  </el-checkbox-group>
-                </div>
-              </el-col>
-            </el-row>
-          </el-col>
-          <el-col :span="11">
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox v-model="checkedLead" size="large" @change="toggleLead">全选</el-checkbox>
-                  <span>【指挥中心】</span>
-                </div>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox-group v-model="leadCenter" class="content">
-                    <el-checkbox :value="w.stationId"
-                      v-for="w in stationDistances.filter((s) => s.stationType === '指挥中心')">{{ w.stationName
-                      }}</el-checkbox>
-                  </el-checkbox-group>
-                </div>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox v-model="checkedDirectedEnergy" size="large"
-                    @change="toggleDirectedEnergy">全选</el-checkbox>
-                  <span>【定向能武器】</span>
-                </div>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox-group v-model="directedEnergyWeapons" class="content">
-                    <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '定向能')">{{ w.name
-                    }}</el-checkbox>
-                  </el-checkbox-group>
-                </div>
-              </el-col>
-            </el-row>
-          </el-col>
+          </div>
+        </div>
+      </div>
 
-        </el-row>
+      <!-- 中烈度配置 -->
+      <div v-if="searchForm.intensity === '中烈度'" class="intensity-block">
+        <div class="config-card mb-12">
+          <div class="config-card-header">
+            <span class="card-icon">🚀</span>
+            <span class="card-title">导弹阵地选择</span>
+          </div>
+          <div class="config-card-body">
+            <el-checkbox-group v-model="searchForm.missileBaseId" class="custom-checkbox-group">
+              <el-checkbox v-for="missileBase in missileBaseEntity" :key="missileBase._id" :value="missileBase._id">{{
+                missileBase.name
+              }}</el-checkbox>
+            </el-checkbox-group>
+          </div>
+        </div>
+
+        <div class="weapon-section-header">
+          <span class="section-icon">🏛️</span>
+          <span class="section-title">军事基地与定向能选型</span>
+        </div>
+
+        <div class="grid-box">
+          <div class="search-item">
+            <div class="weapon-category-header">
+              <span class="cat-title">📡 雷达站 (接收站)</span>
+              <el-checkbox v-model="checkedRadar" size="default" @change="toggleRadar">全选</el-checkbox>
+            </div>
+            <div class="checkbox-group">
+              <el-checkbox-group v-model="radarBase" class="content">
+                <el-checkbox
+                  :value="w.stationId"
+                  v-for="w in stationDistances.filter((s) => s.stationType === '接收站')"
+                  :key="w.stationId"
+                  >{{ w.stationName }}</el-checkbox
+                >
+              </el-checkbox-group>
+            </div>
+          </div>
+
+          <div class="search-item">
+            <div class="weapon-category-header">
+              <span class="cat-title">💻 数据中心</span>
+              <el-checkbox v-model="checkedDataCenter" size="default" @change="toggleDataCenter">全选</el-checkbox>
+            </div>
+            <div class="checkbox-group">
+              <el-checkbox-group v-model="dataCenter" class="content">
+                <el-checkbox
+                  :value="w.stationId"
+                  v-for="w in stationDistances.filter((s) => s.stationType === '数据中心')"
+                  :key="w.stationId"
+                  >{{ w.stationName }}</el-checkbox
+                >
+              </el-checkbox-group>
+            </div>
+          </div>
+
+          <div class="search-item">
+            <div class="weapon-category-header">
+              <span class="cat-title">🏛️ 指挥中心</span>
+              <el-checkbox v-model="checkedLead" size="default" @change="toggleLead">全选</el-checkbox>
+            </div>
+            <div class="checkbox-group">
+              <el-checkbox-group v-model="leadCenter" class="content">
+                <el-checkbox
+                  :value="w.stationId"
+                  v-for="w in stationDistances.filter((s) => s.stationType === '指挥中心')"
+                  :key="w.stationId"
+                  >{{ w.stationName }}</el-checkbox
+                >
+              </el-checkbox-group>
+            </div>
+          </div>
+
+          <div class="search-item">
+            <div class="weapon-category-header">
+              <span class="cat-title">⚡ 定向能武器</span>
+              <el-checkbox v-model="checkedDirectedEnergy" size="default" @change="toggleDirectedEnergy">全选</el-checkbox>
+            </div>
+            <div class="checkbox-group">
+              <el-checkbox-group v-model="directedEnergyWeapons" class="content">
+                <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '定向能')" :key="w.id || w.name">{{
+                  w.name
+                }}</el-checkbox>
+              </el-checkbox-group>
+            </div>
+          </div>
+        </div>
       </div>
-      <div v-if="searchForm.intensity === '低烈度'">
-        <el-row :gutter="5">
-          <el-col :span="2">
-            <div class="search-item-label">电磁武器选择：</div>
-          </el-col>
-          <el-col :span="22">
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-flex">
-                  <el-checkbox v-model="checkedElectronicJamming" size="large"
-                    @change="toggleElectronicJamming">全选</el-checkbox>
-                </div>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox-group v-model="electronicJammingWeapons" class="content">
-                    <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '电子干扰')">{{ w.name
-                    }}</el-checkbox>
-                  </el-checkbox-group>
-                </div>
-              </el-col>
-            </el-row>
-          </el-col>
-        </el-row>
-        <el-row :gutter="5">
-          <el-col :span="2">
-            <div class="search-item-label">雷达站选择：</div>
-          </el-col>
-          <el-col :span="22">
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-flex">
-                  <el-checkbox v-model="checkedRadar" size="large" @change="toggleRadar">全选</el-checkbox>
-                </div>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="24">
-                <div class="search-item-label">
-                  <el-checkbox-group v-model="radarBase" class="content">
-                    <el-checkbox :label="w.stationName" :value="w.stationId"
-                      v-for="w in stationDistances.filter((s) => s.stationType === '接收站')"></el-checkbox>
-                  </el-checkbox-group>
-                </div>
-              </el-col>
-            </el-row>
-          </el-col>
-        </el-row>
+
+      <!-- 低烈度配置 -->
+      <div v-if="searchForm.intensity === '低烈度'" class="intensity-block">
+        <div class="weapon-section-header">
+          <span class="section-icon">📡</span>
+          <span class="section-title">低烈度电磁与雷达选择</span>
+        </div>
+
+        <div class="grid-box">
+          <div class="search-item">
+            <div class="weapon-category-header">
+              <span class="cat-title">⚡ 电磁干扰武器</span>
+              <el-checkbox v-model="checkedElectronicJamming" size="default" @change="toggleElectronicJamming">全选</el-checkbox>
+            </div>
+            <div class="checkbox-group">
+              <el-checkbox-group v-model="electronicJammingWeapons" class="content">
+                <el-checkbox :value="w.name" v-for="w in weapons.filter((s) => s.type === '电子干扰')" :key="w.id || w.name">{{
+                  w.name
+                }}</el-checkbox>
+              </el-checkbox-group>
+            </div>
+          </div>
+
+          <div class="search-item">
+            <div class="weapon-category-header">
+              <span class="cat-title">📡 雷达站选择</span>
+              <el-checkbox v-model="checkedRadar" size="default" @change="toggleRadar">全选</el-checkbox>
+            </div>
+            <div class="checkbox-group">
+              <el-checkbox-group v-model="radarBase" class="content">
+                <el-checkbox
+                  :value="w.stationId"
+                  v-for="w in stationDistances.filter((s) => s.stationType === '接收站')"
+                  :key="w.stationId"
+                  >{{ w.stationName }}</el-checkbox
+                >
+              </el-checkbox-group>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <!-- 操作按钮区域 -->
       <div class="btn-actions">
-        <el-button type="primary" round @click="generateStationPlan">生成打击方案</el-button>
-        <el-button type="success" round @click="saveStationPlan">保存打击方案</el-button>
+        <button type="button" class="sci-btn btn-primary btn-glow" @click="generateStationPlan">
+          <span class="btn-icon">🚀</span>
+          <span>生成打击方案</span>
+        </button>
+        <button type="button" class="sci-btn btn-primary" @click="saveStationPlan">
+          <span class="btn-icon">💾</span>
+          <span>保存打击方案</span>
+        </button>
       </div>
     </form>
     <div class="strike-plan-results" v-if="highIntensityStrikePlan">
@@ -1199,193 +1178,429 @@ const saveStationPlan = async () => {
 </script>
 <style lang="scss" scoped>
 .ev-container {
+  .mb-12 {
+    margin-bottom: 12px;
+  }
+
+  .intensity-block {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
   .weapon-selection {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    border-radius: 6px;
-    padding: 12px;
+    gap: 16px;
+    border-radius: 12px;
+    padding: 20px;
+    background: linear-gradient(180deg, rgba(8, 20, 38, 0.85) 0%, rgba(12, 28, 52, 0.9) 100%);
+    border: 1px solid rgba(0, 225, 255, 0.22);
+    box-shadow:
+      0 12px 32px rgba(0, 0, 0, 0.4),
+      inset 0 0 20px rgba(0, 225, 255, 0.04);
     color: #dff6ff;
     text-align: left;
-    border: 1px solid rgba(143, 208, 234, 0.16);
+    backdrop-filter: blur(12px);
 
-    .search-item-flex {
-      box-shadow: 0 4px 14px rgba(3, 18, 25, 0.6);
-      border-radius: 6px;
-      padding: 10px 12px;
+    /* 顶部配置网格 */
+    .config-top-grid {
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      gap: 10px;
+      gap: 14px;
     }
 
-    .search-item-label {
-      padding: 12px;
+    .config-card {
+      background: rgba(13, 27, 49, 0.7);
+      border: 1px solid rgba(0, 225, 255, 0.18);
+      border-radius: 8px;
+      padding: 12px 14px;
       display: flex;
+      flex-direction: column;
       gap: 10px;
+      box-shadow: inset 0 0 10px rgba(0, 225, 255, 0.03);
+
+      .config-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .card-icon {
+          font-size: 14px;
+        }
+
+        .card-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: #00e1ff;
+          letter-spacing: 0.5px;
+        }
+      }
+
+      .config-card-body {
+        display: flex;
+        align-items: center;
+      }
+    }
+
+    /* 武器分类选型 Header */
+    .weapon-section-header {
+      display: flex;
       align-items: center;
-      font-size: 15px;
-      font-weight: bold;
-      color: #8fb9c7;
+      gap: 8px;
+      padding-top: 4px;
+      border-top: 1px dashed rgba(0, 225, 255, 0.15);
+
+      .section-icon {
+        font-size: 16px;
+      }
+
+      .section-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #00e1ff;
+        letter-spacing: 0.5px;
+      }
+    }
+
+    .grid-box {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+
+      .search-item {
+        display: flex;
+        flex-direction: column;
+        background: rgba(10, 22, 40, 0.65);
+        border: 1px solid rgba(0, 225, 255, 0.15);
+        border-radius: 8px;
+        padding: 12px 16px;
+        box-shadow: 0 4px 14px rgba(3, 18, 25, 0.4);
+        transition: border-color 0.25s ease;
+
+        &:hover {
+          border-color: rgba(0, 225, 255, 0.35);
+        }
+
+        .weapon-category-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-bottom: 10px;
+          margin-bottom: 10px;
+          border-bottom: 1px solid rgba(0, 225, 255, 0.12);
+
+          .cat-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #f1f7ff;
+          }
+        }
+
+        .checkbox-group {
+          display: flex;
+
+          .content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+          }
+        }
+      }
+    }
+
+    /* 按钮组 */
+    .btn-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding-top: 10px;
+      border-top: 1px solid rgba(0, 225, 255, 0.15);
+
+      .sci-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 18px;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        border: 1px solid transparent;
+        user-select: none;
+
+        .btn-icon {
+          font-size: 14px;
+        }
+
+        &.btn-primary {
+          background: linear-gradient(135deg, rgba(0, 102, 255, 0.6), rgba(0, 225, 255, 0.4));
+          border-color: rgba(0, 225, 255, 0.5);
+          color: #ffffff;
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(0, 102, 255, 0.8), rgba(0, 225, 255, 0.6));
+            box-shadow: 0 0 14px rgba(0, 225, 255, 0.5);
+          }
+        }
+
+        &.btn-glow {
+          box-shadow: 0 0 12px rgba(0, 225, 255, 0.3);
+        }
+      }
     }
   }
 
-  .btn-actions {
-    margin: 10px 0;
-    display: flex;
-    justify-content: left;
-    gap: 10px;
-    flex-wrap: wrap;
+  /* Element Plus 内部样式覆盖 */
+  :deep(.custom-radio-group) {
+    .el-radio {
+      background: rgba(8, 18, 33, 0.6);
+      border-color: rgba(0, 225, 255, 0.2);
+      color: #94a3b8;
+      border-radius: 4px;
+      margin-right: 8px;
+
+      &.is-checked {
+        background: rgba(0, 225, 255, 0.15);
+        border-color: #00e1ff;
+        .el-radio__label {
+          color: #00e1ff;
+          font-weight: 600;
+        }
+      }
+    }
+  }
+
+  :deep(.custom-checkbox-group) {
+    .el-checkbox {
+      color: #94a3b8;
+      margin-right: 12px;
+      &.is-checked .el-checkbox__label {
+        color: #00e1ff;
+        font-weight: 600;
+      }
+    }
+  }
+
+  :deep(.el-checkbox) {
+    color: #cbd5e1;
+    .el-checkbox__inner {
+      background-color: rgba(15, 30, 52, 0.8);
+      border-color: rgba(0, 225, 255, 0.3);
+    }
+    &.is-checked .el-checkbox__inner {
+      background-color: #00e1ff;
+      border-color: #00e1ff;
+    }
+    &.is-checked .el-checkbox__label {
+      color: #38bdf8;
+    }
+  }
+
+  :deep(.el-collapse) {
+    border: none;
+    background: transparent;
+    .el-collapse-item__header {
+      background: rgba(8, 18, 33, 0.7);
+      color: #38bdf8;
+      border-bottom: 1px solid rgba(0, 225, 255, 0.15);
+      padding: 0 12px;
+      font-weight: 600;
+    }
+    .el-collapse-item__wrap {
+      background: transparent;
+      border: none;
+    }
+    .el-collapse-item__content {
+      padding: 10px 0;
+      color: #cbd5e1;
+    }
+  }
+
+  :deep(.el-descriptions) {
+    --el-descriptions-table-border: 1px solid rgba(0, 225, 255, 0.15);
+    --el-descriptions-item-bordered-label-background: rgba(8, 18, 33, 0.8);
+    .el-descriptions__cell {
+      background: rgba(13, 27, 49, 0.6);
+      color: #cbd5e1;
+    }
+    .el-descriptions__label {
+      color: #38bdf8;
+    }
   }
 
   .strike-plan-results {
-    margin-top: 12px;
-    padding: 10px;
-    border-radius: 20px;
-    background: linear-gradient(180deg, rgba(10, 32, 54, 0.96), rgba(8, 24, 42, 0.98));
-    border: 1px solid rgba(92, 146, 214, 0.16);
-    box-shadow: 0 16px 32px rgba(2, 10, 20, 0.35);
+    margin-top: 20px;
+    padding: 22px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(8, 20, 38, 0.9) 0%, rgba(12, 28, 52, 0.95) 100%);
+    border: 1px solid rgba(0, 225, 255, 0.22);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(12px);
 
     .strike-plan-header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       gap: 18px;
-      margin-bottom: 18px;
+      margin-bottom: 20px;
       text-align: left;
+      border-bottom: 1px dashed rgba(0, 225, 255, 0.15);
+      padding-bottom: 14px;
 
       h2 {
         margin: 0;
-        font-size: 24px;
-        color: #f2f8ff;
+        font-size: 22px;
+        font-weight: 700;
+        color: #f1f7ff;
+        letter-spacing: 0.5px;
       }
 
       p {
-        margin: 8px 0 0;
-        color: #8fb9e5;
+        margin: 6px 0 0;
+        color: #94a3b8;
         font-size: 13px;
       }
     }
 
     .strike-plan-overview-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(130px, 1fr));
+      display: flex;
+      align-items: center;
       gap: 12px;
-      min-width: 420px;
     }
 
     .overview-chip {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(24, 64, 108, 0.9), rgba(17, 45, 79, 0.94));
-      border: 1px solid rgba(107, 164, 233, 0.18);
+      gap: 4px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: rgba(13, 27, 49, 0.8);
+      border: 1px solid rgba(0, 225, 255, 0.25);
+      box-shadow: inset 0 0 10px rgba(0, 225, 255, 0.05);
 
       span {
-        color: #83b8f3;
-        font-size: 12px;
+        color: #94a3b8;
+        font-size: 11px;
       }
 
       strong {
-        color: #f4f9ff;
+        color: #00e1ff;
         font-size: 18px;
+        font-weight: 700;
+        text-shadow: 0 0 8px rgba(0, 225, 255, 0.4);
       }
     }
 
     .plan-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(320px, 1fr));
-      gap: 18px;
+      gap: 20px;
     }
 
     .plan-grid-three {
       display: grid;
       grid-template-columns: repeat(3, minmax(300px, 1fr));
-      gap: 18px;
+      gap: 20px;
     }
 
     .result-section {
       position: relative;
-      border: 1px solid rgba(114, 170, 235, 0.14);
-      border-radius: 0 24px 24px 0;
-      padding: 18px;
+      border: 1px solid rgba(0, 225, 255, 0.2);
+      border-radius: 12px;
+      padding: 20px;
       text-align: left;
-      background: linear-gradient(180deg, rgba(16, 45, 82, 0.95), rgba(12, 32, 58, 0.98));
-      box-shadow: 0 16px 26px rgba(4, 14, 29, 0.28);
+      background: linear-gradient(180deg, rgba(10, 24, 46, 0.9) 0%, rgba(7, 18, 36, 0.95) 100%);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
 
       &::before {
         content: '';
         position: absolute;
         inset: 0 auto 0 0;
         width: 4px;
-        border-radius: 24px 0 0 24px;
-        background: linear-gradient(180deg, rgba(96, 180, 255, 0.92), rgba(46, 109, 180, 0.92));
+        border-radius: 12px 0 0 12px;
+        background: linear-gradient(180deg, #00e1ff 0%, #0066ff 100%);
       }
 
       &.result-section--count::before {
-        background: linear-gradient(180deg, rgba(106, 210, 190, 0.92), rgba(37, 123, 122, 0.92));
+        background: linear-gradient(180deg, #10b981 0%, #059669 100%);
       }
 
       &.result-section--saturation::before {
-        background: linear-gradient(180deg, rgba(255, 123, 122, 0.92), rgba(200, 50, 50, 0.92));
+        background: linear-gradient(180deg, #f43f5e 0%, #be123c 100%);
       }
 
       &.result-section--lowest-cost::before {
-        background: linear-gradient(180deg, rgba(106, 210, 190, 0.92), rgba(37, 123, 122, 0.92));
+        background: linear-gradient(180deg, #10b981 0%, #059669 100%);
       }
 
       &.result-section--strongest::before {
-        background: linear-gradient(180deg, rgba(235, 170, 80, 0.92), rgba(180, 110, 30, 0.92));
+        background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
       }
     }
 
     .result-section__header {
       display: flex;
       justify-content: space-between;
+      align-items: flex-start;
       gap: 14px;
       margin-bottom: 18px;
+      border-bottom: 1px solid rgba(0, 225, 255, 0.12);
+      padding-bottom: 12px;
 
       h3 {
         margin: 0;
-        font-size: 22px;
-        color: #f6fbff;
+        font-size: 20px;
+        font-weight: 700;
+        color: #ffffff;
       }
 
       p {
-        margin: 6px 0 0;
-        color: #9dbfe2;
+        margin: 4px 0 0;
+        color: #94a3b8;
         line-height: 1.5;
-        font-size: 13px;
+        font-size: 12px;
       }
     }
 
     .result-section__badge {
       align-self: flex-start;
-      padding: 8px 14px;
-      border-radius: 999px;
-      color: #f7fbff;
-      background: linear-gradient(180deg, rgba(56, 123, 196, 0.95), rgba(34, 87, 146, 0.96));
+      padding: 5px 14px;
+      border-radius: 6px;
+      color: #ffffff;
+      background: linear-gradient(135deg, rgba(0, 102, 255, 0.4), rgba(0, 225, 255, 0.3));
+      border: 1px solid rgba(0, 225, 255, 0.4);
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 600;
       white-space: nowrap;
+      box-shadow: 0 0 10px rgba(0, 225, 255, 0.2);
     }
 
     .result-section--count .result-section__badge {
-      background: linear-gradient(180deg, rgba(46, 152, 143, 0.94), rgba(31, 112, 112, 0.96));
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.4), rgba(52, 211, 153, 0.3));
+      border-color: rgba(52, 211, 153, 0.4);
+      box-shadow: 0 0 10px rgba(52, 211, 153, 0.2);
     }
 
     .result-section--saturation .result-section__badge {
-      background: linear-gradient(180deg, rgba(196, 56, 56, 0.95), rgba(146, 34, 34, 0.96));
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.4), rgba(251, 113, 133, 0.3));
+      border-color: rgba(251, 113, 133, 0.4);
+      box-shadow: 0 0 10px rgba(244, 63, 94, 0.2);
     }
 
     .result-section--lowest-cost .result-section__badge {
-      background: linear-gradient(180deg, rgba(46, 152, 143, 0.94), rgba(31, 112, 112, 0.96));
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.4), rgba(52, 211, 153, 0.3));
+      border-color: rgba(52, 211, 153, 0.4);
+      box-shadow: 0 0 10px rgba(52, 211, 153, 0.2);
     }
 
     .result-section--strongest .result-section__badge {
-      background: linear-gradient(180deg, rgba(196, 123, 56, 0.95), rgba(146, 87, 34, 0.96));
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.4), rgba(252, 211, 77, 0.3));
+      border-color: rgba(252, 211, 77, 0.4);
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
     }
 
     .result-section__stats {
@@ -1398,40 +1613,45 @@ const saveStationPlan = async () => {
     .stat-box {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      padding: 16px;
-      border-radius: 18px;
-      background: linear-gradient(180deg, rgba(20, 55, 94, 0.96), rgba(14, 39, 69, 0.98));
-      border: 1px solid rgba(107, 164, 233, 0.12);
+      gap: 6px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: rgba(13, 27, 49, 0.75);
+      border: 1px solid rgba(0, 225, 255, 0.15);
 
       span {
-        color: #8bb8ea;
+        color: #94a3b8;
         font-size: 12px;
       }
 
       strong {
-        color: #ffffff;
-        font-size: 30px;
+        color: #00e1ff;
+        font-size: 28px;
+        font-weight: 700;
         line-height: 1;
+        text-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
       }
 
       small {
-        color: #7f9dbd;
-        line-height: 1.5;
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.4;
       }
     }
 
     .result-block {
-      margin-top: 7px;
-      padding: 10px;
-      border-radius: 18px;
-      background: rgba(8, 24, 42, 0.5);
-      border: 1px solid rgba(95, 150, 214, 0.1);
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: rgba(10, 22, 40, 0.6);
+      border: 1px solid rgba(0, 225, 255, 0.12);
 
       h4 {
-        margin: 0 0 14px;
-        color: #edf6ff;
-        font-size: 16px;
+        margin: 0 0 12px;
+        color: #38bdf8;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
       }
     }
 
@@ -1440,21 +1660,21 @@ const saveStationPlan = async () => {
     .asset-list {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
 
     .mission-list {
       display: flex;
       flex-direction: column;
       width: 100%;
-      gap: 12px;
+      gap: 10px;
       overflow-x: hidden;
     }
 
     .mission-scroll {
-      max-height: 600px;
+      max-height: 500px;
       overflow-y: auto;
-      padding-right: 10px;
+      padding-right: 6px;
 
       .mission-item {
         margin-bottom: 10px;
@@ -1463,134 +1683,91 @@ const saveStationPlan = async () => {
 
     .summary-item,
     .focus-item,
-    .asset-item {
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(20, 55, 94, 0.86), rgba(14, 39, 69, 0.9));
-      border: 1px solid rgba(108, 165, 232, 0.1);
-    }
-
-    .summary-header {
-      padding-bottom: 10px;
-
-      .summary-item {
-        .item-title {
-          display: flex;
-
-          .item-label {
-            min-width: 100px;
-          }
-        }
-      }
-
-    }
-
-
+    .asset-item,
     .mission-item {
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(20, 55, 94, 0.86), rgba(14, 39, 69, 0.9));
-      border: 1px solid rgba(108, 165, 232, 0.1);
-    }
-
-    .mission-item-horizon {
-      display: flex;
-      flex-direction: row;
-      gap: 20px;
-      margin-bottom: 10px;
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(20, 55, 94, 0.86), rgba(14, 39, 69, 0.9));
-      border: 1px solid rgba(108, 165, 232, 0.1);
-    }
-
-    .mission-item-row {
-      display: grid;
-      //flex-wrap: wrap; /* 允许换行 */
-      grid-template-columns: repeat(4, 1fr);
-      /* 四列，每列等宽 */
-      margin-bottom: 10px;
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(20, 55, 94, 0.86), rgba(14, 39, 69, 0.9));
-      border: 1px solid rgba(108, 165, 232, 0.1);
+      padding: 12px 14px;
+      border-radius: 6px;
+      background: rgba(13, 27, 49, 0.8);
+      border: 1px solid rgba(0, 225, 255, 0.12);
     }
 
     .summary-item {
       display: flex;
       text-align: left;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
 
       span {
-        color: #8bb8ea;
+        color: #94a3b8;
         font-size: 12px;
       }
 
       strong {
-        color: #f2f8ff;
-        font-weight: 600;
+        color: #f1f7ff;
+        font-size: 13px;
+        font-weight: 500;
         line-height: 1.6;
       }
     }
 
     .distribution-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
     }
 
     .distribution-card {
-      padding: 14px 16px;
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(20, 55, 94, 0.86), rgba(14, 39, 69, 0.9));
-      border: 1px solid rgba(108, 165, 232, 0.1);
+      padding: 12px 14px;
+      border-radius: 6px;
+      background: rgba(13, 27, 49, 0.8);
+      border: 1px solid rgba(0, 225, 255, 0.12);
 
       strong {
         display: block;
-        color: #f8fbff;
-        font-size: 15px;
-        margin-bottom: 10px;
+        color: #f1f7ff;
+        font-size: 13px;
+        margin-bottom: 8px;
       }
     }
 
     .distribution-card__items {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 6px;
     }
 
     .distribution-tag {
       display: inline-flex;
       align-items: center;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: rgba(20, 88, 154, 0.24);
-      color: #d9ebff;
-      border: 1px solid rgba(120, 180, 245, 0.18);
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(0, 225, 255, 0.12);
+      color: #7dd3fc;
+      border: 1px solid rgba(0, 225, 255, 0.25);
       font-size: 12px;
     }
 
     .empty-placeholder {
-      color: #8bb8ea;
-      font-size: 13px;
+      color: #64748b;
+      font-size: 12px;
     }
 
     .focus-item__title,
     .mission-item__header strong,
     .asset-item strong {
-      color: #f8fbff;
-      font-size: 16px;
+      color: #f8fafc;
+      font-size: 14px;
+      font-weight: 600;
     }
 
     .focus-item__meta,
     .mission-item__time,
     .mission-item__meta,
     .asset-item span {
-      margin-top: 8px;
-      color: #97b7d8;
+      margin-top: 6px;
+      color: #94a3b8;
       line-height: 1.6;
-      font-size: 13px;
+      font-size: 12px;
       display: flex;
     }
 

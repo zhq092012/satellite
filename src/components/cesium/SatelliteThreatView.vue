@@ -269,12 +269,22 @@
 
     <div class="main">
       <div class="title">
-        <el-radio-group v-model="timeMode">
-          <el-radio value="乘积模型威胁度">乘积模型威胁度</el-radio>
-          <el-radio value="历史时间计算">历史时间计算</el-radio>
-          <el-radio value="按任务总时长计算">按任务总时长计算</el-radio>
-          <el-radio value="按任务阶段时长计算">按任务阶段时长计算</el-radio>
-        </el-radio-group>
+        <div class="threat-model-tabs">
+          <button
+            v-for="item in ['乘积模型威胁度', '历史时间计算', '按任务总时长计算', '按任务阶段时长计算']"
+            :key="item"
+            type="button"
+            class="threat-tab-btn"
+            :class="{ 'is-active': timeMode === item }"
+            @click="timeMode = item"
+          >
+            <span class="tab-icon" v-if="item === '乘积模型威胁度'">⚡</span>
+            <span class="tab-icon" v-else-if="item === '历史时间计算'">📈</span>
+            <span class="tab-icon" v-else-if="item === '按任务总时长计算'">⏱️</span>
+            <span class="tab-icon" v-else>🎯</span>
+            <span>{{ item }}</span>
+          </button>
+        </div>
         <div v-show="timeMode === '乘积模型威胁度'" class="product-query-bar">
           <div class="product-query-fields">
             <div class="product-query-item product-query-item--search">
@@ -347,27 +357,49 @@
             </div>
           </div>
         </div>
-        <div v-show="timeMode === '历史时间计算'" class="date-picker-btn">
+        <div v-show="timeMode === '历史时间计算'" class="date-picker-btn task-time-banner">
           <el-date-picker v-model="defaultTime" type="daterange" range-separator="至" start-placeholder="开始日期"
             end-placeholder="结束日期" value-format="YYYY-MM-DD" disabled size="small" />
-          <el-button type="primary" size="small" icon="Aim" @click="calc">计算威胁度</el-button>
-          <el-button type="success" @click="drawer = !drawer" size="small">
-            {{ drawer ? '隐藏' : '显示' }}权重配置
-          </el-button>
+          <button type="button" class="sci-btn btn-primary" @click="calc">
+            <span class="btn-icon">🎯</span>
+            <span>计算威胁度</span>
+          </button>
+          <button type="button" class="sci-btn btn-config" @click="drawer = !drawer">
+            <span class="btn-icon">⚙️</span>
+            <span>{{ drawer ? '隐藏权重配置' : '显示权重配置' }}</span>
+          </button>
         </div>
-        <div v-show="timeMode === '按任务总时长计算'" class="date-picker-btn">
-          <div style="font-size: 14px; display: flex; gap: 10px; align-items: center">
-            <span>任务开始时间:</span>{{ store.activedTask?.beginDate }}<span>任务结束时间:</span>{{ store.activedTask?.endDate }}
+        <div v-show="timeMode === '按任务总时长计算'" class="date-picker-btn task-time-banner">
+          <div class="task-time-info">
+            <span class="time-label">⏱️ 任务时间跨度：</span>
+            <span class="time-value">开始时间: <strong>{{ store.activedTask?.beginDate || '未关联任务' }}</strong></span>
+            <span class="time-sep">|</span>
+            <span class="time-value">结束时间: <strong>{{ store.activedTask?.endDate || '未关联任务' }}</strong></span>
           </div>
-
-          <el-button type="primary" size="small" icon="Aim" @click="handleTaskTime">计算威胁度</el-button>
+          <button type="button" class="sci-btn btn-primary" @click="handleTaskTime">
+            <span class="btn-icon">🎯</span>
+            <span>计算威胁度</span>
+          </button>
         </div>
-        <div v-show="timeMode === '按任务阶段时长计算'" class="date-picker-btn">
-          <div style="font-size: 14px; display: flex; gap: 10px; align-items: center" v-if="currentStep">
-            <span>阶段开始时间:</span>{{ stepStartTime }}<span>阶段结束时间:</span>{{ stepEndTime }}
+        <div v-show="timeMode === '按任务阶段时长计算'" class="date-picker-btn task-time-banner">
+          <div class="task-time-info" v-if="currentStep">
+            <span class="time-label">🎯 阶段时间跨度：</span>
+            <span class="time-value">阶段开始: <strong>{{ stepStartTime }}</strong></span>
+            <span class="time-sep">|</span>
+            <span class="time-value">阶段结束: <strong>{{ stepEndTime }}</strong></span>
           </div>
-          <el-button :type="currentStep === item ? 'primary' : 'info'" v-for="item in steps" :key="item" size="small"
-            @click="handleStepTime(item)">{{ item }}</el-button>
+          <div class="step-btn-group">
+            <button
+              v-for="item in steps"
+              :key="item"
+              type="button"
+              class="sci-btn step-btn"
+              :class="{ 'btn-primary': currentStep === item, 'btn-config': currentStep !== item }"
+              @click="handleStepTime(item)"
+            >
+              {{ item }}
+            </button>
+          </div>
         </div>
       </div>
       <div v-if="timeMode === '乘积模型威胁度'" class="product-mode">
@@ -489,18 +521,22 @@
             <DataAnalysis />
           </el-icon>卫星整体威胁度分析
         </div>
-        <div class="count">
-          <div>
-            <span>{{ statistics.days }}</span><span>分析天数</span>
+        <div class="product-stat-grid count-stat-grid-4">
+          <div class="product-stat-card">
+            <span>分析天数</span>
+            <strong>{{ statistics.days }}</strong>
           </div>
-          <div>
-            <span>{{ statistics.unitCount }}</span><span>分析单位数量</span>
+          <div class="product-stat-card">
+            <span>分析单位数量</span>
+            <strong>{{ statistics.unitCount }}</strong>
           </div>
-          <div>
-            <span>{{ statistics.highThreatCount }}</span><span>极高威胁目标</span>
+          <div class="product-stat-card">
+            <span>极高威胁目标</span>
+            <strong>{{ statistics.highThreatCount }}</strong>
           </div>
-          <div>
-            <span>{{ statistics.avgScore.toFixed(2) }}</span><span>平均威胁分数</span>
+          <div class="product-stat-card">
+            <span>平均威胁分数</span>
+            <strong>{{ statistics.avgScore.toFixed(2) }}</strong>
           </div>
         </div>
         <div class="graph-container">
@@ -564,38 +600,36 @@
         </div>
       </div>
       <div v-if="timeMode === '按任务总时长计算' || timeMode === '按任务阶段时长计算'">
-        <div class="search">
-          <div v-show="timeMode === '按任务阶段时长计算'">
-            <span>阶段：</span>
-            <span>
-              <el-select class="select" v-model="searchForm.step" placeholder="" size="small">
-                <el-option v-for="item in steps" :key="item" :label="item" :value="item"> </el-option>
-              </el-select>
-            </span>
+        <div class="search search-grid-bar">
+          <div v-if="timeMode === '按任务阶段时长计算'" class="search-item">
+            <span class="item-label">阶段</span>
+            <el-select class="select" v-model="searchForm.step" placeholder="请选择阶段" size="small">
+              <el-option v-for="item in steps" :key="item" :label="item" :value="item" />
+            </el-select>
           </div>
-          <span>数据集：</span>
-          <span>
-            <el-select class="select" v-model="searchForm.dataSet" placeholder="" size="small"
-              @change="getConfigOfTask">
-              <el-option v-for="item in dataSetoptions" :key="item.value" :label="item.label" :value="item.value">
-              </el-option>
+          <div class="search-item">
+            <span class="item-label">数据集</span>
+            <el-select class="select" v-model="searchForm.dataSet" placeholder="请选择数据集" size="small" @change="getConfigOfTask">
+              <el-option v-for="item in dataSetoptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
-          </span>
-          <span>轨道筛选：</span>
-          <span>
-            <el-select class="select" v-model="searchForm.orbit" placeholder="" size="small">
-              <el-option v-for="item in orbitOptions" :key="item.value" :label="item.label" :value="item.value">
-              </el-option>
+          </div>
+          <div class="search-item">
+            <span class="item-label">轨道筛选</span>
+            <el-select class="select" v-model="searchForm.orbit" placeholder="选择轨道" size="small">
+              <el-option v-for="item in orbitOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
-          </span>
-
-          <span>搜索：</span>
-          <span>
-            <el-input v-model="searchForm.searchInput" size="small"></el-input>
-          </span>
-          <span>视图：</span>
-
-          <el-button type="primary" size="small" @click="refresh(1, 10)">查询</el-button>
+          </div>
+          <div class="search-item search-item--input">
+            <span class="item-label">搜索</span>
+            <el-input v-model="searchForm.searchInput" size="small" placeholder="卫星名称 / NORAD" clearable />
+          </div>
+          <div class="search-item search-item--btn">
+            <span class="item-label">&nbsp;</span>
+            <button type="button" class="sci-btn btn-primary" @click="refresh(1, 10)">
+              <span class="btn-icon">🔍</span>
+              <span>查询</span>
+            </button>
+          </div>
         </div>
         <div class="weight-panel">
           <div class="wt">
@@ -650,16 +684,18 @@
           </div>
         </div>
 
-        <div class="count-panel">
-          <div>
+        <div class="product-stat-grid count-stat-margin">
+          <div class="product-stat-card">
             <span>总条目</span>
-            <span>{{ countTotal }}</span>
+            <strong>{{ countTotal }}</strong>
           </div>
-          <div>
-            <span>当前展示</span> <span>{{ countCurrent }}</span>
+          <div class="product-stat-card">
+            <span>当前展示</span>
+            <strong>{{ countCurrent }}</strong>
           </div>
-          <div>
-            <span>数据集</span> <span>【{{ searchForm.dataSetLabel }}】</span>
+          <div class="product-stat-card">
+            <span>数据集</span>
+            <strong>【{{ searchForm.dataSetLabel || '未选择' }}】</strong>
           </div>
         </div>
 
@@ -2270,68 +2306,81 @@ function dispose() {
 </script>
 <style lang="scss" scoped>
 .threat-container {
-  --stv-surface-main: var(--surface-bg-color-strong);
-  --stv-surface-soft: var(--surface-bg-color-soft);
-  --stv-surface-base: var(--surface-bg-color);
-  --stv-border: var(--surface-border-color);
-  --stv-text-main: var(--text-color-primary);
-  --stv-text-strong: var(--text-color-strong);
-  --stv-text-muted: var(--text-color-secondary);
-  --stv-accent: var(--accent-color);
-  --stv-accent-soft: var(--accent-color-active);
+  --stv-surface-main: rgba(10, 24, 46, 0.95);
+  --stv-surface-soft: rgba(12, 28, 52, 0.9);
+  --stv-surface-base: rgba(8, 20, 38, 0.85);
+  --stv-border: rgba(0, 225, 255, 0.22);
+  --stv-text-main: #cbd5e1;
+  --stv-text-strong: #ffffff;
+  --stv-text-muted: #94a3b8;
+  --stv-accent: #00e1ff;
+  --stv-accent-soft: #38bdf8;
+
+  padding: 18px;
+  color: #e2e8f0;
+  text-align: left;
 
   .header {
     width: 100%;
-    padding: 10px;
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
+    background: linear-gradient(180deg, rgba(8, 20, 38, 0.92) 0%, rgba(12, 28, 52, 0.95) 100%);
+    border: 1px solid rgba(0, 225, 255, 0.2);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
 
     .config-item {
+      display: flex;
+      flex-direction: column;
+      padding: 10px 0;
+
       .input-value {
         width: 220px;
       }
 
-      display: flex;
-      flex-direction: column;
-      padding: 5px 0;
-
       .config-item__title {
         text-align: left;
-        font-weight: bold;
-        color: var(--stv-accent);
-        font-size: 16px;
+        font-weight: 700;
+        color: #00e1ff;
+        font-size: 15px;
+        letter-spacing: 0.5px;
+        border-bottom: 1px dashed rgba(0, 225, 255, 0.15);
+        padding-bottom: 6px;
+        margin-bottom: 12px;
       }
 
       .config-item_gx {
         display: flex;
         flex-wrap: wrap;
-        gap: 5px;
+        gap: 14px;
 
         .config-item_cx {
           display: flex;
           flex-direction: column;
 
           .title-gd {
-            padding-bottom: 10px;
-            font-weight: bold;
-            color: #408340;
-          }
-
-          &>div {
-            display: flex;
+            padding-bottom: 8px;
+            font-weight: 700;
+            color: #38bdf8;
+            font-size: 13px;
           }
 
           .config-item__cx {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 12px;
 
             div {
               display: flex;
               flex-direction: column;
+              gap: 4px;
 
               span {
                 text-align: left;
+                color: #94a3b8;
+                font-size: 12px;
               }
             }
           }
@@ -2340,15 +2389,18 @@ function dispose() {
 
       .config-item_score {
         display: flex;
-        gap: 10px;
+        gap: 14px;
         flex-wrap: wrap;
 
         &>div {
           display: flex;
           flex-direction: column;
+          gap: 4px;
 
           span {
             text-align: left;
+            color: #94a3b8;
+            font-size: 12px;
           }
         }
       }
@@ -2366,666 +2418,674 @@ function dispose() {
         .item_title {
           display: flex;
           justify-content: space-between;
-        }
+          color: #cbd5e1;
+          font-size: 13px;
 
-        :deep(.atlas-app-slider) {
-          padding: 0 10px;
+          span:last-child {
+            color: #00e1ff;
+            font-weight: 700;
+          }
         }
       }
     }
   }
 
   .main {
+    padding: 0;
+
     .title {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 16px;
       align-items: start;
+      margin-bottom: 18px;
+
+      /* 顶部4模式 Radio 改造为赛博玻璃 Tab */
+      .threat-model-tabs {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+
+        .threat-tab-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          height: 38px;
+          padding: 0 18px;
+          background: rgba(10, 24, 46, 0.7);
+          border: 1px solid rgba(0, 225, 255, 0.2);
+          border-radius: 6px;
+          transition: all 0.25s ease;
+          cursor: pointer;
+          color: #94a3b8;
+          font-size: 13px;
+          font-weight: 600;
+          letter-spacing: 0.3px;
+          outline: none;
+          user-select: none;
+
+          .tab-icon {
+            font-size: 14px;
+          }
+
+          &:hover {
+            border-color: rgba(0, 225, 255, 0.5);
+            background: rgba(0, 225, 255, 0.1);
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(0, 225, 255, 0.2);
+          }
+
+          &.is-active {
+            background: linear-gradient(135deg, rgba(0, 102, 255, 0.5), rgba(0, 225, 255, 0.3));
+            border-color: #00e1ff;
+            color: #ffffff;
+            font-weight: 700;
+            box-shadow: 0 0 16px rgba(0, 225, 255, 0.45);
+            text-shadow: 0 0 8px rgba(0, 225, 255, 0.5);
+
+            .tab-icon {
+              filter: drop-shadow(0 0 4px #00e1ff);
+            }
+          }
+        }
+      }
 
       .date-picker-btn {
         display: flex;
-        gap: 10px;
+        gap: 14px;
         align-items: center;
-      }
-    }
+        flex-wrap: wrap;
+        padding: 12px 18px;
+        background: linear-gradient(180deg, rgba(8, 20, 38, 0.85) 0%, rgba(12, 28, 52, 0.9) 100%);
+        border: 1px solid rgba(0, 225, 255, 0.2);
+        border-radius: 10px;
+        color: #cbd5e1;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
 
-    padding: 10px;
+        .task-time-info {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 13px;
 
-    .main-title {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      padding: 10px 0;
-      color: var(--stv-text-muted);
-      font-weight: bold;
-    }
+          .time-label {
+            color: #00e1ff;
+            font-weight: 700;
+          }
 
-    .count {
-      display: flex;
-      gap: 10px;
-      justify-content: space-between;
+          .time-value {
+            color: #cbd5e1;
+            strong {
+              color: #ffffff;
+            }
+          }
 
-      &>div {
-        background: var(--stv-surface-main);
-        display: flex;
-        flex: 1;
-        flex-direction: column;
-        align-items: center;
-        padding: 5px;
+          .time-sep {
+            color: rgba(0, 225, 255, 0.3);
+          }
+        }
 
-        &>span:first-child {
-          font-size: 18px;
-          font-weight: bold;
+        .step-btn-group {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-left: auto;
+
+          .step-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 34px;
+            padding: 0 18px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            user-select: none;
+            background: rgba(13, 27, 49, 0.8);
+            border: 1px solid rgba(0, 225, 255, 0.25);
+            color: #94a3b8;
+
+            &:hover {
+              background: rgba(0, 225, 255, 0.15);
+              border-color: rgba(0, 225, 255, 0.5);
+              color: #ffffff;
+              box-shadow: 0 0 10px rgba(0, 225, 255, 0.3);
+            }
+
+            &.btn-primary {
+              background: linear-gradient(135deg, rgba(0, 102, 255, 0.6), rgba(0, 225, 255, 0.4));
+              border-color: #00e1ff;
+              color: #ffffff;
+              font-weight: 700;
+              box-shadow: 0 0 14px rgba(0, 225, 255, 0.45);
+              text-shadow: 0 0 6px rgba(0, 225, 255, 0.5);
+            }
+
+            &.btn-config {
+              background: rgba(10, 22, 40, 0.7);
+              border-color: rgba(0, 225, 255, 0.2);
+              color: #94a3b8;
+            }
+          }
         }
       }
     }
 
-    .graph-container {
-      .graph-title {
-        display: flex;
-        align-items: center;
-        gap: 2px;
-        padding: 10px 0;
-        color: var(--stv-text-muted);
-        font-weight: bold;
-      }
-
-      .search-bar {
-        display: flex;
-        gap: 10px;
-        padding: 10px 20%;
-        justify-content: center;
-
-        .search-input {
-          padding-right: 10px;
-          width: 200px;
-        }
-      }
-
-      .graph-desc {
-        padding: 5px;
-        text-align: left;
-        margin-bottom: 5px;
-      }
-
-      .graph-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        grid-auto-rows: minmax(220px, auto);
-        gap: 16px 12px;
-
-        &>div {
-          background: var(--stv-surface-main);
-        }
-
-        &.three-in-row {
-          grid-template-columns: repeat(3, 1fr);
-          grid-auto-rows: minmax(220px, auto);
-          gap: 16px 12px;
-        }
-      }
-    }
-
+    /* 乘积模型查询栏 */
     .product-query-bar {
       width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      padding: 18px 20px 20px;
-      border-radius: 22px;
-      background: linear-gradient(180deg, var(--stv-surface-soft), var(--stv-surface-base));
-      border: 1px solid var(--stv-border);
-      box-shadow: 0 14px 30px rgba(8, 24, 47, 0.3);
-      align-items: stretch;
+      padding: 16px 20px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(8, 20, 38, 0.85) 0%, rgba(12, 28, 52, 0.9) 100%);
+      border: 1px solid rgba(0, 225, 255, 0.22);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(12px);
       box-sizing: border-box;
 
       .product-query-fields {
         display: flex;
-        gap: 16px;
-      }
-
-      :deep(.atlas-app-switch) {
-        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: flex-end;
       }
 
       .product-query-item {
         display: flex;
         flex-direction: column;
-        gap: 7px;
-        justify-content: flex-start;
+        gap: 6px;
         text-align: left;
-        color: var(--stv-text-main);
-        font-size: 13px;
-        min-width: 0;
 
-        &.product-query-item--dataset,
-        &.product-query-item--count,
-        &.product-query-item--longitude,
-        &.product-query-item--key-factor,
-        &.product-query-item--other-factor,
-        &.product-query-item--sort {
-          grid-column: span 2;
-        }
-
-        &.product-query-item--orbit,
-        &.product-query-item--countries,
-        &.product-query-item--search,
-        &.product-query-item--view,
-        &.product-query-item--action {
-          grid-column: span 4;
-        }
-
-        &.product-query-item--action {
-          align-self: stretch;
-        }
-
-        >span:first-child {
-          display: inline-flex;
-          align-items: center;
-          min-height: 18px;
-          color: var(--stv-text-strong);
+        > span:first-child {
+          color: #00e1ff;
           font-size: 12px;
           font-weight: 700;
-          letter-spacing: 0.03em;
+          letter-spacing: 0.3px;
         }
 
-        :deep(.el-select__wrapper),
         :deep(.el-input__wrapper),
-        :deep(.el-input-number),
-        :deep(.el-input-number__decrease),
-        :deep(.el-input-number__increase) {
-          height: 46px;
-          min-height: 46px;
+        :deep(.el-select__wrapper) {
+          background: rgba(13, 27, 49, 0.8);
+          border: 1px solid rgba(0, 225, 255, 0.2);
+          box-shadow: none !important;
+          border-radius: 6px;
+          color: #ffffff;
+
+          &.is-focus, &:hover {
+            border-color: #00e1ff;
+            box-shadow: 0 0 10px rgba(0, 225, 255, 0.3) !important;
+          }
         }
 
-        :deep(.el-select__wrapper),
-        :deep(.el-input__wrapper) {
-          background: linear-gradient(180deg, var(--stv-surface-soft), var(--stv-surface-base));
-          box-shadow: inset 0 0 0 1px rgba(115, 170, 230, 0.22);
-          border-radius: 14px;
-        }
-
-        :deep(.el-select),
-        :deep(.el-input),
-        :deep(.el-input-number) {
-          width: 100% !important;
-        }
-
-        :deep(.el-input__inner),
-        :deep(.el-select__placeholder),
-        :deep(.el-select__selected-item),
-        :deep(.el-input-number__decrease),
-        :deep(.el-input-number__increase) {
-          color: var(--stv-text-strong);
-        }
-
-        :deep(.el-input__inner::placeholder) {
-          color: rgba(220, 235, 255, 0.65);
-        }
-
-        :deep(.el-select__wrapper:hover),
-        :deep(.el-input__wrapper:hover),
-        :deep(.el-input-number:hover) {
-          box-shadow: inset 0 0 0 1px rgba(141, 189, 255, 0.32);
-        }
-
-        :deep(.el-tag.el-tag--info) {
-          background: rgba(125, 172, 232, 0.18);
-          border-color: rgba(125, 172, 232, 0.24);
-          color: var(--stv-text-strong);
-          height: 22px;
-          line-height: 20px;
-          border-radius: 999px;
+        :deep(.el-input__inner) {
+          color: #ffffff;
         }
 
         :deep(.el-input-number) {
-          display: flex;
-          align-items: stretch;
-          background: linear-gradient(180deg, var(--stv-surface-soft), var(--stv-surface-base));
-          border-radius: 14px;
-          box-shadow: inset 0 0 0 1px rgba(115, 170, 230, 0.22);
-        }
-
-        :deep(.el-input-number .el-input) {
-          flex: 1;
-          width: auto;
-        }
-
-        :deep(.el-input-number .el-input__wrapper) {
-          background: transparent;
-          box-shadow: none;
-        }
-
-        :deep(.el-input-number__decrease),
-        :deep(.el-input-number__increase) {
-          width: 34px;
-          background: rgba(255, 255, 255, 0.05);
-          border-color: rgba(115, 170, 230, 0.16);
-        }
-
-        .select,
-        :deep(.el-input),
-        :deep(.el-input-number) {
-          width: 100%;
-          min-width: 200px;
-        }
-
-        :deep(.el-button) {
-          min-height: 46px;
-        }
-      }
-
-      .product-refresh-btn {
-        width: 100%;
-        height: 46px;
-        min-height: 46px;
-        border-radius: 14px;
-        border: none;
-        background: var(--header-bg-gradient);
-        font-weight: 700;
-      }
-    }
-
-    .product-view-switch {
-      display: flex;
-      width: 100%;
-      padding: 4px;
-      height: 46px;
-      min-height: 46px;
-      background: linear-gradient(180deg, var(--stv-surface-soft), var(--stv-surface-base));
-      border-radius: 14px;
-      gap: 4px;
-      align-items: center;
-      box-shadow: inset 0 0 0 1px rgba(115, 170, 230, 0.22);
-
-      .product-view-switch__btn {
-        flex: 1;
-        height: 38px;
-        min-height: 38px;
-        border: 0;
-        background: transparent;
-        color: var(--stv-text-main);
-        padding: 8px 14px;
-        border-radius: 10px;
-        cursor: pointer;
-        font-weight: 700;
-        transition:
-          background-color 0.2s ease,
-          color 0.2s ease,
-          box-shadow 0.2s ease;
-
-        &.active {
-          background: var(--header-bg-gradient);
-          color: var(--stv-text-strong);
-          box-shadow: 0 6px 12px rgba(31, 74, 118, 0.2);
+          background: rgba(13, 27, 49, 0.8);
+          border: 1px solid rgba(0, 225, 255, 0.2);
+          border-radius: 6px;
+          .el-input-number__decrease,
+          .el-input-number__increase {
+            background: rgba(0, 225, 255, 0.1);
+            border-color: rgba(0, 225, 255, 0.2);
+            color: #00e1ff;
+          }
+          .el-input__wrapper {
+            background: transparent;
+            border: none;
+          }
         }
       }
     }
 
+    /* 乘积模型面板 */
     .product-mode {
       display: flex;
       flex-direction: column;
       gap: 18px;
-      margin-top: 20px;
-      color: var(--stv-text-main);
+      margin-top: 18px;
     }
 
-    .product-formula-panel,
-    .product-table-panel {
-      background: linear-gradient(180deg, var(--stv-surface-soft), var(--stv-surface-base));
-      border: 1px solid var(--stv-border);
-      border-radius: 20px;
-      padding: 18px 20px;
-      box-shadow: 0 12px 28px rgba(8, 24, 47, 0.28);
+    .product-formula-panel {
+      background: linear-gradient(180deg, rgba(8, 20, 38, 0.85) 0%, rgba(12, 28, 52, 0.9) 100%);
+      border: 1px solid rgba(0, 225, 255, 0.22);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(12px);
     }
 
     .product-formula-panel__header {
-      display: grid;
-      grid-template-columns: 1.2fr 1fr auto;
-      gap: 16px;
-      align-items: start;
-      margin-bottom: 16px;
-    }
-
-    .product-formula-panel__title {
       display: flex;
-      flex-direction: column;
-      gap: 8px;
-      text-align: left;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 18px;
+      border-bottom: 1px dashed rgba(0, 225, 255, 0.15);
+      padding-bottom: 12px;
 
-      span {
-        color: var(--stv-accent-soft);
-        font-size: 13px;
+      .product-formula-panel__title {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        text-align: left;
+
+        span {
+          color: #94a3b8;
+          font-size: 12px;
+        }
+
+        strong {
+          color: #00e1ff;
+          font-size: 18px;
+          font-weight: 700;
+        }
+      }
+
+      .product-formula-panel__note {
+        flex: 1;
+        max-width: 600px;
+        padding: 10px 14px;
+        border-radius: 6px;
+        background: rgba(13, 27, 49, 0.7);
+        color: #cbd5e1;
+        font-size: 12px;
+        line-height: 1.6;
+        border: 1px solid rgba(0, 225, 255, 0.15);
+        text-align: left;
+      }
+
+      .product-formula-panel__badge {
+        padding: 6px 14px;
+        border-radius: 6px;
+        background: rgba(0, 225, 255, 0.15);
+        color: #00e1ff;
+        border: 1px solid rgba(0, 225, 255, 0.3);
+        font-size: 12px;
         font-weight: 700;
+        white-space: nowrap;
       }
-
-      strong {
-        font-size: 18px;
-        color: var(--stv-text-strong);
-      }
-    }
-
-    .product-formula-panel__note {
-      padding: 14px 18px;
-      border-radius: 14px;
-      background: linear-gradient(180deg, rgba(79, 147, 221, 0.14), rgba(79, 147, 221, 0.08));
-      color: var(--stv-text-main);
-      line-height: 1.7;
-      text-align: left;
-      border: 1px solid rgba(132, 187, 238, 0.16);
-    }
-
-    .product-formula-panel__badge {
-      align-self: center;
-      color: var(--stv-text-strong);
-      font-weight: 700;
-      border: 1px solid rgba(79, 147, 221, 0.3);
-      background: rgba(79, 147, 221, 0.32);
-      padding: 10px 16px;
-      border-radius: 999px;
-      white-space: nowrap;
     }
 
     .product-formula-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
     }
 
     .product-formula-card {
-      background: linear-gradient(180deg, rgba(12, 38, 64, 0.78), rgba(9, 30, 51, 0.88));
-      border: 1px solid var(--stv-border);
-      border-radius: 16px;
-      padding: 18px;
+      background: rgba(10, 22, 40, 0.65);
+      border: 1px solid rgba(0, 225, 255, 0.15);
+      border-left: 3px solid #00e1ff;
+      border-radius: 8px;
+      padding: 16px;
       text-align: left;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+      .product-formula-card__title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #ffffff;
+      }
+
+      .product-formula-card__orbit {
+        margin-top: 4px;
+        color: #38bdf8;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .product-formula-card__main {
+        margin: 10px 0 14px;
+        color: #00e1ff;
+        font-family: monospace;
+        font-weight: 700;
+        font-size: 14px;
+        background: rgba(0, 225, 255, 0.1);
+        padding: 6px 10px;
+        border-radius: 4px;
+        border: 1px solid rgba(0, 225, 255, 0.2);
+      }
+
+      .product-formula-item {
+        margin-bottom: 10px;
+
+        .product-formula-item__label {
+          color: #f1f7ff;
+          font-size: 13px;
+          font-weight: 600;
+        }
+
+        .product-formula-item__text {
+          color: #94a3b8;
+          font-size: 12px;
+          line-height: 1.6;
+        }
+      }
     }
 
-    .product-formula-card__title {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--stv-text-strong);
-    }
-
-    .product-formula-card__orbit {
-      margin-top: 8px;
-      color: var(--stv-accent-soft);
-      font-weight: 600;
-    }
-
-    .product-formula-card__main {
-      margin: 12px 0 16px;
-      color: var(--stv-accent-soft);
-      font-weight: 700;
-      font-size: 16px;
-    }
-
-    .product-formula-item {
-      margin-bottom: 14px;
-    }
-
-    .product-formula-item__label {
-      margin-bottom: 4px;
-      font-weight: 700;
-      color: var(--stv-text-strong);
-    }
-
-    .product-formula-item__text {
-      color: var(--stv-text-main);
-      line-height: 1.7;
-    }
-
-    .product-warning-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
+    /* 统计 3 宫格 */
     .product-stat-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 18px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
     }
 
     .product-stat-card {
-      background: linear-gradient(180deg, var(--stv-surface-soft), var(--stv-surface-base));
-      border: 1px solid var(--stv-border);
-      border-radius: 18px;
-      padding: 20px 24px;
-      box-shadow: 0 12px 24px rgba(8, 24, 47, 0.2);
+      background: rgba(13, 27, 49, 0.8);
+      border: 1px solid rgba(0, 225, 255, 0.2);
+      border-radius: 8px;
+      padding: 16px 20px;
       display: flex;
       flex-direction: column;
-      align-items: start;
-      gap: 10px;
+      gap: 6px;
+      text-align: left;
 
       span {
-        color: var(--stv-accent-soft);
-        font-size: 13px;
-        font-weight: 700;
+        color: #94a3b8;
+        font-size: 12px;
       }
 
       strong {
-        font-size: 20px;
-        color: var(--stv-text-strong);
-      }
-    }
-
-    .product-request-error {
-      margin-bottom: 12px;
-      color: #ff9ead;
-      text-align: left;
-      font-weight: 600;
-    }
-
-    .product-table-panel {
-      :deep(.el-table) {
-        --el-table-header-bg-color: var(--surface-bg-color-strong);
-        --el-table-tr-bg-color: var(--surface-bg-color);
-        --el-table-row-hover-bg-color: rgba(79, 138, 209, 0.16);
-        --el-table-border-color: var(--stv-border);
-        --el-text-color-regular: var(--stv-text-main);
-        --el-text-color-primary: var(--stv-text-strong);
-        --el-fill-color-lighter: rgba(66, 116, 181, 0.16);
-        border-radius: 12px;
-        overflow: hidden;
-      }
-
-      :deep(.el-table th.el-table__cell) {
-        color: var(--stv-accent-soft);
+        color: #00e1ff;
+        font-size: 28px;
         font-weight: 700;
-      }
-
-      :deep(.el-table td.el-table__cell),
-      :deep(.el-table__empty-block) {
-        background: var(--surface-bg-color);
-        color: var(--stv-text-main);
-      }
-
-      :deep(.el-table__inner-wrapper::before) {
-        background-color: rgba(100, 149, 209, 0.16);
-      }
-
-      :deep(.el-tag) {
-        border: none;
+        text-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
       }
     }
 
-    .search {
-      background: var(--stv-surface-main);
-      border-radius: 5px;
-      padding: 10px;
-      margin: 10px 0;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    /* 统计卡片 (历史时间计算) */
+    .count {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 16px;
 
-      .select {
-        width: 200px;
+      & > div {
+        background: rgba(13, 27, 49, 0.8);
+        border: 1px solid rgba(0, 225, 255, 0.2);
+        border-radius: 8px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+
+        & > span:first-child {
+          color: #00e1ff;
+          font-size: 28px;
+          font-weight: 700;
+          text-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
+        }
+
+        & > span:last-child {
+          color: #94a3b8;
+          font-size: 12px;
+        }
+      }
+    }
+
+    /* 图表与说明 */
+    .graph-container {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+
+      .graph-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #00e1ff;
+        font-size: 16px;
+        font-weight: 700;
+        border-bottom: 1px dashed rgba(0, 225, 255, 0.15);
+        padding-bottom: 8px;
+      }
+
+      .search-bar {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-start;
+        align-items: center;
+
+        .search-input {
+          width: 260px;
+        }
+      }
+
+      .graph-desc {
+        padding: 12px 16px;
+        border-radius: 6px;
+        background: rgba(10, 22, 40, 0.65);
+        border: 1px solid rgba(0, 225, 255, 0.15);
+        border-left: 3px solid #38bdf8;
+        color: #cbd5e1;
+        font-size: 13px;
+        line-height: 1.6;
+        text-align: left;
+      }
+
+      .graph-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+
+        & > div {
+          background: rgba(10, 22, 40, 0.7);
+          border: 1px solid rgba(0, 225, 255, 0.15);
+          border-radius: 8px;
+          min-height: 280px;
+        }
+
+        &.three-in-row {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+    }
+
+    /* 强化的 .search-grid-bar 检索过滤栏 */
+    .search-grid-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 16px;
+      padding: 16px 20px;
+      background: linear-gradient(180deg, rgba(8, 20, 38, 0.85) 0%, rgba(12, 28, 52, 0.9) 100%);
+      border: 1px solid rgba(0, 225, 255, 0.22);
+      border-radius: 12px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+      margin-bottom: 18px;
+
+      .search-item {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        text-align: left;
+        min-width: 160px;
+
+        .item-label {
+          color: #00e1ff;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.3px;
+          height: 20px;
+          line-height: 20px;
+          display: flex;
+          align-items: center;
+          white-space: nowrap;
+        }
+
+        .select,
+        :deep(.el-select),
+        :deep(.el-input) {
+          width: 100% !important;
+          min-width: 150px;
+        }
+
+        :deep(.el-input__wrapper),
+        :deep(.el-select__wrapper) {
+          background: rgba(13, 27, 49, 0.8);
+          border: 1px solid rgba(0, 225, 255, 0.2);
+          box-shadow: none !important;
+          border-radius: 6px;
+          color: #ffffff;
+          height: 34px;
+
+          &.is-focus, &:hover {
+            border-color: #00e1ff;
+            box-shadow: 0 0 10px rgba(0, 225, 255, 0.3) !important;
+          }
+        }
+
+        &.search-item--input {
+          flex: 1;
+          min-width: 220px;
+        }
+
+        &.search-item--btn {
+          min-width: 100px;
+          .sci-btn {
+            height: 34px;
+            padding: 0 18px;
+            font-size: 13px;
+          }
+        }
       }
     }
 
     .weight-panel {
-      background: var(--stv-surface-main);
-      border-radius: 5px;
-      padding: 10px;
-      margin: 10px 0;
+      background: linear-gradient(180deg, rgba(8, 20, 38, 0.85) 0%, rgba(12, 28, 52, 0.9) 100%);
+      border: 1px solid rgba(0, 225, 255, 0.2);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
 
       .wt {
         display: flex;
-        align-items: center;
         justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        border-bottom: 1px dashed rgba(0, 225, 255, 0.15);
+        padding-bottom: 12px;
 
         .wl {
           display: flex;
           flex-direction: column;
-          align-items: start;
+          gap: 4px;
+          text-align: left;
 
-          &> :first-child {
-            font-size: 10px;
-            color: #42a9ac;
+          span:first-child {
+            color: #00e1ff;
+            font-size: 16px;
+            font-weight: 700;
+          }
+
+          span:last-child {
+            color: #38bdf8;
+            font-size: 12px;
           }
         }
 
         .tip {
-          background: #42a9ac;
-          border-radius: 5px;
-          padding: 10px;
+          padding: 6px 12px;
+          border-radius: 4px;
+          background: rgba(0, 225, 255, 0.12);
+          color: #7dd3fc;
+          font-size: 12px;
+          border: 1px solid rgba(0, 225, 255, 0.25);
         }
       }
 
       .wb {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
+        gap: 16px;
 
         .wb-l,
         .wb-r {
-          background: var(--stv-surface-base);
-          border-radius: 5px;
-          box-shadow: 0 0 5px rgba(79, 147, 221, 0.4);
-          padding: 20px;
-          margin-top: 10px;
+          background: rgba(10, 22, 40, 0.65);
+          border: 1px solid rgba(0, 225, 255, 0.15);
+          border-radius: 8px;
+          padding: 16px;
           display: flex;
           flex-direction: column;
-          align-items: start;
+          gap: 12px;
+          text-align: left;
 
-          div {
-            width: 95%;
-            padding: 0px 10px;
+          > span:first-child {
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 700;
           }
 
           .orbit-label {
-            font-size: 10px;
-            color: #42a9ac;
+            color: #38bdf8;
+            font-size: 12px;
           }
 
           .weight-item {
             display: flex;
             flex-direction: column;
             gap: 6px;
-            margin-bottom: 10px;
-          }
+            padding: 10px;
+            border-radius: 6px;
+            background: rgba(13, 27, 49, 0.7);
+            border: 1px solid rgba(0, 225, 255, 0.1);
 
-          .score-slider {
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            span {
+              color: #cbd5e1;
+              font-size: 12px;
+            }
+
+            .score-slider {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+
+              .el-slider {
+                flex: 1;
+              }
+
+              span {
+                color: #00e1ff;
+                font-weight: 700;
+                min-width: 32px;
+              }
+            }
           }
         }
       }
     }
 
-    .count-panel {
-      background: var(--stv-surface-main);
-      border-radius: 5px;
-      padding: 10px;
-      margin: 10px 0;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-
-      div {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-
-        &>span:first-child {
-          font-size: 10px;
-          color: #42a9ac;
-        }
-      }
-    }
-
+    /* 表格面板 */
+    .product-table-panel,
     .table-panel {
-      background: var(--stv-surface-main);
-      border-radius: 5px;
-      padding: 10px;
-      margin: 10px 0;
-    }
-  }
+      background: rgba(8, 20, 38, 0.85);
+      border: 1px solid rgba(0, 225, 255, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      overflow: hidden;
 
-  @media (max-width: 1400px) {
-    .main {
-      .product-query-bar {
-        .product-query-fields {
-          grid-template-columns: repeat(6, minmax(0, 1fr));
+      :deep(.el-table) {
+        --el-table-border-color: rgba(0, 225, 255, 0.12);
+        --el-table-header-bg-color: rgba(13, 27, 49, 0.9);
+        --el-table-bg-color: transparent;
+        --el-table-tr-bg-color: transparent;
+        --el-table-row-hover-bg-color: rgba(0, 225, 255, 0.1);
+        --el-text-color-regular: #cbd5e1;
+        --el-text-color-primary: #ffffff;
+
+        th.el-table__cell {
+          color: #00e1ff;
+          font-size: 12px;
+          font-weight: 700;
+          background: rgba(13, 27, 49, 0.9) !important;
         }
 
-        .product-query-item {
-
-          &.product-query-item--dataset,
-          &.product-query-item--count,
-          &.product-query-item--longitude,
-          &.product-query-item--key-factor,
-          &.product-query-item--other-factor,
-          &.product-query-item--sort {
-            grid-column: span 2;
-          }
-
-          &.product-query-item--orbit,
-          &.product-query-item--countries,
-          &.product-query-item--search,
-          &.product-query-item--view,
-          &.product-query-item--action {
-            grid-column: span 3;
-          }
-        }
-      }
-
-      .product-formula-panel__header {
-        grid-template-columns: 1fr;
-      }
-    }
-  }
-
-  @media (max-width: 960px) {
-    .main {
-
-      .product-formula-grid,
-      .product-stat-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .product-query-bar {
-        .product-query-fields {
-          grid-template-columns: 1fr;
-        }
-
-        .product-query-item {
-
-          &.product-query-item--dataset,
-          &.product-query-item--count,
-          &.product-query-item--longitude,
-          &.product-query-item--key-factor,
-          &.product-query-item--other-factor,
-          &.product-query-item--sort,
-          &.product-query-item--orbit,
-          &.product-query-item--countries,
-          &.product-query-item--search,
-          &.product-query-item--view,
-          &.product-query-item--action {
-            grid-column: span 1;
-          }
+        td.el-table__cell {
+          border-bottom: 1px solid rgba(0, 225, 255, 0.08);
+          font-size: 12px;
         }
       }
     }
