@@ -4,38 +4,29 @@
       <!-- 头部 -->
       <el-header class="header-wrapper">
         <div class="header-left">
-          <div class="logo">卫星态势分析系统</div>
+          <div class="logo">
+            <span class="logo-icon">🛰️</span>
+            <span class="logo-title">卫星态势分析系统</span>
+            <span class="logo-badge">SYSTEM</span>
+          </div>
         </div>
 
         <div class="header-center">
-          <MenuTree :active-menu="activeMenu" :menu-data="visibleMenus" menu-mode="horizontal" :show-icon="false" />
+          <MenuTree :active-menu="activeMenu" :menu-data="visibleMenus" menu-mode="horizontal" :show-icon="true" />
         </div>
 
         <div class="header-right actions-bar">
-          <!-- <div v-show="route.name === 'Home'" class="menus">
-            <el-switch
-              v-model="layoutStore.showAnalysisPanel"
-              active-action-icon="View"
-              inactive-action-icon="Hide"
-              active-text="战场列表"
-              @change="layoutStore.toggleShowAnalysisList"
-            />
-            <el-switch
-              v-model="layoutStore.showSatelliteList"
-              active-action-icon="View"
-              inactive-action-icon="Hide"
-              active-text="卫星列表"
-              @change="layoutStore.toggleShowSatelliteList"
-            />
-          </div> -->
-
           <div class="user-panel">
-            <el-avatar :size="32" icon="UserFilled" />
+            <div class="user-avatar-box">
+              <el-avatar :size="32" icon="UserFilled" class="user-avatar" />
+            </div>
             <div class="user-meta">
               <span class="user-name">{{ displayUserName }}</span>
-              <span class="user-role">{{ displayRoleText }}</span>
+              <span class="user-role-tag">{{ displayRoleText }}</span>
             </div>
-            <el-button type="danger" plain size="small" @click="handleLogout">退出登录</el-button>
+            <button type="button" class="sci-logout-btn" @click="handleLogout">
+              <span>退出登录</span>
+            </button>
           </div>
         </div>
 
@@ -312,8 +303,18 @@ onUnmounted(() => {})
     position: relative;
     gap: 24px;
     height: 60px;
-    background: var(--header-bg-gradient);
-    padding: 0 20px;
+    background: linear-gradient(
+      90deg,
+      rgba(8, 22, 44, 0.98) 0%,
+      rgba(13, 35, 62, 0.95) 50%,
+      rgba(8, 22, 44, 0.98) 100%
+    );
+    border-bottom: 1px solid rgba(0, 225, 255, 0.25);
+    box-shadow:
+      0 4px 20px rgba(0, 0, 0, 0.5),
+      0 1px 12px rgba(0, 225, 255, 0.15);
+    padding: 0 24px;
+    z-index: 100;
 
     .header-left {
       display: flex;
@@ -322,12 +323,37 @@ onUnmounted(() => {})
 
       .logo {
         height: 60px;
-        line-height: 60px;
-        font-size: 18px;
-        font-weight: bold;
-        color: #ffffff;
-        letter-spacing: 1px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
         white-space: nowrap;
+
+        .logo-icon {
+          font-size: 22px;
+          filter: drop-shadow(0 0 6px rgba(0, 225, 255, 0.6));
+        }
+
+        .logo-title {
+          font-size: 19px;
+          font-weight: 800;
+          letter-spacing: 1.2px;
+          background: linear-gradient(135deg, #ffffff 30%, #00e1ff 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          filter: drop-shadow(0 0 10px rgba(0, 225, 255, 0.3));
+        }
+
+        .logo-badge {
+          display: inline-block;
+          font-size: 10px;
+          font-weight: 700;
+          padding: 2px 6px;
+          border-radius: 4px;
+          background: rgba(0, 225, 255, 0.12);
+          color: #00e1ff;
+          border: 1px solid rgba(0, 225, 255, 0.3);
+          letter-spacing: 0.8px;
+        }
       }
     }
 
@@ -335,6 +361,8 @@ onUnmounted(() => {})
       flex: 1;
       display: flex;
       align-items: center;
+      justify-content: flex-start;
+      padding-left: 20px;
       min-width: 0;
 
       :deep(.side-bar--menu--horizontal) {
@@ -347,32 +375,75 @@ onUnmounted(() => {})
       display: flex;
       align-items: center;
 
-      .menus {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
       .user-panel {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding-left: 16px;
+        gap: 14px;
+
+        .user-avatar-box {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, rgba(0, 225, 255, 0.6), rgba(0, 150, 255, 0.2));
+          box-shadow: 0 0 8px rgba(0, 225, 255, 0.3);
+
+          .user-avatar {
+            background: #0d2744;
+            color: #00e1ff;
+          }
+        }
 
         .user-meta {
           display: flex;
           flex-direction: column;
-          line-height: 1.2;
-          color: var(--text-color-strong);
+          gap: 2px;
 
           .user-name {
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 13px;
+            font-weight: 700;
+            color: #f1f7ff;
+            line-height: 1.2;
           }
 
-          .user-role {
-            font-size: 12px;
-            color: rgba(217, 233, 251, 0.72);
+          .user-role-tag {
+            font-size: 11px;
+            color: #7dd3fc;
+            background: rgba(0, 225, 255, 0.1);
+            padding: 1px 6px;
+            border-radius: 3px;
+            border: 1px solid rgba(0, 225, 255, 0.2);
+            line-height: 1.3;
+            width: fit-content;
+          }
+        }
+
+        .sci-logout-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          background: rgba(239, 68, 68, 0.12);
+          border: 1px solid rgba(239, 68, 68, 0.35);
+          color: #fca5a5;
+          cursor: pointer;
+          transition: all 0.25s ease;
+
+          &:hover {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: rgba(239, 68, 68, 0.6);
+            color: #ffffff;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+            transform: translateY(-1px);
+          }
+
+          &:active {
+            transform: translateY(0);
           }
         }
       }

@@ -1945,10 +1945,7 @@ async function loadDataBySatelliteId() {
   const highData = high.code === 200 ? high.data : null
   const impData = imp.code === 200 ? imp.data : null
 
-  const hasContent =
-    checkDataHasContent(avgData) ||
-    checkDataHasContent(highData) ||
-    checkDataHasContent(impData)
+  const hasContent = checkDataHasContent(avgData) || checkDataHasContent(highData) || checkDataHasContent(impData)
 
   hasChartData.value = hasContent
 
@@ -3122,6 +3119,7 @@ function dispose() {
         font-size: 13px;
         line-height: 1.6;
         text-align: left;
+        margin: 10px 0;
       }
 
       .graph-grid {

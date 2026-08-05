@@ -6,7 +6,7 @@
         <div class="left-panel" v-show="store.showAnalysisPanel">
           <div class="battle-box">
             <div class="title">
-              <span class="header-text">🌐 全局战场</span>
+              <span class="header-text">🌐 战场管理</span>
               <el-button size="small" icon="Plus" type="primary" round @click="handleCreateBattle">
                 新建战场
               </el-button>
