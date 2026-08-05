@@ -106,25 +106,58 @@
       </section>
     </div>
 
-    <el-dialog title="⚙️ 权重参数配置" v-model="dialogSceneVisible" width="600px" class="weight-dialog">
+    <el-dialog title="⚙️ 权重参数配置" v-model="dialogSceneVisible" width="620px" class="weight-dialog" align-center>
       <div class="weight-explain">
-        <h4>权重配置说明</h4>
-        <ul>
-          <li><strong>情报评分：</strong>范围 0-100；分值越高表示我方对该卫星的信息掌握越全面。</li>
-          <li><strong>可见性评分：</strong>范围 0-100；表示在任务时间窗内卫星的可见时长或可观测性。</li>
-          <li><strong>武器打击评分：</strong>范围 0-100；表示适配用于打击该卫星的武器数量与效果。</li>
+        <div class="explain-title">
+          <span class="explain-icon">💡</span>
+          <span>权重配置说明</span>
+        </div>
+        <ul class="explain-list">
+          <li><strong>情报评分（W_INFO）：</strong>范围 0 - 100；分值越高表示我方对该卫星的信息掌握越全面。</li>
+          <li><strong>可见性评分（W_VIS）：</strong>范围 0 - 100；表示在任务时间窗内卫星的可见时长或可观测性。</li>
+          <li><strong>武器打击评分（W_WEAPON）：</strong>范围 0 - 100；表示适配用于打击该卫星的武器数量与效果。</li>
         </ul>
       </div>
-      <el-form :model="formWeapon" label-width="120px" size="default">
-        <el-form-item label="可见性评分" prop="W_VIS">
-          <el-input-number v-model.number="formWeapon.W_VIS" :min="0" :max="100" />
-        </el-form-item>
-        <el-form-item label="情报评分" prop="W_INFO">
-          <el-input-number v-model.number="formWeapon.W_INFO" :min="0" :max="100" />
-        </el-form-item>
-        <el-form-item label="武器打击评分" prop="W_WEAPON">
-          <el-input-number v-model.number="formWeapon.W_WEAPON" :min="0" :max="100" />
-        </el-form-item>
+      <el-form :model="formWeapon" label-width="120px" size="default" class="weight-form">
+        <el-row :gutter="16">
+          <el-col :span="24">
+            <el-form-item label="可见性评分" prop="W_VIS" class="form-item-no-margin">
+              <el-input-number
+                v-model.number="formWeapon.W_VIS"
+                :min="0"
+                :max="100"
+                :controls="false"
+                class="weight-input"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="24">
+            <el-form-item label="情报评分" prop="W_INFO" class="form-item-no-margin">
+              <el-input-number
+                v-model.number="formWeapon.W_INFO"
+                :min="0"
+                :max="100"
+                :controls="false"
+                class="weight-input"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="24">
+            <el-form-item label="武器打击评分" prop="W_WEAPON" class="form-item-no-margin">
+              <el-input-number
+                v-model.number="formWeapon.W_WEAPON"
+                :min="0"
+                :max="100"
+                :controls="false"
+                class="weight-input"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -639,13 +672,214 @@ onMounted(() => {
   font-weight: 800;
 }
 
+:deep(.weight-dialog) {
+  background: rgba(10, 22, 40, 0.95) !important;
+  border: 1px solid rgba(0, 225, 255, 0.3);
+  border-radius: 12px;
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.7),
+    0 0 24px rgba(0, 225, 255, 0.2);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+
+  .el-dialog__header {
+    margin-right: 0;
+    padding: 16px 20px;
+    background: linear-gradient(90deg, rgba(0, 225, 255, 0.1) 0%, rgba(10, 22, 40, 0) 100%);
+    border-bottom: 1px solid rgba(0, 225, 255, 0.2);
+
+    .el-dialog__title {
+      color: #f1f7ff;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .el-dialog__headerbtn .el-dialog__close {
+      color: #94a3b8;
+
+      &:hover {
+        color: #00e1ff;
+      }
+    }
+  }
+
+  .el-dialog__body {
+    padding: 20px;
+    color: #e2e8f0;
+  }
+
+  .el-dialog__footer {
+    padding: 14px 20px;
+    background: rgba(6, 15, 30, 0.6);
+    border-top: 1px solid rgba(0, 225, 255, 0.15);
+  }
+}
+
 .weight-explain {
-  margin-bottom: 18px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(0, 225, 255, 0.04);
+  border: 1px solid rgba(0, 225, 255, 0.18);
+  border-left: 4px solid #00e1ff;
+
+  .explain-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #38bdf8;
+    margin-bottom: 8px;
+  }
+
+  .explain-list {
+    margin: 0;
+    padding-left: 18px;
+    color: #94a3b8;
+    line-height: 1.7;
+    font-size: 12px;
+
+    li {
+      margin-bottom: 4px;
+      text-align: left;
+
+      strong {
+        color: #e2e8f0;
+      }
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+  }
+}
+
+.weight-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.weight-param-card {
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: rgba(13, 27, 49, 0.7);
+  border: 1px solid rgba(0, 225, 255, 0.15);
+  transition: all 0.25s ease;
+
+  &:hover {
+    border-color: rgba(0, 225, 255, 0.35);
+    box-shadow: 0 0 12px rgba(0, 225, 255, 0.1);
+  }
+
+  .param-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+
+    .param-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #e2e8f0;
+      font-size: 14px;
+      font-weight: 600;
+
+      .param-icon {
+        font-size: 16px;
+      }
+    }
+  }
+
+  .param-slider-wrapper {
+    padding: 0 4px;
+  }
+}
+
+:deep(.custom-input-number) {
+  width: 110px;
+
+  .el-input__wrapper {
+    background-color: rgba(10, 20, 36, 0.8) !important;
+    box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.25) inset !important;
+    border-radius: 4px;
+
+    &:hover,
+    &.is-focus {
+      box-shadow: 0 0 0 1px #00e1ff inset !important;
+    }
+  }
+
+  .el-input__inner {
+    color: #00e1ff !important;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .el-input-number__decrease,
+  .el-input-number__increase {
+    background-color: rgba(15, 32, 59, 0.8) !important;
+    color: #94a3b8 !important;
+    border-color: rgba(0, 225, 255, 0.2) !important;
+
+    &:hover {
+      color: #00e1ff !important;
+      background-color: rgba(0, 225, 255, 0.15) !important;
+    }
+  }
+}
+
+:deep(.custom-slider) {
+  --el-slider-main-bg-color: #00e1ff;
+  --el-slider-runway-bg-color: rgba(0, 225, 255, 0.12);
+  --el-slider-stop-bg-color: rgba(0, 225, 255, 0.2);
+  --el-slider-button-size: 14px;
+  --el-slider-button-wrapper-size: 32px;
+
+  .el-slider__button {
+    border: 2px solid #00e1ff;
+    background-color: #0a1628;
+    box-shadow: 0 0 8px rgba(0, 225, 255, 0.6);
+  }
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
+
+  .sci-btn-cancel {
+    background: rgba(15, 32, 59, 0.8);
+    border: 1px solid rgba(0, 225, 255, 0.2);
+    color: #94a3b8;
+
+    &:hover {
+      background: rgba(0, 225, 255, 0.1);
+      color: #00e1ff;
+      border-color: rgba(0, 225, 255, 0.4);
+    }
+  }
+
+  .sci-btn-submit {
+    background: linear-gradient(135deg, #0099ff 0%, #00e1ff 100%);
+    border: none;
+    color: #061121;
+    font-weight: 700;
+    box-shadow: 0 0 14px rgba(0, 225, 255, 0.4);
+    transition: all 0.25s ease;
+
+    &:hover {
+      opacity: 0.9;
+      box-shadow: 0 0 20px rgba(0, 225, 255, 0.6);
+      transform: translateY(-1px);
+    }
+  }
 }
 
 @media (max-width: 1440px) {

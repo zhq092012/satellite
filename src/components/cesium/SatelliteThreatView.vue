@@ -717,18 +717,20 @@
           <div class="graph-desc">
             威胁分析的时间演变趋势。可以观察到威胁水平在分析期间保持相对稳定，但在特定时间段出现了显著的威胁集中现象，这与地缘政治事件和卫星的活动模式高度相关。
           </div>
-          <div class="graph-title">
-            <el-icon> <Comment /> </el-icon>发现与建议措施
-          </div>
-          <div class="graph-desc">
-            {{ suggestion }}
-          </div>
-          <div class="graph-grid" :class="{ 'three-in-row': !notSingle }">
-            <div id="charts1" />
-            <div id="charts2" v-if="notSingle" />
-            <div id="charts3" />
-            <div id="charts4" />
-            <!-- <div id="charts7" /> -->
+          <div v-show="hasChartData">
+            <div class="graph-title">
+              <el-icon> <Comment /> </el-icon>发现与建议措施
+            </div>
+            <div class="graph-desc">
+              {{ suggestion }}
+            </div>
+            <div class="graph-grid" :class="{ 'three-in-row': !notSingle }">
+              <div id="charts1" />
+              <div id="charts2" v-if="notSingle" />
+              <div id="charts3" />
+              <div id="charts4" />
+              <!-- <div id="charts7" /> -->
+            </div>
           </div>
 
           <div class="graph-title">
@@ -1636,6 +1638,7 @@ const lineYAxisBase = {
 function initGraph1(optData: { date: string; avgThreatScore: number }[]) {
   if (charts1) charts1.dispose()
   const chartDom = document.getElementById('charts1')
+  if (!chartDom || chartDom.clientWidth === 0 || chartDom.clientHeight === 0) return
   charts1 = echarts.init(chartDom)
   const option = {
     title: {
@@ -1686,6 +1689,7 @@ function initGraph1(optData: { date: string; avgThreatScore: number }[]) {
 function initGraph2(optData: { date: string; variation: number }[]) {
   if (charts2) charts2.dispose()
   const chartDom = document.getElementById('charts2')
+  if (!chartDom || chartDom.clientWidth === 0 || chartDom.clientHeight === 0) return
   charts2 = echarts.init(chartDom)
   const option = {
     title: {
@@ -1736,6 +1740,7 @@ function initGraph2(optData: { date: string; variation: number }[]) {
 function initGraph3(optData: { date: string; count: number }[]) {
   if (charts3) charts3.dispose()
   const chartDom = document.getElementById('charts3')
+  if (!chartDom || chartDom.clientWidth === 0 || chartDom.clientHeight === 0) return
   charts3 = echarts.init(chartDom)
   const option = {
     title: {
@@ -1795,6 +1800,7 @@ function initGraph3(optData: { date: string; count: number }[]) {
 function initGraph4(optData: Record<string, number>) {
   if (charts4) charts4.dispose()
   const chartDom = document.getElementById('charts4')
+  if (!chartDom || chartDom.clientWidth === 0 || chartDom.clientHeight === 0) return
   charts4 = echarts.init(chartDom)
   const option = {
     title: {
@@ -1869,63 +1875,120 @@ function initGraphs(searchType: string) {
     loadDataAll()
   }
 }
+// 标识历史时间计算下是否存在有效 echarts 图表数据
+const hasChartData = ref(false)
+
+/**
+ * 辅助检查数据对象或数组中是否包含有效图表数据
+ *
+ * @param data 接口返回的图表数据
+ * @returns 是否包含有效数据
+ */
+function checkDataHasContent(data: any): boolean {
+  if (!data) return false
+  if (Array.isArray(data)) {
+    return data.length > 0
+  }
+  if (typeof data === 'object') {
+    const keys = Object.keys(data)
+    if (keys.length === 0) return false
+    return Object.values(data).some((v) => Number(v) > 0)
+  }
+  return false
+}
+
 // 所有星分析威胁度
 async function loadDataAll() {
   if (timeMode.value !== '历史时间计算') return
   searchInput.value = ''
   store.setSelectedSatellite(null)
-  const avg = await avgThreatAnalysis(store.activedTask?.id!)
-  if (avg.code === 200) {
-    initGraph1(avg.data)
-  }
-  const variation = await variationThreatAnalysis(store.activedTask?.id!)
-  if (variation.code === 200) {
-    initGraph2(variation.data)
-  }
-  const high = await highThreatAnalysis(store.activedTask?.id!)
-  if (high.code === 200) {
-    initGraph3(high.data)
-  }
-  const imp = await threatLevelAnalysis(store.activedTask?.id!)
-  if (imp.code === 200) {
-    initGraph4(imp.data)
+
+  const [avg, variation, high, imp] = await Promise.all([
+    avgThreatAnalysis(store.activedTask?.id!),
+    variationThreatAnalysis(store.activedTask?.id!),
+    highThreatAnalysis(store.activedTask?.id!),
+    threatLevelAnalysis(store.activedTask?.id!),
+  ])
+
+  const avgData = avg.code === 200 ? avg.data : null
+  const variationData = variation.code === 200 ? variation.data : null
+  const highData = high.code === 200 ? high.data : null
+  const impData = imp.code === 200 ? imp.data : null
+
+  const hasContent =
+    checkDataHasContent(avgData) ||
+    checkDataHasContent(variationData) ||
+    checkDataHasContent(highData) ||
+    checkDataHasContent(impData)
+
+  hasChartData.value = hasContent
+
+  if (hasContent) {
+    await nextTick()
+    if (avgData) initGraph1(avgData)
+    if (variationData) initGraph2(variationData)
+    if (highData) initGraph3(highData)
+    if (impData) initGraph4(impData)
   }
 }
 // 单星分析威胁度
 async function loadDataBySatelliteId() {
   if (timeMode.value !== '历史时间计算') return
-  const avg = await avgThreatAnalysis(store.activedTask?.id!, Number(searchInput.value))
-  if (avg.code === 200) {
-    initGraph1(avg.data)
-  }
 
-  const high = await highThreatAnalysis(store.activedTask?.id!, Number(searchInput.value))
-  if (high.code === 200) {
-    initGraph3(high.data)
-  }
-  const imp = await threatLevelAnalysis(store.activedTask?.id!, Number(searchInput.value))
-  if (imp.code === 200) {
-    initGraph4(imp.data)
+  const [avg, high, imp] = await Promise.all([
+    avgThreatAnalysis(store.activedTask?.id!, Number(searchInput.value)),
+    highThreatAnalysis(store.activedTask?.id!, Number(searchInput.value)),
+    threatLevelAnalysis(store.activedTask?.id!, Number(searchInput.value)),
+  ])
+
+  const avgData = avg.code === 200 ? avg.data : null
+  const highData = high.code === 200 ? high.data : null
+  const impData = imp.code === 200 ? imp.data : null
+
+  const hasContent =
+    checkDataHasContent(avgData) ||
+    checkDataHasContent(highData) ||
+    checkDataHasContent(impData)
+
+  hasChartData.value = hasContent
+
+  if (hasContent) {
+    await nextTick()
+    if (avgData) initGraph1(avgData)
+    if (highData) initGraph3(highData)
+    if (impData) initGraph4(impData)
   }
 }
 // 根据国家分析威胁度
 async function loadDataBySateCountry() {
   if (timeMode.value !== '历史时间计算') return
-  const avg = await avgThreatAnalysis(store.activedTask?.id!, undefined, String(searchInput.value))
-  if (avg.code === 200) {
-    initGraph1(avg.data)
-  }
-  const variation = await variationThreatAnalysis(store.activedTask?.id!, String(searchInput.value))
-  if (variation.code === 200) {
-    initGraph2(variation.data)
-  }
-  const high = await highThreatAnalysis(store.activedTask?.id!, undefined, String(searchInput.value))
-  if (high.code === 200) {
-    initGraph3(high.data)
-  }
-  const imp = await threatLevelAnalysis(store.activedTask?.id!, undefined, String(searchInput.value))
-  if (imp.code === 200) {
-    initGraph4(imp.data)
+
+  const [avg, variation, high, imp] = await Promise.all([
+    avgThreatAnalysis(store.activedTask?.id!, undefined, String(searchInput.value)),
+    variationThreatAnalysis(store.activedTask?.id!, String(searchInput.value)),
+    highThreatAnalysis(store.activedTask?.id!, undefined, String(searchInput.value)),
+    threatLevelAnalysis(store.activedTask?.id!, undefined, String(searchInput.value)),
+  ])
+
+  const avgData = avg.code === 200 ? avg.data : null
+  const variationData = variation.code === 200 ? variation.data : null
+  const highData = high.code === 200 ? high.data : null
+  const impData = imp.code === 200 ? imp.data : null
+
+  const hasContent =
+    checkDataHasContent(avgData) ||
+    checkDataHasContent(variationData) ||
+    checkDataHasContent(highData) ||
+    checkDataHasContent(impData)
+
+  hasChartData.value = hasContent
+
+  if (hasContent) {
+    await nextTick()
+    if (avgData) initGraph1(avgData)
+    if (variationData) initGraph2(variationData)
+    if (highData) initGraph3(highData)
+    if (impData) initGraph4(impData)
   }
 }
 const statistics = reactive({
@@ -3260,6 +3323,7 @@ function dispose() {
       border: 1px solid rgba(0, 225, 255, 0.2);
       border-radius: 8px;
       padding: 12px;
+      margin-top: 10px;
       overflow: hidden;
 
       :deep(.atlas-app-table) {

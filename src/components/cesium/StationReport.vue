@@ -587,7 +587,7 @@
         </el-col>
       </el-row>
       <el-row :gutter="10">
-        <el-col :span="12">
+        <el-col :span="24">
           <section class="result-block">
             <h4>电磁干扰武器阵地</h4>
             <div class="asset-list">
@@ -598,7 +598,9 @@
             </div>
           </section>
         </el-col>
-        <el-col :span="12">
+      </el-row>
+      <el-row :gutter="10">
+        <el-col :span="24">
           <section class="result-block">
             <h4>雷达站目标</h4>
             <div class="asset-list">
@@ -618,31 +620,18 @@
             <h4>电磁干扰通信卫星传输链路任务</h4>
             <div class="mission-list">
               <el-scrollbar class="mission-scroll">
-                <el-row :gutter="5" v-for="(strike, index) in lowIntensityStrikePlan.strikeList" :key="index"
-                  style="overflow-x: hidden; width: 100%">
-                  <el-col :span="12">
-                    <div class="mission-item" style="height: 85px">
-                      <div class="mission-item__header">
-                        <strong>任务{{ index + 1 }} * {{ strike.weaponName }}->链路（卫星编号：{{ strike.norad }}->{{
-                          strike.stationName
-                        }}）</strong>
-                      </div>
-                      <div class="mission-item__time">打击度：{{ strike.strike }}</div>
-                      <div class="mission-item__meta">
-                        总体时间窗口：{{ strike.totalWindowStart }} 至 {{ strike.totalWindowEnd }}
-                      </div>
-                    </div>
-                  </el-col>
-                  <el-col :span="12">
-                    <el-scrollbar>
-                      <div class="mission-item-row" style="height: 85px">
-                        <div v-for="(win, i) in strike.windows" :key="i">
-                          <el-tag type="primary">{{ win.windowStart }} 至 {{ win.windowEnd }}</el-tag>
-                        </div>
-                      </div>
-                    </el-scrollbar>
-                  </el-col>
-                </el-row>
+                <div class="mission-item" v-for="(strike, index) in lowIntensityStrikePlan.strikeList" :key="index"
+                  style="margin-bottom: 10px;">
+                  <div class="mission-item__header">
+                    <strong>任务{{ index + 1 }} * {{ strike.weaponName }}->链路（卫星编号：{{ strike.norad }}->{{
+                      strike.stationName
+                    }}）</strong>
+                  </div>
+                  <div class="mission-item__time">打击度：{{ strike.strike }}</div>
+                  <div class="mission-item__meta">
+                    总体时间窗口：{{ strike.totalWindowStart }} 至 {{ strike.totalWindowEnd }}
+                  </div>
+                </div>
               </el-scrollbar>
             </div>
           </section>
