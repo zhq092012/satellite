@@ -29,7 +29,7 @@
       </div>
 
       <div class="header-center">
-        <!-- 矩阵系列信息与干扰烈度 -->
+        <!-- 矩阵系列信息与状态统计看板 -->
         <span class="badge-item" v-if="props.matrixData?.series">
           <span class="label">卫星系列:</span>
           <span class="value">{{ props.matrixData.series }}</span>
@@ -38,9 +38,17 @@
           <span class="label">卫星总数:</span>
           <span class="value">{{ filteredSatellites.length }} 颗</span>
         </span>
+        <span class="badge-item">
+          <span class="label">地面站总数:</span>
+          <span class="value">{{ totalReceiveCount }} 个</span>
+        </span>
         <span class="badge-item alert-badge">
-          <span class="label">被干扰卫星:</span>
+          <span class="label">{{ ganttLabel }}卫星:</span>
           <span class="value danger">{{ struckSatCount }} 颗</span>
+        </span>
+        <span class="badge-item alert-badge">
+          <span class="label">{{ ganttLabel }}地面站:</span>
+          <span class="value danger">{{ struckReceiveCount }} 个</span>
         </span>
       </div>
 
@@ -422,12 +430,15 @@ const store = useLayoutStore()
 interface SatelliteGanttProps {
   /** 算法矩阵根接口返回数据 MatrixResult (可选) */
   matrixData?: MatrixResult | null
+  /** 烈度 */
+  intensity?: string
 }
 
 // [变量声明]
 // 组件定义 Props 属性，若外层未提供则组件自主发起网络请求获取
 const props = withDefaults(defineProps<SatelliteGanttProps>(), {
   matrixData: null,
+  intensity: '低烈度',
 })
 
 // [变量用途]
@@ -453,10 +464,6 @@ const selectedBarId = ref<string | null>(null)
 // [变量用途]
 // 时间刻度缩放倍率 (0.5x ~ 3.0x)
 const timeScaleFactor = ref<number>(1.0)
-
-// [变量用途]
-// 甘特图 Canvas 滚动容器 ref
-const scrollContainerRef = ref<HTMLDivElement | null>(null)
 
 // [类型用途]
 // 甘特图 Bar 元素计算后的封装结构
@@ -568,6 +575,77 @@ const filteredSatellites = computed<SatelliteMatrix[]>(() => {
       sat.stationWindows?.some((win) => win.weapons?.some((w) => w.name.toLowerCase().includes(kw)))
     return matchSatName || matchRec || matchWeapon
   })
+})
+
+/**
+ * [功能说明]
+ * 定义甘特图动词 Label (高烈度为“被摧毁”，中/低烈度为“被干扰”)
+ */
+const ganttLabel = computed<string>(() => {
+  return props.intensity === '高烈度' ? '被摧毁' : '被干扰'
+})
+
+/**
+ * [功能说明]
+ * 提炼当前矩阵数据中所有不重复的地面站对象列表
+ */
+const totalReceiveList = computed(() => {
+  const map = new Map<string, { receiveId: string; receiveName: string; status: number }>()
+
+  const relLists = [currentData.value?.stationRelationList, currentData.value?.initRelationList].filter(Boolean)
+
+  relLists.forEach((rl) => {
+    ;(rl?.receiveObjList || []).forEach((rec) => {
+      if (!map.has(rec.receiveId)) {
+        map.set(rec.receiveId, {
+          receiveId: rec.receiveId,
+          receiveName: rec.receiveName || rec.receiveId,
+          status: rec.receiveStatus || 0,
+        })
+      } else {
+        if (rec.receiveStatus === 1) {
+          map.get(rec.receiveId)!.status = 1
+        }
+      }
+    })
+  })
+
+  // 若关联列表无数据，从卫星过境窗口中兜底提炼
+  if (map.size === 0 && currentData.value?.satelliteMatrixList) {
+    currentData.value.satelliteMatrixList.forEach((sat) => {
+      ;(sat.stationWindows || []).forEach((win) => {
+        if (!map.has(win.receiveId)) {
+          map.set(win.receiveId, {
+            receiveId: win.receiveId,
+            receiveName: win.receiveName || win.receiveId,
+            status: win.strikeStatus || 0,
+          })
+        } else {
+          if (win.strikeStatus === 1) {
+            map.get(win.receiveId)!.status = 1
+          }
+        }
+      })
+    })
+  }
+
+  return Array.from(map.values())
+})
+
+/**
+ * [功能说明]
+ * 计算地面站总数量统计。
+ */
+const totalReceiveCount = computed<number>(() => {
+  return totalReceiveList.value.length
+})
+
+/**
+ * [功能说明]
+ * 计算被干扰/摧毁的地面站数量统计。
+ */
+const struckReceiveCount = computed<number>(() => {
+  return totalReceiveList.value.filter((rec) => rec.status === 1).length
 })
 
 /**

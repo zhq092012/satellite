@@ -52,7 +52,7 @@
 
     <!-- 当切换为甘特图模式时，渲染卫星击毁甘特图组件 -->
     <div v-show="currentViewMode === 'GANTT'" class="cema-workspace" style="height: calc(100vh - 60px); padding: 0">
-      <SatelliteGantt :matrix-data="matrixData" />
+      <SatelliteGantt :matrix-data="matrixData" :intensity="currentIntensity" />
     </div>
 
     <!-- 当切换为武器打击窗口列表模式时，渲染武器打击窗口列表组件 -->
