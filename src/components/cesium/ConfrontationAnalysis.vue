@@ -555,7 +555,7 @@ const renderSateliiteOfTask = async (
                     color: Cesium.Color.YELLOW, // 黄色轨迹
                   }),
                 },
-                description: `<div style="padding: 10px; font-family: Arial, sans-serif;background-color:white; color:  rgba(0, 0, 0, 0.7); border-radius: 8px;">
+                description: `<div style="padding: 10px; font-family: inherit;background-color:white; color:  rgba(0, 0, 0, 0.7); border-radius: 8px;">
       <h3 style="color: #1890ff; margin: 0 0 10px 0;display:flex; justify-content: space-between; align-items:center;"><span>🛰️ ${satel.name_en}</span> ${createInfoBoxActionButton('详情', { norad: satel.norad_id })}</h3>
       <p><strong>NORAD:</strong> ${satel.norad_id} </p>
       <p><strong>卫星类型:</strong> ${satel.sat_type}</p>
@@ -1082,7 +1082,7 @@ function loadWeapons(view: Cesium.Viewer, weapons: Weapon[], camp: string) {
               heightReference: Cesium.HeightReference.NONE,
             }
             ; (existing as any).description =
-              `<div style="padding: 10px; font-family: Arial, sans-serif;background-color:white; color:  rgba(0, 0, 0, 0.7); border-radius: 8px;">
+              `<div style="padding: 10px; font-family: inherit;background-color:white; color:  rgba(0, 0, 0, 0.7); border-radius: 8px;">
       <h3 style="color: #1890ff; margin: 0 0 10px 0;">🛰️ ${weapon.name}</h3>
       <p><strong>武器类型:</strong> ${weapon.type}</p>
       <p><strong>所属国家:</strong> ${weapon.country}</p>
@@ -1118,7 +1118,7 @@ function loadWeapons(view: Cesium.Viewer, weapons: Weapon[], camp: string) {
         pixelOffset: new Cesium.Cartesian2(0, 20),
         heightReference: Cesium.HeightReference.NONE, // 使用绝对高度，避免地形异步 clamp 导致位置错位
       },
-      description: `<div style="padding: 10px; font-family: Arial, sans-serif;background-color:white; color:  rgba(0, 0, 0, 0.7); border-radius: 8px;">
+      description: `<div style="padding: 10px; font-family: inherit;background-color:white; color:  rgba(0, 0, 0, 0.7); border-radius: 8px;">
       <h3 style="color: #1890ff; margin: 0 0 10px 0;">🛰️ ${weapon.name}</h3>
       <p><strong>武器类型:</strong> ${weapon.type}</p>
       <p><strong>所属国家:</strong> ${weapon.country}</p>

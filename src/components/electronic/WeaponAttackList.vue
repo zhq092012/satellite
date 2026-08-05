@@ -510,7 +510,7 @@ const formatTotalWindowsDuration = (plan: WeaponAttackRecord): string => {
     }
 
     .time-font {
-      font-family: monospace;
+      font-family: inherit;
       color: #38bdf8;
       font-weight: 600;
     }
@@ -564,7 +564,7 @@ const formatTotalWindowsDuration = (plan: WeaponAttackRecord): string => {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-family: monospace;
+      font-family: inherit;
 
       .time-start,
       .time-end {

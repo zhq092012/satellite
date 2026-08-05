@@ -81,7 +81,7 @@ export const buildSatelliteInfoBoxDescription = (
     .join('')
 
   return `
-    <div style="padding: 10px; font-family: Arial, sans-serif; background-color: white; color: rgba(0, 0, 0, 0.82); border-radius: 8px;">
+    <div style="padding: 10px; font-family: inherit; background-color: white; color: rgba(0, 0, 0, 0.82); border-radius: 8px;">
       <h3 style="color: #1890ff; margin: 0 0 10px 0; display:flex; justify-content: space-between; align-items:center; gap: 12px;">
         <span>🛰️ ${escapeHtml(detail?.name_en ?? satellite.name)}</span>
         ${createInfoBoxActionButton('详情', { norad: satellite.noradId })}

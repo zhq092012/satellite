@@ -929,14 +929,7 @@ watch(
   min-height: 650px;
   background-color: #0b1120;
   color: #e2e8f0;
-  font-family:
-    'Inter',
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  font-family: inherit;
   overflow: hidden;
 
   /* 1. Header 顶部栏 */
@@ -1246,7 +1239,7 @@ watch(
                 left: 4px;
                 font-size: 11px;
                 color: #94a3b8;
-                font-family: monospace;
+                font-family: inherit;
               }
             }
           }
@@ -1515,7 +1508,7 @@ watch(
                   color: #fbbf24;
                 }
                 &.time-font {
-                  font-family: monospace;
+                  font-family: inherit;
                 }
               }
 
@@ -1525,7 +1518,7 @@ watch(
                 border: 1px solid #f59e0b;
                 box-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
                 color: #fbbf24 !important;
-                font-family: 'Consolas', 'Monaco', monospace;
+                font-family: inherit;
                 font-size: 12px;
                 font-weight: 700;
                 padding: 4px 8px;
@@ -1553,7 +1546,7 @@ watch(
                 .highlight-sub {
                   font-size: 11px;
                   opacity: 0.85;
-                  font-family: monospace;
+                  font-family: inherit;
                   word-break: break-all;
                 }
 
@@ -1598,7 +1591,7 @@ watch(
                     font-size: 13px;
                     font-weight: 700;
                     color: #fbbf24;
-                    font-family: 'Consolas', 'Monaco', monospace;
+                    font-family: inherit;
                     letter-spacing: 0.5px;
                     text-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
                     margin-top: 2px;

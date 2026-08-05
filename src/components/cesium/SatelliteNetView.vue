@@ -864,7 +864,7 @@ watch(
 
     .title {
       font-weight: bold;
-      font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+      font-family: inherit;
       color: #d8ecff;
       text-align: center;
       padding: 5px 0;

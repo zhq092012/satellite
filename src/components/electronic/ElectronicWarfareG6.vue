@@ -2413,7 +2413,7 @@ onUnmounted(() => {
     .win-time {
       font-size: 11px;
       color: #94a3b8;
-      font-family: monospace;
+      font-family: inherit;
     }
 
     .win-status-badge {

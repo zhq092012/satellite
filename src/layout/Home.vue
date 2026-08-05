@@ -2262,7 +2262,7 @@ async function getTaskTargetOptions() {
               font-size: 20px;
               font-weight: 800;
               color: #00e1ff;
-              font-family: 'DIN Alternate', 'Orbitron', monospace, sans-serif;
+              font-family: inherit;
               margin-bottom: 4px;
 
               &.score-num {

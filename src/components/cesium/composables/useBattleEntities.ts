@@ -512,7 +512,7 @@ export function useBattleEntities(
         weaponEntity.position = new Cesium.ConstantPositionProperty(position)
         weaponEntity.description = new Cesium.CallbackProperty((time = new Cesium.JulianDate()) => {
           const { active, completed } = getWepState(time)
-          return `<div style="padding: 10px; font-family: Arial, sans-serif;background-color:white; color: rgba(0, 0, 0, 0.8); border-radius: 8px;">
+          return `<div style="padding: 10px; font-family: inherit;background-color:white; color: rgba(0, 0, 0, 0.8); border-radius: 8px;">
             <h3 style="margin: 0 0 8px 0; color: #ef6b73;">红方武器</h3>
             <p><strong>名称:</strong> ${weapon.name}</p>
             <p><strong>国家:</strong> ${weapon.country}</p>

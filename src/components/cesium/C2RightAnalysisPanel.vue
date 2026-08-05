@@ -317,7 +317,7 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
   gap: 8px;
   backdrop-filter: blur(10px);
   color: #e2e8f0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: inherit;
   overflow: hidden;
 
   * {
@@ -396,7 +396,7 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
 }
 
 .digital-font {
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-family: inherit;
   font-weight: 700;
 }
 
