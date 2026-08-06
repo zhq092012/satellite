@@ -942,7 +942,7 @@ import { useLayoutStore } from '@/store/modules/layout'
 import { ElMessage, type DrawerProps } from 'element-plus'
 import TableWithPageNoCard from '../table/TableWithPageNoCard.vue'
 import type { ThreatTaskWeightsResponse, ThreatWeight } from '@/types/threat'
-import { formatDate, getDaysAgo } from '@/utils/func/funcs'
+import { formatDate, getDaysAgo } from '@/utils/tools/funcs.ts'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import type { SatelliteThreat, SceneConfig } from '@/types/dashboard/index.js'
 defineOptions({

@@ -31,7 +31,7 @@
   </el-card>
 </template>
 <script setup lang="ts">
-import { getPageData } from '@/utils/func/funcs'
+import { getPageData } from '@/utils/tools/funcs'
 import type { TableInstance } from 'element-plus'
 import { computed, ref } from 'vue'
 

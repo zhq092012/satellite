@@ -680,7 +680,7 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch, onBeforeUnmount, onMounted } from 'vue'
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
-import PolygonMap from '@/components/cesium/viewers/BattleArea.vue'
+import PolygonMap from '@/components/cesium/BattleArea.vue'
 import {
   deleteBattle,
   deleteTask,

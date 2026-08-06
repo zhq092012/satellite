@@ -545,9 +545,9 @@ import { ElMessage } from 'element-plus'
 import * as Cesium from 'cesium'
 
 import { useLayoutStore } from '@/store/modules/layout'
-import { formatTimeLineAndAnimation, markBattleArea } from '@/utils/cesium/functionTool'
+import { formatTimeLineAndAnimation, markBattleArea } from '@/utils/tools/functionTool'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
-import { bindInfoBoxButton, unbindInfoBoxButton } from '@/utils/cesium/infoBox'
+import { bindInfoBoxButton, unbindInfoBoxButton } from '@/utils/tools/infoBox'
 import { getSatelliteDetail } from '@/api/dashboard'
 import type {
   StrikePlanV2Extended,
@@ -559,7 +559,7 @@ import type {
 import type { Weapon } from '@/types/dashboard'
 // 导入地面站 BaseStationInfo 类型定义
 import type { BaseStationInfo } from '@/api/system/satellite-system-api'
-import { parseLatLonToCoords, parseMissionWindowDate } from '@/utils/cesium/dateFormat'
+import { parseLatLonToCoords, parseMissionWindowDate } from '@/utils/tools/dateFormat'
 
 import { useSceneData } from '../../composables/useSceneData'
 import { useStrikePlan } from '../../composables/useStrikePlan'

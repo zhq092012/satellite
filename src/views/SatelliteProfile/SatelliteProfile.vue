@@ -1047,7 +1047,7 @@ import {
   getSatelliteTlePages,
   updateStrikeOfTaskV2,
 } from '@/api/dashboard'
-import { getImgServerPath, getMediaServerPath } from '@/utils/func/funcs'
+import { getImgServerPath, getMediaServerPath } from '@/utils/tools/funcs'
 import type { EdgeConfig, Graph, NodeConfig } from '@antv/g6'
 import G6 from '@antv/g6'
 import { useLayoutStore } from '@/store/modules/layout'

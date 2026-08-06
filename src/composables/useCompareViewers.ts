@@ -5,7 +5,7 @@
 import { nextTick, ref, type ShallowRef } from 'vue'
 import * as Cesium from 'cesium'
 import type { BlueSatelliteRecord, HistoricalPlanCard } from '@/types/strike'
-import { createSatelliteStrikeStarDataUri } from '@/utils/cesium/svgIcons'
+import { createSatelliteStrikeStarDataUri } from '@/utils/tools/svgIcons'
 
 // ─── 常量 ───
 const CHINA_OVERVIEW_LON = 107.4

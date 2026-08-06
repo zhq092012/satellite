@@ -1,6 +1,6 @@
 import type { StrikePlan } from '@/types/strike'
 import type { AxiosResponseType } from '@/types/http'
-import { requestAPI } from '@/utils/http/request'
+import { requestAPI } from '@/utils/tools/request'
 import type { Weapon } from '@/types/dashboard'
 export type GenerateStrikePlanV2Param = {
   taskId: number

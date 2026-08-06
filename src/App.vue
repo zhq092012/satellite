@@ -2,7 +2,7 @@
 import { ElConfigProvider } from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { onMounted } from 'vue'
-import SatelliteProfile from '@/views/cesium/SatelliteProfile.vue'
+import SatelliteProfile from '@/views/SatelliteProfile/SatelliteProfile.vue'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 
 const { satelliteProfileVisible, satelliteProfileNorad } = useSatelliteProfileDialog()

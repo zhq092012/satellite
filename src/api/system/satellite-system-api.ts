@@ -1,5 +1,5 @@
 import type { AxiosResponsePage, AxiosResponseType } from '@/types/http'
-import { requestAPI } from '@/utils/http/request'
+import { requestAPI } from '@/utils/tools/request'
 // 基站信息接口
 export interface BaseStationInfo {
   _id?: string

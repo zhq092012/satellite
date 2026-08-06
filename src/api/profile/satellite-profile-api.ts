@@ -1,5 +1,5 @@
 import type { AxiosResponsePage, AxiosResponseType } from '@/types/http'
-import { requestAPI } from '@/utils/http/request'
+import { requestAPI } from '@/utils/tools/request'
 
 export interface SatelliteAdvantageOrDisadvantage {
   _id: string

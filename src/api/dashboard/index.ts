@@ -2,7 +2,7 @@ import type { BattleForm, SatelliteNode, SatelliteRelation, SatelliteStrike, Sat
 import type { AxiosResponsePage, AxiosResponseType } from '@/types/http'
 import type { Strike, StrikeV2 } from '@/types/strike'
 import type { ThreatTaskWeightsResponse } from '@/types/threat'
-import { requestAPI } from '@/utils/http/request'
+import { requestAPI } from '@/utils/tools/request'
 
 /**
  * 获取首页所有卫星轨道数据

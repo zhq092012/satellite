@@ -12,15 +12,15 @@ import {
   mixColor,
   STRIKE_LINK_FADE_MS,
   STRIKE_SATELLITE_BLINK_MS,
-} from '@/utils/cesium/strikeStyle'
+} from '@/utils/tools/strikeStyle'
 import {
   getWeaponIconScale,
   createWeaponIconDataUri,
   createSatelliteStrikeStarDataUri,
   createStationExplosionDiamondDataUri,
-} from '@/utils/cesium/svgIcons'
-import { parseMissionWindowDate } from '@/utils/cesium/dateFormat'
-import { buildSatelliteInfoBoxDescription } from '@/utils/cesium/infoBoxBuilder'
+} from '@/utils/tools/svgIcons'
+import { parseMissionWindowDate } from '@/utils/tools/dateFormat'
+import { buildSatelliteInfoBoxDescription } from '@/utils/tools/infoBoxBuilder'
 import type { Weapon } from '@/types/dashboard'
 import type { BlueSatelliteRecord, SatelliteRelationItem } from '@/types/strike'
 

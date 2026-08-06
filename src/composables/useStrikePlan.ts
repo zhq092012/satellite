@@ -17,7 +17,7 @@ import {
 } from '@/api/strikePlan/satellite-strikeplan-api'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { HistoricalPlanCard } from '@/types/strike'
-import { buildHistoricalPlanFromKillChainPlan } from '@/utils/cesium/killChainAdapter'
+import { buildHistoricalPlanFromKillChainPlan } from '@/utils/tools/killChainAdapter'
 
 export function useStrikePlan(
   historicalPlans: { value: StrikePlanV2Extended[] },

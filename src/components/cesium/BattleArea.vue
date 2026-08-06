@@ -14,7 +14,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import * as Cesium from 'cesium'
-import { DrawClosedPolygon } from '@/utils/cesium/cesiumPolygon'
+import { DrawClosedPolygon } from '@/utils/tools/cesiumPolygon'
 let viewer: Cesium.Viewer
 const cesiumContainer = ref<HTMLElement | null>()
 const creditEl = ref<HTMLElement | null>()

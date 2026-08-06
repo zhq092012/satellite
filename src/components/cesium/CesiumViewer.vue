@@ -78,11 +78,11 @@ import {
   type SatelliteConstellation,
   type SituationData,
 } from '@/api/dashboard'
-import { createWeaponIconDataUri, getWeaponIconScale } from '@/utils/cesium/svgIcons'
+import { createWeaponIconDataUri, getWeaponIconScale } from '@/utils/tools/svgIcons'
 import * as satellitejs from 'satellite.js'
 import { useLayoutStore } from '@/store/modules/layout'
-import { formatTimeLineAndAnimation, markBattleArea } from '@/utils/cesium/functionTool'
-import { bindInfoBoxButton, createInfoBoxActionButton, unbindInfoBoxButton } from '@/utils/cesium/infoBox'
+import { formatTimeLineAndAnimation, markBattleArea } from '@/utils/tools/functionTool'
+import { bindInfoBoxButton, createInfoBoxActionButton, unbindInfoBoxButton } from '@/utils/tools/infoBox'
 import { CallbackProperty } from 'cesium'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import type { SatelliteData, Weapon } from '@/types/dashboard'

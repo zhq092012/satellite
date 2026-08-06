@@ -1,4 +1,4 @@
-import { requestAPI } from '@/utils/http/request'
+import { requestAPI } from '@/utils/tools/request'
 import type { AxiosResponseType } from '@/types/http'
 
 export interface MenuItem {

@@ -2,8 +2,9 @@
  * Cesium InfoBox HTML 构建
  * 用于生成点击卫星后弹出的信息面板内容
  */
-import { createInfoBoxActionButton } from '@/utils/cesium/infoBox'
-import type { BlueSatelliteRecord } from '../types'
+import type { BlueSatelliteRecord } from '@/types/strike'
+import { createInfoBoxActionButton } from '@/utils/tools/infoBox'
+
 
 /** HTML 转义，防止 XSS */
 export const escapeHtml = (value: unknown): string =>
