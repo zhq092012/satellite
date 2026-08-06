@@ -399,14 +399,35 @@ const initViewer = async () => {
  * - 关闭卫星面板
  */
 const clearViewer = () => {
-  if (!viewer) return
+  if (!viewer || viewer.isDestroyed()) return
+
+  // 1. 暂停渲染循环，防止 _onTick 在清理过程中并发更新
+  const prevRenderLoop = viewer.useDefaultRenderLoop
+  const prevAnimate = viewer.clock.shouldAnimate
+  viewer.useDefaultRenderLoop = false
+  viewer.clock.shouldAnimate = false
+
   if (clockTickRemoveListener) {
     clockTickRemoveListener()
     clockTickRemoveListener = null
   }
   clearElectronicNetworkEntities()
   viewer.entities.removeAll()
-  viewer.scene.primitives.removeAll()
+
+  // 2. 只移除我们手动添加的 Primitive 集合（pointCollection、labelCollection），
+  //    不要使用 viewer.scene.primitives.removeAll()！
+  //    removeAll() 会同时销毁 Cesium DataSourceDisplay 内部维护的 PrimitiveCollection，
+  //    导致后续 _onTick → GeometryVisualizer.update 访问已销毁的对象而抛出
+  //    "This object was destroyed" 异常。
+  if (pointCollection && !pointCollection.isDestroyed()) {
+    viewer.scene.primitives.remove(pointCollection)
+  }
+  pointCollection = null
+  if (labelCollection && !labelCollection.isDestroyed()) {
+    viewer.scene.primitives.remove(labelCollection)
+  }
+  labelCollection = null
+
   satellitePointPrimitives.clear()
   satelliteLabelPrimitives.clear()
   satellitePrimitiveEntities.clear()
@@ -414,6 +435,12 @@ const clearViewer = () => {
   clearConstellationOverlayEntities()
   selectedConstellation.value = null
   store.closeSatPanel()
+
+  // 3. 恢复渲染循环和时钟动画（仅当 viewer 未被销毁时）
+  if (!viewer.isDestroyed()) {
+    viewer.useDefaultRenderLoop = prevRenderLoop
+    viewer.clock.shouldAnimate = prevAnimate
+  }
 }
 
 // 以 NORAD 编号为 key，存储当前渲染的所有卫星实体
@@ -1787,7 +1814,14 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
     satelliteOrbitData.clear()
     satellitePositionPropertyCache.clear()
     satelliteEntities.clear()
+
+    // 暂停渲染循环，防止 removeAll() 与 _onTick 并发访问已销毁的 Batch
+    const prevLoop = viewer.useDefaultRenderLoop
+    viewer.useDefaultRenderLoop = false
     viewer.entities.removeAll()
+    if (!viewer.isDestroyed()) {
+      viewer.useDefaultRenderLoop = prevLoop
+    }
   }
 
   // 获取任务的卫星列表（只在第一次或任务切换时请求）
