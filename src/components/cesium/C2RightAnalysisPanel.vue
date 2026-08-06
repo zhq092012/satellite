@@ -20,10 +20,7 @@
               <span>{{ selectedNode.type === 'RECEIVE' ? '地面接收站详情' : '数据中心详情' }}</span>
             </div>
             <div class="title-right">
-              <span
-                class="status-pill"
-                :class="selectedNode.status === 1 ? 'pill-red' : 'pill-green'"
-              >
+              <span class="status-pill" :class="selectedNode.status === 1 ? 'pill-red' : 'pill-green'">
                 {{ selectedNode.status === 1 ? '🔴 已毁伤/打压' : '🟢 正常可操作' }}
               </span>
               <button class="close-node-btn" @click="clearSelectedNode" title="关闭详情">✕</button>
@@ -39,11 +36,15 @@
             <div class="node-grid">
               <div class="grid-item">
                 <span class="item-label">节点类别:</span>
-                <span class="item-val glow-cyan">{{ selectedNode.type === 'RECEIVE' ? '地基相控阵接收站' : '中心云数据处理中心' }}</span>
+                <span class="item-val glow-cyan">{{
+                  selectedNode.type === 'RECEIVE' ? '地基相控阵接收站' : '中心云数据处理中心'
+                }}</span>
               </div>
               <div class="grid-item">
                 <span class="item-label">地理坐标:</span>
-                <span class="item-val digital-font">{{ selectedNode.latitude.toFixed(2) }}°N, {{ selectedNode.longitude.toFixed(2) }}°E</span>
+                <span class="item-val digital-font"
+                  >{{ selectedNode.latitude.toFixed(2) }}°N, {{ selectedNode.longitude.toFixed(2) }}°E</span
+                >
               </div>
               <div class="grid-item">
                 <span class="item-label">部署海拔:</span>
@@ -66,9 +67,7 @@
             </div>
 
             <div class="node-actions">
-              <button class="fly-btn" @click="handleFlyToNode">
-                🎯 视角直达该站点
-              </button>
+              <button class="fly-btn" @click="handleFlyToNode">🎯 视角直达该站点</button>
             </div>
           </div>
         </div>
@@ -86,15 +85,21 @@
               <span class="status-pill pill-cyan">
                 {{ selectedSatellite.sat_type || '卫星资产' }}
               </span>
-              <button class="close-node-btn" @click="clearSelectedSatellite" title="关闭详情">✕</button>
             </div>
           </div>
 
           <div class="selected-satellite-card">
             <div class="sat-main-header">
               <div class="sat-title-box">
-                <span class="sat-name-text">{{ selectedSatellite.name_cn || selectedSatellite.name_en || selectedSatellite.name_all || ('SAT-' + selectedSatellite.norad) }}</span>
-                <span class="sat-sub-text" v-if="selectedSatellite.name_en && selectedSatellite.name_cn">{{ selectedSatellite.name_en }}</span>
+                <span class="sat-name-text">{{
+                  selectedSatellite.name_cn ||
+                  selectedSatellite.name_en ||
+                  selectedSatellite.name_all ||
+                  'SAT-' + selectedSatellite.norad
+                }}</span>
+                <span class="sat-sub-text" v-if="selectedSatellite.name_en && selectedSatellite.name_cn">{{
+                  selectedSatellite.name_en
+                }}</span>
               </div>
               <span class="country-tag">{{ selectedSatellite.country || '未标记' }}</span>
             </div>
@@ -110,15 +115,22 @@
               </div>
               <div class="grid-item">
                 <span class="item-label">轨道倾角 (i):</span>
-                <span class="item-val digital-font">{{ selectedSatellite.i ? selectedSatellite.i.toFixed(2) + '°' : '--' }}</span>
+                <span class="item-val digital-font">{{
+                  selectedSatellite.i ? selectedSatellite.i.toFixed(2) + '°' : '--'
+                }}</span>
               </div>
               <div class="grid-item">
                 <span class="item-label">运行周期 (Cycle):</span>
-                <span class="item-val digital-font glow-amber">{{ selectedSatellite.cycle ? selectedSatellite.cycle.toFixed(1) + ' 分钟' : '--' }}</span>
+                <span class="item-val digital-font glow-amber">{{
+                  selectedSatellite.cycle ? selectedSatellite.cycle.toFixed(1) + ' 分钟' : '--'
+                }}</span>
               </div>
               <div class="grid-item">
                 <span class="item-label">近/远地点:</span>
-                <span class="item-val digital-font">{{ selectedSatellite.prg ? selectedSatellite.prg.toFixed(0) : '--' }} / {{ selectedSatellite.apg ? selectedSatellite.apg.toFixed(0) : '--' }} km</span>
+                <span class="item-val digital-font"
+                  >{{ selectedSatellite.prg ? selectedSatellite.prg.toFixed(0) : '--' }} /
+                  {{ selectedSatellite.apg ? selectedSatellite.apg.toFixed(0) : '--' }} km</span
+                >
               </div>
               <div class="grid-item">
                 <span class="item-label">发射时间:</span>
@@ -126,7 +138,9 @@
               </div>
               <div class="grid-item" v-if="selectedSatellite.equipment">
                 <span class="item-label">载荷配置:</span>
-                <span class="item-val sat-desc-text" :title="selectedSatellite.equipment">{{ selectedSatellite.equipment }}</span>
+                <span class="item-val sat-desc-text" :title="selectedSatellite.equipment">{{
+                  selectedSatellite.equipment
+                }}</span>
               </div>
               <div class="grid-item" v-if="selectedSatellite.mass">
                 <span class="item-label">卫星质量:</span>
@@ -135,12 +149,8 @@
             </div>
 
             <div class="sat-actions">
-              <button class="fly-btn outline-btn" @click="handleOpenSatelliteProfile">
-                📖 查看全景档案
-              </button>
-              <button class="fly-btn" @click="handleFlyToSatellite">
-                🎯 视角追踪定位
-              </button>
+              <button class="fly-btn outline-btn" @click="handleOpenSatelliteProfile">📖 查看全景档案</button>
+              <button class="fly-btn" @click="handleFlyToSatellite">🎯 视角追踪定位</button>
             </div>
           </div>
         </div>
@@ -351,11 +361,6 @@ const handleFlyToNode = () => {
 
 /** 当前选中的 3D 卫星详细信息 (由 getSatelliteDetail 接口查询) */
 const selectedSatellite = computed(() => store.selectedSatellite)
-
-/** 清空选中的卫星详细信息 */
-const clearSelectedSatellite = () => {
-  store.setSelectedSatellite(null)
-}
 
 /** 打开卫星全景档案对话框 */
 const handleOpenSatelliteProfile = () => {
