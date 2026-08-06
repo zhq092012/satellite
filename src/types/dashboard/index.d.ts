@@ -186,31 +186,7 @@ interface SceneConfig {
   }
   user_overrides?: SceneConfig & { updated_at: string }
 }
-/**
- * 武器基础信息数据模型。
- *
- * [使用约束]
- * - 修改时请勿改变现有必填字段定义。
- * - satellite_type 为可选的目标/适用卫星类型描述。
- */
-interface Weapon {
-  /** 武器唯一标识 */
-  id?: string
-  /** 武器名称 */
-  name: string
-  /** 所属国家/地区 */
-  country: string
-  /** 武器类型（如：导弹、干扰机、激光武器等） */
-  type: string
-  /** 武器部署纬度 (-90 ~ 90) */
-  latitude: number
-  /** 武器部署经度 (-180 ~ 180) */
-  longitude: number
-  /** 打击高度或最大射程(km) */
-  range: number
-  /** 适用/目标卫星类型（如：低轨通信卫星、导航卫星等） */
-  satellite_type?: string
-}
+
 interface SatelliteStrike {
   comprehensive_strike_score: number
   threat_score: number
@@ -262,4 +238,29 @@ interface PointData {
   type: string
   paths?: Position[] | Record<string, Position[]>
   modelPath?: string
+}
+/**
+ * 武器基础信息数据模型。
+ *
+ * [使用约束]
+ * - 修改时请勿改变现有必填字段定义。
+ * - satellite_type 为可选的目标/适用卫星类型描述。
+ */
+export interface Weapon {
+  /** 武器唯一标识 */
+  id?: string
+  /** 武器名称 */
+  name: string
+  /** 所属国家/地区 */
+  country: string
+  /** 武器类型（如：导弹、干扰机、激光武器等） */
+  type: string
+  /** 武器部署纬度 (-90 ~ 90) */
+  latitude: number
+  /** 武器部署经度 (-180 ~ 180) */
+  longitude: number
+  /** 打击高度或最大射程(km) */
+  range: number
+  /** 适用/目标卫星类型（如：低轨通信卫星、导航卫星等） */
+  satellite_type?: string
 }

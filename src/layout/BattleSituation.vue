@@ -45,8 +45,6 @@
               :is="activeTabComponent"
               :key="store.activetab"
               :ref="setRef"
-              @threatAnalysis="threatAnalysis"
-              @changeEffectModel="handleChangeEffectModel"
               :tab-key="store.activetab"
               :has-nav="true"
               :has-legend="false"
@@ -105,6 +103,7 @@ import { getSatelliteList, getSituationDataOfTask, getStrikeSatellites, type Sit
 import { getMatrixList, getDefaultMatrixData, type MatrixResult } from '@/api/electronic'
 import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
+import type { SatelliteStrike } from '@/types/dashboard'
 const store = useLayoutStore()
 const authStore = useAuthStore()
 useSatelliteProfileDialog()
@@ -329,7 +328,10 @@ async function loadMatrixData(taskId: number, intensityLevel = '中度交战') {
     matrixData.value = getDefaultMatrixData()
   }
 }
-
+/**
+ * 修改烈度
+ * @param level 烈度级别
+ */
 const handleIntensityChange = (level: '高烈度' | '中烈度' | '低烈度') => {
   if (store.activedTask?.id) {
     loadMatrixData(store.activedTask.id, level)
@@ -409,6 +411,9 @@ const loadSatelliteList = async () => {
     satellite_loadnum.value = res.data.numberOfElements
   }
 }
+/**
+ *
+ */
 const handleChangeEffectModel = () => {
   // 仅在战场态势视图时刷新 orbit 路径（其他 tab 组件不会使用该 viewer）
   if (store.activetab === '战场态势视图') {

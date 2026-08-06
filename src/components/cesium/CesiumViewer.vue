@@ -66,22 +66,25 @@
 import type { MatrixResult, StationWindow } from '@/api/electronic'
 import { useElectronicCesiumBridge } from '@/composables/useElectronicCesiumBridge'
 import { useTimelineSync } from '@/composables/useTimelineSync'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
 import * as Cesium from 'cesium'
 import * as echarts from 'echarts'
 import {
+  getAllWeapons,
   getSatelliteConstellations,
   getSatelliteTLEData,
   getTLEDataByTaskId,
   type SatelliteConstellation,
   type SituationData,
 } from '@/api/dashboard'
+import { createWeaponIconDataUri, getWeaponIconScale } from './helpers/svgIcons'
 import * as satellitejs from 'satellite.js'
 import { useLayoutStore } from '@/store/modules/layout'
 import { formatTimeLineAndAnimation, markBattleArea } from '@/utils/cesium/functionTool'
 import { bindInfoBoxButton, createInfoBoxActionButton, unbindInfoBoxButton } from '@/utils/cesium/infoBox'
 import { CallbackProperty } from 'cesium'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
+import type { SatelliteData, Weapon } from '@/types/dashboard'
 
 // 全局布局状态管理 store
 const store = useLayoutStore()
@@ -95,19 +98,6 @@ const MATERIAL_URL = import.meta.env.VITE_MATERIAL_URL
 const cesiumContainer = useTemplateRef('cesiumContainer')
 // Cesium credit 容器 DOM 引用（避免多个 Viewer 实例抢占同一 id）
 const creditEl = ref<HTMLElement | null>(null)
-
-/**
- * 组件对外暴露的事件定义
- *
- * [事件说明]
- * - threatAnalysis: 触发威胁分析面板
- * - changeEffectModel: 切换惯性系/地固系效果模式，payload 为是否启用效果模式
- */
-interface Emits {
-  (e: 'threatAnalysis'): void
-  (e: 'changeEffectModel', payload: boolean): void
-}
-const emit = defineEmits<Emits>()
 
 /**
  * 组件 Props 定义
@@ -690,12 +680,132 @@ const toggleRadarFrustums = (show: boolean) => {
 
 const showRedSatellites = ref(false)
 
+// [变量用途]
+// 保存通过 getAllWeapons 查询得到的全量我方武器数据。
+const redWeaponDataList = ref<Weapon[]>([])
+
+// [变量用途]
+// 保存创建在 Cesium Viewer 中的我方武器实体引用列表。
+const redWeaponEntities = shallowRef<Cesium.Entity[]>([])
+
 /**
  * [功能]
- * 控制我方 (红方) 天基卫星显隐 (电子对抗模式默认隐藏非目标红方卫星，保持地图干净)
+ * 查询我方所有武器资源列表并将其绘制到 Cesium 地球球面上
+ *
+ * [数据来源]
+ * 调用 getAllWeapons API 接口获取全量武器数据模型
+ *
+ * [处理规则]
+ * - 使用 createWeaponIconDataUri 根据武器类型 (如：导弹/干扰/定向能/天基/火炮) 动态生成特定 SVG 图标
+ * - 在实体上绑定 Point, Billboard, Label 与 Ellipse (武器作用半径/防线)
+ * - 初始显隐受 showRedSatellites.value 状态控制
+ */
+const loadAndRenderRedWeapons = async () => {
+  if (!viewer) return
+  try {
+    const res = await getAllWeapons()
+    if (res.code === 200 && res.data?.weapons) {
+      redWeaponDataList.value = res.data.weapons
+      renderRedWeaponsOnCesium()
+    }
+  } catch (err) {
+    console.error('获取我方武器列表失败:', err)
+  }
+}
+
+/**
+ * [功能]
+ * 在 Cesium Viewer 中构造并绘制我方武器 3D 节点与作用防线
+ */
+const renderRedWeaponsOnCesium = () => {
+  if (!viewer) return
+
+  // 清理旧的武器实体
+  redWeaponEntities.value.forEach((entity) => {
+    viewer?.entities.remove(entity)
+  })
+  redWeaponEntities.value = []
+
+  const weapons = redWeaponDataList.value
+  const newEntities: Cesium.Entity[] = []
+
+  weapons.forEach((weapon, index) => {
+    if (!Number.isFinite(weapon.longitude) || !Number.isFinite(weapon.latitude)) return
+
+    const weaponId = `our-weapon-${weapon.id ?? index}`
+    const position = Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 500)
+    const iconScale = getWeaponIconScale(weapon.type)
+    const weaponColor = Cesium.Color.fromCssColorString('#ef6b73')
+    const iconUri = createWeaponIconDataUri(weapon.type, weaponColor, iconScale)
+    const rangeMeters = Math.max(10000, Number(weapon.range ?? 0) * 1000)
+
+    const entity = viewer.entities.add({
+      id: weaponId,
+      name: weapon.name,
+      position: new Cesium.ConstantPositionProperty(position),
+      show: showRedSatellites.value,
+      billboard: {
+        image: iconUri,
+        scale: iconScale,
+        width: 30 * iconScale,
+        height: 30 * iconScale,
+        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        heightReference: Cesium.HeightReference.NONE,
+      },
+      label: {
+        text: `${weapon.name} (${weapon.type || '武器'})`,
+        font: '12px sans-serif',
+        fillColor: Cesium.Color.fromCssColorString('#ff9e9e'),
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        pixelOffset: new Cesium.Cartesian2(0, 22),
+        showBackground: true,
+        backgroundColor: new Cesium.Color(0, 0, 0, 0.45),
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 10000000),
+      },
+      ellipse: {
+        semiMajorAxis: rangeMeters,
+        semiMinorAxis: rangeMeters,
+        material: Cesium.Color.fromCssColorString('#ef6b73').withAlpha(0.1),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString('#ef6b73').withAlpha(0.5),
+        height: 0,
+      },
+      description: `<div style="padding: 12px; font-family: sans-serif; background-color: #1a2233; color: #e6f7ff; border-radius: 8px; border: 1px solid #ef6b73;">
+        <h3 style="margin: 0 0 10px 0; color: #ef6b73; font-size: 16px;">🛩️ 我方武器资产</h3>
+        <p style="margin: 4px 0;"><strong>武器名称:</strong> ${weapon.name}</p>
+        <p style="margin: 4px 0;"><strong>所属国家/地区:</strong> ${weapon.country}</p>
+        <p style="margin: 4px 0;"><strong>武器类型:</strong> ${weapon.type}</p>
+        <p style="margin: 4px 0;"><strong>部署位置:</strong> 经度 ${weapon.longitude.toFixed(2)}°, 纬度 ${weapon.latitude.toFixed(2)}°</p>
+        <p style="margin: 4px 0;"><strong>打击高度/射程:</strong> ${weapon.range} km</p>
+        ${weapon.satellite_type ? `<p style="margin: 4px 0;"><strong>适用目标:</strong> ${weapon.satellite_type}</p>` : ''}
+      </div>`,
+    })
+
+    newEntities.push(entity)
+  })
+
+  redWeaponEntities.value = newEntities
+}
+
+/**
+ * [功能]
+ * 控制我方武器与卡座显隐 (切换复选框时触发)
  */
 const toggleRedSatellites = (show: boolean) => {
   showRedSatellites.value = show
+
+  // 显隐我方武器实体
+  redWeaponEntities.value.forEach((entity) => {
+    entity.show = show
+  })
+
+  // 如果武器列表尚未拉取，且主动勾选显示，则补充加载一次
+  if (show && redWeaponDataList.value.length === 0) {
+    void loadAndRenderRedWeapons()
+  }
+
   if (!pointCollection) return
   const matrixSats = props.matrixData?.initMatrixList || props.matrixData?.satelliteMatrixList || []
   const enemyNoradSet = new Set(matrixSats.map((s) => s.norad))
@@ -2164,6 +2274,7 @@ onMounted(async () => {
       applyConstellationVisualState()
     }
     viewer.camera.moveEnd.addEventListener(cameraMoveEndListener)
+    void loadAndRenderRedWeapons()
   }
   startContainerSizeObserver()
 })

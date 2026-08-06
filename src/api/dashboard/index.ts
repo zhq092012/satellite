@@ -1,3 +1,4 @@
+import type { BattleForm, SatelliteNode, SatelliteRelation, SatelliteStrike, SatelliteThreat, SceneConfig, TaskForm, TLEDataResponse, Weapon } from '@/types/dashboard'
 import type { AxiosResponsePage, AxiosResponseType } from '@/types/http'
 import type { Strike, StrikeV2 } from '@/types/strike'
 import type { ThreatTaskWeightsResponse } from '@/types/threat'

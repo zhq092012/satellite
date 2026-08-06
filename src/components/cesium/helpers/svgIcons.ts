@@ -4,7 +4,13 @@
  */
 import * as Cesium from 'cesium'
 
-/** 根据武器类型获取图标缩放比例 */
+/**
+ * [功能]
+ * 根据武器类型获取图标缩放比例
+ *
+ * @param weaponType 武器类型字符串
+ * @returns 缩放比例数值
+ */
 export const getWeaponIconScale = (weaponType: string): number => {
   const normalizedType = weaponType.trim()
 
@@ -16,8 +22,14 @@ export const getWeaponIconScale = (weaponType: string): number => {
 }
 
 /**
+ * [功能]
  * 生成武器图标的 SVG data URI
  * 根据武器类型（电子干扰/动能/定向能/天基）生成不同形状的 SVG 图标
+ *
+ * @param weaponType 武器类型名称
+ * @param color 武器颜色（Cesium.Color）
+ * @param iconScale 图标缩放系数
+ * @returns SVG 的 Data URI 字符串
  */
 export const createWeaponIconDataUri = (weaponType: string, color: Cesium.Color, iconScale = 1): string => {
   const normalizedType = weaponType.trim()
@@ -89,8 +101,13 @@ export const createWeaponIconDataUri = (weaponType: string, color: Cesium.Color,
 }
 
 /**
+ * [功能]
  * 创建打击卫星图标（多角星形）
  * 用于表示已打击或正在打击中的卫星
+ *
+ * @param color 颜色（Cesium.Color）
+ * @param iconScale 图标缩放系数
+ * @returns SVG 的 Data URI 字符串
  */
 export const createSatelliteStrikeStarDataUri = (color: Cesium.Color, iconScale = 1): string => {
   const solidColor = Cesium.Color.clone(color, new Cesium.Color())
@@ -120,8 +137,13 @@ export const createSatelliteStrikeStarDataUri = (color: Cesium.Color, iconScale 
 }
 
 /**
+ * [功能]
  * 创建基站爆炸菱形图标
  * 用于低/中烈度杀伤链方案中已打击的地面站
+ *
+ * @param color 颜色（Cesium.Color）
+ * @param iconScale 图标缩放系数
+ * @returns SVG 的 Data URI 字符串
  */
 export const createStationExplosionDiamondDataUri = (color: Cesium.Color, iconScale = 1): string => {
   const solidColor = Cesium.Color.clone(color, new Cesium.Color())

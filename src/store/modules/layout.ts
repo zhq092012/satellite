@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import * as Cesium from 'cesium'
+import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
 interface State {
   activetab: string
   isCollapse: boolean

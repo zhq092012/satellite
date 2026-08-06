@@ -37,12 +37,12 @@
         <label class="toggle-item">
           <input type="checkbox" v-model="showRadarFrustum" @change="$emit('toggle-radar-frustum', showRadarFrustum)" />
           <span class="checkbox-custom"></span>
-          <span class="toggle-text">📡 3D 雷达探测包络视椎</span>
+          <span class="toggle-text">📡 地面接收站</span>
         </label>
         <label class="toggle-item">
           <input type="checkbox" v-model="showOrbitTrails" @change="$emit('toggle-orbit-trails', showOrbitTrails)" />
           <span class="checkbox-custom"></span>
-          <span class="toggle-text">🛰️ 卫星运行真实轨道轨迹</span>
+          <span class="toggle-text">🛰️ 卫星运行轨迹</span>
         </label>
         <label class="toggle-item">
           <input
@@ -51,15 +51,15 @@
             @change="$emit('toggle-red-satellites', showRedSatellites)"
           />
           <span class="checkbox-custom"></span>
-          <span class="toggle-text">🇨🇳 显示我方(红方)天基卫星</span>
+          <span class="toggle-text">🛩️ 我方武器</span>
         </label>
       </div>
 
       <!-- 视角快速定位按钮 -->
       <div class="camera-actions">
-        <button class="c2-btn action-btn" @click="$emit('fly-to-view', 'GLOBAL')">🌐 全景视口</button>
-        <button class="c2-btn action-btn" @click="$emit('fly-to-view', 'SPACE')">🛰️ 天基集群</button>
-        <button class="c2-btn action-btn" @click="$emit('fly-to-view', 'GROUND')">🏢 地基节点</button>
+        <button class="c2-btn action-btn" @click="$emit('fly-to-view', 'GLOBAL')">🌐 全景视角</button>
+        <button class="c2-btn action-btn" @click="$emit('fly-to-view', 'SPACE')">🛰️ 卫星视角</button>
+        <button class="c2-btn action-btn" @click="$emit('fly-to-view', 'GROUND')">🏢 地面视角</button>
       </div>
     </div>
 
