@@ -706,6 +706,7 @@ import { ElMessage, type FormRules, type FormInstance, ElMessageBox } from 'elem
 import { useRouter } from 'vue-router'
 import { useLayoutStore } from '@/store/modules/layout'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
+import type { BattleForm, TaskForm } from '@/types/dashboard'
 const polygonRef = ref<InstanceType<typeof PolygonMap> | null>(null)
 defineOptions({ name: 'Home' }) // 对应 keep-alive 的 include
 

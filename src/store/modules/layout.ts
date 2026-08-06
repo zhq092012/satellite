@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import * as Cesium from 'cesium'
 import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
+import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
+
 interface State {
   activetab: string
   isCollapse: boolean
@@ -14,6 +16,9 @@ interface State {
   showAnalysisPanel: boolean //分析面板
   showSatelliteMsgBox: boolean
   selectedSatellite: SatelliteDetail | null
+
+  /** 当前选中的 3D 敌方地面基础设施节点 (地面接收站 / 中心云数据中心) */
+  selectedInfrastructureNode: InfrastructureLocation | null
 
   allSatelliteOfTask: SatelliteData[]
   effectModel: boolean // 是否惯性参考系
@@ -39,6 +44,7 @@ export const useLayoutStore = defineStore('layout-store', {
       showSatelliteMsgBox: false,
       showAnalysisPanel: true,
       selectedSatellite: null,
+      selectedInfrastructureNode: null,
 
       allSatelliteOfTask: [],
       effectModel: true,
@@ -116,6 +122,15 @@ export const useLayoutStore = defineStore('layout-store', {
     },
     setSelectedSatellite(satellite: SatelliteDetail | null) {
       this.selectedSatellite = satellite
+    },
+    /**
+     * [功能]
+     * 设置当前选中的敌方地面基础设施节点 (地面接收站 / 中心云数据中心)
+     *
+     * @param node 选中的 InfrastructureLocation 对象或 null
+     */
+    setSelectedInfrastructureNode(node: InfrastructureLocation | null) {
+      this.selectedInfrastructureNode = node
     },
     /* 关闭面板 */
     closeSatPanel() {

@@ -1,4 +1,5 @@
 import { useLayoutStore } from '@/store/modules/layout'
+import type { BattleForm } from '@/types/dashboard';
 import { EntityCollection } from 'cesium'
 import * as Cesium from 'cesium'
 const store = useLayoutStore()
@@ -164,7 +165,7 @@ export function buildSegmentedTrack(
 }
 // 标记战场
 export function markBattleArea(viewer: Cesium.Viewer, battle: BattleForm | null, orbit_altitude_km: number = 20000000) {
-  if (battle === null) return
+  if (!viewer || (viewer as any).isDestroyed?.() || battle === null) return
   let entitys: EntityCollection = new EntityCollection()
   // 用于计算整体视野的 BoundingSphere（包含所有圆与多边形）
   let combinedBS: Cesium.BoundingSphere | null = null

@@ -762,6 +762,7 @@ import {
   type StrikePlanV2PlanDetail,
 } from '@/api/strikePlan/satellite-strikeplan-api'
 import { getTaskWeapons } from '@/api/dashboard'
+import type { Weapon } from '@/types/dashboard'
 defineOptions({
   name: 'EvaluationReport',
 })

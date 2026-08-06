@@ -9,6 +9,7 @@ import { useLayoutStore } from '@/store/modules/layout'
 import type { StrikePlanV2MissionWindowItem } from '@/api/strikePlan/satellite-strikeplan-api'
 import type { ActiveStrikeQueueItem, BlueSatelliteRecord, MetricCard, StageItem } from '../types'
 import { formatClock, formatDateTime, formatFullDateTime, parseMissionWindowDate } from '../helpers/dateFormat'
+import type { Weapon } from '@/types/dashboard'
 
 export function useSimulationPlayback(
   viewer: ShallowRef<Cesium.Viewer | null>,

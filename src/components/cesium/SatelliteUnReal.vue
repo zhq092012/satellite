@@ -555,6 +555,10 @@ import type {
   RespKillChainPlanMiddle,
   RespKillChainPlanHigh,
 } from '@/api/strikePlan/satellite-strikeplan-api'
+// 导入首页/装备仪表盘 Weapon 类型定义
+import type { Weapon } from '@/types/dashboard'
+// 导入地面站 BaseStationInfo 类型定义
+import type { BaseStationInfo } from '@/api/system/satellite-system-api'
 import { parseLatLonToCoords, parseMissionWindowDate } from './helpers/dateFormat'
 
 import { useSceneData } from './composables/useSceneData'
@@ -1016,7 +1020,8 @@ const refreshSceneEntities = (fitScene = false, resetEntities = false) => {
 
       const elecNames = new Set(uniqueElecWeapons.map((ew) => ew.name))
       const elecIds = new Set(uniqueElecWeapons.map((ew) => String(ew.id)))
-      const filtered = taskWeapons.value.filter((tw) => elecIds.has(String(tw.id)) || elecNames.has(tw.name))
+      // 过滤与低烈度打击方案相匹配的电子干扰武器
+      const filtered = taskWeapons.value.filter((tw: Weapon) => elecIds.has(String(tw.id)) || elecNames.has(tw.name))
       redWeapons.value = filtered.length > 0 ? filtered : uniqueElecWeapons
 
       const allStationDetails = plans.flatMap((p) => p.stationDetails || [])
@@ -1025,7 +1030,8 @@ const refreshSceneEntities = (fitScene = false, resetEntities = false) => {
 
       const stNames = new Set(uniqueStations.map((sd) => sd.stationName))
       const stIds = new Set(uniqueStations.map((sd) => sd.stationId))
-      const filteredStations = baseStations.value.filter((bs) => stIds.has(bs._id || '') || stNames.has(bs.name))
+      // 过滤与低烈度打击方案相匹配的地面站
+      const filteredStations = baseStations.value.filter((bs: BaseStationInfo) => stIds.has(bs._id || '') || stNames.has(bs.name))
       const stationsToMap =
         filteredStations.length > 0
           ? filteredStations
@@ -1086,8 +1092,9 @@ const refreshSceneEntities = (fitScene = false, resetEntities = false) => {
       const allDirectedWindows = plans.flatMap((p) => p.directedWindows || [])
       const directedWeaponIds = new Set(allDirectedWindows.map((dw) => String(dw.weapon_id)))
       const directedWeaponNames = new Set(allDirectedWindows.map((dw) => dw.weapon_name))
+      // 过滤与中烈度打击方案相匹配的定向能武器，使用已导入的 Weapon 类型注解
       const filteredDirectedWeapons = taskWeapons.value.filter(
-        (tw) => directedWeaponIds.has(String(tw.id)) || directedWeaponNames.has(tw.name)
+        (tw: Weapon) => directedWeaponIds.has(String(tw.id)) || directedWeaponNames.has(tw.name)
       )
 
       redWeapons.value = [...basesMapped, ...filteredDirectedWeapons]
@@ -1570,7 +1577,13 @@ onBeforeUnmount(() => {
   }
   clearSatelliteTleCache()
   if (viewer.value && !viewer.value.isDestroyed()) {
-    viewer.value.destroy()
+    try {
+      viewer.value.useDefaultRenderLoop = false
+      viewer.value.clock.shouldAnimate = false
+      viewer.value.destroy()
+    } catch (e) {
+      console.warn('SatelliteUnReal viewer destroy warning', e)
+    }
   }
   viewer.value = null
   isViewerReady.value = false

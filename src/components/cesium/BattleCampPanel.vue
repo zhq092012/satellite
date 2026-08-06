@@ -103,6 +103,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { getImgServerPath } from '@/utils/func/funcs'
 import satelliteFallback from '@/assets/img/satellite.png'
+import type { SatelliteStrike } from '@/types/dashboard'
 
 type SummaryRow = {
   name: string

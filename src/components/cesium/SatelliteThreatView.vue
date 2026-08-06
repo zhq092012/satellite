@@ -944,6 +944,7 @@ import TableWithPageNoCard from '../table/TableWithPageNoCard.vue'
 import type { ThreatTaskWeightsResponse, ThreatWeight } from '@/types/threat'
 import { formatDate, getDaysAgo } from '@/utils/func/funcs'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
+import type { SatelliteThreat, SceneConfig } from '@/types/dashboard/index.js'
 defineOptions({
   name: 'ThreatAnalysis',
 })

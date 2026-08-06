@@ -314,7 +314,11 @@ async function loadStrikeList(taskId: number) {
     strikeSatelliteList.value = res.data.content ?? []
   }
 }
-
+/**
+ * 加载算法矩阵
+ * @param taskId 任务ID
+ * @param intensityLevel 烈度级别
+ */
 async function loadMatrixData(taskId: number, intensityLevel = '中度交战') {
   try {
     const res = await getMatrixList({ norad: 60419, taskId, intensityLevel })

@@ -660,6 +660,7 @@ import {
   type StrikePlanV2PlanDetail,
 } from '@/api/strikePlan/satellite-strikeplan-api.ts'
 import { getTaskStageIntensityOptions, getTaskWeapons } from '@/api/dashboard'
+import type { Weapon } from '@/types/dashboard'
 
 defineOptions({
   name: 'StationReport',
@@ -875,14 +876,60 @@ const toggleLead = () => {
     clearMilitaryBaseAll('指挥中心')
   }
 }
+/**
+ * [类型用途]
+ * 中烈度打击方案在 UI 页面渲染时的包装模型接口。
+ *
+ * [数据来源]
+ * 由 computed 属性 middleIntensityPlans 根据后端返回的 StationStrikePlanResp 映射转化得到。
+ *
+ * [字段规则]
+ * - key: 方案唯一键名（如 'saturation' | 'lowest-cost' | 'strongest'）。
+ * - badge: 方案标签显示名称。
+ * - accent: 方案的主题高亮样式别名。
+ * - plan: 中烈度打击方案原始数据对象。
+ *
+ * [使用约束]
+ * 仅用于 StationReport.vue 模板视图中的卡片渲染。
+ */
+interface MiddleIntensityPlanItem {
+  /** 方案唯一 key */
+  key: string
+  /** 方案徽章标题 */
+  badge: string
+  /** 方案样式主题色标识 */
+  accent: string
+  /** 对应的中烈度打击方案详情对象 */
+  plan: StationStrikePlanResp
+}
+
 //中低烈度打击方案(饱和式打击、成本最低、突防最强)
 const middleIntensityStrikePlan = ref<StationStrikePlanResp[]>([])
 const sSaturationStrikePlan = computed(() => middleIntensityStrikePlan.value.find(s => s.planType === '饱和式打击'))
 const lowestCostStrikePlan = computed(() => middleIntensityStrikePlan.value.find(s => s.planType === '成本最低'))
 const strongestPenetrationStrikePlan = computed(() => middleIntensityStrikePlan.value.find(s => s.planType === '突防最强'))
 
-const middleIntensityPlans = computed(() => {
-  const list = []
+/**
+ * [功能]
+ * 聚合并筛选当前可用的中烈度打击方案列表，包括饱和式打击、成本最低和突防最强方案。
+ *
+ * [处理规则]
+ * - 依次检查三大中烈度方案是否存在。
+ * - 将存在的方案包装为 MiddleIntensityPlanItem 对象格式推入列表。
+ *
+ * [副作用]
+ * 无副作用。
+ *
+ * [异常处理]
+ * 无异常，未匹配到方案时返回空数组。
+ *
+ * [修改约束]
+ * - 必须显式声明返回类型为 MiddleIntensityPlanItem[]，防止 TypeScript 将初始数组推导为 never[]。
+ *
+ * @returns 待渲染的中烈度打击方案包装数组
+ */
+const middleIntensityPlans = computed<MiddleIntensityPlanItem[]>(() => {
+  const list: MiddleIntensityPlanItem[] = []
   if (sSaturationStrikePlan.value) {
     list.push({
       key: 'saturation',

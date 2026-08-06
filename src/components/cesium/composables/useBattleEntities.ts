@@ -22,6 +22,7 @@ import {
 } from '../helpers/svgIcons'
 import { parseMissionWindowDate } from '../helpers/dateFormat'
 import { buildSatelliteInfoBoxDescription } from '../helpers/infoBoxBuilder'
+import type { Weapon } from '@/types/dashboard'
 
 /**
  * tips:由于在这个业务场景中，地面站被统一适配并存放在了 blueSatellites 集合中（将它的 satType 设为 '基站'，高度 altitude 设为 100 ），

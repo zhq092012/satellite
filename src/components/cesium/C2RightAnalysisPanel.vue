@@ -11,6 +11,141 @@
 
     <!-- 全面板纵向滚动容器 -->
     <el-scrollbar class="panel-body-scroll">
+      <!-- 0. 选中敌方地面基础设施节点 (地面接收站 / 数据中心) 详细信息展示卡片 -->
+      <transition name="el-zoom-in-top">
+        <div v-if="selectedNode" class="panel-section selected-node-section">
+          <div class="section-title title-highlight">
+            <div class="title-left">
+              <span class="title-icon">{{ selectedNode.type === 'RECEIVE' ? '📡' : '💻' }}</span>
+              <span>{{ selectedNode.type === 'RECEIVE' ? '地面接收站详情' : '数据中心详情' }}</span>
+            </div>
+            <div class="title-right">
+              <span
+                class="status-pill"
+                :class="selectedNode.status === 1 ? 'pill-red' : 'pill-green'"
+              >
+                {{ selectedNode.status === 1 ? '🔴 已毁伤/打压' : '🟢 正常可操作' }}
+              </span>
+              <button class="close-node-btn" @click="clearSelectedNode" title="关闭详情">✕</button>
+            </div>
+          </div>
+
+          <div class="selected-node-card">
+            <div class="node-main-header">
+              <span class="node-name-text">{{ selectedNode.name }}</span>
+              <span class="node-id-tag">ID: {{ selectedNode.id }}</span>
+            </div>
+
+            <div class="node-grid">
+              <div class="grid-item">
+                <span class="item-label">节点类别:</span>
+                <span class="item-val glow-cyan">{{ selectedNode.type === 'RECEIVE' ? '地基相控阵接收站' : '中心云数据处理中心' }}</span>
+              </div>
+              <div class="grid-item">
+                <span class="item-label">地理坐标:</span>
+                <span class="item-val digital-font">{{ selectedNode.latitude.toFixed(2) }}°N, {{ selectedNode.longitude.toFixed(2) }}°E</span>
+              </div>
+              <div class="grid-item">
+                <span class="item-label">部署海拔:</span>
+                <span class="item-val digital-font">{{ selectedNode.altitude }} m</span>
+              </div>
+              <div class="grid-item">
+                <span class="item-label">物理仰角掩蔽:</span>
+                <span class="item-val digital-font glow-amber">10.0° 门槛</span>
+              </div>
+              <div class="grid-item">
+                <span class="item-label">解扩通信余量:</span>
+                <span class="item-val digital-font" :class="selectedNode.status === 1 ? 'glow-red' : 'glow-green'">
+                  {{ selectedNode.status === 1 ? '-12.5 dB (中断)' : '+18.5 dB (良好)' }}
+                </span>
+              </div>
+              <div class="grid-item">
+                <span class="item-label">关联过境窗口:</span>
+                <span class="item-val digital-font glow-cyan">{{ nodeAssociatedWindows.length }} 个</span>
+              </div>
+            </div>
+
+            <div class="node-actions">
+              <button class="fly-btn" @click="handleFlyToNode">
+                🎯 视角直达该站点
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <!-- 0.1 选中 3D 卫星详细信息展示卡片 (由 getSatelliteDetail 接口获取) -->
+      <transition name="el-zoom-in-top">
+        <div v-if="selectedSatellite" class="panel-section selected-satellite-section">
+          <div class="section-title title-highlight">
+            <div class="title-left">
+              <span class="title-icon">🛰️</span>
+              <span>卫星资产详情 (NORAD: {{ selectedSatellite.norad }})</span>
+            </div>
+            <div class="title-right">
+              <span class="status-pill pill-cyan">
+                {{ selectedSatellite.sat_type || '卫星资产' }}
+              </span>
+              <button class="close-node-btn" @click="clearSelectedSatellite" title="关闭详情">✕</button>
+            </div>
+          </div>
+
+          <div class="selected-satellite-card">
+            <div class="sat-main-header">
+              <div class="sat-title-box">
+                <span class="sat-name-text">{{ selectedSatellite.name_cn || selectedSatellite.name_en || selectedSatellite.name_all || ('SAT-' + selectedSatellite.norad) }}</span>
+                <span class="sat-sub-text" v-if="selectedSatellite.name_en && selectedSatellite.name_cn">{{ selectedSatellite.name_en }}</span>
+              </div>
+              <span class="country-tag">{{ selectedSatellite.country || '未标记' }}</span>
+            </div>
+
+            <div class="sat-grid">
+              <div class="grid-item">
+                <span class="item-label">NORAD 编号:</span>
+                <span class="item-val digital-font glow-cyan">#{{ selectedSatellite.norad }}</span>
+              </div>
+              <div class="grid-item">
+                <span class="item-label">卫星类型:</span>
+                <span class="item-val glow-cyan">{{ selectedSatellite.sat_type || '常规卫星' }}</span>
+              </div>
+              <div class="grid-item">
+                <span class="item-label">轨道倾角 (i):</span>
+                <span class="item-val digital-font">{{ selectedSatellite.i ? selectedSatellite.i.toFixed(2) + '°' : '--' }}</span>
+              </div>
+              <div class="grid-item">
+                <span class="item-label">运行周期 (Cycle):</span>
+                <span class="item-val digital-font glow-amber">{{ selectedSatellite.cycle ? selectedSatellite.cycle.toFixed(1) + ' 分钟' : '--' }}</span>
+              </div>
+              <div class="grid-item">
+                <span class="item-label">近/远地点:</span>
+                <span class="item-val digital-font">{{ selectedSatellite.prg ? selectedSatellite.prg.toFixed(0) : '--' }} / {{ selectedSatellite.apg ? selectedSatellite.apg.toFixed(0) : '--' }} km</span>
+              </div>
+              <div class="grid-item">
+                <span class="item-label">发射时间:</span>
+                <span class="item-val digital-font">{{ selectedSatellite.launch_date || '--' }}</span>
+              </div>
+              <div class="grid-item" v-if="selectedSatellite.equipment">
+                <span class="item-label">载荷配置:</span>
+                <span class="item-val sat-desc-text" :title="selectedSatellite.equipment">{{ selectedSatellite.equipment }}</span>
+              </div>
+              <div class="grid-item" v-if="selectedSatellite.mass">
+                <span class="item-label">卫星质量:</span>
+                <span class="item-val digital-font">{{ selectedSatellite.mass }} kg</span>
+              </div>
+            </div>
+
+            <div class="sat-actions">
+              <button class="fly-btn outline-btn" @click="handleOpenSatelliteProfile">
+                📖 查看全景档案
+              </button>
+              <button class="fly-btn" @click="handleFlyToSatellite">
+                🎯 视角追踪定位
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
+
       <!-- 1. 网络脆弱点与高价值枢纽分析模块 -->
       <div class="panel-section">
         <div class="section-title">
@@ -186,12 +321,57 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { getDefaultMatrixData, type MatrixResult, type Weapon } from '@/api/electronic'
+import { useLayoutStore } from '@/store/modules/layout'
+import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 
 const props = defineProps<{
   matrixData?: MatrixResult | null
 }>()
 
+const store = useLayoutStore()
+const { openSatelliteProfile } = useSatelliteProfileDialog()
 const activeMatrix = computed<MatrixResult>(() => props.matrixData || getDefaultMatrixData())
+
+/** 当前选中的 3D 敌方地面基础设施节点 (地面接收站 / 数据中心) */
+const selectedNode = computed(() => store.selectedInfrastructureNode)
+
+/** 清空选中的基础设施节点 */
+const clearSelectedNode = () => {
+  store.setSelectedInfrastructureNode(null)
+}
+
+/** 触发相机平滑定位视角直达当前选中的站点 */
+const handleFlyToNode = () => {
+  if (selectedNode.value) {
+    const node = selectedNode.value
+    store.setSelectedInfrastructureNode(null)
+    store.setSelectedInfrastructureNode(node)
+  }
+}
+
+/** 当前选中的 3D 卫星详细信息 (由 getSatelliteDetail 接口查询) */
+const selectedSatellite = computed(() => store.selectedSatellite)
+
+/** 清空选中的卫星详细信息 */
+const clearSelectedSatellite = () => {
+  store.setSelectedSatellite(null)
+}
+
+/** 打开卫星全景档案对话框 */
+const handleOpenSatelliteProfile = () => {
+  if (selectedSatellite.value?.norad) {
+    openSatelliteProfile(selectedSatellite.value.norad)
+  }
+}
+
+/** 视角追踪定位选中的卫星 */
+const handleFlyToSatellite = () => {
+  if (selectedSatellite.value?.norad) {
+    const sat = selectedSatellite.value
+    store.setSelectedSatellite(null)
+    store.setSelectedSatellite(sat)
+  }
+}
 
 // 1. 网络脆弱点与高价值枢纽
 const highValueHubs = computed(() => {
@@ -409,6 +589,15 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
   })
 
   return list
+})
+
+/** 与当前选中站点关联的过境通信窗口列表 */
+const nodeAssociatedWindows = computed(() => {
+  if (!selectedNode.value) return []
+  const node = selectedNode.value
+  return allWindowsList.value.filter(
+    (win) => win.receiveId === node.id || win.receiveName.includes(node.name) || node.name.includes(win.receiveName)
+  )
 })
 </script>
 
@@ -917,6 +1106,255 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
         &.tag-red {
           background: rgba(239, 68, 68, 0.15);
           color: #f87171;
+        }
+      }
+    }
+  }
+}
+
+.selected-node-section {
+  background: rgba(14, 30, 56, 0.95) !important;
+  border: 1px solid rgba(0, 225, 255, 0.4) !important;
+  box-shadow: 0 0 16px rgba(0, 225, 255, 0.2);
+
+  .title-highlight {
+    justify-content: space-between;
+
+    .title-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .title-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-pill {
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-weight: 700;
+
+      &.pill-green {
+        background: rgba(34, 197, 94, 0.2);
+        color: #4ade80;
+        border: 1px solid rgba(34, 197, 94, 0.4);
+      }
+      &.pill-red {
+        background: rgba(239, 68, 68, 0.2);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+      }
+    }
+
+    .close-node-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+      transition: color 0.2s;
+
+      &:hover {
+        color: #f87171;
+      }
+    }
+  }
+
+  .selected-node-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 4px;
+
+    .node-main-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 4px;
+
+      .node-name-text {
+        font-size: 13px;
+        font-weight: 700;
+        color: #00e1ff;
+      }
+      .node-id-tag {
+        font-size: 10px;
+        color: #94a3b8;
+        background: rgba(255, 255, 255, 0.06);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+    }
+
+    .node-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px 8px;
+
+      .grid-item {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        background: rgba(7, 16, 31, 0.6);
+        padding: 4px 6px;
+        border-radius: 4px;
+        border: 1px solid rgba(0, 225, 255, 0.1);
+
+        .item-label {
+          font-size: 10px;
+          color: #94a3b8;
+        }
+        .item-val {
+          font-size: 11px;
+          font-weight: 700;
+        }
+      }
+    }
+
+    .node-actions {
+      display: flex;
+      justify-content: flex-end;
+      padding-top: 2px;
+
+      .fly-btn {
+        background: linear-gradient(135deg, rgba(0, 225, 255, 0.2), rgba(0, 140, 255, 0.4));
+        border: 1px solid rgba(0, 225, 255, 0.5);
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+          background: linear-gradient(135deg, rgba(0, 225, 255, 0.4), rgba(0, 140, 255, 0.6));
+          box-shadow: 0 0 10px rgba(0, 225, 255, 0.4);
+        }
+      }
+    }
+  }
+}
+
+.selected-satellite-section {
+  background: rgba(14, 28, 48, 0.95) !important;
+  border: 1px solid rgba(0, 225, 255, 0.4) !important;
+  box-shadow: 0 0 16px rgba(0, 225, 255, 0.25);
+
+  .status-pill.pill-cyan {
+    background: rgba(0, 225, 255, 0.15);
+    color: #00e1ff;
+    border: 1px solid rgba(0, 225, 255, 0.4);
+  }
+
+  .selected-satellite-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 4px;
+
+    .sat-main-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 4px;
+
+      .sat-title-box {
+        display: flex;
+        flex-direction: column;
+
+        .sat-name-text {
+          font-size: 13px;
+          font-weight: 700;
+          color: #00e1ff;
+        }
+        .sat-sub-text {
+          font-size: 10px;
+          color: #94a3b8;
+        }
+      }
+
+      .country-tag {
+        font-size: 10px;
+        color: #fbbf24;
+        background: rgba(251, 191, 36, 0.12);
+        border: 1px solid rgba(251, 191, 36, 0.3);
+        padding: 1px 6px;
+        border-radius: 3px;
+      }
+    }
+
+    .sat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px 8px;
+
+      .grid-item {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        background: rgba(7, 16, 31, 0.6);
+        padding: 4px 6px;
+        border-radius: 4px;
+        border: 1px solid rgba(0, 225, 255, 0.1);
+
+        .item-label {
+          font-size: 10px;
+          color: #94a3b8;
+        }
+        .item-val {
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .sat-desc-text {
+          font-size: 10px;
+          color: #e2e8f0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      }
+    }
+
+    .sat-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      padding-top: 2px;
+
+      .fly-btn {
+        background: linear-gradient(135deg, rgba(0, 225, 255, 0.2), rgba(0, 140, 255, 0.4));
+        border: 1px solid rgba(0, 225, 255, 0.5);
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &.outline-btn {
+          background: rgba(255, 255, 255, 0.06);
+          border-color: rgba(255, 255, 255, 0.2);
+          color: #cbd5e1;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+          }
+        }
+
+        &:hover {
+          background: linear-gradient(135deg, rgba(0, 225, 255, 0.4), rgba(0, 140, 255, 0.6));
+          box-shadow: 0 0 10px rgba(0, 225, 255, 0.4);
         }
       }
     }

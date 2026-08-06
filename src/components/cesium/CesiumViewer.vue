@@ -64,7 +64,7 @@
 </template>
 <script setup lang="ts">
 import type { MatrixResult, StationWindow } from '@/api/electronic'
-import { useElectronicCesiumBridge } from '@/composables/useElectronicCesiumBridge'
+import { useElectronicCesiumBridge, type InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import { useTimelineSync } from '@/composables/useTimelineSync'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
 import * as Cesium from 'cesium'
@@ -72,6 +72,7 @@ import * as echarts from 'echarts'
 import {
   getAllWeapons,
   getSatelliteConstellations,
+  getSatelliteDetail,
   getSatelliteTLEData,
   getTLEDataByTaskId,
   type SatelliteConstellation,
@@ -208,13 +209,15 @@ const waitForContainerReady = async (maxFrames = 180) => {
  * - 触发 viewer.scene.requestRender()
  */
 const syncViewerRenderLoopWithContainer = () => {
-  if (!viewer || !cesiumContainer.value) return
+  if (!viewer || viewer.isDestroyed() || !cesiumContainer.value) return
   const canRender = hasValidContainerSize(cesiumContainer.value)
   // 当容器尺寸为 0 时暂停渲染，避免 Cesium 在更新 framebuffer 时创建 0 宽高纹理。
   viewer.useDefaultRenderLoop = canRender
   if (!canRender) return
   ;(viewer as any).resize?.()
-  viewer.scene.requestRender()
+  if (!viewer.isDestroyed()) {
+    viewer.scene.requestRender()
+  }
 }
 
 /**
@@ -223,7 +226,7 @@ const syncViewerRenderLoopWithContainer = () => {
  *
  * [处理规则]
  * - 已存在监听器时直接返回，避免重复注册
- * - 容器尺寸从 0 变为有效值且 Viewer 尚未初始化时，自动触发 initViewer
+ * - 容器尺寸从 0 变为有效值且 Viewer 尚未初始化（或已销毁）时，自动触发 initViewer
  * - 已初始化时同步渲染循环开关
  *
  * [修改约束]
@@ -232,7 +235,7 @@ const syncViewerRenderLoopWithContainer = () => {
 const startContainerSizeObserver = () => {
   if (!cesiumContainer.value || resizeObserver) return
   resizeObserver = new ResizeObserver(() => {
-    if (!viewer && hasValidContainerSize(cesiumContainer.value)) {
+    if ((!viewer || viewer.isDestroyed()) && hasValidContainerSize(cesiumContainer.value)) {
       void initViewer()
       return
     }
@@ -255,7 +258,7 @@ const stopContainerSizeObserver = () => {
 }
 
 const initViewer = async () => {
-  if (viewer || viewerInitializing) return
+  if ((viewer && !viewer.isDestroyed()) || viewerInitializing) return
   viewerInitializing = true
   try {
     if (cesiumContainer.value) {
@@ -528,6 +531,35 @@ const flyToEnemyNetwork = () => {
     duration: 2.0,
   })
 }
+
+/**
+ * [功能]
+ * 视角平滑直达敌方地面基础设施节点 (地面接收站 / 中心云数据中心) 上空
+ *
+ * @param node 选中的 InfrastructureLocation 对象
+ */
+const flyToInfrastructureNode = (node: InfrastructureLocation) => {
+  if (!viewer || !node) return
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(node.longitude, node.latitude, 1200000),
+    orientation: {
+      heading: Cesium.Math.toRadians(0),
+      pitch: Cesium.Math.toRadians(-60),
+      roll: 0,
+    },
+    duration: 1.5,
+  })
+}
+
+// 监听 store 中选中的地面基础设施节点，如果外部选择变更则定位相机
+watch(
+  () => store.selectedInfrastructureNode,
+  (newNode) => {
+    if (newNode) {
+      flyToInfrastructureNode(newNode)
+    }
+  }
+)
 
 /**
  * [功能]
@@ -853,7 +885,7 @@ const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null =
  * 根据当前 Cesium 时钟时间更新敌方星地过境连线、星中中继连线与地地光纤网
  */
 const updateElectronicDynamicLinks = () => {
-  if (!viewer || !props.matrixData) return
+  if (!viewer || viewer.isDestroyed() || !props.matrixData) return
 
   const currentTime = Cesium.JulianDate.toDate(viewer.clock.currentTime)
   updateSimulationTime(currentTime)
@@ -1608,32 +1640,51 @@ function handleViewerClickEvent() {
     if (!Cesium.defined(picked)) {
       store.closeSatPanel() // 点到空白也关闭
       store.setSelectedSatellite(null) // 清空选择的卫星
+      store.setSelectedInfrastructureNode(null) // 清空选中的地面基础设施节点
       showPaths.value = false
       for (const element of satelliteEntities.values()) {
         if (element.path) element.path.show = new Cesium.CallbackProperty(() => false, false)
       }
       resetHighlightSatellites() // 取消高亮
-      // clearConstellationSelection()
       return
     }
 
     const pickedId = picked.id as { id?: string; norad?: number } | Cesium.Entity | undefined
     if (!pickedId) return
+    const rawEntityId = String((pickedId as { id?: string }).id ?? '')
+
+    // 检测是否点击了敌方地面接收站或数据中心 3D 实体
+    if (rawEntityId.startsWith('infra-node-')) {
+      const cleanId = rawEntityId.replace(/-(ring|frustum)$/, '')
+      const infraMatch = infrastructureNodes.value.find((node) => `infra-node-${node.type}-${node.id}` === cleanId)
+      if (infraMatch) {
+        store.setSelectedInfrastructureNode(infraMatch)
+        flyToInfrastructureNode(infraMatch)
+        return
+      }
+    } else {
+      // 点击其他 3D 实体时，重置基础设施选择状态
+      store.setSelectedInfrastructureNode(null)
+    }
+
     const primitiveNorad = Number((pickedId as { norad?: number }).norad)
-    const entityId = String((pickedId as { id?: string }).id ?? '')
+    const entityId = rawEntityId
     const noradMatch = entityId.match(/satellite-(\d+)/)
     const norad = Number.isFinite(primitiveNorad) ? primitiveNorad : noradMatch ? Number(noradMatch[1]) : null
     if (!Number.isFinite(norad)) return
 
     selectConstellationByNorad(Number(norad))
-    // const res = await getSatelliteDetail({ norad: Number(norad) })
-    // if (res.code === 200) {
-    //   const satellite = res.data
-    //   if (satellite) {
-    //     highlightSatellite({ norad_id: String(norad) })
-    //   }
-    // }
     highlightSatellite({ norad_id: String(norad) })
+
+    // 调用 getSatelliteDetail 查询卫星详细信息并同步保存至全局 layout store，供右侧 C2 面板展示
+    try {
+      const res = await getSatelliteDetail({ norad: Number(norad) })
+      if (res.code === 200 && res.data) {
+        store.setSelectedSatellite(res.data)
+      }
+    } catch (error) {
+      console.error('查询卫星详细信息接口失败:', error)
+    }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
 }
 
@@ -1986,6 +2037,57 @@ const resetHighlightSatellites = () => {
   }
   applyConstellationVisualState()
 }
+
+const clearSatelliteMapsAndCaches = () => {
+  satelliteRenderToken += 1
+  satelliteRenderBusy.value = false
+  pointCollection = null
+  labelCollection = null
+  satellitePointPrimitives.clear()
+  satelliteLabelPrimitives.clear()
+  satellitePrimitiveEntities.clear()
+  renderedPrimitiveSatelliteMap.clear()
+  clearConstellationOverlayEntities()
+  selectedConstellation.value = null
+  satelliteEntities.clear()
+  satelliteOrbitData.clear()
+  satellitePositionPropertyCache.clear()
+  satelliteTleCache.clear()
+  cachedSatelliteList = null
+  cachedTaskId = null
+  currentRenderTaskId = null
+  electronicNodeEntityIds.clear()
+  electronicDynamicLinkEntityIds.clear()
+
+  if (viewer) {
+    if (!viewer.isDestroyed()) {
+      try {
+        // 停止默认渲染循环，截断帧更新 (CesiumWidget._onTick)
+        viewer.useDefaultRenderLoop = false
+        viewer.clock.shouldAnimate = false
+      } catch (e) {
+        console.warn('failed to stop render loop on unmount', e)
+      }
+
+      try {
+        unbindInfoBoxButton(viewer)
+      } catch (e) {
+        console.warn('unbindInfoBoxButton warning on unmount', e)
+      }
+
+      Object.values(chartInstances).forEach((chart) => disposeChart(chart))
+
+      try {
+        viewer.destroy()
+      } catch (e) {
+        console.warn('failed to destroy viewer on unmount', e)
+      }
+    }
+    // 强制归零全局引用的 viewer，避免后续逻辑访问已销毁的实例
+    viewer = null as any
+  }
+}
+
 // 战场态势数据（展示红蓝对比数据，为 null 表示未加载）
 const battleSituationData = ref<SituationData | null>(null)
 
@@ -2314,41 +2416,73 @@ watch(
  */
 onBeforeUnmount(() => {
   stopContainerSizeObserver()
-  try {
-    viewer.clock.shouldAnimate = false
-  } catch (e) {
-    console.warn('failed to disable rotationController on unmount', e)
-  }
-  if (viewer) {
-    satelliteRenderToken += 1
-    satelliteRenderBusy.value = false
-    pointCollection = null
-    labelCollection = null
-    satellitePointPrimitives.clear()
-    satelliteLabelPrimitives.clear()
-    satellitePrimitiveEntities.clear()
-    renderedPrimitiveSatelliteMap.clear()
-    clearConstellationOverlayEntities()
-    selectedConstellation.value = null
-    satelliteEntities.clear()
-    satelliteOrbitData.clear()
-    satellitePositionPropertyCache.clear()
-    satelliteTleCache.clear()
-    cachedSatelliteList = null
-    cachedTaskId = null
-    currentRenderTaskId = null
-    viewer.clock.shouldAnimate = false
 
-    unbindInfoBoxButton(viewer)
-
-    if (cameraMoveEndListener) {
-      viewer.camera.moveEnd.removeEventListener(cameraMoveEndListener)
-      cameraMoveEndListener = null
+  // 1. 先安全移除时钟 Tick 监听器，防止销毁过程中触发 onTick 更新
+  if (clockTickRemoveListener) {
+    try {
+      clockTickRemoveListener()
+    } catch (e) {
+      console.warn('failed to remove clockTickRemoveListener on unmount', e)
     }
+    clockTickRemoveListener = null
+  }
 
-    Object.values(chartInstances).forEach((chart) => disposeChart(chart))
+  // 2. 移除相机变化监听器
+  if (cameraMoveEndListener) {
+    try {
+      if (viewer && !viewer.isDestroyed()) {
+        viewer.camera.changed.removeEventListener(cameraMoveEndListener)
+      }
+    } catch (e) {
+      console.warn('failed to remove cameraMoveEndListener on unmount', e)
+    }
+    cameraMoveEndListener = null
+  }
 
-    viewer.destroy && viewer.destroy()
+  satelliteRenderToken += 1
+  satelliteRenderBusy.value = false
+  pointCollection = null
+  labelCollection = null
+  satellitePointPrimitives.clear()
+  satelliteLabelPrimitives.clear()
+  satellitePrimitiveEntities.clear()
+  renderedPrimitiveSatelliteMap.clear()
+  clearConstellationOverlayEntities()
+  selectedConstellation.value = null
+  satelliteEntities.clear()
+  satelliteOrbitData.clear()
+  satellitePositionPropertyCache.clear()
+  satelliteTleCache.clear()
+  cachedSatelliteList = null
+  cachedTaskId = null
+  currentRenderTaskId = null
+
+  if (viewer) {
+    if (!viewer.isDestroyed()) {
+      try {
+        // 停止默认渲染循环，截断帧更新 (CesiumWidget._onTick)
+        viewer.useDefaultRenderLoop = false
+        viewer.clock.shouldAnimate = false
+      } catch (e) {
+        console.warn('failed to stop render loop on unmount', e)
+      }
+
+      try {
+        unbindInfoBoxButton(viewer)
+      } catch (e) {
+        console.warn('unbindInfoBoxButton warning on unmount', e)
+      }
+
+      Object.values(chartInstances).forEach((chart) => disposeChart(chart))
+
+      try {
+        viewer.destroy()
+      } catch (e) {
+        console.warn('failed to destroy viewer on unmount', e)
+      }
+    }
+    // 强制归零全局引用的 viewer，避免后续逻辑拦截并访问已销毁的实例
+    viewer = null as any
   }
 })
 /**

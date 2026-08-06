@@ -162,6 +162,7 @@ import SatelliteNetView from './SatelliteNetView.vue'
 import { EarthRotationController } from '@/utils/cesium/earthRotaion'
 import { bindInfoBoxButton, createInfoBoxActionButton, unbindInfoBoxButton } from '@/utils/cesium/infoBox'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
+import type { SatelliteStrike, Weapon } from '@/types/dashboard/index.js'
 const { openSatelliteProfile } = useSatelliteProfileDialog()
 // 接收父组件传入的展示控制属性，避免非 props 属性警告
 const props = defineProps<{

@@ -266,6 +266,7 @@
 <script setup lang="ts">
 import { getSatelliteDetail, getSatelliteRelations, getSatelliteRelationsBySatellite } from '@/api/dashboard'
 import { useLayoutStore } from '@/store/modules/layout'
+import type { SatelliteData, SatelliteNode } from '@/types/dashboard'
 import G6, { Graph, type EdgeConfig, type GraphData, type INode, type NodeConfig } from '@antv/g6'
 import dayjs from 'dayjs'
 import { computed, nextTick, reactive, ref, watch } from 'vue'
