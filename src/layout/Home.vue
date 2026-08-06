@@ -679,7 +679,6 @@
 </template>
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch, onBeforeUnmount, onMounted } from 'vue'
-import * as echarts from 'echarts'
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
 import PolygonMap from '@/components/cesium/viewers/BattleArea.vue'
 import {
@@ -690,7 +689,6 @@ import {
   getHomeSatellite,
   getSatelliteConstellations,
   getSatelliteCount,
-  getSatelliteDistribution,
   getSatelliteList,
   getTaskList,
   queryTaskProgress,
@@ -699,7 +697,6 @@ import {
   updateBattle,
   updateTask,
   type SatelliteConstellation,
-  type SatelliteDistribution,
   getTaskStageTargetOptions,
 } from '@/api/dashboard'
 import { ElMessage, type FormRules, type FormInstance, ElMessageBox } from 'element-plus'

@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium'
 import { TiandituImagercyProvider } from './mapConfig'
+import type { PointData } from '@/types/dashboard'
 
 interface ViewerConfig {
   creditContainerId: string

@@ -56,9 +56,7 @@ import { ElMessage } from 'element-plus'
 import MenuTree from './MenuTree.vue'
 import { logout as logoutApi, type MenuItem } from '@/api/auth'
 import { useAuthStore } from '@/store/modules/auth'
-import { useLayoutStore } from '@/store/modules/layout'
 
-const layoutStore = useLayoutStore()
 const authStore = useAuthStore()
 // 获取路由实例
 const route = useRoute()
@@ -338,7 +336,7 @@ onUnmounted(() => {})
           font-weight: 800;
           letter-spacing: 1.2px;
           background: linear-gradient(135deg, #ffffff 30%, #00e1ff 100%);
-          -webkit-background-clip: text;
+          background-clip: text;
           -webkit-text-fill-color: transparent;
           filter: drop-shadow(0 0 10px rgba(0, 225, 255, 0.3));
         }

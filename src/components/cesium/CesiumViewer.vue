@@ -507,7 +507,7 @@ const electronicNodeEntityIds = new Set<string>()
 const electronicDynamicLinkEntityIds = new Set<string>()
 
 // 电子信息战录 composable：解析地面站、中继卡号集和过境窗口判断工具
-const { infrastructureNodes, relayNoradSet, isTimeInWindow } = useElectronicCesiumBridge(toRef(props, 'matrixData'))
+const { infrastructureNodes, isTimeInWindow } = useElectronicCesiumBridge(toRef(props, 'matrixData'))
 // 时间轴同步：将 Cesium 时钟时间同步到全局仿真时间状态
 const { updateSimulationTime } = useTimelineSync()
 // Cesium 时钟 onTick 监听器的移除函数（组件销毁时必须调用）
@@ -2070,56 +2070,6 @@ const resetHighlightSatellites = () => {
     })
   }
   applyConstellationVisualState()
-}
-
-const clearSatelliteMapsAndCaches = () => {
-  satelliteRenderToken += 1
-  satelliteRenderBusy.value = false
-  pointCollection = null
-  labelCollection = null
-  satellitePointPrimitives.clear()
-  satelliteLabelPrimitives.clear()
-  satellitePrimitiveEntities.clear()
-  renderedPrimitiveSatelliteMap.clear()
-  clearConstellationOverlayEntities()
-  selectedConstellation.value = null
-  satelliteEntities.clear()
-  satelliteOrbitData.clear()
-  satellitePositionPropertyCache.clear()
-  satelliteTleCache.clear()
-  cachedSatelliteList = null
-  cachedTaskId = null
-  currentRenderTaskId = null
-  electronicNodeEntityIds.clear()
-  electronicDynamicLinkEntityIds.clear()
-
-  if (viewer) {
-    if (!viewer.isDestroyed()) {
-      try {
-        // 停止默认渲染循环，截断帧更新 (CesiumWidget._onTick)
-        viewer.useDefaultRenderLoop = false
-        viewer.clock.shouldAnimate = false
-      } catch (e) {
-        console.warn('failed to stop render loop on unmount', e)
-      }
-
-      try {
-        unbindInfoBoxButton(viewer)
-      } catch (e) {
-        console.warn('unbindInfoBoxButton warning on unmount', e)
-      }
-
-      Object.values(chartInstances).forEach((chart) => disposeChart(chart))
-
-      try {
-        viewer.destroy()
-      } catch (e) {
-        console.warn('failed to destroy viewer on unmount', e)
-      }
-    }
-    // 强制归零全局引用的 viewer，避免后续逻辑访问已销毁的实例
-    viewer = null as any
-  }
 }
 
 // 战场态势数据（展示红蓝对比数据，为 null 表示未加载）
