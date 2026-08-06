@@ -78,7 +78,7 @@ import {
   type SatelliteConstellation,
   type SituationData,
 } from '@/api/dashboard'
-import { createWeaponIconDataUri, getWeaponIconScale } from './helpers/svgIcons'
+import { createWeaponIconDataUri, getWeaponIconScale } from '@/utils/cesium/svgIcons'
 import * as satellitejs from 'satellite.js'
 import { useLayoutStore } from '@/store/modules/layout'
 import { formatTimeLineAndAnimation, markBattleArea } from '@/utils/cesium/functionTool'

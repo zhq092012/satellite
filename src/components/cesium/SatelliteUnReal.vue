@@ -559,14 +559,14 @@ import type {
 import type { Weapon } from '@/types/dashboard'
 // 导入地面站 BaseStationInfo 类型定义
 import type { BaseStationInfo } from '@/api/system/satellite-system-api'
-import { parseLatLonToCoords, parseMissionWindowDate } from './helpers/dateFormat'
+import { parseLatLonToCoords, parseMissionWindowDate } from '@/utils/cesium/dateFormat'
 
-import { useSceneData } from './composables/useSceneData'
-import { useStrikePlan } from './composables/useStrikePlan'
-import { useSimulationPlayback } from './composables/useSimulationPlayback'
-import { useSatelliteRelation } from './composables/useSatelliteRelation'
-import { useCompareViewers } from './composables/useCompareViewers'
-import { useBattleEntities } from './composables/useBattleEntities'
+import { useSceneData } from '../../composables/useSceneData'
+import { useStrikePlan } from '../../composables/useStrikePlan'
+import { useSimulationPlayback } from '../../composables/useSimulationPlayback'
+import { useSatelliteRelation } from '../../composables/useSatelliteRelation'
+import { useCompareViewers } from '../../composables/useCompareViewers'
+import { useBattleEntities } from '../../composables/useBattleEntities'
 
 const CHINA_OVERVIEW_LON = 107.4
 const CHINA_OVERVIEW_LAT = 33.42
@@ -1031,7 +1031,9 @@ const refreshSceneEntities = (fitScene = false, resetEntities = false) => {
       const stNames = new Set(uniqueStations.map((sd) => sd.stationName))
       const stIds = new Set(uniqueStations.map((sd) => sd.stationId))
       // 过滤与低烈度打击方案相匹配的地面站
-      const filteredStations = baseStations.value.filter((bs: BaseStationInfo) => stIds.has(bs._id || '') || stNames.has(bs.name))
+      const filteredStations = baseStations.value.filter(
+        (bs: BaseStationInfo) => stIds.has(bs._id || '') || stNames.has(bs.name)
+      )
       const stationsToMap =
         filteredStations.length > 0
           ? filteredStations

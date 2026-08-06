@@ -6,7 +6,7 @@ import { ref, type ShallowRef } from 'vue'
 import * as Cesium from 'cesium'
 import { getSatelliteRelations, getSatelliteRelationsBySatellite } from '@/api/dashboard'
 import { useLayoutStore } from '@/store/modules/layout'
-import type { BlueSatelliteRecord, SatelliteRelationItem } from '../types'
+import type { BlueSatelliteRecord, SatelliteRelationItem } from '../components/cesium/types'
 import type { SatelliteRelation } from '@/types/dashboard'
 
 export function useSatelliteRelation(

@@ -6,23 +6,23 @@
 import { type Ref, type ShallowRef } from 'vue'
 import * as Cesium from 'cesium'
 import type { StrikePlanV2MissionWindowItem } from '@/api/strikePlan/satellite-strikeplan-api'
-import type { BlueSatelliteRecord, SatelliteRelationItem } from '../types'
 import {
   getStrikePhase,
   getStrikeTypeStyle,
   mixColor,
   STRIKE_LINK_FADE_MS,
   STRIKE_SATELLITE_BLINK_MS,
-} from '../helpers/strikeStyle'
+} from '@/utils/cesium/strikeStyle'
 import {
   getWeaponIconScale,
   createWeaponIconDataUri,
   createSatelliteStrikeStarDataUri,
   createStationExplosionDiamondDataUri,
-} from '../helpers/svgIcons'
-import { parseMissionWindowDate } from '../helpers/dateFormat'
-import { buildSatelliteInfoBoxDescription } from '../helpers/infoBoxBuilder'
+} from '@/utils/cesium/svgIcons'
+import { parseMissionWindowDate } from '@/utils/cesium/dateFormat'
+import { buildSatelliteInfoBoxDescription } from '@/utils/cesium/infoBoxBuilder'
 import type { Weapon } from '@/types/dashboard'
+import type { BlueSatelliteRecord, SatelliteRelationItem } from '@/types/strike'
 
 /**
  * tips:由于在这个业务场景中，地面站被统一适配并存放在了 blueSatellites 集合中（将它的 satType 设为 '基站'，高度 altitude 设为 100 ），

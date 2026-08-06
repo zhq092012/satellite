@@ -39,7 +39,7 @@ const routes: Array<RouteRecordRaw> = [
       {
         path: 'situation',
         name: 'Situation',
-        component: () => import('@/layout/BattleSituation.vue'),
+        component: () => import('@/components/BattleSituation/BattleSituation.vue'),
         meta: {
           title: '战场态势分析',
           icon: 'icon-situation',

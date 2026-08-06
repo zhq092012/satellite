@@ -5,6 +5,7 @@
 
     /* Linting */
     "strict": true,
+    /* 确保any类型不会报错*/
     "noImplicitAny": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

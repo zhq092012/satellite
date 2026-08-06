@@ -1,11 +1,9 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, type Ref } from 'vue'
 import * as Cesium from 'cesium'
 import type {
   MatrixResult,
   ReceiveObj,
-  StationObj,
-  StationWindow,
-  Weapon
+  StationObj
 } from '@/api/electronic'
 
 /**

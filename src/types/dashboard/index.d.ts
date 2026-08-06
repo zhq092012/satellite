@@ -264,3 +264,4 @@ export interface Weapon {
   /** 适用/目标卫星类型（如：低轨通信卫星、导航卫星等） */
   satellite_type?: string
 }
+

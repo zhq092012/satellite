@@ -4,8 +4,8 @@
  */
 import { nextTick, ref, type ShallowRef } from 'vue'
 import * as Cesium from 'cesium'
-import type { BlueSatelliteRecord, HistoricalPlanCard } from '../types'
-import { createSatelliteStrikeStarDataUri } from '../helpers/svgIcons'
+import type { BlueSatelliteRecord, HistoricalPlanCard } from '@/types/strike'
+import { createSatelliteStrikeStarDataUri } from '@/utils/cesium/svgIcons'
 
 // ─── 常量 ───
 const CHINA_OVERVIEW_LON = 107.4
@@ -111,21 +111,21 @@ export function useCompareViewers(
         position,
         billboard: isStruck
           ? new Cesium.BillboardGraphics({
-              image: createSatelliteStrikeStarDataUri(Cesium.Color.fromCssColorString('#ef6b73'), 0.88),
-              scale: 0.88,
-              width: 24.64,
-              height: 24.64,
-              verticalOrigin: Cesium.VerticalOrigin.CENTER,
-            })
+            image: createSatelliteStrikeStarDataUri(Cesium.Color.fromCssColorString('#ef6b73'), 0.88),
+            scale: 0.88,
+            width: 24.64,
+            height: 24.64,
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+          })
           : undefined,
         point: isStruck
           ? undefined
           : new Cesium.PointGraphics({
-              pixelSize: 9,
-              color: Cesium.Color.fromCssColorString('#4ea6ff'),
-              outlineColor: Cesium.Color.WHITE,
-              outlineWidth: 2,
-            }),
+            pixelSize: 9,
+            color: Cesium.Color.fromCssColorString('#4ea6ff'),
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 2,
+          }),
         label: new Cesium.LabelGraphics({
           text: isStruck ? `${satellite.name}（已打击）` : satellite.name,
           font: '11px sans-serif',

@@ -21,7 +21,7 @@ import {
   type StrikePlanV2Extended,
 } from '@/api/strikePlan/satellite-strikeplan-api'
 import { useLayoutStore } from '@/store/modules/layout'
-import type { BlueSatelliteRecord } from '../types'
+import type { BlueSatelliteRecord } from '../components/cesium/types'
 import type { Weapon } from '@/types/dashboard'
 
 export function useSceneData() {

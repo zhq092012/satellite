@@ -85,14 +85,14 @@
 </template>
 <script setup lang="ts">
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
-import C2LeftControlPanel from '@/components/cesium/C2LeftControlPanel.vue'
-import C2RightAnalysisPanel from '@/components/cesium/C2RightAnalysisPanel.vue'
+import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
+import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
 import SatelliteNetView from '@/components/cesium/SatelliteNetView.vue'
 import SatelliteUnReal from '@/components/cesium/SatelliteUnReal.vue'
 import SatelliteThreatView from '@/components/cesium/SatelliteThreatView.vue'
 import SatelliteAttackabilityView from '@/components/cesium/SatelliteAttackabilityView.vue'
 import EvaluationReport from '@/components/cesium/EvaluationReport.vue'
-import StationReport from '@/components/cesium/StationReport.vue'
+import KillChain from '@/components/cesium/KillChain.vue'
 import ConfrontView from '@/components/cesium/ConfrontationAnalysis.vue'
 import ElectronicWarfare from '@/components/electronic/ElectronicWarfare.vue'
 import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue'
@@ -114,7 +114,7 @@ const compMap = {
   SatelliteThreatView,
   SatelliteAttackabilityView,
   EvaluationReport,
-  StationReport,
+  StationReport: KillChain,
   ConfrontView,
   ElectronicWarfare,
   ElectronicWarfareG6,
