@@ -80,6 +80,8 @@ export interface RelayRelationMap {
   from: string;
   /** 接收方中继卫星 NORAD/Id 字符串 */
   to: string;
+  /** 中继卫星过境时间窗口列表 */
+  visibilityWindows: SatelliteRelayWindow[]
 }
 
 /**
@@ -203,6 +205,7 @@ export interface WeaponWindow {
   endWindow: string;   // 时间格式："YYYY-MM-DD HH:mm:ss"
 }
 
+export type SatelliteRelayWindow = WeaponWindow
 // 主数据项接口定义
 export interface WeaponAttackRecord {
   weaponName: string;   // 武器名称
@@ -508,9 +511,24 @@ export const getDefaultMatrixData = (): MatrixResult => {
       relayList: [22314],
       satelliteList: [60419, 48643, 59444, 58136, 57693],
       relations: [
-        { from: '60419', to: '22314' },
-        { from: '48643', to: '22314' },
-        { from: '57693', to: '22314' },
+        {
+          from: '60419', to: '22314', visibilityWindows: [{
+            "beginWindow": "2026-07-28 20:55:20",
+            "endWindow": "2026-07-28 21:51:39"
+          }]
+        },
+        {
+          from: '48643', to: '22314', visibilityWindows: [{
+            "beginWindow": "2026-07-28 20:55:20",
+            "endWindow": "2026-07-28 21:51:39"
+          }]
+        },
+        {
+          from: '57693', to: '22314', visibilityWindows: [{
+            "beginWindow": "2026-07-28 20:55:20",
+            "endWindow": "2026-07-28 21:51:39"
+          }]
+        },
       ],
     },
     initRelationList: {

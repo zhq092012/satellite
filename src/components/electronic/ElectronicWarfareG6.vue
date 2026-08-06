@@ -56,7 +56,11 @@
     </div>
 
     <!-- 当切换为武器打击窗口列表模式时，渲染武器打击窗口列表组件 -->
-    <div v-show="currentViewMode === 'WEAPON_ATTACK'" class="cema-workspace" style="height: calc(100vh - 60px); padding: 0">
+    <div
+      v-show="currentViewMode === 'WEAPON_ATTACK'"
+      class="cema-workspace"
+      style="height: calc(100vh - 60px); padding: 0"
+    >
       <WeaponAttackList :matrix-data="matrixData" />
     </div>
 
@@ -139,7 +143,7 @@
           <!-- AI: 显示当前点击选中的节点提示及重置筛选按钮 -->
           <span class="node-filter-tip" v-if="selectedNodeInfo">
             已选择节点: <strong class="glow-text-cyan">{{ selectedNodeInfo.name }}</strong> (共
-            {{ displayedWindowsList.length }} 个过境窗口)
+            {{ displayedWindowsList.length }} 个过境/可见窗口)
             <el-button type="primary" link size="small" style="margin-left: 8px" @click="clearSelectedNode"
               >重置筛选</el-button
             >
@@ -160,6 +164,7 @@
           class="window-card"
           :class="{
             'card-struck': win.strikeStatus === 1,
+            'card-relay': win.isRelayWindow,
             'card-active': isWindowActiveAtCurrentTime(win),
             'card-selected': selectedWindowId === win.id,
           }"
@@ -167,8 +172,11 @@
         >
           <div class="card-header">
             <span class="win-time">{{ win.startTimeShort }} ~ {{ win.endTimeShort }}</span>
-            <span class="win-status-badge" :class="win.strikeStatus === 1 ? 'badge-danger' : 'badge-success'">
-              {{ win.strikeStatus === 1 ? '受毁伤打压' : '正常过境' }}
+            <span
+              class="win-status-badge"
+              :class="win.isRelayWindow ? 'badge-relay' : win.strikeStatus === 1 ? 'badge-danger' : 'badge-success'"
+            >
+              {{ win.isRelayWindow ? '中继可见' : win.strikeStatus === 1 ? '受毁伤打压' : '正常过境' }}
             </span>
           </div>
 
@@ -176,7 +184,9 @@
             <div class="win-link-info">
               <span class="sat-name" :title="win.satName">🛰️ {{ win.satName }}</span>
               <span class="arrow-icon">➔</span>
-              <span class="rec-name" :title="win.receiveName">📡 {{ win.receiveName }}</span>
+              <span class="rec-name" :title="win.receiveName"
+                >{{ win.isRelayWindow ? '🛰️' : '📡' }} {{ win.receiveName }}</span
+              >
             </div>
 
             <div class="win-meta-info" v-if="win.strikeStatus === 1">
@@ -184,6 +194,9 @@
               <span class="weapon-tag" v-if="win.weapons && win.weapons.length > 0" :title="win.weapons[0].name">
                 🎯 {{ win.weapons[0].name }} ({{ win.weapons[0].type }})
               </span>
+            </div>
+            <div class="win-meta-info" v-else-if="win.isRelayWindow">
+              <span class="relay-tag">星间中继过境窗口</span>
             </div>
           </div>
         </div>
@@ -266,7 +279,7 @@ const selectedNodeInfo = ref<SelectedNodeMeta | null>(null)
 // ==================== 时间轴相关变量定义 ====================
 
 // [类型用途]
-// 时间轴过境/打击窗口统一包装结构
+// 时间轴过境/打击/中继窗口统一包装结构
 interface WindowItemWrapper {
   id: string
   satName: string
@@ -282,19 +295,15 @@ interface WindowItemWrapper {
   strikeStatus: number
   delayMin?: number
   weapons?: Weapon[] | null
+  /** 是否为星间中继过境时间窗口 */
+  isRelayWindow?: boolean
+  /** 星间中继目标中继卫星 NORAD */
+  relayNorad?: number
 }
 
 // [变量用途]
 // 选中的时间窗口 ID
 const selectedWindowId = ref<string | null>(null)
-
-// [变量用途]
-// 是否正在自动播放推演
-const isPlaying = ref(false)
-
-// [变量用途]
-// 播放倍速 (1x, 2x, 5x, 10x)
-const playSpeed = ref<number>(1)
 
 // [变量用途]
 // 自动播放 Timer 定时器句柄
@@ -501,9 +510,36 @@ const demoMatrixData: MatrixResult = {
     relayList: [22314],
     satelliteList: [48643, 57693, 58136],
     relations: [
-      { from: '48643', to: '22314' },
-      { from: '57693', to: '22314' },
-      { from: '58136', to: '22314' },
+      {
+        from: '48643',
+        to: '22314',
+        visibilityWindows: [
+          {
+            beginWindow: '2026-07-28 20:55:20',
+            endWindow: '2026-07-28 21:51:39',
+          },
+        ],
+      },
+      {
+        from: '57693',
+        to: '22314',
+        visibilityWindows: [
+          {
+            beginWindow: '2026-07-28 20:55:20',
+            endWindow: '2026-07-28 21:51:39',
+          },
+        ],
+      },
+      {
+        from: '58136',
+        to: '22314',
+        visibilityWindows: [
+          {
+            beginWindow: '2026-07-28 20:55:20',
+            endWindow: '2026-07-28 21:51:39',
+          },
+        ],
+      },
     ],
   },
   initRelationList: {
@@ -1043,6 +1079,37 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
     })
   })
 
+  // 3. 提取 relayRelation.relations 中的星间中继过境时间窗口 (visibilityWindows)
+  const relayRels = data.relayRelation?.relations || []
+  relayRels.forEach((rel) => {
+    const fromNorad = Number(rel.from)
+    const toNorad = Number(rel.to)
+    const fromSatName = satMap.get(fromNorad) || `Sat-${fromNorad}`
+    const toSatName = satMap.get(toNorad) || `TDRS-${toNorad}`
+
+    const windows = rel.visibilityWindows || []
+    windows.forEach((win, index) => {
+      const startTs = parseToTimestamp(win.beginWindow)
+      const endTs = parseToTimestamp(win.endWindow)
+      list.push({
+        id: `win-relay-${rel.from}-${rel.to}-${index}`,
+        satName: fromSatName,
+        satNorad: fromNorad,
+        receiveName: toSatName,
+        receiveId: `sat-${rel.to}`,
+        startTime: win.beginWindow,
+        endTime: win.endWindow,
+        startTimeShort: win.beginWindow ? win.beginWindow.split(' ')[1] || win.beginWindow : '',
+        endTimeShort: win.endWindow ? win.endWindow.split(' ')[1] || win.endWindow : '',
+        startTimestamp: startTs,
+        endTimestamp: endTs,
+        strikeStatus: 0,
+        isRelayWindow: true,
+        relayNorad: toNorad,
+      })
+    })
+  })
+
   // 按过境开始时间从早到晚进行升序排序
   list.sort((a, b) => a.startTimestamp - b.startTimestamp)
   return list
@@ -1066,8 +1133,8 @@ const displayedWindowsList = computed<WindowItemWrapper[]>(() => {
   let filtered: WindowItemWrapper[] = []
 
   if (node.type === 'sat') {
-    // 1. 普通卫星: 筛选 satNorad 匹配的时间窗口
-    filtered = all.filter((w) => w.satNorad === node.norad)
+    // 1. 普通卫星: 筛选 satNorad 匹配或星间中继 relayNorad 匹配的时间窗口
+    filtered = all.filter((w) => w.satNorad === node.norad || w.relayNorad === node.norad)
   } else if (node.type === 'relay') {
     // 2. 中继卫星: 筛选中继卫星自身及所有由其提供转发服务的依赖卫星时间窗口
     const relayRels = matrixData.value?.relayRelation?.relations || []
@@ -1077,10 +1144,14 @@ const displayedWindowsList = computed<WindowItemWrapper[]>(() => {
     relayRels.forEach((rel) => {
       if (Number(rel.to) === node.norad) {
         relatedNorads.add(Number(rel.from))
+      } else if (Number(rel.from) === node.norad) {
+        relatedNorads.add(Number(rel.to))
       }
     })
 
-    filtered = all.filter((w) => relatedNorads.has(w.satNorad))
+    filtered = all.filter(
+      (w) => w.relayNorad === node.norad || w.satNorad === node.norad || relatedNorads.has(w.satNorad)
+    )
   } else if (node.type === 'receive') {
     // 3. 地面接收站: 筛选 receiveId 匹配的时间窗口
     filtered = all.filter((w) => w.receiveId === node.receiveId)
@@ -1135,10 +1206,6 @@ const timeRangeText = computed(() => {
   }
 })
 
-const formattedCurrentTime = computed(() => {
-  return formatTimeStr(currentTimestamp.value)
-})
-
 /**
  * 初始化时间轴当前时间为最小值
  */
@@ -1154,85 +1221,11 @@ const isWindowActiveAtCurrentTime = (win: WindowItemWrapper) => {
   return currentTimestamp.value >= win.startTimestamp && currentTimestamp.value <= win.endTimestamp
 }
 
-/**
- * 时间轴 Slider 变动处理
- */
-const handleSliderChange = (val: number) => {
-  const range = maxTimestamp.value - minTimestamp.value
-  if (range > 0) {
-    currentTimestamp.value = minTimestamp.value + (val / 100) * range
-    highlightActiveElements()
-  }
-}
-
-const formatSliderTooltip = (val: number) => {
-  const range = maxTimestamp.value - minTimestamp.value
-  const ts = minTimestamp.value + (val / 100) * range
-  return formatTimeStr(ts)
-}
-
-/**
- * 播放 / 暂停推演
- */
-const togglePlay = () => {
-  isPlaying.value = !isPlaying.value
-  if (isPlaying.value) {
-    if (currentTimestamp.value >= maxTimestamp.value) {
-      currentTimestamp.value = minTimestamp.value
-    }
-    startPlaybackTimer()
-  } else {
-    stopPlaybackTimer()
-  }
-}
-
-const startPlaybackTimer = () => {
-  stopPlaybackTimer()
-  playTimer = setInterval(() => {
-    const totalSpan = maxTimestamp.value - minTimestamp.value
-    if (totalSpan <= 0) return
-
-    // 每次递增 0.5% 的时间跨度，乘以倍速
-    const step = (totalSpan / 200) * playSpeed.value
-    currentTimestamp.value += step
-
-    if (currentTimestamp.value >= maxTimestamp.value) {
-      currentTimestamp.value = maxTimestamp.value
-      currentTimeProgress.value = 100
-      isPlaying.value = false
-      stopPlaybackTimer()
-    } else {
-      currentTimeProgress.value = ((currentTimestamp.value - minTimestamp.value) / totalSpan) * 100
-    }
-    highlightActiveElements()
-  }, 300)
-}
-
 const stopPlaybackTimer = () => {
   if (playTimer) {
     clearInterval(playTimer)
     playTimer = null
   }
-}
-
-const resetTimeline = () => {
-  isPlaying.value = false
-  stopPlaybackTimer()
-  initTimelineBounds()
-  selectedWindowId.value = null
-  highlightActiveElements()
-}
-
-const jumpToStart = () => {
-  currentTimestamp.value = minTimestamp.value
-  currentTimeProgress.value = 0
-  highlightActiveElements()
-}
-
-const jumpToEnd = () => {
-  currentTimestamp.value = maxTimestamp.value
-  currentTimeProgress.value = 100
-  highlightActiveElements()
 }
 
 /**
@@ -2404,6 +2397,17 @@ onUnmounted(() => {
     border-color: rgba(255, 77, 79, 0.45);
   }
 
+  &.card-relay {
+    border-color: rgba(168, 85, 247, 0.45);
+    background: rgba(168, 85, 247, 0.08);
+
+    &.card-active {
+      border-color: #a855f7;
+      background: rgba(168, 85, 247, 0.2);
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.35);
+    }
+  }
+
   .card-header {
     display: flex;
     align-items: center;
@@ -2428,6 +2432,10 @@ onUnmounted(() => {
       &.badge-danger {
         background: rgba(239, 68, 68, 0.2);
         color: #f87171;
+      }
+      &.badge-relay {
+        background: rgba(168, 85, 247, 0.2);
+        color: #c084fc;
       }
     }
   }
@@ -2471,6 +2479,16 @@ onUnmounted(() => {
       color: #fbbf24;
       background: rgba(251, 191, 36, 0.15);
       border: 1px solid rgba(251, 191, 36, 0.3);
+      padding: 2px 6px;
+      border-radius: 3px;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+
+    .relay-tag {
+      color: #c084fc;
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.3);
       padding: 2px 6px;
       border-radius: 3px;
       white-space: nowrap;
