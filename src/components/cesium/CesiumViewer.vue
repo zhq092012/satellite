@@ -568,11 +568,32 @@ const flyToEnemyNetwork = () => {
  *
  * @param node 选中的 InfrastructureLocation 对象
  */
+let currentTrackedNorad: number | null = null
+
+/**
+ * [功能]
+ * 视角平滑直达敌方地面基础设施节点 (地面接收站 / 中心云数据中心) 上空
+ *
+ * @param node 选中的 InfrastructureLocation 对象
+ */
 const flyToInfrastructureNode = (node: InfrastructureLocation) => {
   if (!viewer || !node) return
+  currentTrackedNorad = null
   viewer.trackedEntity = undefined
+
+  // 如果节点缺少有效的经纬度，在 infrastructureNodes 数据源中匹配
+  let targetLon = node.longitude
+  let targetLat = node.latitude
+  if (!targetLon && !targetLat) {
+    const matched = infrastructureNodes.value.find((n) => n.id === node.id && n.type === node.type)
+    if (matched) {
+      targetLon = matched.longitude
+      targetLat = matched.latitude
+    }
+  }
+
   viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(node.longitude, node.latitude, 1200000),
+    destination: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 1200000),
     orientation: {
       heading: Cesium.Math.toRadians(0),
       pitch: Cesium.Math.toRadians(-60),
@@ -584,22 +605,46 @@ const flyToInfrastructureNode = (node: InfrastructureLocation) => {
 
 /**
  * [功能]
- * 视角平滑锁定并持续跟随指定的卫星运动，或飞向该卫星位置
+ * 视角平滑锁定与定位跟随指定的卫星
  *
  * [处理规则]
- * - 优先在 viewer.entities 中寻找对应的 3D 实体对象 (satellite-${norad} 或 sat-node-${norad})
- * - 若找到实体，则将 viewer.trackedEntity 设置为该实体，启用 Cesium 原生相机轨迹锁定与持续跟随
- * - 若该卫星仅以 PointPrimitive 形式存在，则计算当前 Cartesian3 坐标并使用 viewer.camera.flyTo 平滑飞向该位置
+ * - 避免对同一目标反复重置相机
+ * - 给实体设置 viewFrom 偏置参数以防止无方向向量时的剧烈摇摆
+ * - 若存在 Entity，优先使用 viewer.flyTo(entity) 平滑飞向并聚集，随后绑定 trackedEntity 跟随
+ * - 若仅 Primitive 存在，使用 camera.flyTo 定位到该 3D 坐标
  *
  * @param norad 目标卫星 NORAD 编号
  */
 const trackSatelliteByNorad = (norad: number) => {
   if (!viewer || !norad) return
+  if (currentTrackedNorad === norad && viewer.trackedEntity) return
+
+  currentTrackedNorad = norad
 
   // 1. 优先查找是否存在 3D Entity 实体
   const entity = viewer.entities.getById(`satellite-${norad}`) || viewer.entities.getById(`sat-node-${norad}`)
   if (entity) {
-    viewer.trackedEntity = entity
+    // 为实体配置防摇摆偏置视角 (后上方 1500km, 1000km)
+    if (!entity.viewFrom) {
+      entity.viewFrom = new Cesium.ConstantProperty(
+        new Cesium.Cartesian3(0.0, -1500000.0, 1000000.0)
+      ) as unknown as Cesium.Property
+    }
+
+    const offset = new Cesium.HeadingPitchRange(
+      Cesium.Math.toRadians(0),
+      Cesium.Math.toRadians(-35),
+      2200000
+    )
+
+    viewer.flyTo(entity, {
+      duration: 1.2,
+      offset,
+    }).then((completed) => {
+      if (completed && currentTrackedNorad === norad) {
+        viewer.trackedEntity = entity
+      }
+    })
     return
   }
 
@@ -609,10 +654,15 @@ const trackSatelliteByNorad = (norad: number) => {
   if (pos) {
     const norm = Cesium.Cartesian3.normalize(pos, new Cesium.Cartesian3())
     const magnitude = Cesium.Cartesian3.magnitude(pos)
-    const cameraPos = Cesium.Cartesian3.multiplyByScalar(norm, magnitude + 2_000_000, new Cesium.Cartesian3())
+    const cameraPos = Cesium.Cartesian3.multiplyByScalar(norm, magnitude + 2_500_000, new Cesium.Cartesian3())
     viewer.camera.flyTo({
       destination: cameraPos,
-      duration: 1.5,
+      orientation: {
+        heading: Cesium.Math.toRadians(0),
+        pitch: Cesium.Math.toRadians(-45),
+        roll: 0,
+      },
+      duration: 1.2,
     })
   }
 }
@@ -1763,6 +1813,7 @@ function handleViewerClickEvent() {
   viewer.screenSpaceEventHandler.setInputAction(async function (event: Cesium.ScreenSpaceEventHandler.PositionedEvent) {
     const picked = viewer.scene.pick(event.position)
     if (!Cesium.defined(picked)) {
+      currentTrackedNorad = null
       viewer.trackedEntity = undefined // 点击空白处解绑视角跟随
       store.closeSatPanel() // 点到空白也关闭
       store.setSelectedSatellite(null) // 清空选择的卫星

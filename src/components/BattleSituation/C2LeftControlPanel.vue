@@ -82,9 +82,13 @@
       <div class="ground-nodes-grid">
         <div
           v-for="node in groundNodes"
-          :key="node.id"
+          :key="`${node.type}-${node.id}`"
           class="ground-node-pill"
-          :class="{ 'node-center': node.type === 'STATION' }"
+          :class="{
+            'node-center': node.type === 'STATION',
+            active: selectedInfrastructureNode?.id === node.id && selectedInfrastructureNode?.type === node.type,
+          }"
+          @click="handleSelectGroundNode(node)"
         >
           <span class="node-icon">{{ node.type === 'STATION' ? '💻' : '📡' }}</span>
           <span class="node-name" :title="node.name">{{ node.name }}</span>
@@ -110,6 +114,8 @@
  */
 import { ref, computed } from 'vue'
 import { getDefaultMatrixData, type MatrixResult, type SatelliteMatrix, type InitMatrix } from '@/api/electronic'
+import { useLayoutStore } from '@/store/modules/layout'
+import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 
 const props = defineProps<{
   /** 算法矩阵响应式数据 */
@@ -166,10 +172,34 @@ const satList = computed(() => {
   return Array.from(map.values())
 })
 
+const store = useLayoutStore()
+const selectedInfrastructureNode = computed(() => store.selectedInfrastructureNode)
+
+/**
+ * 解析经纬度字符串 (例如 "68.350,133.500") 为 [latitude, longitude]
+ */
+const parseLatLon = (latLonStr?: string): [number, number] => {
+  if (!latLonStr) return [0, 0]
+  const parts = latLonStr.split(',').map((val) => parseFloat(val.trim()))
+  if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+    return [parts[0], parts[1]]
+  }
+  return [0, 0]
+}
+
+// 选择/取消选择敌方地面接收站或数据中心
+const handleSelectGroundNode = (node: InfrastructureLocation) => {
+  if (selectedInfrastructureNode.value?.id === node.id && selectedInfrastructureNode.value?.type === node.type) {
+    store.setSelectedInfrastructureNode(null)
+  } else {
+    store.setSelectedInfrastructureNode(node)
+  }
+}
+
 // 提取敌方地面设施列表 (接收站 + 数据中心)
-const groundNodes = computed(() => {
+const groundNodes = computed<InfrastructureLocation[]>(() => {
   const data = activeMatrix.value
-  const nodes: { id: string; name: string; type: 'RECEIVE' | 'STATION' }[] = []
+  const nodes: InfrastructureLocation[] = []
   const defaultData = getDefaultMatrixData()
 
   let relationData = data.stationRelationList
@@ -182,20 +212,30 @@ const groundNodes = computed(() => {
 
   if (relationData?.receiveObjList) {
     relationData.receiveObjList.forEach((rec) => {
+      const [lat, lon] = parseLatLon(rec.receiveLatLon)
       nodes.push({
         id: rec.receiveId,
         name: rec.receiveName,
         type: 'RECEIVE',
+        latitude: lat,
+        longitude: lon,
+        altitude: 0,
+        status: rec.receiveStatus ?? 0,
       })
     })
   }
 
   if (relationData?.stationObjList) {
     relationData.stationObjList.forEach((st) => {
+      const [lat, lon] = parseLatLon(st.stationLatLon)
       nodes.push({
         id: st.stationId,
         name: st.stationName,
         type: 'STATION',
+        latitude: lat,
+        longitude: lon,
+        altitude: 0,
+        status: st.stationStatus ?? 0,
       })
     })
   }
@@ -406,6 +446,23 @@ const groundNodes = computed(() => {
   border-radius: 6px;
   background: rgba(18, 32, 54, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: rgba(56, 189, 248, 0.4);
+    background: rgba(30, 58, 95, 0.8);
+  }
+
+  &.active {
+    border-color: #38bdf8;
+    background: rgba(14, 165, 233, 0.25);
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+    .node-name {
+      color: #38bdf8;
+      font-weight: bold;
+    }
+  }
 
   .node-icon {
     font-size: 12px;
@@ -430,6 +487,15 @@ const groundNodes = computed(() => {
     border-color: rgba(168, 85, 247, 0.3);
     .node-type-label {
       color: #c084fc;
+    }
+
+    &.active {
+      border-color: #a855f7;
+      background: rgba(168, 85, 247, 0.25);
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.35);
+      .node-name {
+        color: #e9d5ff;
+      }
     }
   }
 }
