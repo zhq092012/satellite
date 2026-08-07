@@ -214,6 +214,9 @@ import type { MatrixResult, Weapon } from '@/api/electronic'
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import WeaponAttackList from '@/components/electronic/WeaponAttackList.vue'
 
+defineOptions({
+  name: 'ElectronicWarfareG6',
+})
 const store = useLayoutStore()
 
 // [类型用途]

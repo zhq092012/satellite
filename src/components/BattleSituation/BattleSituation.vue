@@ -62,7 +62,9 @@
       </div>
       <div v-else class="map-box">
         <div class="tab-content">
-          <keep-alive include="EvaluationReport,ThreatAnalysis,SatelliteAttackabilityView,ElectronicWarfare">
+          <keep-alive
+            include="EvaluationReport,ThreatAnalysis,SatelliteAttackabilityView,KillChain,ElectronicWarfareG6"
+          >
             <component
               v-if="activeTabComponent"
               :is="activeTabComponent"
@@ -94,7 +96,6 @@ import SatelliteAttackabilityView from '@/components/cesium/SatelliteAttackabili
 import EvaluationReport from '@/components/cesium/EvaluationReport.vue'
 import KillChain from '@/components/cesium/KillChain.vue'
 import ConfrontView from '@/components/cesium/ConfrontationAnalysis.vue'
-import ElectronicWarfare from '@/components/electronic/ElectronicWarfare.vue'
 import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue'
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import { useLayoutStore } from '@/store/modules/layout'
@@ -114,9 +115,8 @@ const compMap = {
   SatelliteThreatView,
   SatelliteAttackabilityView,
   EvaluationReport,
-  StationReport: KillChain,
+  KillChain,
   ConfrontView,
-  ElectronicWarfare,
   ElectronicWarfareG6,
   SatelliteGantt,
 }
@@ -135,7 +135,7 @@ const tabDefs = [
   {
     label: '杀伤链方案',
     value: '杀伤链方案',
-    component: 'StationReport',
+    component: 'KillChain',
     permissionCode: 'battle:killChain',
   },
   {
@@ -215,10 +215,7 @@ type EvaluationReportInst = InstanceOf<typeof EvaluationReport>
  * 红蓝对抗分析组件实例类型
  */
 type ConfrontInst = InstanceOf<typeof ConfrontView>
-/**
- * 电子对抗分析组件实例类型
- */
-type ElectronicWarfareInst = InstanceOf<typeof ElectronicWarfare>
+
 /**
  * 当前激活组件的实例类型
  */
@@ -230,7 +227,6 @@ type ActiveInst =
   | SatelliteAttackabilityViewInst
   | EvaluationReportInst
   | ConfrontInst
-  | ElectronicWarfareInst
 
 /**
  * 获取当前激活的组件
@@ -256,10 +252,7 @@ const satelliteUnRealRef = shallowRef<SatelliteUnRealInst | null>()
  * 红蓝对抗分析组件的引用
  */
 const confrontRef = shallowRef<ConfrontInst | null>()
-/**
- * 电子对抗分析组件的引用
- */
-const electronicWarfareRef = shallowRef<ElectronicWarfareInst | null>()
+
 /**
  * 设置组件引用
  * @param el 组件实例
@@ -285,9 +278,6 @@ function setRef(el: any) {
         break
       case '红蓝对抗分析':
         confrontRef.value = activeRef.value as ConfrontInst
-        break
-      case '电子对抗分析':
-        electronicWarfareRef.value = activeRef.value as ElectronicWarfareInst
         break
     }
   }

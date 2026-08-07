@@ -4,7 +4,7 @@
     <div v-if="satelliteRenderBusy" class="render-loading">
       <div class="render-loading__panel">
         <div class="render-loading__spinner"></div>
-        <div class="render-loading__text">正在加载卫星数据...</div>
+        <div class="render-loading__text">正在加载数据...</div>
       </div>
     </div>
     <!-- 星座工具栏 -->

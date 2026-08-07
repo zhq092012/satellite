@@ -663,7 +663,7 @@ import { getTaskStageIntensityOptions, getTaskWeapons } from '@/api/dashboard'
 import type { Weapon } from '@/types/dashboard'
 
 defineOptions({
-  name: 'StationReport',
+  name: 'KillChain',
 })
 const searchForm = ref({
   intensity: '',
