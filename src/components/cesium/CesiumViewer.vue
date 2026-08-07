@@ -1991,7 +1991,12 @@ const ensureOrbitData = (norad: number, satel: any): Cesium.SampledPositionPrope
     return satellitePositionPropertyCache.get(norad)!
   }
 
-  const tleData = satelliteTleCache.get(norad)
+  let tleData = satelliteTleCache.get(norad)
+  if ((!tleData || !tleData.line1 || !tleData.line2) && satel?.line1 && satel?.line2) {
+    tleData = { line1: satel.line1, line2: satel.line2 }
+    satelliteTleCache.set(norad, tleData)
+  }
+
   if (!tleData || !tleData.line1 || !tleData.line2) return null
 
   const satrec = satellitejs.twoline2satrec(tleData.line1, tleData.line2)
@@ -2314,7 +2319,7 @@ const highlightSatellite = (sate: { norad_id: string }) => {
       label: {
         text: `[敌方${isRelay ? '数据中继卫星' : '过境卫星'}]\n${satInfo?.name || `NORAD: ${norad}`}`,
         font: 'bold 13px sans-serif',
-        fillColor: Cesium.Color.YELLOW,
+        fillColor: Cesium.Color.CYAN,
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
@@ -2336,6 +2341,15 @@ const highlightSatellite = (sate: { norad_id: string }) => {
     electronicNodeEntityIds.add(entityId)
   }
 
+  // 避免重叠标签产生双重颜色重影：若 sat-node-${norad} 与 satellite-${norad} 同时存在，隐藏备用实体的标签
+  const satNodeEnt = viewer.entities.getById(`sat-node-${norad}`)
+  const satelliteEnt = viewer.entities.getById(`satellite-${sate.norad_id}`)
+  if (satNodeEnt && satelliteEnt && satNodeEnt !== satelliteEnt) {
+    if (satelliteEnt.label) {
+      satelliteEnt.label.show = new Cesium.ConstantProperty(false)
+    }
+  }
+
   // 2. Entity 模式节点高亮与自带 path 加粗
   if (entity) {
     viewer.selectedEntity = entity
@@ -2347,11 +2361,32 @@ const highlightSatellite = (sate: { norad_id: string }) => {
     }
     if (entity.label) {
       entity.label.show = new Cesium.ConstantProperty(true)
-      entity.label.fillColor = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
+      entity.label.fillColor = new Cesium.ConstantProperty(Cesium.Color.CYAN)
     }
+
+    // 针对 48643 等矩阵卫星，确保解析轨道采样数据并生成 3D 发光轨迹线
+    const satInfo = (props.matrixData?.initMatrixList || []).find((s) => s.norad === norad)
+    if (satInfo) {
+      const posProp = ensureOrbitData(norad, satInfo)
+      if (posProp) {
+        entity.position = posProp
+      }
+    }
+
     if (entity.path) {
       entity.path.show = new CallbackProperty(() => true, false)
       entity.path.width = new Cesium.ConstantProperty(4)
+    } else {
+      entity.path = new Cesium.PathGraphics({
+        show: new CallbackProperty(() => true, false),
+        leadTime: 90 * 60,
+        trailTime: 0,
+        width: 4,
+        material: new Cesium.PolylineGlowMaterialProperty({
+          glowPower: 0.2,
+          color: Cesium.Color.YELLOW,
+        }),
+      }) as any
     }
   }
 
@@ -2365,8 +2400,8 @@ const highlightSatellite = (sate: { norad_id: string }) => {
   }
   const labelPrimitive = satelliteLabelPrimitives.get(norad)
   if (labelPrimitive) {
-    labelPrimitive.show = true
-    labelPrimitive.fillColor = Cesium.Color.YELLOW
+    // 选中的卫星若已拥有 3D Entity Label，隐藏 Primitive 集合中的对应 Label，彻底消除同位置标签文字重影
+    labelPrimitive.show = !entity || !entity.label
   }
 
   // 4. 不再渲染单独插值的 Polyline 发光轨迹，仅保留并加粗 Entity 自带 Path
