@@ -592,51 +592,52 @@ const flyToInfrastructureNode = (node: InfrastructureLocation) => {
     }
   }
 
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 1200000),
-    orientation: {
-      heading: Cesium.Math.toRadians(0),
-      pitch: Cesium.Math.toRadians(-60),
-      roll: 0,
-    },
+  // 1. 基于地面站经纬度生成包围球 Target 中心
+  const stationPos = Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 0)
+  const boundingSphere = new Cesium.BoundingSphere(stationPos, 0)
+
+  // 2. 距离地面站中心 300,000 米，俯视角 -45°，100% 居中瞄准地面站
+  const offset = new Cesium.HeadingPitchRange(
+    Cesium.Math.toRadians(0),
+    Cesium.Math.toRadians(-45),
+    300000
+  )
+
+  viewer.camera.flyToBoundingSphere(boundingSphere, {
     duration: 1.5,
+    offset,
   })
 }
 
 /**
  * [功能]
- * 视角平滑锁定与定位跟随指定的卫星
+ * 视角平滑锁定与近距离定位跟随指定的卫星
  *
  * [处理规则]
  * - 避免对同一目标反复重置相机
- * - 给实体设置 viewFrom 偏置参数以防止无方向向量时的剧烈摇摆
- * - 若存在 Entity，优先使用 viewer.flyTo(entity) 平滑飞向并聚集，随后绑定 trackedEntity 跟随
- * - 若仅 Primitive 存在，使用 camera.flyTo 定位到该 3D 坐标
+ * - 使用 BoundingSphere + HeadingPitchRange 将视角 100% 锁定聚焦在卫星 3D 坐标中央
+ * - 若存在 Entity，使用 viewer.flyTo(entity, { offset }) 聚集并绑定 trackedEntity
+ * - 若仅 Primitive 存在，使用 camera.flyToBoundingSphere 精准定位该 3D 坐标
  *
  * @param norad 目标卫星 NORAD 编号
  */
 const trackSatelliteByNorad = (norad: number) => {
   if (!viewer || !norad) return
-  if (currentTrackedNorad === norad && viewer.trackedEntity) return
 
   currentTrackedNorad = norad
 
-  // 1. 优先查找是否存在 3D Entity 实体
   const entity = viewer.entities.getById(`satellite-${norad}`) || viewer.entities.getById(`sat-node-${norad}`)
+  const pos = getSatellitePositionInCesium(norad)
+
+  // 统一离卫星 400,000 米 (400km)，俯视角 -30° 的聚焦 offset
+  const offset = new Cesium.HeadingPitchRange(
+    Cesium.Math.toRadians(0),
+    Cesium.Math.toRadians(-30),
+    400000
+  )
+
   if (entity) {
-    // 为实体配置防摇摆偏置视角 (后上方 1500km, 1000km)
-    if (!entity.viewFrom) {
-      entity.viewFrom = new Cesium.ConstantProperty(
-        new Cesium.Cartesian3(0.0, -1500000.0, 1000000.0)
-      ) as unknown as Cesium.Property
-    }
-
-    const offset = new Cesium.HeadingPitchRange(
-      Cesium.Math.toRadians(0),
-      Cesium.Math.toRadians(-35),
-      2200000
-    )
-
+    entity.viewFrom = undefined
     viewer.flyTo(entity, {
       duration: 1.2,
       offset,
@@ -648,21 +649,12 @@ const trackSatelliteByNorad = (norad: number) => {
     return
   }
 
-  // 2. 若仅 Primitive 形式存在，取消锁合并平滑飞向该坐标
-  viewer.trackedEntity = undefined
-  const pos = getSatellitePositionInCesium(norad)
   if (pos) {
-    const norm = Cesium.Cartesian3.normalize(pos, new Cesium.Cartesian3())
-    const magnitude = Cesium.Cartesian3.magnitude(pos)
-    const cameraPos = Cesium.Cartesian3.multiplyByScalar(norm, magnitude + 2_500_000, new Cesium.Cartesian3())
-    viewer.camera.flyTo({
-      destination: cameraPos,
-      orientation: {
-        heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(-45),
-        roll: 0,
-      },
+    viewer.trackedEntity = undefined
+    const boundingSphere = new Cesium.BoundingSphere(pos, 0)
+    viewer.camera.flyToBoundingSphere(boundingSphere, {
       duration: 1.2,
+      offset,
     })
   }
 }
