@@ -620,6 +620,24 @@ const trackSatelliteByNorad = (norad: number, force = false) => {
 
   currentTrackedNorad = norad
 
+  // 2. 尝试同步该卫星的过境时间窗口时刻至 Cesium 时钟，确保视角飞赴时卫星在过境点的可见正面
+  if (props.matrixData) {
+    const battleMatch = (props.matrixData.battleMatrixList || []).find((b) => b.norad === norad)
+    const windowStart =
+      battleMatch?.windows?.[0]?.startTime ||
+      (props.matrixData.initMatrixList || []).find((i) => i.norad === norad)?.initWindows?.[0]?.peakWindow
+    if (windowStart) {
+      try {
+        const date = new Date(windowStart.replace(/-/g, '/'))
+        if (!isNaN(date.getTime())) {
+          viewer.clock.currentTime = Cesium.JulianDate.fromDate(date)
+        }
+      } catch (e) {
+        // ignore parse error
+      }
+    }
+  }
+
   let entity = viewer.entities.getById(`satellite-${norad}`) || viewer.entities.getById(`sat-node-${norad}`)
   const pos = getSatellitePositionInCesium(norad)
 
@@ -2530,6 +2548,9 @@ const jumpToTimeAndPlay = (timeStr?: string) => {
     }
   }
   viewer.clock.shouldAnimate = true
+  if (currentTrackedNorad) {
+    trackSatelliteByNorad(currentTrackedNorad, true)
+  }
   viewer.scene.requestRender()
 }
 
