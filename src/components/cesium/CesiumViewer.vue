@@ -615,9 +615,8 @@ const flyToInfrastructureNode = (node: InfrastructureLocation) => {
 const trackSatelliteByNorad = (norad: number, force = false) => {
   if (!viewer || !norad) return
 
-  // 避免对同一目标反复重置相机或被 watch(store.selectedSatellite) 触发二次飞行的竞态与切回抖动
-  // 注意：若 viewer.trackedEntity 不存在，仍需重新锁定跟随
-  if (!force && currentTrackedNorad === norad && viewer.trackedEntity) return
+  // 1. 严格守卫：若当前已经在追踪/飞向该 NORAD 卫星，且未指定 force，直接拦截防二次飞行抖动
+  if (!force && currentTrackedNorad === norad) return
 
   currentTrackedNorad = norad
 
@@ -641,16 +640,12 @@ const trackSatelliteByNorad = (norad: number, force = false) => {
 
   if (entity) {
     entity.viewFrom = undefined
-    viewer
-      .flyTo(entity, {
-        duration: 1.2,
-        offset,
-      })
-      .then((completed) => {
-        if (completed && currentTrackedNorad === norad) {
-          viewer.trackedEntity = entity
-        }
-      })
+    // 立刻绑定 trackedEntity 保持中心跟随，并启动单次平滑视角飞行
+    viewer.trackedEntity = entity
+    viewer.flyTo(entity, {
+      duration: 1.2,
+      offset,
+    })
     return
   }
 
@@ -805,11 +800,10 @@ const renderElectronicInfrastructureNodes = () => {
     electronicNodeEntityIds.add(satEntityId)
   })
 
-  // 仅在未选择卫星且未选择地面节点时，渲染完敌方节点后才自动平滑飞赴地面网络区域，避免异步加载矩阵时触发竞态切回地面站
+  // 仅在未选择卫星且未选择地面节点时，渲染完敌方节点后才自动平滑飞赴地面网络区域
+  // 若当前已在追踪卫星，切勿重复触发 flyTo，保障一次平滑直达卫星视角
   if (!currentTrackedNorad && !props.selectedNorad && !store.selectedSatellite && !store.selectedInfrastructureNode) {
     flyToEnemyNetwork()
-  } else if (currentTrackedNorad) {
-    trackSatelliteByNorad(currentTrackedNorad, true)
   }
 }
 
