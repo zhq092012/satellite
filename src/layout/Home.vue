@@ -1438,20 +1438,21 @@ const switchTime = (tab: string) => {
 
 const satelliteOrbitList = ref<SatelliteInfo[]>([])
 /**
- * 获取卫星tle数据列表
+ * [功能]
+ * 获取全量卫星轨道原始数据列表
+ *
+ * [处理规则]
+ * - 已存在数据时跳过请求
+ * - 仅加载数据保存至 satelliteOrbitList，不在此处全量渲染 Primitive
+ *
+ * [副作用]
+ * - 修改 satelliteOrbitList.value
  */
 const loadSatelliteOrbit = async () => {
+  if (satelliteOrbitList.value.length) return
   const res = await getHomeSatellite(1, 1000000)
-  if (res.code === 200) {
+  if (res.code === 200 && res.data?.content) {
     satelliteOrbitList.value = res.data.content
-
-    if (satelliteOrbitList.value.length) {
-      cesiumViewerRef.value?.clearViewer()
-      cesiumViewerRef.value?.renderSatellitePathWithPrimitive(satelliteOrbitList.value)
-      if (selectedConstellationName.value) {
-        await cesiumViewerRef.value?.focusConstellationByName(selectedConstellationName.value)
-      }
-    }
   }
 }
 type ConstellationListItem = SatelliteConstellation & { satelliteCount: number }
@@ -1485,22 +1486,49 @@ const filteredConstellationList = computed(() => {
 
 /**
  * [功能]
- * 选择某个星座：展开/进入侧边栏星座详情，并在 3D 地图上高亮展示该星座的卫星、包络及星间链路
+ * 查找并仅渲染指定星座对应的卫星
  *
- * @param constellation 选中的星座对象
+ * [处理规则]
+ * - 确保 satelliteOrbitList 数据已加载
+ * - 根据星座 noradIds 提取匹配的卫星数组
+ * - 调用 CesiumViewer 的 clearViewer 清理场景
+ * - 仅将匹配的星座卫星数组传递给 renderSatellitePathWithPrimitive 渲染
+ * - 聚焦 Camera 到该星座
+ *
+ * [副作用]
+ * - 修改 selectedConstellationDetail.value 与 selectedConstellationName.value
+ * - 触发 Cesium Viewer 图层与相机渲染
+ *
+ * @param constellation 目标星座对象
  */
-const handleSelectConstellation = async (constellation: ConstellationListItem) => {
+const renderConstellationSatellites = async (constellation: ConstellationListItem) => {
+  if (!constellation) return
   selectedConstellationDetail.value = constellation
   selectedConstellationName.value = constellation.name
-  store.showAnalysisPanel = true
 
-  // 如果尚未加载卫星 primitive 数据，则自动触发加载
   if (!satelliteOrbitList.value.length) {
     await loadSatelliteOrbit()
   }
 
-  // 联动 Cesium Viewer 聚焦于该星座
+  const noradSet = new Set((constellation.noradIds || []).map((id) => Number(id)))
+  const filteredSatellites = satelliteOrbitList.value.filter((s) => noradSet.has(Number(s.norad)))
+
+  cesiumViewerRef.value?.clearViewer()
+  if (filteredSatellites.length) {
+    await cesiumViewerRef.value?.renderSatellitePathWithPrimitive(filteredSatellites)
+  }
   await cesiumViewerRef.value?.focusConstellationByName(constellation.name)
+}
+
+/**
+ * [功能]
+ * 选择某个星座：展开侧边栏星座详情，并仅渲染该星座的卫星、包络及星间链路
+ *
+ * @param constellation 选中的星座对象
+ */
+const handleSelectConstellation = async (constellation: ConstellationListItem) => {
+  store.showAnalysisPanel = true
+  await renderConstellationSatellites(constellation)
 }
 
 /**
@@ -1513,10 +1541,12 @@ const handleBackToConstellationList = () => {
 
 /**
  * [功能]
- * 清除地图上的星座高亮与聚焦
+ * 清除地图上的星座高亮与聚焦，并清理场景
  */
 const handleClearMapConstellation = async () => {
   selectedConstellationName.value = ''
+  selectedConstellationDetail.value = null
+  cesiumViewerRef.value?.clearViewer()
   await cesiumViewerRef.value?.focusConstellationByName(null)
 }
 
@@ -1532,6 +1562,26 @@ const loadConstellationList = async () => {
         satelliteCount: Array.isArray(item.noradIds) ? item.noradIds.length : 0,
       }))
       .sort((left, right) => right.satelliteCount - left.satelliteCount)
+  }
+}
+
+/**
+ * [功能]
+ * 初始化星座与卫星渲染
+ *
+ * [处理规则]
+ * - 并发加载星座列表和全量卫星数据
+ * - 读取到星座列表后，默认选择并加载第一个星座，仅渲染对应的星座卫星
+ *
+ * [副作用]
+ * - 修改 constellationList.value 和 satelliteOrbitList.value
+ * - 触发首屏 Cesium Viewer 第一个星座的视角与 Primitive 渲染
+ */
+const initConstellationAndSatellites = async () => {
+  await Promise.all([loadConstellationList(), loadSatelliteOrbit()])
+
+  if (constellationList.value.length > 0) {
+    await renderConstellationSatellites(constellationList.value[0])
   }
 }
 
@@ -1657,11 +1707,10 @@ onBeforeUnmount(() => {
 
 onMounted(() => {
   nextTick(() => {
-    loadSatelliteOrbit()
+    void initConstellationAndSatellites()
   })
 
   loadSatelliteList()
-  loadConstellationList()
   loadBattleList()
   loadSatelliteCount()
   loadTaskSatetypes()
