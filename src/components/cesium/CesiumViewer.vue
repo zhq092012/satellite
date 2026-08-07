@@ -602,26 +602,41 @@ const flyToInfrastructureNode = (node: InfrastructureLocation) => {
 
 /**
  * [功能]
- * 视角平滑锁定与近距离定位跟随指定的卫星
+ * 视角平滑锁定与远距离 (全地球视角) 定位跟随指定的卫星
  *
  * [处理规则]
- * - 避免对同一目标反复重置相机
- * - 使用 BoundingSphere + HeadingPitchRange 将视角 100% 锁定聚焦在卫星 3D 坐标中央
- * - 若存在 Entity，使用 viewer.flyTo(entity, { offset }) 聚集并绑定 trackedEntity
- * - 若仅 Primitive 存在，使用 camera.flyToBoundingSphere 精准定位该 3D 坐标
+ * - 避免对同一目标反复重置相机（若 currentTrackedNorad 已是目标且没有设置 force 标志，则直接跳过，防止 watch(store.selectedSatellite) 触发竞态二次飞行）
+ * - 使用 HeadingPitchRange 将视角锁定在能看到整个地球的视角 (俯角 -90°，距离 22,000,000 米)，并持续跟随卫星
+ * - 若 Entity 暂不存在，则动态创建并挂载 CallbackProperty 位置，确保 viewer.trackedEntity 总是有效，跟随的卫星始终在屏幕区域内
  *
  * @param norad 目标卫星 NORAD 编号
+ * @param force 是否强制重置视角并重新飞行
  */
-const trackSatelliteByNorad = (norad: number) => {
+const trackSatelliteByNorad = (norad: number, force = false) => {
   if (!viewer || !norad) return
+
+  // 避免对同一目标反复重置相机或被 watch(store.selectedSatellite) 触发二次飞行的竞态与切回抖动
+  if (!force && currentTrackedNorad === norad) return
 
   currentTrackedNorad = norad
 
-  const entity = viewer.entities.getById(`satellite-${norad}`) || viewer.entities.getById(`sat-node-${norad}`)
+  let entity = viewer.entities.getById(`satellite-${norad}`) || viewer.entities.getById(`sat-node-${norad}`)
   const pos = getSatellitePositionInCesium(norad)
 
-  // 统一离卫星 400,000 米 (400km)，俯视角 -30° 的聚焦 offset
-  const offset = new Cesium.HeadingPitchRange(Cesium.Math.toRadians(0), Cesium.Math.toRadians(-30), 400000)
+  // 全视角地球 offset：离卫星 22,000,000 米 (22,000km)，俯视角 -90° (直视地心/俯视全球)
+  // 确保能查看到完整的地球球体，且被跟随的卫星保持在屏幕中央视野内
+  const offset = new Cesium.HeadingPitchRange(Cesium.Math.toRadians(0), Cesium.Math.toRadians(-90), 22000000)
+
+  // 若实体暂不存在，但可计算得到位置，动态创建一个带 position 属性的实体以便锁定跟随
+  if (!entity && pos) {
+    entity = viewer.entities.add({
+      id: `satellite-${norad}`,
+      position: new Cesium.CallbackProperty(
+        () => getSatellitePositionInCesium(norad) || pos,
+        false
+      ) as unknown as Cesium.PositionProperty,
+    })
+  }
 
   if (entity) {
     entity.viewFrom = undefined
@@ -639,7 +654,6 @@ const trackSatelliteByNorad = (norad: number) => {
   }
 
   if (pos) {
-    viewer.trackedEntity = undefined
     const boundingSphere = new Cesium.BoundingSphere(pos, 0)
     viewer.camera.flyToBoundingSphere(boundingSphere, {
       duration: 1.2,
@@ -664,6 +678,8 @@ watch(
   (newSat) => {
     if (newSat && newSat.norad) {
       trackSatelliteByNorad(Number(newSat.norad))
+    } else if (!newSat) {
+      currentTrackedNorad = null
     }
   }
 )
