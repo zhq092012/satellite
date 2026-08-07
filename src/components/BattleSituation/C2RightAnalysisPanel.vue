@@ -4,14 +4,133 @@
     <div class="panel-header">
       <div class="header-title-box">
         <span class="header-icon">📊</span>
-        <span class="header-title glow-text-cyan">战场态势 - 网络毁伤态势</span>
+        <span class="header-title glow-text-cyan">敌方数据传输与链路效能</span>
       </div>
-      <span class="panel-badge badge-red">时效战果分析</span>
+      <span class="panel-badge badge-blue">正常传输分析</span>
     </div>
 
     <!-- 全面板纵向滚动容器 -->
     <el-scrollbar class="panel-body-scroll">
-      <!-- 0. 选中敌方地面基础设施节点 (地面接收站 / 数据中心) 详细信息展示卡片 -->
+      <!-- 1. 敌方全网传输资产与拓扑概览 -->
+      <div class="panel-section">
+        <div class="section-title">
+          <span class="title-icon">🌐</span>
+          <span>敌方全网传输资产统计</span>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">过境卫星</span>
+            <strong class="stat-val glow-cyan">{{ transitSatCount }} 颗</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">中继节点</span>
+            <strong class="stat-val glow-amber">{{ relaySatCount }} 颗</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">地面接收站</span>
+            <strong class="stat-val glow-blue">{{ receiveStationCount }} 个</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">数据中心</span>
+            <strong class="stat-val glow-purple">{{ dataCenterCount }} 个</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 当前选中卫星的数据传输链路与窗口分析 -->
+      <div class="panel-section selected-sat-analysis">
+        <div class="section-title">
+          <span class="title-icon">🔗</span>
+          <span>目标卫星数据传输链路与窗口</span>
+          <span class="active-badge" v-if="selectedSatelliteNorad">
+            NORAD: #{{ selectedSatelliteNorad }}
+          </span>
+        </div>
+
+        <!-- A. 未点击/未选择任何卫星时的静态提示 -->
+        <div v-if="!selectedSatelliteNorad" class="empty-sat-box">
+          <span class="empty-icon">🛰️</span>
+          <p class="empty-text">当前处于全网静态展示模式</p>
+          <small class="empty-sub">点击左侧列表或地图上的敌方卫星，系统将自动加载其专属传输矩阵，并推进时间轴至过境窗口</small>
+        </div>
+
+        <!-- B. 已选中某颗敌方卫星时的传输分析 -->
+        <div v-else class="sat-analysis-box">
+          <!-- 卫星核心标示 -->
+          <div class="sat-header-row">
+            <div class="sat-title-group">
+              <span class="sat-name-large">{{ currentSatName }}</span>
+              <span class="sat-type-tag">{{ currentSatType }}</span>
+            </div>
+            <button class="clear-btn" @click="handleClearSelection" title="重置回到静态视图">重置静态</button>
+          </div>
+
+          <!-- 传输路径 Flow Diagram -->
+          <div class="link-flow-card">
+            <div class="flow-step">
+              <span class="step-icon">🛰️</span>
+              <span class="step-text">{{ currentSatName }}</span>
+              <span class="step-sub">天基感知</span>
+            </div>
+            <span class="flow-arrow">➔</span>
+            <div class="flow-step">
+              <span class="step-icon">{{ hasRelayNode ? '📡' : '🏢' }}</span>
+              <span class="step-text">{{ targetRelayOrStation }}</span>
+              <span class="step-sub">{{ hasRelayNode ? '中继/接收站' : '接收站' }}</span>
+            </div>
+            <span class="flow-arrow">➔</span>
+            <div class="flow-step">
+              <span class="step-icon">💻</span>
+              <span class="step-text">{{ targetDataCenter }}</span>
+              <span class="step-sub">数据中心</span>
+            </div>
+          </div>
+
+          <!-- 过境传输时间窗口 -->
+          <div class="window-detail-card" v-if="latestTransmissionWindow">
+            <div class="card-subtitle">
+              <span>⏱️ 下一个有效传输窗口 (自动连通推演)</span>
+            </div>
+            <div class="window-time-box">
+              <div class="time-row">
+                <span class="time-label">窗口开始:</span>
+                <span class="time-val digital-font glow-cyan">{{ latestTransmissionWindow.startTime }}</span>
+              </div>
+              <div class="time-row">
+                <span class="time-label">窗口结束:</span>
+                <span class="time-val digital-font">{{ latestTransmissionWindow.endTime }}</span>
+              </div>
+              <div class="time-row">
+                <span class="time-label">持续时长:</span>
+                <span class="time-val digital-font glow-amber">{{ windowDurationText }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 传输效能与延迟指标 -->
+          <div class="metrics-grid">
+            <div class="metric-item">
+              <span class="m-label">过境频次 (gjNum):</span>
+              <span class="m-val digital-font glow-cyan">{{ passFrequency }} 次/24h</span>
+            </div>
+            <div class="metric-item">
+              <span class="m-label">估算传输延时:</span>
+              <span class="m-val digital-font glow-green">{{ estimatedLatency }}</span>
+            </div>
+            <div class="metric-item">
+              <span class="m-label">通信余量:</span>
+              <span class="m-val digital-font glow-cyan">+18.5 dB</span>
+            </div>
+            <div class="metric-item">
+              <span class="m-label">最短用时:</span>
+              <span class="m-val digital-font glow-amber">{{ minTimeText }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 选中 3D 节点/资产详情 (Node & Asset Detail) -->
       <transition name="el-zoom-in-top">
         <div v-if="selectedNode" class="panel-section selected-node-section">
           <div class="section-title title-highlight">
@@ -19,12 +138,7 @@
               <span class="title-icon">{{ selectedNode.type === 'RECEIVE' ? '📡' : '💻' }}</span>
               <span>{{ selectedNode.type === 'RECEIVE' ? '地面接收站详情' : '数据中心详情' }}</span>
             </div>
-            <div class="title-right">
-              <span class="status-pill" :class="selectedNode.status === 1 ? 'pill-red' : 'pill-green'">
-                {{ selectedNode.status === 1 ? '🔴 已毁伤/打压' : '🟢 正常可操作' }}
-              </span>
-              <button class="close-node-btn" @click="clearSelectedNode" title="关闭详情">✕</button>
-            </div>
+            <button class="close-node-btn" @click="clearSelectedNode" title="关闭详情">✕</button>
           </div>
 
           <div class="selected-node-card">
@@ -51,1317 +165,558 @@
                 <span class="item-val digital-font">{{ selectedNode.altitude }} m</span>
               </div>
               <div class="grid-item">
-                <span class="item-label">物理仰角掩蔽:</span>
-                <span class="item-val digital-font glow-amber">10.0° 门槛</span>
-              </div>
-              <div class="grid-item">
                 <span class="item-label">解扩通信余量:</span>
-                <span class="item-val digital-font" :class="selectedNode.status === 1 ? 'glow-red' : 'glow-green'">
-                  {{ selectedNode.status === 1 ? '-12.5 dB (中断)' : '+18.5 dB (良好)' }}
-                </span>
+                <span class="item-val digital-font glow-green">+18.5 dB (良好)</span>
               </div>
-              <div class="grid-item">
-                <span class="item-label">关联过境窗口:</span>
-                <span class="item-val digital-font glow-cyan">{{ nodeAssociatedWindows.length }} 个</span>
-              </div>
-            </div>
-
-            <div class="node-actions">
-              <button class="fly-btn" @click="handleFlyToNode">🎯 视角直达该站点</button>
             </div>
           </div>
         </div>
       </transition>
-
-      <!-- 0.1 选中 3D 卫星详细信息展示卡片 (由 getSatelliteDetail 接口获取) -->
-      <transition name="el-zoom-in-top">
-        <div v-if="selectedSatellite" class="panel-section selected-satellite-section">
-          <div class="section-title title-highlight">
-            <div class="title-left">
-              <span class="title-icon">🛰️</span>
-              <span>卫星资产详情 (NORAD: {{ selectedSatellite.norad }})</span>
-            </div>
-            <div class="title-right">
-              <span class="status-pill pill-cyan">
-                {{ selectedSatellite.sat_type || '卫星资产' }}
-              </span>
-            </div>
-          </div>
-
-          <div class="selected-satellite-card">
-            <div class="sat-main-header">
-              <div class="sat-title-box">
-                <span class="sat-name-text">{{
-                  selectedSatellite.name_cn ||
-                  selectedSatellite.name_en ||
-                  selectedSatellite.name_all ||
-                  'SAT-' + selectedSatellite.norad
-                }}</span>
-                <span class="sat-sub-text" v-if="selectedSatellite.name_en && selectedSatellite.name_cn">{{
-                  selectedSatellite.name_en
-                }}</span>
-              </div>
-              <span class="country-tag">{{ selectedSatellite.country || '未标记' }}</span>
-            </div>
-
-            <div class="sat-grid">
-              <div class="grid-item">
-                <span class="item-label">NORAD 编号:</span>
-                <span class="item-val digital-font glow-cyan">#{{ selectedSatellite.norad }}</span>
-              </div>
-              <div class="grid-item">
-                <span class="item-label">卫星类型:</span>
-                <span class="item-val glow-cyan">{{ selectedSatellite.sat_type || '常规卫星' }}</span>
-              </div>
-              <div class="grid-item">
-                <span class="item-label">轨道倾角 (i):</span>
-                <span class="item-val digital-font">{{
-                  selectedSatellite.i ? selectedSatellite.i.toFixed(2) + '°' : '--'
-                }}</span>
-              </div>
-              <div class="grid-item">
-                <span class="item-label">运行周期 (Cycle):</span>
-                <span class="item-val digital-font glow-amber">{{
-                  selectedSatellite.cycle ? selectedSatellite.cycle.toFixed(1) + ' 分钟' : '--'
-                }}</span>
-              </div>
-              <div class="grid-item">
-                <span class="item-label">近/远地点:</span>
-                <span class="item-val digital-font"
-                  >{{ selectedSatellite.prg ? selectedSatellite.prg.toFixed(0) : '--' }} /
-                  {{ selectedSatellite.apg ? selectedSatellite.apg.toFixed(0) : '--' }} km</span
-                >
-              </div>
-              <div class="grid-item">
-                <span class="item-label">发射时间:</span>
-                <span class="item-val digital-font">{{ selectedSatellite.launch_date || '--' }}</span>
-              </div>
-              <div class="grid-item" v-if="selectedSatellite.equipment">
-                <span class="item-label">载荷配置:</span>
-                <span class="item-val sat-desc-text" :title="selectedSatellite.equipment">{{
-                  selectedSatellite.equipment
-                }}</span>
-              </div>
-              <div class="grid-item" v-if="selectedSatellite.mass">
-                <span class="item-label">卫星质量:</span>
-                <span class="item-val digital-font">{{ selectedSatellite.mass }} kg</span>
-              </div>
-            </div>
-
-            <div class="sat-actions">
-              <button class="fly-btn outline-btn" @click="handleOpenSatelliteProfile">📖 查看全景档案</button>
-              <button class="fly-btn" @click="handleFlyToSatellite">🎯 视角追踪定位</button>
-            </div>
-          </div>
-        </div>
-      </transition>
-
-      <!-- 1. 网络脆弱点与高价值枢纽分析模块 -->
-      <div class="panel-section">
-        <div class="section-title">
-          <span class="title-icon">🎯</span>
-          <span>网络脆弱点与高价值枢纽</span>
-        </div>
-
-        <div class="hubs-list">
-          <div v-for="hub in highValueHubs" :key="hub.id" class="hub-card">
-            <div class="hub-header">
-              <span class="hub-icon">{{ hub.icon }}</span>
-              <span class="hub-name"
-                ><strong>{{ hub.name }}</strong></span
-              >
-              <span class="hub-tag" :class="hub.tagClass">{{ hub.tag }}</span>
-            </div>
-
-            <div class="hub-body">
-              <div class="hub-metric">
-                <span class="metric-label">1对N并发链路:</span>
-                <span class="metric-value digital-font glow-cyan">{{ hub.linkCount }} 条</span>
-              </div>
-              <div class="hub-metric">
-                <span class="metric-label">抗干扰解扩余量:</span>
-                <span class="metric-value digital-font" :class="hub.marginClass">{{ hub.margin }}</span>
-              </div>
-              <div class="hub-metric">
-                <span class="metric-label">单点失效风险:</span>
-                <span class="metric-value digital-font" :class="hub.riskClass">{{ hub.riskIndex }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 2. 累积时延战果与时效性损毁模块 -->
-      <div class="panel-section">
-        <div class="section-title">
-          <span class="title-icon">⏱️</span>
-          <span>累积时延战果与时效性损失</span>
-        </div>
-
-        <div class="stats-grid-row">
-          <!-- 累计时效损失 -->
-          <div class="stat-box box-amber">
-            <span class="stat-title">累计链路时效损失</span>
-            <div class="stat-num-box">
-              <span class="stat-num digital-font glow-amber">+{{ cumulativeDelayMin }}</span>
-              <span class="stat-unit">分钟</span>
-            </div>
-          </div>
-
-          <!-- 通信中断瘫痪率 -->
-          <div class="stat-box box-red">
-            <span class="stat-title">通信网络瘫痪率</span>
-            <div class="stat-num-box">
-              <span class="stat-num digital-font glow-red">{{ interruptionRate }}%</span>
-              <span class="stat-unit">毁伤链路</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 需求2新增：全链路传输首完成时效（未打击基线 vs 打击后实际） -->
-        <div class="chain-latency-cards">
-          <!-- 指标一：未受到打击时最早完成全链路传输时间 -->
-          <div class="chain-card chain-card--baseline">
-            <div class="chain-card__header">
-              <span class="chain-title">未打击最早全链路传输 (相对开始)</span>
-              <span class="chain-tag tag-green">基线最优</span>
-            </div>
-            <div class="chain-card__body">
-              <div class="chain-num-box">
-                <span class="chain-num digital-font glow-green">{{ unStruckEarliestTime.timeText }}</span>
-                <span class="chain-unit">相对开始</span>
-              </div>
-              <div class="chain-route-info">
-                <span class="route-label">传输模式:</span>
-                <span class="route-path glow-cyan">{{ unStruckEarliestTime.modeText }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 指标二：打击后最早完成全链路传输的实际时间 -->
-          <div class="chain-card chain-card--struck">
-            <div class="chain-card__header">
-              <span class="chain-title">打击后实际最早全链路传输 (相对开始)</span>
-              <span class="chain-tag tag-red">受损延时</span>
-            </div>
-            <div class="chain-card__body">
-              <div class="chain-num-box">
-                <span class="chain-num digital-font glow-red">{{ struckEarliestTime.timeText }}</span>
-                <span class="chain-unit">相对开始</span>
-              </div>
-              <div class="chain-route-info">
-                <span class="route-label">影响状态:</span>
-                <span class="route-path glow-amber">{{ struckEarliestTime.statusText }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 毁伤打压概览小条 -->
-        <div class="damage-summary-bar">
-          <div class="summary-item">
-            <span class="dot dot-red"></span>
-            <span
-              >受损地面站: <strong class="glow-red">{{ struckReceiveCount }}</strong> / {{ totalReceiveCount }} 个</span
-            >
-          </div>
-          <div class="summary-item">
-            <span class="dot dot-amber"></span>
-            <span
-              >打压/毁伤卫星: <strong class="glow-amber">{{ struckSatCount }}</strong> / {{ totalSatCount }} 颗</span
-            >
-          </div>
-          <div class="summary-item">
-            <span class="dot dot-blue"></span>
-            <span
-              >切断骨干链路: <strong class="glow-cyan">{{ severedLinkCount }}</strong> 条</span
-            >
-          </div>
-        </div>
-      </div>
-
-      <!-- 3. 实时全链路通信过境窗口明细 -->
-      <div class="panel-section">
-        <div class="section-title">
-          <span class="title-icon">📡</span>
-          <span>过境通信窗口与毁伤明细</span>
-          <span class="count-tag">{{ allWindowsList.length }} 个窗口</span>
-        </div>
-
-        <div class="windows-feed-list">
-          <div v-if="allWindowsList.length === 0" class="empty-feed">暂无过境窗口数据</div>
-          <div
-            v-for="(win, idx) in allWindowsList.slice(0, 10)"
-            :key="win.id || idx"
-            class="feed-card"
-            :class="{ 'card-struck': win.strikeStatus === 1 }"
-          >
-            <div class="feed-header">
-              <span class="feed-time digital-font">{{ win.startTimeShort }} ~ {{ win.endTimeShort }}</span>
-              <span class="feed-status" :class="win.strikeStatus === 1 ? 'status-red' : 'status-green'">
-                {{ win.strikeStatus === 1 ? '受毁伤打压' : '正常过境' }}
-              </span>
-            </div>
-
-            <div class="feed-body">
-              <div class="link-route">
-                <span class="sat-text">🛰️ {{ win.satName }}</span>
-                <span class="arrow">➔</span>
-                <span class="rec-text">📡 {{ win.receiveName }}</span>
-              </div>
-
-              <div class="feed-meta" v-if="win.strikeStatus === 1">
-                <span class="meta-tag tag-amber" v-if="win.delayMin">延时: +{{ win.delayMin }}m</span>
-                <span
-                  class="meta-tag tag-red"
-                  v-if="win.weapons && win.weapons.length > 0"
-                  :title="win.weapons[0].name"
-                >
-                  🎯 {{ win.weapons[0].name }} ({{ win.weapons[0].type }})
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </el-scrollbar>
   </aside>
 </template>
 
 <script setup lang="ts">
+/**
+ * [功能]
+ * 战场态势 - C2 右侧数据传输与链路效能分析面板
+ *
+ * [处理规则]
+ * - 重点展示敌方传输链路 (敌方卫星 -> 中继/接收站 -> 数据中心)
+ * - 展现过境时间窗口、传输延时、最短用时、资产统计与资产详情
+ * - 不包含任何攻击/毁伤/打压战果内容
+ */
 import { computed } from 'vue'
-import { getDefaultMatrixData, type MatrixResult, type Weapon } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
-import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
+import {
+  getDefaultMatrixData,
+  type MatrixResult,
+  type SatelliteMatrix,
+  type InitMatrix,
+  type BattleWindow,
+} from '@/api/electronic'
 
 const props = defineProps<{
+  /** 算法矩阵数据 */
   matrixData?: MatrixResult | null
+  /** 当前选中的卫星 NORAD */
+  selectedSatelliteNorad?: number | null
+}>()
+
+const emit = defineEmits<{
+  (e: 'clear-satellite-selection'): void
 }>()
 
 const store = useLayoutStore()
-const { openSatelliteProfile } = useSatelliteProfileDialog()
+
 const activeMatrix = computed<MatrixResult>(() => props.matrixData || getDefaultMatrixData())
 
-/** 当前选中的 3D 敌方地面基础设施节点 (地面接收站 / 数据中心) */
+// 选中的地面节点
 const selectedNode = computed(() => store.selectedInfrastructureNode)
-
-/** 清空选中的基础设施节点 */
 const clearSelectedNode = () => {
   store.setSelectedInfrastructureNode(null)
 }
 
-/** 触发相机平滑定位视角直达当前选中的站点 */
-const handleFlyToNode = () => {
-  if (selectedNode.value) {
-    const node = selectedNode.value
-    store.setSelectedInfrastructureNode(null)
-    store.setSelectedInfrastructureNode(node)
-  }
+// 清除选择
+const handleClearSelection = () => {
+  emit('clear-satellite-selection')
 }
 
-/** 当前选中的 3D 卫星详细信息 (由 getSatelliteDetail 接口查询) */
-const selectedSatellite = computed(() => store.selectedSatellite)
+// 全网资产统计
+const transitSatCount = computed(() => {
+  const data = activeMatrix.value
+  const list = data.initMatrixList || []
+  return list.filter((s) => !s.satType?.includes('中继')).length || 6
+})
 
-/** 打开卫星全景档案对话框 */
-const handleOpenSatelliteProfile = () => {
-  if (selectedSatellite.value?.norad) {
-    openSatelliteProfile(selectedSatellite.value.norad)
+const relaySatCount = computed(() => {
+  const data = activeMatrix.value
+  return data.relayRelation?.relayList?.length || 1
+})
+
+const receiveStationCount = computed(() => {
+  const relationData = activeMatrix.value.stationRelationList || activeMatrix.value.initRelationList
+  return relationData?.receiveObjList?.length || 12
+})
+
+const dataCenterCount = computed(() => {
+  const relationData = activeMatrix.value.stationRelationList || activeMatrix.value.initRelationList
+  return relationData?.stationObjList?.length || 3
+})
+
+// 当前选中卫星信息
+const currentSatItem = computed(() => {
+  if (!props.selectedSatelliteNorad) return null
+  const norad = props.selectedSatelliteNorad
+  const data = activeMatrix.value
+
+  const matchInit = (data.initMatrixList || []).find((item: InitMatrix) => item.norad === norad)
+  if (matchInit) return matchInit
+
+  const matchSat = (data.satelliteMatrixList || []).find((item: SatelliteMatrix) => item.norad === norad)
+  if (matchSat) return matchSat
+
+  const matchBattle = (data.battleMatrixList || []).find((item) => item.norad === norad)
+  if (matchBattle) return matchBattle
+
+  return null
+})
+
+const currentSatName = computed(() => {
+  return currentSatItem.value?.name || (props.selectedSatelliteNorad ? `SAT-#${props.selectedSatelliteNorad}` : '')
+})
+
+const currentSatType = computed(() => {
+  return (currentSatItem.value as any)?.satType || '过境观测卫星'
+})
+
+// 解析传输路径 (中继/接收站 & 数据中心)
+const hasRelayNode = computed(() => {
+  const data = activeMatrix.value
+  return (data.relayRelation?.relayList?.length || 0) > 0
+})
+
+const targetRelayOrStation = computed(() => {
+  const relationData = activeMatrix.value.stationRelationList || activeMatrix.value.initRelationList
+  const rec = relationData?.receiveObjList?.[0]
+  if (hasRelayNode.value) {
+    return 'TDRS-6 (中继) / ReceiveStation-1'
   }
-}
+  return rec ? rec.receiveName : '基站 ReceiveStation-1'
+})
 
-/** 视角追踪定位选中的卫星 */
-const handleFlyToSatellite = () => {
-  if (selectedSatellite.value?.norad) {
-    const sat = selectedSatellite.value
-    store.setSelectedSatellite(null)
-    store.setSelectedSatellite(sat)
-  }
-}
+const targetDataCenter = computed(() => {
+  const relationData = activeMatrix.value.stationRelationList || activeMatrix.value.initRelationList
+  const st = relationData?.stationObjList?.[0]
+  return st ? st.stationName : '中心云 Station-1'
+})
 
-// 1. 网络脆弱点与高价值枢纽
-const highValueHubs = computed(() => {
+// 最新/最早的过境传输窗口
+const latestTransmissionWindow = computed<BattleWindow | null>(() => {
+  if (!props.selectedSatelliteNorad) return null
   const data = activeMatrix.value
-  const list: {
-    id: string
-    name: string
-    icon: string
-    tag: string
-    tagClass: string
-    linkCount: number
-    margin: string
-    marginClass: string
-    riskIndex: string
-    riskClass: string
-  }[] = []
 
-  // 提取多路并发地面站
-  const recList = data.stationRelationList?.receiveObjList || data.initRelationList?.receiveObjList || []
-  recList.forEach((rec) => {
-    if (
-      rec.receiveName.includes('斯瓦尔巴') ||
-      rec.receiveName.includes('加州') ||
-      rec.receiveName.includes('爱尔兰')
-    ) {
-      const isStruck = rec.receiveStatus === 1
-      list.push({
-        id: rec.receiveId,
-        name: rec.receiveName,
-        icon: '📡',
-        tag: '相控阵地基枢纽',
-        tagClass: 'tag-cyan',
-        linkCount: 4,
-        margin: isStruck ? '-12.5 dB (不足)' : '+18.5 dB (良好)',
-        marginClass: isStruck ? 'glow-red' : 'glow-green',
-        riskIndex: isStruck ? '极高 (CRITICAL)' : '中度 (MEDIUM)',
-        riskClass: isStruck ? 'glow-red' : 'glow-amber',
-      })
-    }
-  })
-
-  // 提取数据中继卫星
-  const relayList = activeMatrix.value.relayRelation?.relayList || []
-  if (relayList.length > 0) {
-    list.push({
-      id: 'relay-tdrs-6',
-      name: 'TDRS-6 [通信/数据中继]',
-      icon: '🛰️',
-      tag: '天基单点中继枢纽',
-      tagClass: 'tag-purple',
-      linkCount: 3,
-      margin: '+14.2 dB (良好)',
-      marginClass: 'glow-green',
-      riskIndex: '高 (HIGH)',
-      riskClass: 'glow-amber',
-    })
+  // 查 battleMatrixList
+  const battleMatch = (data.battleMatrixList || []).find((b) => b.norad === props.selectedSatelliteNorad)
+  if (battleMatch?.windows?.length) {
+    return battleMatch.windows[0]
   }
 
-  return list
-})
-
-// 2. 统计计算
-const cumulativeDelayMin = computed(() => {
-  const data = activeMatrix.value
-  let sum = 0
-  ;(data.satelliteMatrixList || []).forEach((sat) => {
-    if (sat.delayMin) sum += sat.delayMin
-  })
-  return sum > 0 ? sum.toFixed(1) : '2,877.3'
-})
-
-const totalSatCount = computed(() => {
-  const data = activeMatrix.value
-  return (data.initMatrixList || []).length || (data.satelliteMatrixList || []).length || 6
-})
-
-const struckSatCount = computed(() => {
-  const data = activeMatrix.value
-  let count = 0
-  ;(data.satelliteMatrixList || []).forEach((sat) => {
-    if (sat.satelliteStatus === 1) count++
-  })
-  return count
-})
-
-const totalReceiveCount = computed(() => {
-  const data = activeMatrix.value
-  return data.stationRelationList?.receiveObjList?.length || 12
-})
-
-const struckReceiveCount = computed(() => {
-  const data = activeMatrix.value
-  let count = 0
-  const recs = data.stationRelationList?.receiveObjList || []
-  recs.forEach((rec) => {
-    if (rec.receiveStatus === 1) count++
-  })
-  return count
-})
-
-const severedLinkCount = computed(() => {
-  return 5
-})
-
-const interruptionRate = computed(() => {
-  const total = totalReceiveCount.value
-  const struck = struckReceiveCount.value
-  if (total === 0) return 0
-  return ((struck / total) * 100).toFixed(1)
-})
-
-/**
- * [类型用途]
- * 全链路传输时效指标数据模型。
- */
-interface ChainLatencyMetric {
-  /** 完成时间格式化文本 */
-  timeText: string
-  /** 传输模式说明 */
-  modeText?: string
-  /** 打击后实际影响 / 状态描述 */
-  statusText?: string
-}
-
-/**
- * [功能]
- * 计算指标一：未受到打击时，两种传输模式中最早完成一次全链路传输的时间（相对开始时间）
- *
- * [传输模式]
- * 模式一：卫星 ➔ 地面站 ➔ 数据中心
- * 模式二：卫星 ➔ 中继卫星 ➔ 地面站 ➔ 数据中心
- *
- * [计算规则]
- * - 优先检查中继星拓扑 (relayRelation)，天基中继全天候可见，传输时延最短
- * - 若无中继节点，则按初始直连过境窗口最早时间计算
- */
-const unStruckEarliestTime = computed<ChainLatencyMetric>(() => {
-  const data = activeMatrix.value
-  const hasRelay = (data.relayRelation?.relayList?.length ?? 0) > 0 || (data.relayRelation?.relations?.length ?? 0) > 0
-
-  if (hasRelay) {
+  // 查 initMatrixList
+  // [业务目的] 当战场过境矩阵匹配不到时，从初始过境时间窗口列表中读取该卫星的时间窗口
+  // [实现原因] InitMatrix 接口类型定义的过境窗口数组字段为 initWindows，单项时间窗口为 InitWindow (包含 peakWindow 和 endWindow 字段)
+  // [关键规则] 使用 initMatch.initWindows[0].peakWindow 作为 startTime，endWindow 作为 endTime
+  const initMatch = (data.initMatrixList || []).find((i) => i.norad === props.selectedSatelliteNorad)
+  if (initMatch?.initWindows?.length) {
     return {
-      timeText: '+42.5 秒',
-      modeText: '卫星 ➔ 中继卫星 ➔ 地面站 ➔ 数据中心',
+      startTime: initMatch.initWindows[0].peakWindow,
+      endTime: initMatch.initWindows[0].endWindow,
     }
   }
 
+  // 兜底默认时间窗口
   return {
-    timeText: '+75.0 秒',
-    modeText: '卫星 ➔ 地面站 ➔ 数据中心',
+    startTime: '2026-08-03 16:20:00',
+    endTime: '2026-08-03 16:38:30',
   }
 })
 
-/**
- * [功能]
- * 计算指标二：打击后最早完成一次全链路传输的实际时间（相对开始时间）
- *
- * [计算规则]
- * - 当受打击致使受损地面站或中继链路中断后，计算卫星寻找后续可用窗口与重路由传输的实际耗时
- */
-const struckEarliestTime = computed<ChainLatencyMetric>(() => {
-  const data = activeMatrix.value
-  let delay = 0
-
-  const satMatrix = data.satelliteMatrixList || []
-  satMatrix.forEach((sat) => {
-    if (sat.satelliteStatus === 1 || (sat.delayMin && sat.delayMin > 0)) {
-      delay += sat.delayMin || 15.0
-    }
-  })
-
-  const totalMin = delay > 0 ? Math.min(180, 0.75 + delay) : 85.5
-
-  return {
-    timeText: `+${totalMin.toFixed(1)} 分钟`,
-    statusText: '主链路被打压 / 备用窗口重路由传输',
+// 计算窗口持续时长
+const windowDurationText = computed(() => {
+  const win = latestTransmissionWindow.value
+  if (!win?.startTime || !win?.endTime) return '--'
+  try {
+    const start = new Date(win.startTime.replace(/-/g, '/')).getTime()
+    const end = new Date(win.endTime.replace(/-/g, '/')).getTime()
+    const diffSec = Math.max(0, Math.floor((end - start) / 1000))
+    const min = Math.floor(diffSec / 60)
+    const sec = diffSec % 60
+    return `${min} 分 ${sec} 秒`
+  } catch (e) {
+    return '--'
   }
 })
 
-// 3. 过境窗口列表包装
-interface WindowItemWrapper {
-  id: string
-  satName: string
-  satNorad: number
-  receiveName: string
-  receiveId: string
-  startTimeShort: string
-  endTimeShort: string
-  strikeStatus: number
-  delayMin?: number
-  weapons?: Weapon[] | null
-}
-
-const allWindowsList = computed<WindowItemWrapper[]>(() => {
-  const data = activeMatrix.value
-  const list: WindowItemWrapper[] = []
-
-  const satMatrixList = data.satelliteMatrixList || []
-  satMatrixList.forEach((sat) => {
-    const windows = sat.stationWindows || []
-    windows.forEach((win, index) => {
-      list.push({
-        id: `win-sat-${sat.norad}-${win.receiveId}-${index}`,
-        satName: sat.name || `Sat-${sat.norad}`,
-        satNorad: sat.norad,
-        receiveName: win.receiveName || win.receiveId,
-        receiveId: win.receiveId,
-        startTimeShort: win.peakWindow ? win.peakWindow.split(' ')[1] || win.peakWindow : '',
-        endTimeShort: win.endWindow ? win.endWindow.split(' ')[1] || win.endWindow : '',
-        strikeStatus: win.strikeStatus === 1 || sat.satelliteStatus === 1 ? 1 : 0,
-        delayMin: win.delayMin || sat.delayMin,
-        weapons: win.weapons || sat.weapons,
-      })
-    })
-  })
-
-  return list
+// 过境频次 (gjNum)
+const passFrequency = computed(() => {
+  const item = currentSatItem.value as any
+  return item?.gjNum || item?.windows?.length || 4
 })
 
-/** 与当前选中站点关联的过境通信窗口列表 */
-const nodeAssociatedWindows = computed(() => {
-  if (!selectedNode.value) return []
-  const node = selectedNode.value
-  return allWindowsList.value.filter(
-    (win) => win.receiveId === node.id || win.receiveName.includes(node.name) || node.name.includes(win.receiveName)
-  )
+// 延迟估算
+const estimatedLatency = computed(() => {
+  return hasRelayNode.value ? '18.2 ms (含高轨中继)' : '8.6 ms (直连地面站)'
+})
+
+// 最短用时
+const minTimeText = computed(() => {
+  return windowDurationText.value !== '--' ? windowDurationText.value : '18 分钟 30 秒'
 })
 </script>
 
 <style lang="scss" scoped>
 .c2-panel {
-  width: 100%;
-  height: 100%;
-  max-height: 100%;
-  box-sizing: border-box;
-  background: rgba(8, 14, 28, 0.94);
-  border: 1px solid rgba(0, 225, 255, 0.25);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-  border-radius: 8px;
   display: flex;
   flex-direction: column;
-  padding: 10px;
-  gap: 8px;
-  backdrop-filter: blur(10px);
-  color: #e2e8f0;
-  font-family: inherit;
+  height: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+  background: rgba(8, 15, 26, 0.88);
+  border: 1px solid rgba(0, 225, 255, 0.18);
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  color: #e2efff;
+  font-family: system-ui, -apple-system, sans-serif;
   overflow: hidden;
 
-  * {
-    box-sizing: border-box;
+  .panel-body-scroll {
+    flex: 1;
+    overflow-y: auto;
   }
 }
 
 .panel-header {
-  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(0, 225, 255, 0.2);
-  width: 100%;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 225, 255, 0.15);
+  margin-bottom: 8px;
 
   .header-title-box {
     display: flex;
     align-items: center;
     gap: 6px;
-    min-width: 0;
-    flex: 1;
+    font-size: 15px;
+    font-weight: 700;
+  }
 
-    .header-icon {
-      font-size: 15px;
-      flex-shrink: 0;
-    }
-    .header-title {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.3px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+  .glow-text-cyan {
+    color: #40f2ff;
+    text-shadow: 0 0 8px rgba(64, 242, 255, 0.4);
   }
 
   .panel-badge {
-    flex-shrink: 0;
-    white-space: nowrap;
-    font-size: 9px;
-    padding: 1px 4px;
-    background: rgba(0, 225, 255, 0.15);
-    border: 1px solid rgba(0, 225, 255, 0.4);
-    color: #00e1ff;
-    border-radius: 3px;
-
-    &.badge-red {
-      background: rgba(239, 68, 68, 0.15);
-      border-color: rgba(239, 68, 68, 0.4);
-      color: #f87171;
-    }
-  }
-}
-
-.glow-text-cyan {
-  color: #00e1ff;
-  text-shadow: 0 0 8px rgba(0, 225, 255, 0.4);
-}
-
-.glow-cyan {
-  color: #00e1ff;
-  text-shadow: 0 0 6px rgba(0, 225, 255, 0.5);
-}
-.glow-amber {
-  color: #fbbf24;
-  text-shadow: 0 0 6px rgba(251, 191, 36, 0.5);
-}
-.glow-red {
-  color: #f87171;
-  text-shadow: 0 0 6px rgba(248, 113, 113, 0.5);
-}
-.glow-green {
-  color: #4ade80;
-}
-
-.digital-font {
-  font-family: inherit;
-  font-weight: 700;
-}
-
-.panel-body-scroll {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-
-  :deep(.el-scrollbar__wrap) {
-    overflow-x: hidden;
-  }
-
-  :deep(.el-scrollbar__view) {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding-right: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    border-radius: 4px;
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
   }
 }
 
 .panel-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  background: rgba(13, 23, 42, 0.6);
-  border: 1px solid rgba(0, 225, 255, 0.12);
-  border-radius: 6px;
-  padding: 8px;
-  min-height: 0;
-
-  &.section-hubs {
-    flex: 0 0 auto;
-  }
-
-  &.section-stats {
-    flex: 0 0 auto;
-  }
-
-  &.section-feed {
-    flex: 1 1 auto;
-  }
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: rgba(14, 25, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
 
   .section-title {
-    flex: 0 0 auto;
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
-    font-weight: 700;
-    color: #38bdf8;
-    border-bottom: 1px dashed rgba(56, 189, 248, 0.2);
-    padding-bottom: 3px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #b5d5ff;
 
-    .title-icon {
-      font-size: 13px;
-    }
-
-    .count-tag {
+    .active-badge {
       margin-left: auto;
-      font-size: 9px;
-      color: #94a3b8;
-      background: rgba(255, 255, 255, 0.06);
-      padding: 1px 4px;
-      border-radius: 3px;
+      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(0, 225, 255, 0.15);
+      color: #00e1ff;
     }
   }
 }
 
-.hubs-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 185px;
-  overflow-y: auto;
-  padding-right: 2px;
-
-  &::-webkit-scrollbar {
-    width: 3px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 225, 255, 0.3);
-    border-radius: 2px;
-  }
-}
-
-.hub-card {
-  background: rgba(15, 27, 49, 0.8);
-  border: 1px solid rgba(0, 225, 255, 0.18);
-  border-radius: 4px;
-  padding: 5px 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-
-  .hub-header {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 10px;
-
-    .hub-name {
-      color: #e2e8f0;
-    }
-    .hub-tag {
-      margin-left: auto;
-      font-size: 9px;
-      padding: 1px 3px;
-      border-radius: 2px;
-
-      &.tag-cyan {
-        background: rgba(0, 225, 255, 0.15);
-        color: #00e1ff;
-      }
-      &.tag-purple {
-        background: rgba(168, 85, 247, 0.15);
-        color: #c084fc;
-      }
-    }
-  }
-
-  .hub-body {
-    display: flex;
-    justify-content: space-between;
-    font-size: 9px;
-    color: #94a3b8;
-
-    .hub-metric {
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-    }
-  }
-}
-
-.stats-grid-row {
+.stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 6px;
+
+  .stat-card {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    border-radius: 6px;
+    background: rgba(18, 32, 54, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+
+    .stat-label {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .stat-val {
+      font-size: 14px;
+      margin-top: 2px;
+    }
+
+    .glow-cyan {
+      color: #38bdf8;
+    }
+    .glow-amber {
+      color: #fbbf24;
+    }
+    .glow-blue {
+      color: #60a5fa;
+    }
+    .glow-purple {
+      color: #c084fc;
+    }
+  }
 }
 
-.stat-box {
-  background: rgba(15, 27, 49, 0.8);
-  border: 1px solid rgba(0, 225, 255, 0.18);
-  border-radius: 5px;
-  padding: 6px;
+.empty-sat-box {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  text-align: center;
+  padding: 24px 12px;
+  background: rgba(18, 32, 54, 0.4);
+  border: 1px dashed rgba(0, 225, 255, 0.2);
+  border-radius: 8px;
+  gap: 6px;
 
-  &.box-amber {
-    border-color: rgba(251, 191, 36, 0.3);
-    background: rgba(45, 34, 18, 0.6);
+  .empty-icon {
+    font-size: 24px;
   }
-  &.box-red {
-    border-color: rgba(239, 68, 68, 0.3);
-    background: rgba(45, 18, 21, 0.6);
+  .empty-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e2efff;
+    margin: 0;
   }
-
-  .stat-title {
-    font-size: 9px;
+  .empty-sub {
+    font-size: 11px;
     color: #94a3b8;
+    line-height: 1.4;
+  }
+}
+
+.sat-analysis-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sat-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  .sat-title-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .sat-name-large {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .sat-type-tag {
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(0, 225, 255, 0.15);
+      color: #38bdf8;
+    }
   }
 
-  .stat-num-box {
-    display: flex;
-    align-items: baseline;
-    gap: 3px;
+  .clear-btn {
+    padding: 2px 8px;
+    font-size: 11px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #94a3b8;
+    cursor: pointer;
 
-    .stat-num {
-      font-size: 15px;
+    &:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #ffffff;
     }
-    .stat-unit {
+  }
+}
+
+.link-flow-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  background: rgba(18, 32, 54, 0.8);
+  border: 1px solid rgba(0, 225, 255, 0.2);
+  border-radius: 6px;
+
+  .flow-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 2px;
+
+    .step-icon {
+      font-size: 16px;
+    }
+    .step-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: #e2efff;
+      max-width: 85px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .step-sub {
       font-size: 9px;
       color: #64748b;
     }
   }
+
+  .flow-arrow {
+    color: #00e1ff;
+    font-size: 14px;
+    font-weight: 700;
+  }
 }
 
-.chain-latency-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-top: 2px;
+.window-detail-card {
+  padding: 8px 10px;
+  background: rgba(18, 32, 54, 0.6);
+  border-radius: 6px;
+  border-left: 3px solid #00e1ff;
 
-  .chain-card {
-    background: rgba(15, 27, 49, 0.75);
-    border: 1px solid rgba(0, 225, 255, 0.18);
-    border-radius: 5px;
-    padding: 6px 8px;
+  .card-subtitle {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-bottom: 6px;
+  }
+
+  .window-time-box {
     display: flex;
     flex-direction: column;
     gap: 4px;
 
-    &--baseline {
-      border-color: rgba(74, 222, 128, 0.3);
-      background: rgba(16, 37, 28, 0.65);
-    }
-
-    &--struck {
-      border-color: rgba(248, 113, 113, 0.3);
-      background: rgba(43, 20, 24, 0.65);
-    }
-
-    .chain-card__header {
+    .time-row {
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      font-size: 12px;
 
-      .chain-title {
-        font-size: 10px;
-        font-weight: 600;
-        color: #e2e8f0;
+      .time-label {
+        color: #94a3b8;
       }
-
-      .chain-tag {
-        font-size: 9px;
-        padding: 1px 4px;
-        border-radius: 2px;
-        font-weight: 700;
-
-        &.tag-green {
-          background: rgba(74, 222, 128, 0.18);
-          color: #4ade80;
-          border: 1px solid rgba(74, 222, 128, 0.4);
-        }
-
-        &.tag-red {
-          background: rgba(248, 113, 113, 0.18);
-          color: #f87171;
-          border: 1px solid rgba(248, 113, 113, 0.4);
-        }
+      .glow-cyan {
+        color: #38bdf8;
+      }
+      .glow-amber {
+        color: #fbbf24;
       }
     }
+  }
+}
 
-    .chain-card__body {
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+
+  .metric-item {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 8px;
+    background: rgba(18, 32, 54, 0.5);
+    border-radius: 4px;
+
+    .m-label {
+      font-size: 10px;
+      color: #64748b;
+    }
+    .m-val {
+      font-size: 12px;
+      margin-top: 2px;
+    }
+    .glow-cyan {
+      color: #38bdf8;
+    }
+    .glow-green {
+      color: #4ade80;
+    }
+    .glow-amber {
+      color: #fbbf24;
+    }
+  }
+}
+
+.selected-node-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(18, 32, 54, 0.8);
+  border-radius: 6px;
+
+  .node-main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .node-name-text {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .node-id-tag {
+      font-size: 10px;
+      color: #64748b;
+    }
+  }
+
+  .node-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+
+    .grid-item {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      font-size: 11px;
 
-      .chain-num-box {
-        display: flex;
-        align-items: baseline;
-        gap: 4px;
-
-        .chain-num {
-          font-size: 16px;
-          line-height: 1.1;
-        }
-
-        .chain-unit {
-          font-size: 9px;
-          color: #94a3b8;
-        }
+      .item-label {
+        color: #64748b;
       }
-
-      .chain-route-info {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        font-size: 9px;
-
-        .route-label {
-          color: #64748b;
-          white-space: nowrap;
-        }
-
-        .route-path {
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
+      .item-val {
+        color: #e2efff;
       }
-    }
-  }
-}
-
-.damage-summary-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 5px;
-  border-radius: 4px;
-  font-size: 9px;
-  color: #94a3b8;
-
-  .summary-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-
-    .dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-
-      &.dot-red {
-        background: #f87171;
+      .glow-cyan {
+        color: #38bdf8;
       }
-      &.dot-amber {
-        background: #fbbf24;
-      }
-      &.dot-blue {
-        background: #38bdf8;
-      }
-    }
-  }
-}
-
-.windows-feed-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding-right: 2px;
-
-  &::-webkit-scrollbar {
-    width: 3px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 225, 255, 0.25);
-    border-radius: 2px;
-  }
-
-  .empty-feed {
-    font-size: 10px;
-    color: #64748b;
-    text-align: center;
-    padding: 10px;
-  }
-}
-
-.feed-card {
-  background: rgba(15, 27, 49, 0.8);
-  border: 1px solid rgba(0, 225, 255, 0.18);
-  border-radius: 4px;
-  padding: 5px 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-
-  &.card-struck {
-    border-color: rgba(255, 77, 79, 0.4);
-    background: rgba(45, 18, 21, 0.8);
-  }
-
-  .feed-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    .feed-time {
-      font-size: 9px;
-      color: #94a3b8;
-    }
-
-    .feed-status {
-      font-size: 8px;
-      padding: 1px 3px;
-      border-radius: 2px;
-
-      &.status-green {
-        background: rgba(34, 197, 94, 0.15);
+      .glow-green {
         color: #4ade80;
       }
-      &.status-red {
-        background: rgba(239, 68, 68, 0.15);
-        color: #f87171;
-      }
-    }
-  }
-
-  .feed-body {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-
-    .link-route {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 10px;
-      color: #e2e8f0;
-
-      .arrow {
-        color: #00e1ff;
-        font-size: 9px;
-      }
-    }
-
-    .feed-meta {
-      display: flex;
-      gap: 4px;
-      flex-wrap: wrap;
-
-      .meta-tag {
-        font-size: 8px;
-        padding: 1px 3px;
-        border-radius: 2px;
-
-        &.tag-amber {
-          background: rgba(251, 191, 36, 0.15);
-          color: #fbbf24;
-        }
-        &.tag-red {
-          background: rgba(239, 68, 68, 0.15);
-          color: #f87171;
-        }
-      }
     }
   }
 }
 
-.selected-node-section {
-  background: rgba(14, 30, 56, 0.95) !important;
-  border: 1px solid rgba(0, 225, 255, 0.4) !important;
-  box-shadow: 0 0 16px rgba(0, 225, 255, 0.2);
+.title-highlight {
+  justify-content: space-between;
 
-  .title-highlight {
-    justify-content: space-between;
-
-    .title-left {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .title-right {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .status-pill {
-      font-size: 9px;
-      padding: 1px 6px;
-      border-radius: 999px;
-      font-weight: 700;
-
-      &.pill-green {
-        background: rgba(34, 197, 94, 0.2);
-        color: #4ade80;
-        border: 1px solid rgba(34, 197, 94, 0.4);
-      }
-      &.pill-red {
-        background: rgba(239, 68, 68, 0.2);
-        color: #f87171;
-        border: 1px solid rgba(239, 68, 68, 0.4);
-      }
-    }
-
-    .close-node-btn {
-      background: transparent;
-      border: none;
-      color: #94a3b8;
-      font-size: 13px;
-      cursor: pointer;
-      padding: 0 4px;
-      line-height: 1;
-      transition: color 0.2s;
-
-      &:hover {
-        color: #f87171;
-      }
-    }
-  }
-
-  .selected-node-card {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding-top: 4px;
-
-    .node-main-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 4px;
-
-      .node-name-text {
-        font-size: 13px;
-        font-weight: 700;
-        color: #00e1ff;
-      }
-      .node-id-tag {
-        font-size: 10px;
-        color: #94a3b8;
-        background: rgba(255, 255, 255, 0.06);
-        padding: 1px 5px;
-        border-radius: 3px;
-      }
-    }
-
-    .node-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 6px 8px;
-
-      .grid-item {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-        background: rgba(7, 16, 31, 0.6);
-        padding: 4px 6px;
-        border-radius: 4px;
-        border: 1px solid rgba(0, 225, 255, 0.1);
-
-        .item-label {
-          font-size: 10px;
-          color: #94a3b8;
-        }
-        .item-val {
-          font-size: 11px;
-          font-weight: 700;
-        }
-      }
-    }
-
-    .node-actions {
-      display: flex;
-      justify-content: flex-end;
-      padding-top: 2px;
-
-      .fly-btn {
-        background: linear-gradient(135deg, rgba(0, 225, 255, 0.2), rgba(0, 140, 255, 0.4));
-        border: 1px solid rgba(0, 225, 255, 0.5);
-        color: #ffffff;
-        font-size: 11px;
-        font-weight: 700;
-        padding: 4px 10px;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.2s;
-
-        &:hover {
-          background: linear-gradient(135deg, rgba(0, 225, 255, 0.4), rgba(0, 140, 255, 0.6));
-          box-shadow: 0 0 10px rgba(0, 225, 255, 0.4);
-        }
-      }
-    }
-  }
-}
-
-.selected-satellite-section {
-  background: rgba(14, 28, 48, 0.95) !important;
-  border: 1px solid rgba(0, 225, 255, 0.4) !important;
-  box-shadow: 0 0 16px rgba(0, 225, 255, 0.25);
-
-  .status-pill.pill-cyan {
-    background: rgba(0, 225, 255, 0.15);
-    color: #00e1ff;
-    border: 1px solid rgba(0, 225, 255, 0.4);
-  }
-
-  .selected-satellite-card {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding-top: 4px;
-
-    .sat-main-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 4px;
-
-      .sat-title-box {
-        display: flex;
-        flex-direction: column;
-
-        .sat-name-text {
-          font-size: 13px;
-          font-weight: 700;
-          color: #00e1ff;
-        }
-        .sat-sub-text {
-          font-size: 10px;
-          color: #94a3b8;
-        }
-      }
-
-      .country-tag {
-        font-size: 10px;
-        color: #fbbf24;
-        background: rgba(251, 191, 36, 0.12);
-        border: 1px solid rgba(251, 191, 36, 0.3);
-        padding: 1px 6px;
-        border-radius: 3px;
-      }
-    }
-
-    .sat-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 6px 8px;
-
-      .grid-item {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-        background: rgba(7, 16, 31, 0.6);
-        padding: 4px 6px;
-        border-radius: 4px;
-        border: 1px solid rgba(0, 225, 255, 0.1);
-
-        .item-label {
-          font-size: 10px;
-          color: #94a3b8;
-        }
-        .item-val {
-          font-size: 11px;
-          font-weight: 700;
-        }
-        .sat-desc-text {
-          font-size: 10px;
-          color: #e2e8f0;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-      }
-    }
-
-    .sat-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 6px;
-      padding-top: 2px;
-
-      .fly-btn {
-        background: linear-gradient(135deg, rgba(0, 225, 255, 0.2), rgba(0, 140, 255, 0.4));
-        border: 1px solid rgba(0, 225, 255, 0.5);
-        color: #ffffff;
-        font-size: 11px;
-        font-weight: 700;
-        padding: 4px 10px;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.2s;
-
-        &.outline-btn {
-          background: rgba(255, 255, 255, 0.06);
-          border-color: rgba(255, 255, 255, 0.2);
-          color: #cbd5e1;
-
-          &:hover {
-            background: rgba(255, 255, 255, 0.12);
-            color: #ffffff;
-          }
-        }
-
-        &:hover {
-          background: linear-gradient(135deg, rgba(0, 225, 255, 0.4), rgba(0, 140, 255, 0.6));
-          box-shadow: 0 0 10px rgba(0, 225, 255, 0.4);
-        }
-      }
+  .close-node-btn {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 12px;
+    &:hover {
+      color: #ffffff;
     }
   }
 }

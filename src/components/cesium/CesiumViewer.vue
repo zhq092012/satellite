@@ -73,6 +73,8 @@ const props = defineProps<{
   showAnimation: boolean
   /** 算法矩阵数据（包含地面站、中继卫星、过境窗口与打压状态） */
   matrixData?: MatrixResult | null
+  /** 当前选中的敌方卫星 NORAD */
+  selectedNorad?: number | null
 }>()
 
 // Cesium Viewer 实例（全局唯一），未初始化时为 undefined
@@ -236,11 +238,81 @@ const initViewer = async () => {
         })
       )
 
-      // 设置最小缩放高度（单位：米），允许滚轮拉近观察细节
+      // [业务目的] 限制相机高度与俯仰角，防止将地球拖到屏幕下方
+      // [实现原因] 用户向上拖拽鼠标时相机仰角过大，会导致地球球体被推到屏幕下方外框
+      // [关键规则] 限制相机高度范围，并在 preRender 监听中动态约束俯仰角 (-90° ~ -20°) 及中心点 Y 坐标
       viewer.scene.screenSpaceCameraController.minimumZoomDistance = 100000
+      viewer.scene.screenSpaceCameraController.maximumZoomDistance = 25000000
 
       // 禁止相机跑到地面以下
       viewer.scene.globe.depthTestAgainstTerrain = false
+
+      // [动态几何约束] 绑定 preRender 监听，限制地球不能被拖移至屏幕下方边缘之外
+      // 原因: 静态限制俯仰角(-20°)在高视角高度(如 20000km)下仍会导致视角偏离地心，将地球推到屏幕下方之外。
+      // 解决: 根据相机高度计算地球视角半角 theta，高高度下自动将 Pitch 上限收紧至接近 -90°(直视地心)，确保地球始终居中在视野内。
+      viewer.scene.preRender.addEventListener(() => {
+        if (!viewer || viewer.isDestroyed()) return
+        const cam = viewer.camera
+        const carto = cam.positionCartographic
+        if (!carto) return
+
+        // [地心与视角几何计算] 地球平均半径约 6,371,000 米
+        const EARTH_RADIUS = 6371000
+        const distance = EARTH_RADIUS + Math.max(0, carto.height)
+        // 计算当前高度下地球视盘的半角 (0 ~ PI/2)
+        const sinTheta = Math.min(1.0, EARTH_RADIUS / distance)
+        const theta = Math.asin(sinTheta)
+
+        // [动态俯仰角限制]
+        // -90° (-PI/2) 对应相机直视地心。
+        // 高高度(如 25,000km)下 theta 仅约 14°，地心为 -90°。
+        // 允许倾斜范围控制在 theta 的 0.65 动态比例以内，高高度时自动收紧至接近 -90°，低空允许 -20° 看地平线
+        const dynamicMaxPitch = Math.min(
+          Cesium.Math.toRadians(-20),
+          -Math.PI / 2 + theta * 0.65
+        )
+        const minPitch = Cesium.Math.toRadians(-89)
+
+        let targetPitch = cam.pitch
+        let needUpdate = false
+
+        // 1. 检查相机俯仰角是否超出当前高度下的允许范围
+        if (cam.pitch > dynamicMaxPitch) {
+          targetPitch = dynamicMaxPitch
+          needUpdate = true
+        } else if (cam.pitch < minPitch) {
+          targetPitch = minPitch
+          needUpdate = true
+        }
+
+        // 2. 检查地心 (0,0,0) 的二维屏幕坐标，防止拖拽导致地球超出屏幕中心下侧
+        const centerPos = Cesium.SceneTransforms.worldToWindowCoordinates(
+          viewer.scene,
+          Cesium.Cartesian3.ZERO
+        )
+        const canvasHeight = viewer.canvas.clientHeight
+
+        // 如果地心坐标无效(已被推到相机后方)或地心 Y 坐标被拖到屏幕下侧 60% 以下
+        if (!centerPos || centerPos.y > canvasHeight * 0.60) {
+          targetPitch = Math.min(targetPitch, dynamicMaxPitch - Cesium.Math.toRadians(5))
+          needUpdate = true
+        }
+
+        if (needUpdate) {
+          cam.setView({
+            destination: Cesium.Cartesian3.fromRadians(
+              carto.longitude,
+              carto.latitude,
+              carto.height
+            ),
+            orientation: {
+              heading: cam.heading,
+              pitch: targetPitch,
+              roll: 0,
+            },
+          })
+        }
+      })
 
       // 只在有变化时渲染，提高切换路由/隐藏时性能
       viewer.scene.requestRenderMode = true
@@ -498,6 +570,7 @@ const flyToEnemyNetwork = () => {
  */
 const flyToInfrastructureNode = (node: InfrastructureLocation) => {
   if (!viewer || !node) return
+  viewer.trackedEntity = undefined
   viewer.camera.flyTo({
     destination: Cesium.Cartesian3.fromDegrees(node.longitude, node.latitude, 1200000),
     orientation: {
@@ -509,12 +582,57 @@ const flyToInfrastructureNode = (node: InfrastructureLocation) => {
   })
 }
 
+/**
+ * [功能]
+ * 视角平滑锁定并持续跟随指定的卫星运动，或飞向该卫星位置
+ *
+ * [处理规则]
+ * - 优先在 viewer.entities 中寻找对应的 3D 实体对象 (satellite-${norad} 或 sat-node-${norad})
+ * - 若找到实体，则将 viewer.trackedEntity 设置为该实体，启用 Cesium 原生相机轨迹锁定与持续跟随
+ * - 若该卫星仅以 PointPrimitive 形式存在，则计算当前 Cartesian3 坐标并使用 viewer.camera.flyTo 平滑飞向该位置
+ *
+ * @param norad 目标卫星 NORAD 编号
+ */
+const trackSatelliteByNorad = (norad: number) => {
+  if (!viewer || !norad) return
+
+  // 1. 优先查找是否存在 3D Entity 实体
+  const entity = viewer.entities.getById(`satellite-${norad}`) || viewer.entities.getById(`sat-node-${norad}`)
+  if (entity) {
+    viewer.trackedEntity = entity
+    return
+  }
+
+  // 2. 若仅 Primitive 形式存在，取消锁合并平滑飞向该坐标
+  viewer.trackedEntity = undefined
+  const pos = getSatellitePositionInCesium(norad)
+  if (pos) {
+    const norm = Cesium.Cartesian3.normalize(pos, new Cesium.Cartesian3())
+    const magnitude = Cesium.Cartesian3.magnitude(pos)
+    const cameraPos = Cesium.Cartesian3.multiplyByScalar(norm, magnitude + 2_000_000, new Cesium.Cartesian3())
+    viewer.camera.flyTo({
+      destination: cameraPos,
+      duration: 1.5,
+    })
+  }
+}
+
 // 监听 store 中选中的地面基础设施节点，如果外部选择变更则定位相机
 watch(
   () => store.selectedInfrastructureNode,
   (newNode) => {
     if (newNode) {
       flyToInfrastructureNode(newNode)
+    }
+  }
+)
+
+// 监听 store 中选中的卫星，如果外部选择变更且存在选中的卫星，则锁定相机视角跟随
+watch(
+  () => store.selectedSatellite,
+  (newSat) => {
+    if (newSat && newSat.norad) {
+      trackSatelliteByNorad(Number(newSat.norad))
     }
   }
 )
@@ -600,34 +718,42 @@ const renderElectronicInfrastructureNodes = () => {
     }
   })
 
-  // 4. 渲染敌方天基中继卫星 TDRS-6 (Norad 22314) 3D 实体
-  const relayNorad = 22314
-  const relayEntityId = `sat-node-${relayNorad}`
-  if (!viewer.entities.getById(relayEntityId)) {
-    const relayPos = Cesium.Cartesian3.fromDegrees(-45.1, 12.4, 35786000)
+  // 4. 渲染敌方天基过境与中继卫星集群 3D 实体
+  const matrixSats = props.matrixData?.initMatrixList || []
+  matrixSats.forEach((sat) => {
+    const satEntityId = `sat-node-${sat.norad}`
+    if (viewer.entities.getById(satEntityId)) return
+
+    const initialPos = getSatellitePositionInCesium(sat.norad)
+    if (!initialPos) return
+
+    const isRelay = sat.norad === 22314 || (sat.satType || '').includes('中继')
+    const satColor = isRelay ? Cesium.Color.PURPLE : Cesium.Color.CYAN
+
     viewer.entities.add({
-      id: relayEntityId,
-      position: relayPos,
+      id: satEntityId,
+      position: new Cesium.CallbackProperty(() => getSatellitePositionInCesium(sat.norad) || initialPos, false) as unknown as Cesium.PositionProperty,
       point: {
-        pixelSize: 16,
-        color: Cesium.Color.PURPLE,
-        outlineColor: Cesium.Color.GOLD,
-        outlineWidth: 3,
+        pixelSize: isRelay ? 16 : 13,
+        color: satColor,
+        outlineColor: isRelay ? Cesium.Color.GOLD : Cesium.Color.WHITE,
+        outlineWidth: 2.5,
       },
       label: {
-        text: '[敌方数据中继卫星]\nTDRS-6 (GEO高轨中继)',
-        font: 'bold 13px sans-serif',
-        fillColor: Cesium.Color.MEDIUMPURPLE,
+        text: `[敌方${isRelay ? '数据中继卫星' : '过境卫星'}]\n${sat.name}`,
+        font: 'bold 12px sans-serif',
+        fillColor: satColor,
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         showBackground: true,
         backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
         pixelOffset: new Cesium.Cartesian2(0, -28),
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 30_000_000),
       },
     })
-    electronicNodeEntityIds.add(relayEntityId)
-  }
+    electronicNodeEntityIds.add(satEntityId)
+  })
 
   // 渲染完敌方节点后自动平滑飞赴
   flyToEnemyNetwork()
@@ -827,10 +953,51 @@ const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null =
   if (primitive && primitive.position) {
     return primitive.position
   }
-  const entity = viewer?.entities?.getById(`sat-node-${norad}`)
+  // 核心防止无限递归逻辑：切勿检索 sat-node-${norad} 实体本身，
+  // 因为该实体的 position 使用了基于 getSatellitePositionInCesium 的 CallbackProperty，
+  // 若再次读取其 position.getValue() 会触发死循环调用 (Maximum call stack size exceeded)。
+  const entity = viewer?.entities?.getById(`satellite-${norad}`)
   if (entity && entity.position) {
-    return entity.position.getValue(viewer.clock.currentTime) || null
+    const pos = entity.position.getValue(viewer.clock.currentTime)
+    if (pos) return pos
   }
+
+  // 尝试从 TLE 两行数据中推算当前时刻 3D 位置
+  const matrixSats = props.matrixData?.initMatrixList || []
+  const initSat = matrixSats.find((s) => s.norad === norad)
+  let line1 = initSat?.line1
+  let line2 = initSat?.line2
+  if (!line1 || !line2) {
+    const tleCache = satelliteTleCache.get(norad)
+    if (tleCache?.line1 && tleCache?.line2) {
+      line1 = tleCache.line1
+      line2 = tleCache.line2
+    }
+  }
+
+  if (line1 && line2 && viewer) {
+    try {
+      const satrec = satellitejs.twoline2satrec(line1, line2)
+      if (satrec) {
+        const now = viewer.clock.currentTime
+        const date = Cesium.JulianDate.toDate(now)
+        const posVel = satellitejs.propagate(satrec, date)
+        if (posVel && posVel.position) {
+          const gmst = satellitejs.gstime(date)
+          let posEcf = satellitejs.eciToEcf(posVel.position, gmst)
+          if (store.effectModel) {
+            posEcf = posVel.position
+          }
+          if (posEcf) {
+            return new Cesium.Cartesian3(posEcf.x * 1000, posEcf.y * 1000, posEcf.z * 1000)
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
   const fallbackCoords = satelliteCoordMap.get(norad)
   if (fallbackCoords) {
     return Cesium.Cartesian3.fromDegrees(fallbackCoords[0], fallbackCoords[1], fallbackCoords[2])
@@ -1596,6 +1763,7 @@ function handleViewerClickEvent() {
   viewer.screenSpaceEventHandler.setInputAction(async function (event: Cesium.ScreenSpaceEventHandler.PositionedEvent) {
     const picked = viewer.scene.pick(event.position)
     if (!Cesium.defined(picked)) {
+      viewer.trackedEntity = undefined // 点击空白处解绑视角跟随
       store.closeSatPanel() // 点到空白也关闭
       store.setSelectedSatellite(null) // 清空选择的卫星
       store.setSelectedInfrastructureNode(null) // 清空选中的地面基础设施节点
@@ -1627,12 +1795,13 @@ function handleViewerClickEvent() {
 
     const primitiveNorad = Number((pickedId as { norad?: number }).norad)
     const entityId = rawEntityId
-    const noradMatch = entityId.match(/satellite-(\d+)/)
+    const noradMatch = entityId.match(/satellite-(\d+)/) || entityId.match(/sat-node-(\d+)/)
     const norad = Number.isFinite(primitiveNorad) ? primitiveNorad : noradMatch ? Number(noradMatch[1]) : null
     if (!Number.isFinite(norad)) return
 
     selectConstellationByNorad(Number(norad))
     highlightSatellite({ norad_id: String(norad) })
+    trackSatelliteByNorad(Number(norad)) // 点击卫星时，相机视角锁合并持续跟随该卫星
 
     // 调用 getSatelliteDetail 查询卫星详细信息并同步保存至全局 layout store，供右侧 C2 面板展示
     try {
@@ -1972,36 +2141,251 @@ function markBattle() {
   markBattleArea(viewer, store.battle)
 }
 
-// 高亮卫星
-const highlightSatellite = (sate: { norad_id: string }) => {
-  // 先清除高亮
-  resetHighlightSatellites()
-  const entity = viewer.entities.getById(`satellite-${sate.norad_id}`)
-  if (entity) {
-    viewer.selectedEntity = entity
-    entity.point!.outlineColor = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
-    entity.point!.pixelSize = new Cesium.ConstantProperty(12)
-    entity.path!.show = new CallbackProperty(() => true, false)
+// [常量] 选中卫星高亮 3D 轨迹 Entity ID
+const HIGHLIGHT_TRAIL_ENTITY_ID = 'selected-sat-orbit-trail'
+
+/**
+ * [功能]
+ * 根据卫星 TLE 数据计算并绘制选中卫星的 3D 动态发光轨道运行轨迹
+ *
+ * [数据来源]
+ * 优先从 props.matrixData.initMatrixList 读取 line1/line2，若无则从 satelliteTleCache 缓存获取
+ *
+ * [处理规则]
+ * - 使用 satellitejs 计算 1.5 圈轨道的 3D 笛卡尔坐标采样点
+ * - 在 Cesium 中构造 PolylineGlow 材质的发光黄光轨道线
+ *
+ * @param norad 选中的敌方卫星 NORAD 编号
+ */
+const renderSelectedSatelliteOrbitTrail = (norad: number) => {
+  if (!viewer || viewer.isDestroyed()) return
+
+  // 1. 从当前 matrixData 中查找 TLE 轨道参数
+  const matrixSats = props.matrixData?.initMatrixList || []
+  const initSatMatch = matrixSats.find((s) => s.norad === norad)
+
+  let line1 = initSatMatch?.line1
+  let line2 = initSatMatch?.line2
+
+  // 2. 若 matrixData 中未匹配到，则降级从 satelliteTleCache 读取
+  if (!line1 || !line2) {
+    const tleCache = satelliteTleCache.get(norad)
+    if (tleCache?.line1 && tleCache?.line2) {
+      line1 = tleCache.line1
+      line2 = tleCache.line2
+    }
+  }
+
+  if (!line1 || !line2) return
+
+  try {
+    const satrec = satellitejs.twoline2satrec(line1, line2)
+    if (!satrec) return
+
+    const positions: Cesium.Cartesian3[] = []
+    const now = viewer.clock.currentTime
+    const startDate = Cesium.JulianDate.toDate(now)
+
+    // 采样 1.5 圈轨道 (约 120 分钟时间段，每分钟采样一点)
+    for (let i = -30; i <= 90; i++) {
+      const sampleTime = new Date(startDate.getTime() + i * 60 * 1000)
+      const posVel = satellitejs.propagate(satrec, sampleTime)
+      if (posVel && posVel.position) {
+        const gmst = satellitejs.gstime(sampleTime)
+        let posEcf = satellitejs.eciToEcf(posVel.position, gmst)
+        if (store.effectModel) {
+          posEcf = posVel.position
+        }
+        if (posEcf) {
+          positions.push(new Cesium.Cartesian3(posEcf.x * 1000, posEcf.y * 1000, posEcf.z * 1000))
+        }
+      }
+    }
+
+    if (positions.length > 2) {
+      // 移除旧的高亮轨迹 Entity
+      const existingTrail = viewer.entities.getById(HIGHLIGHT_TRAIL_ENTITY_ID)
+      if (existingTrail) {
+        viewer.entities.remove(existingTrail)
+      }
+
+      // 创建全新的 3D 轨迹发光线条
+      viewer.entities.add({
+        id: HIGHLIGHT_TRAIL_ENTITY_ID,
+        polyline: {
+          positions,
+          width: 3.2,
+          material: new Cesium.PolylineGlowMaterialProperty({
+            glowPower: 0.35,
+            color: Cesium.Color.YELLOW,
+          }),
+        },
+      })
+    }
+  } catch (err) {
+    console.warn('计算选中卫星 3D 运行轨迹失败:', norad, err)
   }
 }
 
-// 清除高亮
+/**
+ * [功能]
+ * 清除所有卫星的高亮样式与 3D 轨迹
+ */
 const resetHighlightSatellites = () => {
+  if (!viewer || viewer.isDestroyed()) return
+
+  // 1. 移除发光轨迹线
+  const trailEntity = viewer.entities.getById(HIGHLIGHT_TRAIL_ENTITY_ID)
+  if (trailEntity) {
+    viewer.entities.remove(trailEntity)
+  }
+
+  // 2. 复原 Entity 模式高亮样式
   const satellites = viewer.entities.values.filter((s: any) => String(s._id ?? '').startsWith('satellite-'))
   if (satellites && satellites.length) {
     satellites.forEach((entity: any) => {
-      const id = entity._id?.split('satellite-')[1]
-      // 有时 norad_id 可能是字符串或数字，统一转字符串对比
-      const sate = store.allSatelliteOfTask.find((s) => String(s.norad_id) === String(id))
-      if (sate && entity && entity.point) {
+      if (entity && entity.point) {
         entity.point.outlineColor = new Cesium.ConstantProperty(Cesium.Color.WHITE)
         entity.point.pixelSize = new Cesium.ConstantProperty(8)
-        entity.path!.show = new CallbackProperty(() => false, false)
+        if (entity.path) {
+          entity.path.show = new CallbackProperty(() => false, false)
+        }
       }
     })
   }
+
+  // 3. 复原 Primitive 模式高亮样式
+  satellitePointPrimitives.forEach((pointPrimitive, norad) => {
+    const satellite = renderedPrimitiveSatelliteMap.get(norad)
+    if (satellite) {
+      pointPrimitive.pixelSize = 4
+      pointPrimitive.color = getConstellationColor(satellite, norad)
+      pointPrimitive.outlineColor = Cesium.Color.WHITE
+    }
+  })
+  satelliteLabelPrimitives.forEach((labelPrimitive) => {
+    labelPrimitive.fillColor = Cesium.Color.WHITE
+  })
+
   applyConstellationVisualState()
 }
+
+/**
+ * [功能]
+ * 高亮指定 NORAD 编号的敌方卫星、绘制其 3D 运行轨迹并自动平滑飞赴定位
+ *
+ * @param sate 包含 norad_id 的对象
+ */
+const highlightSatellite = (sate: { norad_id: string }) => {
+  if (!viewer || viewer.isDestroyed()) return
+  resetHighlightSatellites()
+
+  const norad = Number(sate.norad_id)
+  if (!Number.isFinite(norad)) return
+
+  // 1. 确保该卫星在 viewer.entities 中有对应的 3D Entity 节点
+  const entityId = `sat-node-${norad}`
+  let entity = viewer.entities.getById(`satellite-${sate.norad_id}`) || viewer.entities.getById(entityId)
+  const satPos = getSatellitePositionInCesium(norad)
+
+  if (!entity && satPos) {
+    const matrixSats = props.matrixData?.initMatrixList || []
+    const satInfo = matrixSats.find((s) => s.norad === norad)
+    const isRelay = norad === 22314 || (satInfo?.satType || '').includes('中继')
+
+    entity = viewer.entities.add({
+      id: entityId,
+      position: new Cesium.CallbackProperty(() => getSatellitePositionInCesium(norad) || satPos, false) as unknown as Cesium.PositionProperty,
+      point: {
+        pixelSize: 18,
+        color: Cesium.Color.GOLD,
+        outlineColor: Cesium.Color.YELLOW,
+        outlineWidth: 4,
+      },
+      label: {
+        text: `[敌方${isRelay ? '数据中继卫星' : '过境卫星'}]\n${satInfo?.name || `NORAD: ${norad}`}`,
+        font: 'bold 13px sans-serif',
+        fillColor: Cesium.Color.YELLOW,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        showBackground: true,
+        backgroundColor: new Cesium.Color(0, 0, 0, 0.75),
+        pixelOffset: new Cesium.Cartesian2(0, -30),
+      },
+    })
+    electronicNodeEntityIds.add(entityId)
+  }
+
+  // 2. Entity 模式节点高亮
+  if (entity) {
+    viewer.selectedEntity = entity
+    if (entity.point) {
+      entity.point.outlineColor = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
+      entity.point.outlineWidth = new Cesium.ConstantProperty(4)
+      entity.point.pixelSize = new Cesium.ConstantProperty(18)
+      entity.point.color = new Cesium.ConstantProperty(Cesium.Color.GOLD)
+    }
+    if (entity.label) {
+      entity.label.show = new Cesium.ConstantProperty(true)
+      entity.label.fillColor = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
+    }
+    if (entity.path) {
+      entity.path.show = new CallbackProperty(() => true, false)
+    }
+  }
+
+  // 3. Primitive 模式节点高亮 (PointPrimitive & LabelPrimitive)
+  const pointPrimitive = satellitePointPrimitives.get(norad)
+  if (pointPrimitive) {
+    pointPrimitive.pixelSize = 18
+    pointPrimitive.color = Cesium.Color.GOLD
+    pointPrimitive.outlineColor = Cesium.Color.YELLOW
+    pointPrimitive.show = true
+  }
+  const labelPrimitive = satelliteLabelPrimitives.get(norad)
+  if (labelPrimitive) {
+    labelPrimitive.show = true
+    labelPrimitive.fillColor = Cesium.Color.YELLOW
+  }
+
+  // 4. 计算并绘制该卫星的 3D 动态发光轨迹线条
+  renderSelectedSatelliteOrbitTrail(norad)
+
+  // 5. 【镜头定位】平滑飞赴定位至选中卫星上空视角
+  if (satPos) {
+    const carto = Cesium.Cartographic.fromCartesian(satPos)
+    const lon = Cesium.Math.toDegrees(carto.longitude)
+    const lat = Cesium.Math.toDegrees(carto.latitude)
+    const height = Math.max(1500000, carto.height + 1800000)
+
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
+      orientation: {
+        heading: Cesium.Math.toRadians(0),
+        pitch: Cesium.Math.toRadians(-60),
+        roll: 0,
+      },
+      duration: 1.5,
+    })
+  }
+
+  viewer.scene.requestRender()
+}
+
+// 监听 selectedNorad 属性，联动更新高亮与轨迹
+watch(
+  () => props.selectedNorad,
+  (newNorad) => {
+    if (!viewer || viewer.isDestroyed()) return
+    if (newNorad) {
+      highlightSatellite({ norad_id: String(newNorad) })
+    } else {
+      resetHighlightSatellites()
+    }
+  },
+  { immediate: true }
+)
 
 /**
  * 安全销毁 ECharts 实例，避免重复销毁报错
@@ -2132,6 +2516,39 @@ onBeforeUnmount(() => {
  * - toggleRadarFrustums: 显隐雷达探测包络视椒
  * - toggleRedSatellites: 显隐我方卡座
  */
+/**
+ * [功能]
+ * 暂停时钟推演动画 (用于未选择单颗卫星时静态展示)
+ */
+const pauseClockAnimation = () => {
+  if (viewer && !viewer.isDestroyed()) {
+    viewer.clock.shouldAnimate = false
+  }
+}
+
+/**
+ * [功能]
+ * 推进 Cesium 时钟至指定时间点并开启推演动画
+ *
+ * @param timeStr 时间格式字符串或 ISO 8601 字符串
+ */
+const jumpToTimeAndPlay = (timeStr?: string) => {
+  if (!viewer || viewer.isDestroyed()) return
+  if (timeStr) {
+    try {
+      const date = new Date(timeStr.replace(/-/g, '/'))
+      if (!isNaN(date.getTime())) {
+        const targetJulianDate = Cesium.JulianDate.fromDate(date)
+        viewer.clock.currentTime = targetJulianDate
+      }
+    } catch (err) {
+      console.warn('时间跳转解析失败:', timeStr, err)
+    }
+  }
+  viewer.clock.shouldAnimate = true
+  viewer.scene.requestRender()
+}
+
 defineExpose({
   renderSatellitePathWithPrimitive,
   clearViewer,
@@ -2142,6 +2559,8 @@ defineExpose({
   flyToView,
   toggleRadarFrustums,
   toggleRedSatellites,
+  pauseClockAnimation,
+  jumpToTimeAndPlay,
 })
 </script>
 <style lang="scss" scoped>
