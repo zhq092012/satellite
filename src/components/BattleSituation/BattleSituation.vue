@@ -421,11 +421,14 @@ const loadSatelliteList = async () => {
 const handleChangeEffectModel = () => {
   // 仅在战场态势视图时刷新 orbit 路径（其他 tab 组件不会使用该 viewer）
   if (store.activetab === '战场态势视图') {
-    loadOrbitSateList()
+    loadSatelliteEntities()
   }
 }
 
-const loadOrbitSateList = () => {
+/**
+ * 渲染卫星轨迹和实体
+ */
+const loadSatelliteEntities = () => {
   if (store.activedTask?.id && store.activetab === '战场态势视图') {
     // 显示卫星轨迹（仅在战场态势视图激活时）
     cesiumViewerRef.value?.renderSateliitePathWithEntity(store.activedTask?.id, undefined)
@@ -433,13 +436,16 @@ const loadOrbitSateList = () => {
 }
 
 onMounted(() => {
+  /**
+   * 如果当前没有激活的页面，自动切换到第一个页面
+   */
   if (visibleTabs.value.length > 0) {
     const hasCurrent = visibleTabs.value.some((item) => item.value === store.activetab)
     switchTab(hasCurrent ? store.activetab : visibleTabs.value[0].value)
   }
 
   nextTick(() => {
-    loadOrbitSateList()
+    loadSatelliteEntities()
   })
   // 卫星列表
   loadSatelliteList()
@@ -453,7 +459,7 @@ watch(
   async (tab) => {
     if (tab === '战场态势视图') {
       nextTick(() => {
-        loadOrbitSateList()
+        loadSatelliteEntities()
       })
       loadSatelliteList()
       if (store.activedTask?.id) {

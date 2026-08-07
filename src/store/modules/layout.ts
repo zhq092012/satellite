@@ -4,7 +4,7 @@ import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 
 interface State {
-  activetab: string
+  activetab: string //当前激活的Tab页
   isCollapse: boolean
   activedTask: TaskForm | null
   battle: BattleForm | null

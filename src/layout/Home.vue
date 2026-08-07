@@ -98,15 +98,6 @@
                       <el-button type="danger" icon="Delete" size="small" @click="handleDeleteTask(task)" round plain>
                         删除
                       </el-button>
-                      <el-button
-                        type="primary"
-                        icon="Aim"
-                        size="small"
-                        @click="handleElectronicWarfare(task, battle)"
-                        round
-                      >
-                        电子对抗
-                      </el-button>
                     </div>
 
                     <div v-if="getTaskProgress(task)" class="task-item__progress">
@@ -1418,22 +1409,6 @@ const handleDeleteTask = (task: TaskForm) => {
         message: '用户取消删除',
       })
     })
-}
-/**
- * 电子对抗任务
- * @param task 任务信息
- */
-const handleElectronicWarfare = (task: TaskForm, battle: BattleForm) => {
-  if (isTaskDetailDisabled(task)) {
-    return
-  }
-  // 保存当前TaskId
-  store.setActivedTask(task)
-  store.setActivedBattle(battle)
-  store.activetab = '电子对抗分析'
-  router.push({
-    name: 'Situation',
-  })
 }
 
 //查看任务详情

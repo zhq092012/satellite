@@ -7,7 +7,7 @@
         <div class="render-loading__text">正在加载卫星数据...</div>
       </div>
     </div>
-
+    <!-- 星座工具栏 -->
     <div v-if="selectedConstellation" class="constellation-toolbar">
       <span class="constellation-toolbar__badge">{{
         selectedConstellation.chineseName || selectedConstellation.name
@@ -20,45 +20,6 @@
         @change="handleConstellationLinkToggle"
       />
       <el-button size="small" text @click="clearConstellationSelection">清除星座选择</el-button>
-    </div>
-    <div class="situation-panel" v-if="store.activetab === '战场态势视图' && battleSituationData">
-      <div class="situation-panel__header">
-        <span class="situation-panel__title">战场态势</span>
-        <span class="situation-panel__subtitle">红蓝对比</span>
-      </div>
-      <div class="situation-panel__content">
-        <div v-for="camp in battleCampCards" :key="camp.key" class="camp-card" :class="camp.theme">
-          <div class="camp-card__header">
-            <span class="camp-card__name">{{ camp.label }}</span>
-            <span class="camp-card__badge">{{ camp.totalLabel }}</span>
-            <span class="camp-card__badge">总时长：{{ camp.durationText }}分钟</span>
-          </div>
-          <div class="camp-card__summary">
-            <div class="camp-ring" :style="camp.ringStyle">
-              <div class="camp-ring__inner">
-                <span class="camp-ring__label">总计</span>
-                <span class="camp-ring__value">{{ camp.total }}</span>
-              </div>
-            </div>
-            <div class="camp-stats">
-              <div class="camp-stats__item" v-for="item in camp.summaryRows" :key="item.name">
-                <span class="camp-stats__label">{{ item.name }}</span>
-                <span class="camp-stats__value">{{ item.value }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="chart-block">
-            <div class="section-title">卫星类型统计</div>
-            <div :id="`${camp.key}-satellite-type-chart`" class="chart-box chart-box--bar"></div>
-          </div>
-
-          <div class="chart-block">
-            <div class="section-title">武器分类统计</div>
-            <div :id="`${camp.key}-weapon-type-chart`" class="chart-box chart-box--pie"></div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -76,7 +37,6 @@ import {
   getSatelliteTLEData,
   getTLEDataByTaskId,
   type SatelliteConstellation,
-  type SituationData,
 } from '@/api/dashboard'
 import { createWeaponIconDataUri, getWeaponIconScale } from '@/utils/tools/svgIcons'
 import * as satellitejs from 'satellite.js'
@@ -135,12 +95,6 @@ let resizeObserver: ResizeObserver | null = null
 let viewerInitializing = false
 // Cesium 是否已完成首次初始化（用于外部判断是否可以操作 Viewer）
 const cesiumInitialized = ref(false)
-
-// 卫星类型展示顺序（用于战场态势统计图表的固定排序）
-const SATELLITE_TYPE_ORDER = ['导弹预警', '侦察', '通信', '导航', '太空目标监视与攻防'] as const
-// 武器类型展示顺序（用于战场态势武器统计图表的固定排序）
-const weaponTypeOrder = ['动能', '定向能', '电子干扰', '天基武器', '其他'] as const
-
 /**
  * 战场态势面板中四个 ECharts 图表实例缓存
  *
@@ -282,7 +236,7 @@ const initViewer = async () => {
         baseLayerPicker: false, // 关闭底图选择器
         baseLayer: false, // 不使用默认底图
         infoBox: false, // 打开消息框（点击实体时显示信息）
-        selectionIndicator: true, // 关闭选中指示器（我们自定义点击事件）
+        selectionIndicator: false, // 关闭选中指示器（我们自定义点击事件）
       })
       // 关闭默认双击追踪（保持相机不动）
       viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
@@ -293,18 +247,6 @@ const initViewer = async () => {
           credit: 'credit', // 版权信息
         })
       )
-      // 设置相机飞到中国上空 10 万米高度
-      // if (props.position) {
-      //   const position = Cesium.Cartesian3.fromDegrees(props.position.lon, props.position.lat, props.position.alt) // 经度、纬度、高度（单位：米）
-      //   viewer.camera.setView({
-      //     destination: position,
-      //     orientation: {
-      //       heading: 0.0, // 方向
-      //       pitch: -Cesium.Math.PI_OVER_TWO, // 俯仰角
-      //       roll: 0.0, // 横滚角
-      //     },
-      //   })
-      // }
 
       // 设置最小缩放高度（单位：米），允许滚轮拉近观察细节
       viewer.scene.screenSpaceCameraController.minimumZoomDistance = 100000
@@ -378,8 +320,9 @@ const initViewer = async () => {
           showDetail(norad)
         },
       })
-
+      // 开始监听容器尺寸变化
       startContainerSizeObserver()
+      // 同步渲染循环
       syncViewerRenderLoopWithContainer()
     }
   } finally {
@@ -2072,90 +2015,6 @@ const resetHighlightSatellites = () => {
   applyConstellationVisualState()
 }
 
-// 战场态势数据（展示红蓝对比数据，为 null 表示未加载）
-const battleSituationData = ref<SituationData | null>(null)
-
-/**
- * 格式化数量为字符串，缺省值为 0
- * @param value 数量値
- * @returns 字符串数量
- */
-const formatCount = (value?: number) => `${Number(value ?? 0)}`
-
-/**
- * 格式化时长为字符串，不是有限数时返回 '0'
- * @param value 时长数値（分钟）
- * @returns 字符串时长
- */
-const formatDuration = (value?: number) => {
-  const duration = Number(value ?? 0)
-  if (!Number.isFinite(duration)) return '0'
-  return `${duration}`
-}
-
-/**
- * 取对象中数值最大的前 N 个条目，用于展示地区过境 TopN 数据
- *
- * @param source 键为地区名、值为计数的对象
- * @param limit 返回最大条目数，默认 4
- * @returns 按值降序排序的 { name, value } 数组
- */
-const toTopRows = (source?: Record<string, number>, limit = 4) => {
-  return Object.entries(source ?? {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([name, value]) => ({ name, value: formatCount(value) }))
-}
-
-/**
- * 按卡座类型固定顺序输出据据行，确保图表 X 轴顺序不变
- *
- * @param source 键为卡座类型名称、值为数量的对象
- * @returns 按 SATELLITE_TYPE_ORDER 顺序排列的 { name, value } 数组
- */
-const getFixedSatelliteTypeRows = (source?: Record<string, number>) => {
-  return SATELLITE_TYPE_ORDER.map((name) => ({
-    name,
-    value: Number(source?.[name] ?? 0),
-  }))
-}
-
-/**
- * 将原始武器类型字符串归一化为碰 weaponTypeOrder 中定义的标准类型
- *
- * @param type 原始武器类型字符串
- * @returns 标准化后的类型字符串
- */
-const normalizeWeaponType = (type?: string) => {
-  const text = String(type ?? '').trim()
-  if (!text) return '其他'
-  if (text.includes('动能')) return '动能'
-  if (text.includes('定向能')) return '定向能'
-  if (text.includes('电子干扰') || text.includes('干扰')) return '电子干扰'
-  if (text.includes('天基')) return '天基武器'
-  return '其他'
-}
-
-/**
- * 统计武器列表中各类型数量，按 weaponTypeOrder 顺序输出
- *
- * [处理规则]
- * - '其他' 分类为 0 时不展示
- *
- * @param list 武器列表，每项包含 type 字符串
- * @returns 按顺序排列的 { name, value } 数组
- */
-const getWeaponTypeRows = (list?: Array<{ type?: string }>) => {
-  const counts = new Map<string, number>()
-  for (const item of list ?? []) {
-    const key = normalizeWeaponType(item?.type)
-    counts.set(key, (counts.get(key) ?? 0) + 1)
-  }
-  return weaponTypeOrder
-    .map((name) => ({ name, value: Number(counts.get(name) ?? 0) }))
-    .filter((item) => item.value > 0 || item.name !== '其他')
-}
-
 /**
  * 安全销毁 ECharts 实例，避免重复销毁报错
  *
@@ -2166,185 +2025,6 @@ const disposeChart = (chart: echarts.ECharts | null) => {
     chart.dispose()
   }
 }
-
-/**
- * [功能]
- * 渲染红/蓝方阵营卡座类型柱状图和武器分类饼图
- *
- * [处理规则]
- * - 先 dispose 旧实例再初始化，避免内存泄漏
- * - DOM 元素不存在时直接返回
- *
- * @param campKey 阵营标识: 'red' | 'blue'
- * @param satelliteRows 卡座类型据据行
- * @param weaponRows 武器分类据据行
- */
-const renderCampCharts = (
-  campKey: 'red' | 'blue',
-  satelliteRows: Array<{ name: string; value: number }>,
-  weaponRows: Array<{ name: string; value: number }>
-) => {
-  const satelliteTypeDom = document.getElementById(`${campKey}-satellite-type-chart`)
-  const weaponTypeDom = document.getElementById(`${campKey}-weapon-type-chart`)
-  if (!satelliteTypeDom || !weaponTypeDom) return
-
-  const satelliteTypeChartKey = campKey === 'red' ? 'redSatelliteType' : 'blueSatelliteType'
-  const weaponTypeChartKey = campKey === 'red' ? 'redWeaponType' : 'blueWeaponType'
-
-  disposeChart(chartInstances[satelliteTypeChartKey])
-  disposeChart(chartInstances[weaponTypeChartKey])
-
-  chartInstances[satelliteTypeChartKey] = echarts.init(satelliteTypeDom)
-  chartInstances[weaponTypeChartKey] = echarts.init(weaponTypeDom)
-
-  chartInstances[satelliteTypeChartKey]?.setOption({
-    backgroundColor: 'transparent',
-    grid: { left: 16, right: 16, top: 26, bottom: 16, containLabel: true },
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    xAxis: {
-      type: 'category',
-      data: satelliteRows.map((item) => item.name),
-      axisLabel: { color: '#c8d4e3', interval: 0, rotate: 18, fontSize: 11 },
-      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.24)' } },
-    },
-    yAxis: {
-      type: 'value',
-      axisLabel: { color: '#c8d4e3' },
-      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
-    },
-    series: [
-      {
-        type: 'bar',
-        data: satelliteRows.map((item) => item.value),
-        barWidth: '42%',
-        itemStyle: {
-          color: campKey === 'red' ? '#ff5a5f' : '#2ca6ff',
-          borderRadius: [6, 6, 0, 0],
-        },
-      },
-    ],
-    textStyle: { color: '#e4ebf5' },
-  })
-
-  chartInstances[weaponTypeChartKey]?.setOption({
-    backgroundColor: 'transparent',
-    tooltip: { trigger: 'item' },
-    legend: {
-      bottom: 0,
-      left: 'center',
-      textStyle: { color: '#c8d4e3', fontSize: 11 },
-    },
-    series: [
-      {
-        type: 'pie',
-        radius: ['34%', '58%'],
-        center: ['50%', '45%'],
-        avoidLabelOverlap: true,
-        itemStyle: {
-          borderColor: 'rgba(8, 14, 22, 0.95)',
-          borderWidth: 2,
-        },
-        label: { color: '#e4ebf5', formatter: '{b}\n{d}%' },
-        labelLine: { lineStyle: { color: 'rgba(255,255,255,0.35)' } },
-        data: weaponRows.map((item) => ({
-          name: item.name,
-          value: item.value,
-        })),
-      },
-    ],
-    color:
-      campKey === 'red'
-        ? ['#ff5a5f', '#ff8f8f', '#ffb0b0', '#ffd2d2', '#ffe8e8']
-        : ['#2ca6ff', '#5fb8ff', '#8dccff', '#b7ddff', '#d9edff'],
-    textStyle: { color: '#e4ebf5' },
-  })
-}
-
-/**
- * [功能]
- * 渲染战场态势折线卫星类型和武器分类图表
- *
- * [处理规则]
- * - 等待 nextTick 确保 DOM 已更新再初始化图表
- * - battleSituationData 为 null 时直接返回
- * - 渲染完成后派发 resize 事件触发 ECharts 自适应
- */
-const renderSituationCharts = async () => {
-  await nextTick()
-  const data = battleSituationData.value
-  if (!data) return
-  renderCampCharts(
-    'red',
-    getFixedSatelliteTypeRows(data.红方.红方过境卫星分类数量),
-    getWeaponTypeRows(data.红方.红方武器阵地列表)
-  )
-  renderCampCharts(
-    'blue',
-    getFixedSatelliteTypeRows(data.蓝方.蓝方过境卫星分类数量),
-    getWeaponTypeRows(data.蓝方.蓝方武器阵地列表)
-  )
-  window.dispatchEvent(new Event('resize'))
-}
-
-/**
- * [功能]
- * 调整战场态势面板内所有 ECharts 实例的大小
- *
- * [说明]
- * 建议在容器尺寸改变时（如标签切换、Tab resize）后调用
- */
-const resizeSituationCharts = () => {
-  chartInstances.redSatelliteType?.resize()
-  chartInstances.blueSatelliteType?.resize()
-  chartInstances.redWeaponType?.resize()
-  chartInstances.blueWeaponType?.resize()
-}
-
-/**
- * [功能]
- * 战场态势面板红蓝阵营卡片数据计算（computed）
- *
- * [数据来源]
- * 从 battleSituationData 计算得到红蓝方卡座总数、过境时长、地区分布和样式
- *
- * [取值规则]
- * - battleSituationData 为 null 时返回空数组
- * - ringStyle 用于环形占比可视化（conic-gradient）
- */
-const battleCampCards = computed(() => {
-  const data = battleSituationData.value
-  if (!data) return []
-
-  const redTotal = Number(data['红方']?.红方过境卫星总数 ?? 0)
-  const blueTotal = Number(data['蓝方']?.蓝方过境卫星总数 ?? 0)
-
-  return [
-    {
-      key: 'red',
-      label: '红方',
-      theme: 'is-red',
-      total: redTotal,
-      totalLabel: `${redTotal}`,
-      durationText: formatDuration(data['红方']?.红方卫星过境总时长),
-      summaryRows: toTopRows(data['红方']?.红方各地区过境卫星数量, 3),
-      ringStyle: {
-        background: `conic-gradient(#ff4d4f 0 68%, rgba(255, 255, 255, 0.08) 68% 100%)`,
-      },
-    },
-    {
-      key: 'blue',
-      label: '蓝方',
-      theme: 'is-blue',
-      total: blueTotal,
-      totalLabel: `${blueTotal}`,
-      durationText: formatDuration(data['蓝方']?.蓝方卫星过境总时长),
-      summaryRows: toTopRows(data['蓝方']?.蓝方各地区过境卫星数量, 3),
-      ringStyle: {
-        background: `conic-gradient(#2ca6ff 0 66%, rgba(255, 255, 255, 0.08) 66% 100%)`,
-      },
-    },
-  ]
-})
 
 /**
  * 组件挂载完成时初始化 Cesium Viewer 并绑定相机移动监听器
@@ -2365,25 +2045,6 @@ onMounted(async () => {
   startContainerSizeObserver()
 })
 
-// 监听战场态势数据变化，自动重渲染图表
-watch(
-  battleSituationData,
-  async () => {
-    await renderSituationCharts()
-  },
-  { deep: true }
-)
-
-// 监听 Tab 切换，在战场态势视图激活时重新渲染和调整图表大小
-watch(
-  () => store.activetab,
-  async (tab) => {
-    if (tab !== '战场态势视图' || !battleSituationData.value) return
-    await nextTick()
-    await renderSituationCharts()
-    resizeSituationCharts()
-  }
-)
 /**
  * 组件卸载前清理所有 Cesium 资源
  *
@@ -2499,6 +2160,7 @@ defineExpose({
 .cesium-container {
   position: relative;
   height: 100%;
+  min-height: 600px;
   /* 1. 进入前：藏在左边 */
   .slide-enter-from {
     transform: translateX(-100%);
