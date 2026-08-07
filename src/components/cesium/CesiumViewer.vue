@@ -64,23 +64,11 @@ const creditEl = ref<HTMLElement | null>(null)
  * 组件 Props 定义
  *
  * [字段说明]
- * - tabKey: 父组件 tab 标识，用于区分不同 Viewer 实例
- * - hasNav: 是否显示导航
- * - position: 相机初始定位坐标（经度、纬度、高度，单位：度/米）
- * - showSatMsg: 是否显示卫星信息面板
  * - showTimeLine: 是否显示时间轴控件
  * - showAnimation: 是否显示动画控件
  * - matrixData: 算法矩阵数据（包含地面站、中继卫星、过境窗口与打压状态）
  */
 const props = defineProps<{
-  tabKey?: string | number
-  hasNav?: boolean
-  position?: {
-    lon: number
-    lat: number
-    alt: number
-  } | null
-  showSatMsg?: boolean
   showTimeLine: boolean
   showAnimation: boolean
   /** 算法矩阵数据（包含地面站、中继卫星、过境窗口与打压状态） */

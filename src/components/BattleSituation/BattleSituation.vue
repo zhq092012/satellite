@@ -45,10 +45,6 @@
               :is="activeTabComponent"
               :key="store.activetab"
               :ref="setRef"
-              :tab-key="store.activetab"
-              :has-nav="true"
-              :has-legend="false"
-              :show-sat-msg="true"
               :showTimeLine="true"
               :showAnimation="true"
               :matrix-data="matrixData"
@@ -155,12 +151,6 @@ const tabDefs = [
   //   value: '红蓝对抗分析',
   //   component: 'ConfrontView',
   //   permissionCode: 'battle:confront',
-  // },
-  // {
-  //   label: '电子对抗分析',
-  //   value: '电子对抗分析',
-  //   component: 'ElectronicWarfare',
-  //   permissionCode: 'battle:electronicWarfare',
   // },
   {
     label: '电磁对抗分析',
