@@ -616,7 +616,8 @@ const trackSatelliteByNorad = (norad: number, force = false) => {
   if (!viewer || !norad) return
 
   // 避免对同一目标反复重置相机或被 watch(store.selectedSatellite) 触发二次飞行的竞态与切回抖动
-  if (!force && currentTrackedNorad === norad) return
+  // 注意：若 viewer.trackedEntity 不存在，仍需重新锁定跟随
+  if (!force && currentTrackedNorad === norad && viewer.trackedEntity) return
 
   currentTrackedNorad = norad
 
@@ -804,8 +805,12 @@ const renderElectronicInfrastructureNodes = () => {
     electronicNodeEntityIds.add(satEntityId)
   })
 
-  // 渲染完敌方节点后自动平滑飞赴
-  flyToEnemyNetwork()
+  // 仅在未选择卫星且未选择地面节点时，渲染完敌方节点后才自动平滑飞赴地面网络区域，避免异步加载矩阵时触发竞态切回地面站
+  if (!currentTrackedNorad && !props.selectedNorad && !store.selectedSatellite && !store.selectedInfrastructureNode) {
+    flyToEnemyNetwork()
+  } else if (currentTrackedNorad) {
+    trackSatelliteByNorad(currentTrackedNorad, true)
+  }
 }
 
 /**
