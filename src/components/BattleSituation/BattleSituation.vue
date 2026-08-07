@@ -68,12 +68,6 @@
               :ref="setRef"
               @threatAnalysis="threatAnalysis"
               @changeEffectModel="handleChangeEffectModel"
-              :tab-key="store.activetab"
-              :has-nav="true"
-              :has-legend="true"
-              :show-sat-msg="true"
-              :showTimeLine="true"
-              :showAnimation="true"
             />
           </keep-alive>
         </div>

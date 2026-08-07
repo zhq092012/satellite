@@ -178,14 +178,6 @@ import type { StrikeV2 } from '@/types/strike'
 defineOptions({
   name: 'SatelliteAttackabilityView',
 })
-defineProps<{
-  tabKey?: string
-  hasNav?: boolean
-  hasLegend?: boolean
-  showSatMsg?: boolean
-  showTimeLine?: boolean
-  showAnimation?: boolean
-}>()
 
 defineEmits(['threatAnalysis', 'changeEffectModel'])
 

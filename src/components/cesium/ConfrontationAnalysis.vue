@@ -11,9 +11,14 @@
 
         <span class="title">当前作战阶段:</span>
         <div style="display: flex; gap: 10px">
-          <el-tag style="cursor: pointer" type="primary" v-for="tag in segments"
-            :effect="currentSegment === tag ? 'dark' : 'plain'" @click="syncClockAndStep(tag, view3D.clock)">{{ tag
-            }}</el-tag>
+          <el-tag
+            style="cursor: pointer"
+            type="primary"
+            v-for="tag in segments"
+            :effect="currentSegment === tag ? 'dark' : 'plain'"
+            @click="syncClockAndStep(tag, view3D.clock)"
+            >{{ tag }}</el-tag
+          >
         </div>
 
         <div class="switch-bars">
@@ -25,20 +30,34 @@
             size="small"
             :disabled="selectedMode == '天对天'"
           ></el-switch> -->
-          <el-switch v-model="showView2D" active-color="#13ce66" inactive-color="#ff4949" active-text="开启二维视图"
-            size="small" :disabled="selectedMode == '天对天'"></el-switch>
+          <el-switch
+            v-model="showView2D"
+            active-color="#13ce66"
+            inactive-color="#ff4949"
+            active-text="开启二维视图"
+            size="small"
+            :disabled="selectedMode == '天对天'"
+          ></el-switch>
         </div>
       </div>
       <div class="nav-right">
-        <el-switch v-model="store.showNetView" active-color="#13ce66" inactive-color="#ff4949"
-          active-text="开启网络视图"></el-switch>
+        <el-switch
+          v-model="store.showNetView"
+          active-color="#13ce66"
+          inactive-color="#ff4949"
+          active-text="开启网络视图"
+        ></el-switch>
       </div>
     </div>
-    <div id="cesiumContainer" :class="[{ animating: showView2D, 'not-animating': !showView2D }, selectedModeClass]"
-      class="fullSize">
+    <div
+      id="cesiumContainer"
+      :class="[{ animating: showView2D, 'not-animating': !showView2D }, selectedModeClass]"
+      class="fullSize"
+    >
       <div class="left-top-bar" v-show="selectedMode !== '天对天'">
         <div>
-          <span>{{ statistics?.weaponNum || 0 }}</span><span>武器总数</span>
+          <span>{{ statistics?.weaponNum || 0 }}</span
+          ><span>武器总数</span>
         </div>
         <div style="display: flex; flex-direction: row">
           <div v-for="[type, count] in Object.entries(statistics?.weaponTypeMap || {})" :key="type">
@@ -56,12 +75,25 @@
       </div>
       <div class="left-workbench">
         <el-splitter class="workbench-splitter" layout="horizontal">
-          <el-splitter-panel v-if="selectedMode !== '天对天'" collapsible size="300px" min="220px" class="sidebar-panel">
+          <el-splitter-panel
+            v-if="selectedMode !== '天对天'"
+            collapsible
+            size="300px"
+            min="220px"
+            class="sidebar-panel"
+          >
             <div class="left-side-bar">
               <div class="panel-title">武器信息列表</div>
 
-              <el-tree ref="weaponTreeRef" node-key="id" show-checkbox :data="weaponsTreeData" :props="treeProps"
-                :default-expand-all="true" @check-change="handleWeaponTreeCheckChange"></el-tree>
+              <el-tree
+                ref="weaponTreeRef"
+                node-key="id"
+                show-checkbox
+                :data="weaponsTreeData"
+                :props="treeProps"
+                :default-expand-all="true"
+                @check-change="handleWeaponTreeCheckChange"
+              ></el-tree>
             </div>
           </el-splitter-panel>
           <el-splitter-panel class="main-panel">
@@ -104,7 +136,13 @@
               </div>
             </div>
           </el-splitter-panel>
-          <el-splitter-panel v-if="selectedMode !== '天对天'" collapsible size="300px" min="220px" class="sidebar-panel">
+          <el-splitter-panel
+            v-if="selectedMode !== '天对天'"
+            collapsible
+            size="300px"
+            min="220px"
+            class="sidebar-panel"
+          >
             <div class="right-side-bar">
               <div class="panel-title">可打击卫星列表</div>
               <div class="satellite-list">
@@ -113,7 +151,8 @@
                 <ul v-else>
                   <li v-for="sat in satelliteStrike" :key="sat.norad_id">
                     <div>
-                      <strong>{{ sat.name_en }}</strong>（{{ sat.country }}）
+                      <strong>{{ sat.name_en }}</strong
+                      >（{{ sat.country }}）
                     </div>
                     <div>NORAD：{{ sat.norad_id }}</div>
                     <div>卫星类型：{{ sat.sat_type || '未知' }}</div>
@@ -164,15 +203,6 @@ import { bindInfoBoxButton, createInfoBoxActionButton, unbindInfoBoxButton } fro
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import type { SatelliteStrike, Weapon } from '@/types/dashboard/index.js'
 const { openSatelliteProfile } = useSatelliteProfileDialog()
-// 接收父组件传入的展示控制属性，避免非 props 属性警告
-const props = defineProps<{
-  tabKey?: string
-  hasNav?: boolean
-  hasLegend?: boolean
-  showSatMsg?: boolean
-  showTimeLine?: boolean
-  showAnimation?: boolean
-}>()
 
 // 声明父组件可能监听的自定义事件
 const emit = defineEmits(['threatAnalysis', 'changeEffectModel'])
@@ -1065,25 +1095,25 @@ function loadWeapons(view: Cesium.Viewer, weapons: Weapon[], camp: string) {
       const existing = view.entities.getById(`weapon-${weapon.id}`)
       if (existing) {
         try {
-          ; (existing as any).position = position
-            ; (existing as any).orientation = Cesium.Transforms.headingPitchRollQuaternion(position, hpr)
-            ; (existing as any).point = {
-              pixelSize: 8,
-              outlineWidth: 2,
-              outlineColor: Cesium.Color.WHITE,
-              color: camp === 'our' ? Cesium.Color.RED.withAlpha(0.5) : Cesium.Color.BLUE.withAlpha(0.5),
-              heightReference: Cesium.HeightReference.NONE,
-            }
-            ; (existing as any).label = {
-              text: weapon.name,
-              font: '12px sans-serif',
-              fillColor: Cesium.Color.WHITE,
-              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-              pixelOffset: new Cesium.Cartesian2(0, 20),
-              heightReference: Cesium.HeightReference.NONE,
-            }
-            ; (existing as any).description =
-              `<div style="padding: 10px; font-family: inherit;background-color:white; color:  rgba(0, 0, 0, 0.7); border-radius: 8px;">
+          ;(existing as any).position = position
+          ;(existing as any).orientation = Cesium.Transforms.headingPitchRollQuaternion(position, hpr)
+          ;(existing as any).point = {
+            pixelSize: 8,
+            outlineWidth: 2,
+            outlineColor: Cesium.Color.WHITE,
+            color: camp === 'our' ? Cesium.Color.RED.withAlpha(0.5) : Cesium.Color.BLUE.withAlpha(0.5),
+            heightReference: Cesium.HeightReference.NONE,
+          }
+          ;(existing as any).label = {
+            text: weapon.name,
+            font: '12px sans-serif',
+            fillColor: Cesium.Color.WHITE,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            pixelOffset: new Cesium.Cartesian2(0, 20),
+            heightReference: Cesium.HeightReference.NONE,
+          }
+          ;(existing as any).description =
+            `<div style="padding: 10px; font-family: inherit;background-color:white; color:  rgba(0, 0, 0, 0.7); border-radius: 8px;">
       <h3 style="color: #1890ff; margin: 0 0 10px 0;">🛰️ ${weapon.name}</h3>
       <p><strong>武器类型:</strong> ${weapon.type}</p>
       <p><strong>所属国家:</strong> ${weapon.country}</p>
@@ -1581,7 +1611,6 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
     overflow: hidden;
 
     &.not-animating {
-
       /* 动画关闭时：隐藏 view2D，仅显示 view3D + view4D 对半分 */
       #view2D {
         display: none !important;
@@ -1802,7 +1831,7 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
         font-size: 12px;
       }
 
-      .satellite-list li>div {
+      .satellite-list li > div {
         margin-bottom: 3px;
       }
 
@@ -1812,18 +1841,18 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
         border-left: 2px solid rgba(44, 166, 255, 0.38);
       }
 
-      .weapon-window-list>div {
+      .weapon-window-list > div {
         margin-bottom: 2px;
         font-size: 12px;
         color: #c6d8ff;
       }
 
-      .weapon-window-list>div .weapon-name {
+      .weapon-window-list > div .weapon-name {
         font-weight: bold;
         color: #a9cfff;
       }
 
-      .weapon-window-list>div .strike-window {
+      .weapon-window-list > div .strike-window {
         color: #ffffff;
       }
     }
