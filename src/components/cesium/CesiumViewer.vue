@@ -591,8 +591,8 @@ const flyToInfrastructureNode = (node: InfrastructureLocation) => {
   const stationPos = Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 0)
   const boundingSphere = new Cesium.BoundingSphere(stationPos, 0)
 
-  // 2. 距离地面站中心 300,000 米，俯视角 -45°，100% 居中瞄准地面站
-  const offset = new Cesium.HeadingPitchRange(Cesium.Math.toRadians(0), Cesium.Math.toRadians(-45), 300000)
+  // 2. 适当抬高视角高度（从 300 km 提高至 2500 km / 2,500,000 米），俯视角 -50°，100% 居中瞄准地面站的同时能清晰兼顾并查看到周边其他地面站节点
+  const offset = new Cesium.HeadingPitchRange(Cesium.Math.toRadians(0), Cesium.Math.toRadians(-50), 2500000)
 
   viewer.camera.flyToBoundingSphere(boundingSphere, {
     duration: 1.5,
@@ -1083,10 +1083,14 @@ const updateElectronicDynamicLinks = () => {
 
   const activeLinkKeys = new Set<string>()
 
-  // 1. 遍历敌方卫星矩阵解析星地过境窗口连线
+  // 1. 遍历敌方过境卫星矩阵解析星地过境窗口连线 (忽略中继卫星与地面站之间的直接连线)
   const satelliteMatrixList = props.matrixData.satelliteMatrixList || []
   satelliteMatrixList.forEach((satItem) => {
     const norad = satItem.norad
+    // 去掉中继卫星与地面站之间的连线
+    const isRelay = norad === 22314 || (satItem.satType || '').includes('中继')
+    if (isRelay) return
+
     const satPos = getSatellitePositionInCesium(norad)
     if (!satPos) return
 
@@ -1127,69 +1131,6 @@ const updateElectronicDynamicLinks = () => {
       }
     })
   })
-
-  // 2. 解析敌方星中中继链路 (Relay Satellites)
-  const relayRelation = props.matrixData.relayRelation
-  if (relayRelation && relayRelation.relations) {
-    relayRelation.relations.forEach((rel) => {
-      const fromNorad = Number(rel.from)
-      const toNorad = Number(rel.to)
-      const fromPos = getSatellitePositionInCesium(fromNorad)
-      const toPos = getSatellitePositionInCesium(toNorad)
-
-      if (fromPos && toPos) {
-        const linkKey = `link-relay-${fromNorad}-${toNorad}`
-        activeLinkKeys.add(linkKey)
-
-        if (!viewer.entities.getById(linkKey)) {
-          viewer.entities.add({
-            id: linkKey,
-            polyline: {
-              positions: [fromPos, toPos],
-              width: 2.2,
-              material: new Cesium.PolylineGlowMaterialProperty({
-                glowPower: 0.2,
-                color: Cesium.Color.GOLD,
-              }),
-            },
-          })
-          electronicDynamicLinkEntityIds.add(linkKey)
-        }
-      }
-    })
-  }
-
-  // 3. 解析地面站 -> 中心云站地地传输网 (Station Relations)
-  const stationRelationList = props.matrixData.stationRelationList
-  if (stationRelationList && stationRelationList.relations) {
-    stationRelationList.relations.forEach((rel) => {
-      const fromNode = infrastructureNodes.value.find((n) => n.id === rel.from)
-      const toNode = infrastructureNodes.value.find((n) => n.id === rel.to)
-
-      if (fromNode && toNode) {
-        const linkKey = `link-ground-${rel.from}-${rel.to}`
-        activeLinkKeys.add(linkKey)
-
-        if (!viewer.entities.getById(linkKey)) {
-          const fromPos = Cesium.Cartesian3.fromDegrees(fromNode.longitude, fromNode.latitude, fromNode.altitude)
-          const toPos = Cesium.Cartesian3.fromDegrees(toNode.longitude, toNode.latitude, toNode.altitude)
-
-          viewer.entities.add({
-            id: linkKey,
-            polyline: {
-              positions: [fromPos, toPos],
-              width: 2.0,
-              material: new Cesium.PolylineGlowMaterialProperty({
-                glowPower: 0.15,
-                color: Cesium.Color.MAGENTA,
-              }),
-            },
-          })
-          electronicDynamicLinkEntityIds.add(linkKey)
-        }
-      }
-    })
-  }
 
   // 清理非激活动态连线
   electronicDynamicLinkEntityIds.forEach((linkId) => {
