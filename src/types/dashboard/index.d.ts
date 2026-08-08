@@ -186,29 +186,55 @@ interface SceneConfig {
   }
   user_overrides?: SceneConfig & { updated_at: string }
 }
-
+/**
+ * 航天器打击实体
+ */
 interface SatelliteStrike {
+  /** 综合打击分数 */
   comprehensive_strike_score: number
+  /** 威胁分数 */
   threat_score: number
+  /** 国际航标编号 */
   norad_id: string
+  /** 图片 */
   img: string
+  /** 航天器编号 */
   int_id: string
+  /** 英文名称 */
   name_en: string
+  /** 国家 */
   country: string
+  /** 航天器类型 */
   sat_type: string
+  /** 总体分数 */
   overallScore?: number
+  /** 最佳窗口 */
+  /** 最佳窗口 */
   optimal_time_window: string
+  /** 信息分数 */
   information_score: number
+  /** 可打击分数 */
   kedaji_score: number
+  /** 轨道类型 */
   orbit_type: number
+  /** 排序 */
   sort: number
+  /** 可视化分数 */
   visibility_score: number
+  /** 武器分数 */
   weapon_score: number
-  weapons_window: WeaponWindow[]
+  /** 武器窗口 */
+  weapons_window: StrikeTimeWindow[]
 }
-interface WeaponWindow {
+/**
+ * 航天器打击实体
+ */
+interface StrikeTimeWindow {
+  /** 窗口id */
   id: number
+  /** 窗口名称 */
   name: string
+  /** 打击窗口 */
   strike_window: string
 }
 interface SatelliteThreat {

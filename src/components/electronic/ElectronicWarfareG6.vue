@@ -10,13 +10,8 @@
       <div class="header-center">
         <!-- 1. 交战烈度切换按钮组 -->
         <div class="intensity-group">
-          <button
-            v-for="level in intensityOptions"
-            :key="level"
-            class="nav-tab-btn"
-            :class="{ active: currentIntensity === level }"
-            @click="handleIntensityChange(level)"
-          >
+          <button v-for="level in intensityOptions" :key="level" class="nav-tab-btn"
+            :class="{ active: currentIntensity === level }" @click="handleIntensityChange(level)">
             {{ level }}
           </button>
         </div>
@@ -25,13 +20,8 @@
 
         <!-- 2. 拓扑显示模式切换 -->
         <div class="matrix-tab-group">
-          <button
-            v-for="mode in viewModeOptions"
-            :key="mode.key"
-            class="nav-tab-btn tab-matrix"
-            :class="{ active: currentViewMode === mode.key }"
-            @click="currentViewMode = mode.key"
-          >
+          <button v-for="mode in viewModeOptions" :key="mode.key" class="nav-tab-btn tab-matrix"
+            :class="{ active: currentViewMode === mode.key }" @click="currentViewMode = mode.key">
             {{ mode.name }}
           </button>
         </div>
@@ -56,11 +46,8 @@
     </div>
 
     <!-- 当切换为武器打击窗口列表模式时，渲染武器打击窗口列表组件 -->
-    <div
-      v-show="currentViewMode === 'WEAPON_ATTACK'"
-      class="cema-workspace"
-      style="height: calc(100vh - 60px); padding: 0"
-    >
+    <div v-show="currentViewMode === 'WEAPON_ATTACK'" class="cema-workspace"
+      style="height: calc(100vh - 60px); padding: 0">
       <WeaponAttackList :matrix-data="matrixData" />
     </div>
 
@@ -70,33 +57,23 @@
       <div class="topo-summary-bar">
         <div class="stat-badge">
           <span class="stat-dot dot-sat"></span>
-          <span
-            >卫星节点: <strong>{{ satNodeCount }}</strong> 颗</span
-          >
+          <span>卫星节点: <strong>{{ satNodeCount }}</strong> 颗</span>
         </div>
         <div class="stat-badge">
           <span class="stat-dot dot-rec"></span>
-          <span
-            >地面站节点: <strong>{{ receiveNodeCount }}</strong> 个</span
-          >
+          <span>地面站节点: <strong>{{ receiveNodeCount }}</strong> 个</span>
         </div>
         <div class="stat-badge">
           <span class="stat-dot dot-station"></span>
-          <span
-            >数据中心: <strong>{{ stationNodeCount }}</strong> 个</span
-          >
+          <span>数据中心: <strong>{{ stationNodeCount }}</strong> 个</span>
         </div>
         <div class="stat-badge">
           <span class="stat-dot dot-normal-link"></span>
-          <span
-            >正常链路: <strong>{{ normalLinkCount }}</strong> 条</span
-          >
+          <span>正常链路: <strong>{{ normalLinkCount }}</strong> 条</span>
         </div>
         <div class="stat-badge alert-stat">
           <span class="stat-dot dot-struck-link"></span>
-          <span
-            >打压/中断链路: <strong>{{ struckLinkCount }}</strong> 条 (红色虚线标识)</span
-          >
+          <span>打压/中断链路: <strong>{{ struckLinkCount }}</strong> 条 (红色虚线标识)</span>
         </div>
       </div>
 
@@ -144,9 +121,8 @@
           <span class="node-filter-tip" v-if="selectedNodeInfo">
             已选择节点: <strong class="glow-text-cyan">{{ selectedNodeInfo.name }}</strong> (共
             {{ displayedWindowsList.length }} 个过境/可见窗口)
-            <el-button type="primary" link size="small" style="margin-left: 8px" @click="clearSelectedNode"
-              >重置筛选</el-button
-            >
+            <el-button type="primary" link size="small" style="margin-left: 8px"
+              @click="clearSelectedNode">重置筛选</el-button>
           </span>
         </div>
       </div>
@@ -156,26 +132,17 @@
         <div v-if="displayedWindowsList.length === 0" class="empty-window-card">
           <span>暂无相关节点的过境/打击时间窗口数据</span>
         </div>
-        <div
-          v-else
-          v-for="(win, idx) in displayedWindowsList"
-          :key="win.id || idx"
-          :ref="(el) => setCardRef(el, win.id)"
-          class="window-card"
-          :class="{
+        <div v-else v-for="(win, idx) in displayedWindowsList" :key="win.id || idx"
+          :ref="(el) => setCardRef(el, win.id)" class="window-card" :class="{
             'card-struck': win.strikeStatus === 1,
             'card-relay': win.isRelayWindow,
             'card-active': isWindowActiveAtCurrentTime(win),
             'card-selected': selectedWindowId === win.id,
-          }"
-          @click="selectWindowItem(win)"
-        >
+          }" @click="selectWindowItem(win)">
           <div class="card-header">
             <span class="win-time">{{ win.startTimeShort }} ~ {{ win.endTimeShort }}</span>
-            <span
-              class="win-status-badge"
-              :class="win.isRelayWindow ? 'badge-relay' : win.strikeStatus === 1 ? 'badge-danger' : 'badge-success'"
-            >
+            <span class="win-status-badge"
+              :class="win.isRelayWindow ? 'badge-relay' : win.strikeStatus === 1 ? 'badge-danger' : 'badge-success'">
               {{ win.isRelayWindow ? '中继可见' : win.strikeStatus === 1 ? '受毁伤打压' : '正常过境' }}
             </span>
           </div>
@@ -184,9 +151,8 @@
             <div class="win-link-info">
               <span class="sat-name" :title="win.satName">🛰️ {{ win.satName }}</span>
               <span class="arrow-icon">➔</span>
-              <span class="rec-name" :title="win.receiveName"
-                >{{ win.isRelayWindow ? '🛰️' : '📡' }} {{ win.receiveName }}</span
-              >
+              <span class="rec-name" :title="win.receiveName">{{ win.isRelayWindow ? '🛰️' : '📡' }} {{ win.receiveName
+                }}</span>
             </div>
 
             <div class="win-meta-info" v-if="win.strikeStatus === 1">
@@ -1023,8 +989,8 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
   const list: WindowItemWrapper[] = []
   const satMap = new Map<number, string>()
 
-  ;(data.initMatrixList || []).forEach((s) => satMap.set(s.norad, s.name))
-  ;(data.satelliteMatrixList || []).forEach((s) => satMap.set(s.norad, s.name))
+    ; (data.initMatrixList || []).forEach((s) => satMap.set(s.norad, s.name))
+    ; (data.satelliteMatrixList || []).forEach((s) => satMap.set(s.norad, s.name))
 
   // 1. 从 satelliteMatrixList 提取 (包含打击状态 strikeStatus)
   const satMatrixList = data.satelliteMatrixList || []
@@ -1342,15 +1308,15 @@ const buildG6GraphData = () => {
 
   // 1. 提取普通卫星 (Layer 1) 与 中继卫星 (Layer 2)
   const satMap = new Map<number, { norad: number; name: string; satType: string; status: number }>()
-  ;(data.initMatrixList || []).forEach((s) => {
-    satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: 0 })
-  })
-  ;(data.satelliteMatrixList || []).forEach((s) => {
-    satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: s.satelliteStatus || 0 })
-  })
+    ; (data.initMatrixList || []).forEach((s) => {
+      satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: 0 })
+    })
+    ; (data.satelliteMatrixList || []).forEach((s) => {
+      satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: s.satelliteStatus || 0 })
+    })
   // [逻辑说明] 提取星间中继拓扑关系中的中继卫星节点
   if (data.relayRelation) {
-    ;(data.relayRelation.relayList || []).forEach((norad) => {
+    ; (data.relayRelation.relayList || []).forEach((norad) => {
       if (!satMap.has(norad)) {
         satMap.set(norad, { norad, name: `TDRS-${norad}`, satType: '通信/数据中继', status: 0 })
       }
@@ -1378,7 +1344,7 @@ const buildG6GraphData = () => {
       : [data.stationRelationList, data.initRelationList].filter(Boolean)
 
   relLists.forEach((rl) => {
-    ;(rl.receiveObjList || []).forEach((rec) => {
+    ; (rl.receiveObjList || []).forEach((rec) => {
       const recStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : rec.receiveStatus || 0
       if (!receiveMap.has(rec.receiveId)) {
         receiveMap.set(rec.receiveId, {
@@ -1400,7 +1366,7 @@ const buildG6GraphData = () => {
   // 3. Layer 3: 中心云数据中心 (Data Centers)
   const stationMap = new Map<string, { stationId: string; stationName: string; status: number }>()
   relLists.forEach((rl) => {
-    ;(rl.stationObjList || []).forEach((st) => {
+    ; (rl.stationObjList || []).forEach((st) => {
       const stStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : st.stationStatus || 0
       if (!stationMap.has(st.stationId)) {
         stationMap.set(st.stationId, {
@@ -1714,57 +1680,57 @@ const buildG6GraphData = () => {
   // 1. Layer 1 -> Layer 2 边 (卫星 -> 地面站)
   if (currentViewMode.value === 'PRE_STRIKE') {
     // 打击前: 取 initMatrixList
-    ;(data.initMatrixList || []).forEach((sat) => {
+    ; (data.initMatrixList || []).forEach((sat) => {
       const satId = `sat-${sat.norad}`
-      ;(sat.initWindows || []).forEach((win) => {
-        const edgeId = `edge-${satId}-${win.receiveId}`
-        if (!edgeSet.has(edgeId) && nodeSet.has(satId) && nodeSet.has(win.receiveId)) {
-          edgeSet.add(edgeId)
-          normalCount++
-          edges.push({
-            id: edgeId,
-            source: satId,
-            target: win.receiveId,
-            sourceAnchor: 1, // 源节点下边中心
-            targetAnchor: 0, // 目标节点上边中心
-            type: 'struck-cubic',
-            isStruck: false,
-            style: {
-              stroke: '#00e1ff',
-              lineWidth: 2,
-            },
-          })
-        }
-      })
+        ; (sat.initWindows || []).forEach((win) => {
+          const edgeId = `edge-${satId}-${win.receiveId}`
+          if (!edgeSet.has(edgeId) && nodeSet.has(satId) && nodeSet.has(win.receiveId)) {
+            edgeSet.add(edgeId)
+            normalCount++
+            edges.push({
+              id: edgeId,
+              source: satId,
+              target: win.receiveId,
+              sourceAnchor: 1, // 源节点下边中心
+              targetAnchor: 0, // 目标节点上边中心
+              type: 'struck-cubic',
+              isStruck: false,
+              style: {
+                stroke: '#00e1ff',
+                lineWidth: 2,
+              },
+            })
+          }
+        })
     })
   } else {
     // 全景对比 / 打击后: 取 satelliteMatrixList
-    ;(data.satelliteMatrixList || []).forEach((sat) => {
+    ; (data.satelliteMatrixList || []).forEach((sat) => {
       const satId = `sat-${sat.norad}`
-      ;(sat.stationWindows || []).forEach((win) => {
-        const edgeId = `edge-${satId}-${win.receiveId}`
-        if (!edgeSet.has(edgeId) && nodeSet.has(satId) && nodeSet.has(win.receiveId)) {
-          edgeSet.add(edgeId)
-          const isStruck = win.strikeStatus === 1 || sat.satelliteStatus === 1
-          if (isStruck) struckCount++
-          else normalCount++
+        ; (sat.stationWindows || []).forEach((win) => {
+          const edgeId = `edge-${satId}-${win.receiveId}`
+          if (!edgeSet.has(edgeId) && nodeSet.has(satId) && nodeSet.has(win.receiveId)) {
+            edgeSet.add(edgeId)
+            const isStruck = win.strikeStatus === 1 || sat.satelliteStatus === 1
+            if (isStruck) struckCount++
+            else normalCount++
 
-          edges.push({
-            id: edgeId,
-            source: satId,
-            target: win.receiveId,
-            sourceAnchor: 1, // 源节点下边中心
-            targetAnchor: 0, // 目标节点上边中心
-            type: 'struck-cubic',
-            isStruck,
-            style: {
-              stroke: isStruck ? '#ff4d4f' : '#00e1ff',
-              lineWidth: isStruck ? 2.2 : 2,
-              lineDash: isStruck ? [6, 4] : undefined,
-            },
-          })
-        }
-      })
+            edges.push({
+              id: edgeId,
+              source: satId,
+              target: win.receiveId,
+              sourceAnchor: 1, // 源节点下边中心
+              targetAnchor: 0, // 目标节点上边中心
+              type: 'struck-cubic',
+              isStruck,
+              style: {
+                stroke: isStruck ? '#ff4d4f' : '#00e1ff',
+                lineWidth: isStruck ? 2.2 : 2,
+                lineDash: isStruck ? [6, 4] : undefined,
+              },
+            })
+          }
+        })
     })
   }
 
@@ -2074,7 +2040,7 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@import '../styles/theme.scss';
+@use '../styles/theme.scss';
 
 .cema-g6-dashboard {
   width: 100%;
@@ -2161,9 +2127,11 @@ onUnmounted(() => {
   gap: 16px;
   font-size: 13px;
   color: #94a3b8;
+
   .label-text {
     margin-right: 5px;
   }
+
   .time-value {
     color: #00e1ff;
     font-weight: 600;
@@ -2202,19 +2170,24 @@ onUnmounted(() => {
     height: 8px;
     border-radius: 50%;
   }
+
   .dot-sat {
     background: #00e1ff;
     box-shadow: 0 0 6px #00e1ff;
   }
+
   .dot-rec {
     background: #00f2fe;
   }
+
   .dot-station {
     background: #3b82f6;
   }
+
   .dot-normal-link {
     background: #38bdf8;
   }
+
   .dot-struck-link {
     background: #ff4d4f;
     box-shadow: 0 0 6px #ff4d4f;
@@ -2261,11 +2234,13 @@ onUnmounted(() => {
     .layer-text {
       display: flex;
       flex-direction: column;
+
       .layer-title {
         font-size: 13px;
         font-weight: 700;
         color: #00e1ff;
       }
+
       .layer-sub {
         font-size: 10px;
         color: #64748b;
@@ -2274,6 +2249,7 @@ onUnmounted(() => {
 
     &.layer-2-item {
       border-color: rgba(0, 242, 254, 0.3);
+
       .layer-title {
         color: #00f2fe;
       }
@@ -2281,6 +2257,7 @@ onUnmounted(() => {
 
     &.layer-3-item {
       border-color: rgba(59, 130, 246, 0.3);
+
       .layer-title {
         color: #60a5fa;
       }
@@ -2316,6 +2293,7 @@ onUnmounted(() => {
     color: #00e1ff;
     margin-right: 8px;
   }
+
   .time-range-text {
     font-size: 11px;
     color: #64748b;
@@ -2324,6 +2302,7 @@ onUnmounted(() => {
   .current-time-display {
     font-size: 12px;
     color: #94a3b8;
+
     .time-value {
       color: #00e1ff;
       font-weight: 700;
@@ -2344,6 +2323,7 @@ onUnmounted(() => {
   &::-webkit-scrollbar {
     height: 8px;
   }
+
   &::-webkit-scrollbar-thumb {
     background: rgba(0, 225, 255, 0.4);
     border-radius: 4px;
@@ -2352,6 +2332,7 @@ onUnmounted(() => {
       background: rgba(0, 225, 255, 0.7);
     }
   }
+
   &::-webkit-scrollbar-track {
     background: rgba(0, 225, 255, 0.08);
     border-radius: 4px;
@@ -2432,10 +2413,12 @@ onUnmounted(() => {
         background: rgba(16, 185, 129, 0.2);
         color: #34d399;
       }
+
       &.badge-danger {
         background: rgba(239, 68, 68, 0.2);
         color: #f87171;
       }
+
       &.badge-relay {
         background: rgba(168, 85, 247, 0.2);
         color: #c084fc;
@@ -2458,9 +2441,11 @@ onUnmounted(() => {
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+
     .arrow-icon {
       color: #64748b;
     }
+
     .rec-name {
       color: #34d399;
       max-width: 110px;

@@ -3,12 +3,8 @@
     <main class="main">
       <div class="tabs-bar">
         <div class="tabs">
-          <div
-            v-for="tab in visibleTabs"
-            :key="tab.value"
-            :class="{ active: store.activetab === tab.value }"
-            @click="switchTab(tab.value)"
-          >
+          <div v-for="tab in visibleTabs" :key="tab.value" :class="{ active: store.activetab === tab.value }"
+            @click="switchTab(tab.value)">
             {{ tab.label }}
           </div>
         </div>
@@ -28,52 +24,29 @@
       <div v-if="store.activetab === '战场态势视图'" class="battle-grid">
         <!-- C2 敌方网络与资产拓扑左侧边栏 -->
         <div class="battle-grid__side battle-grid__side--left">
-          <C2LeftControlPanel
-            :matrix-data="matrixData"
-            :selected-norad="selectedNorad"
-            @select-satellite="handleSelectSatellite"
-            @toggle-radar-frustum="handleToggleRadarFrustum"
-            @toggle-orbit-trails="handleToggleOrbitTrails"
-            @fly-to-view="handleFlyToView"
-          />
+          <C2LeftControlPanel :matrix-data="matrixData" :selected-norad="selectedNorad"
+            @select-satellite="handleSelectSatellite" @toggle-radar-frustum="handleToggleRadarFrustum"
+            @toggle-orbit-trails="handleToggleOrbitTrails" @fly-to-view="handleFlyToView" />
         </div>
         <!-- 中间 3D Cesium 地球 -->
         <div class="battle-grid__center">
           <div class="battle-grid__earth">
-            <component
-              v-if="activeTabComponent"
-              :is="activeTabComponent"
-              :key="store.activetab"
-              :ref="setRef"
-              :showTimeLine="true"
-              :showAnimation="true"
-              :matrix-data="matrixData"
-              :selected-norad="selectedNorad"
-            />
+            <component v-if="activeTabComponent" :is="activeTabComponent" :key="store.activetab" :ref="setRef"
+              :showTimeLine="true" :showAnimation="true" :matrix-data="matrixData" :selected-norad="selectedNorad" />
           </div>
         </div>
         <!-- C2 敌方数据传输与链路效能右侧边栏 -->
         <div class="battle-grid__side battle-grid__side--right">
-          <C2RightAnalysisPanel
-            :matrix-data="matrixData"
-            :selected-satellite-norad="selectedNorad"
-            @clear-satellite-selection="handleSelectSatellite(null)"
-          />
+          <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad"
+            @clear-satellite-selection="handleSelectSatellite(null)" />
         </div>
       </div>
       <div v-else class="map-box">
         <div class="tab-content">
           <keep-alive
-            include="EvaluationReport,ThreatAnalysis,SatelliteAttackabilityView,KillChain,ElectronicWarfareG6"
-          >
-            <component
-              v-if="activeTabComponent"
-              :is="activeTabComponent"
-              :key="store.activetab"
-              :ref="setRef"
-              @threatAnalysis="threatAnalysis"
-              @changeEffectModel="handleChangeEffectModel"
-            />
+            include="EvaluationReport,ThreatAnalysis,SatelliteAttackabilityView,KillChain,ElectronicWarfareG6">
+            <component v-if="activeTabComponent" :is="activeTabComponent" :key="store.activetab" :ref="setRef"
+              @threatAnalysis="threatAnalysis" @changeEffectModel="handleChangeEffectModel" />
           </keep-alive>
         </div>
       </div>
@@ -95,11 +68,10 @@ import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import { useAuthStore } from '@/store/modules/auth'
-import { getSatelliteList, getSituationDataOfTask, getStrikeSatellites, type SituationData } from '@/api/dashboard'
+import { getSatelliteList } from '@/api/dashboard'
 import { getMatrixList, getDefaultMatrixData, type MatrixResult } from '@/api/electronic'
 import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
-import type { SatelliteStrike } from '@/types/dashboard'
 const store = useLayoutStore()
 const authStore = useAuthStore()
 useSatelliteProfileDialog()
@@ -275,8 +247,7 @@ const threatAnalysis = () => {
   switchTab('卫星威胁分析')
 }
 
-const battleSituationData = ref<SituationData | null>(null)
-const strikeSatelliteList = ref<SatelliteStrike[]>([])
+
 
 // 当前选中的敌方卫星 NORAD (未选中时为 null，表示静态展示)
 const selectedNorad = ref<number | null>(null)
@@ -300,7 +271,7 @@ const handleSelectSatellite = async (norad: number | null) => {
   // 1. 如果没有选择卫星 (静态展示模式)
   if (!norad || !taskId) {
     if (cesiumViewerRef.value && (cesiumViewerRef.value as any).pauseClockAnimation) {
-      ;(cesiumViewerRef.value as any).pauseClockAnimation()
+      ; (cesiumViewerRef.value as any).pauseClockAnimation()
     }
     if (taskId) {
       await loadMatrixData(taskId)
@@ -358,7 +329,7 @@ const handleSelectSatellite = async (norad: number | null) => {
 
       // 使用 Cesium 时钟推进到窗口发生时刻，并开启连线推演动画
       if (cesiumViewerRef.value && (cesiumViewerRef.value as any).jumpToTimeAndPlay) {
-        ;(cesiumViewerRef.value as any).jumpToTimeAndPlay(windowStartTime)
+        ; (cesiumViewerRef.value as any).jumpToTimeAndPlay(windowStartTime)
       }
     }
   } catch (err) {
@@ -379,19 +350,7 @@ watch(
   }
 )
 
-async function loadSituationData(taskId: number) {
-  const res = await getSituationDataOfTask(taskId)
-  if (res.code === 200 && res.data) {
-    battleSituationData.value = res.data
-  }
-}
 
-async function loadStrikeList(taskId: number) {
-  const res = await getStrikeSatellites(taskId, 1, 10000)
-  if (res.code === 200) {
-    strikeSatelliteList.value = res.data.content ?? []
-  }
-}
 
 /**
  * 加载初始算法矩阵 (未选择卫星时展示全量资产拓扑)
@@ -413,30 +372,30 @@ async function loadMatrixData(taskId: number) {
 
 const handleToggleRadarFrustum = (show: boolean) => {
   if (cesiumViewerRef.value && (cesiumViewerRef.value as any).toggleRadarFrustums) {
-    ;(cesiumViewerRef.value as any).toggleRadarFrustums(show)
+    ; (cesiumViewerRef.value as any).toggleRadarFrustums(show)
   }
 }
 
 const handleToggleOrbitTrails = (show: boolean) => {
   if (cesiumViewerRef.value && (cesiumViewerRef.value as any).toggleOrbitTrails) {
-    ;(cesiumViewerRef.value as any).toggleOrbitTrails(show)
+    ; (cesiumViewerRef.value as any).toggleOrbitTrails(show)
   }
 }
 
 const handleFlyToView = (target: 'GLOBAL' | 'SPACE' | 'GROUND') => {
   if (cesiumViewerRef.value && (cesiumViewerRef.value as any).flyToView) {
-    ;(cesiumViewerRef.value as any).flyToView(target)
+    ; (cesiumViewerRef.value as any).flyToView(target)
   }
 }
 
 async function loadBattleSituationData(taskId: number) {
-  await Promise.all([loadSituationData(taskId), loadStrikeList(taskId), loadMatrixData(taskId)])
+  await loadMatrixData(taskId)
 
   // 初始进入未选择具体卫星时，默认静态展示不演示动画
   if (!selectedNorad.value) {
     nextTick(() => {
       if (cesiumViewerRef.value && (cesiumViewerRef.value as any).pauseClockAnimation) {
-        ;(cesiumViewerRef.value as any).pauseClockAnimation()
+        ; (cesiumViewerRef.value as any).pauseClockAnimation()
       }
     })
   }
@@ -525,7 +484,9 @@ onMounted(() => {
     void loadBattleSituationData(store.activedTask.id)
   }
 })
-
+/**
+ * 监听 tab 页面切换
+ */
 watch(
   () => store.activetab,
   async (tab) => {
@@ -541,6 +502,9 @@ watch(
   }
 )
 
+/**
+ * 监听任务改变
+ */
 watch(
   () => store.activedTask?.id,
   async (taskId, prevTaskId) => {
@@ -622,7 +586,7 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
           }
         }
 
-        & > div.active {
+        &>div.active {
           background: $bs-accent-active;
           color: $bs-text-strong;
         }
@@ -928,7 +892,7 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
           gap: 10px;
           padding: 5px;
 
-          & > div {
+          &>div {
             background: $bs-surface-bg-muted;
             flex: 1;
             padding: 5px;
@@ -936,12 +900,12 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
             flex-direction: column;
             align-items: center;
 
-            & > span:first-child {
+            &>span:first-child {
               font-size: 18px;
               font-weight: bold;
             }
 
-            & > span:last-child {
+            &>span:last-child {
               font-size: 14px;
               color: $bs-text-muted;
             }
@@ -969,7 +933,7 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
             grid-template-columns: 1.5fr 1fr;
 
             .task-item__left {
-              & > div {
+              &>div {
                 text-align: left;
               }
             }
@@ -1018,14 +982,14 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
               display: grid;
               grid-template-columns: 1.2fr 2fr;
 
-              & > span:first-child {
+              &>span:first-child {
                 align-self: center;
                 text-align: right;
                 padding-right: 10px;
                 color: $bs-text-muted;
               }
 
-              & > span:last-child {
+              &>span:last-child {
                 text-align: left;
                 align-self: center;
                 white-space: normal;
