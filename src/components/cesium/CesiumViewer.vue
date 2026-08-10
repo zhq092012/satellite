@@ -1926,15 +1926,14 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
 
     cachedSatelliteList = res.data.results || []
     cachedTaskId = taskId
-    // 保存任务相关的所有卫星，网络安全使用
-    store.saveTaskSatellite(cachedSatelliteList)
   }
 
   if (!cachedSatelliteList) return
   const enemyCountrySet = computed(() => new Set(normalizeCountryList(store.activedTask?.enemyCountry)))
   // 过滤条件应用
   let satelliteList = cachedSatelliteList.filter((s) => enemyCountrySet.value.has(s.country))
-
+  // 保存任务相关的所有卫星，网络安全使用
+  store.saveTaskSatellite(satelliteList)
   // 需要渲染的卫星 ID 集合，用于隐藏未命中的实体
   const wantedNorads = new Set(satelliteList.map((s) => Number(s.norad_id)))
 
