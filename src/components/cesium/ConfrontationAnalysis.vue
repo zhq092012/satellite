@@ -204,9 +204,6 @@ import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDial
 import type { SatelliteStrike, Weapon } from '@/types/dashboard/index.js'
 const { openSatelliteProfile } = useSatelliteProfileDialog()
 
-// 声明父组件可能监听的自定义事件
-const emit = defineEmits(['threatAnalysis', 'changeEffectModel'])
-
 const creditEl3D = ref<HTMLElement | null>(null)
 const creditEl2D = ref<HTMLElement | null>(null)
 const creditEl4D = ref<HTMLElement | null>(null)

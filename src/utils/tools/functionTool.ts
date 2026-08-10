@@ -105,9 +105,9 @@ export function buildSegmentedTrack(
   const segments = Array.isArray(paths)
     ? [paths]
     : Object.keys(paths || {})
-        .sort()
-        .map((k) => (paths as Record<string, TrackSegment>)[k])
-        .filter((seg) => seg && seg.length)
+      .sort()
+      .map((k) => (paths as Record<string, TrackSegment>)[k])
+      .filter((seg) => seg && seg.length)
 
   if (!segments.length) return null
 
@@ -170,32 +170,7 @@ export function markBattleArea(viewer: Cesium.Viewer, battle: BattleForm | null,
   // 用于计算整体视野的 BoundingSphere（包含所有圆与多边形）
   let combinedBS: Cesium.BoundingSphere | null = null
   const createAreaMode = battle.createAreaMode
-  if (createAreaMode === '圆') {
-    const circleJSON = JSON.parse(battle.circleJSON!) as { name: string; center: [number, number]; radiusKm: number }[]
-    if (circleJSON.length === 0) return
-    circleJSON.forEach((circle) => {
-      const center = Cesium.Cartesian3.fromDegrees(circle.center[0], circle.center[1], circle.radiusKm * 1000)
-      const entity = viewer.entities.add({
-        position: center,
-        ellipse: {
-          semiMinorAxis: circle.radiusKm * 1000,
-          semiMajorAxis: circle.radiusKm * 1000,
-          height: 0,
-          material: new Cesium.ColorMaterialProperty(Cesium.Color.YELLOW.withAlpha(0.3)),
-          outline: true,
-          outlineColor: Cesium.Color.RED,
-        },
-      })
-      entitys.add(entity)
-      // 为圆生成 BoundingSphere 并合并
-      try {
-        const bs = new Cesium.BoundingSphere(center, circle.radiusKm * 1000)
-        combinedBS = combinedBS ? Cesium.BoundingSphere.union(combinedBS, bs, new Cesium.BoundingSphere()) : bs
-      } catch (e) {
-        // 忽略计算错误，继续处理其它要素
-      }
-    })
-  } else if (createAreaMode === '多边形') {
+  if (createAreaMode === '多边形') {
     const polygonJSON = JSON.parse(battle.area!) as {
       name: string
       lonlats: [number, number][]
@@ -229,13 +204,13 @@ export function markBattleArea(viewer: Cesium.Viewer, battle: BattleForm | null,
           hierarchy: new Cesium.PolygonHierarchy(points),
           material: new Cesium.ColorMaterialProperty(Cesium.Color.ORANGE.withAlpha(0.3)),
           perPositionHeight: true,
-          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 15000000),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 150000000),
         },
         polyline: {
           positions: [...points, points[0]], // 闭合线
           width: 2,
           material: new Cesium.ColorMaterialProperty(Cesium.Color.RED),
-          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 15000000),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 150000000),
         },
       })
 
@@ -268,24 +243,7 @@ export function markBattleArea(viewer: Cesium.Viewer, battle: BattleForm | null,
       const battleCenterOrientation = new Cesium.HeadingPitchRoll(0.0, -Cesium.Math.toRadians(90.0), 0.0)
       store.setBattleCenter(battleCenterCartesian, battleCenterOrientation)
     } catch (e) {
-      // 备用：若 flyToBoundingSphere 不可用，使用 flyTo
-      try {
-        const bs = combinedBS as Cesium.BoundingSphere
-        const centerCarto = Cesium.Cartographic.fromCartesian(bs.center)
-        const lon = Cesium.Math.toDegrees(centerCarto.longitude)
-        const lat = Cesium.Math.toDegrees(centerCarto.latitude)
-        // 在store 中保存当前战场中心坐标，供其它组件使用
-        const battleCenterCartesian = Cesium.Cartesian3.fromDegrees(lon, lat, Math.min(bs.radius * 2, 15000000))
-        const battleCenterOrientation = new Cesium.HeadingPitchRoll(0.0, -Cesium.Math.toRadians(45.0), 0.0)
-        store.setBattleCenter(battleCenterCartesian, battleCenterOrientation)
-        viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(lon, lat, Math.min(bs.radius * 2, 15000000)),
-          orientation: battleCenterOrientation,
-          duration: 1.5,
-        })
-      } catch (_) {
-        // 最后兜底，不抛出
-      }
+      console.error('无法定位战场中心', e)
     }
   }
 }

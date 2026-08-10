@@ -179,8 +179,6 @@ defineOptions({
   name: 'SatelliteAttackabilityView',
 })
 
-defineEmits(['threatAnalysis', 'changeEffectModel'])
-
 type StrikeRow = StrikeV2['strikeList'][number]
 
 type RuleCard = {

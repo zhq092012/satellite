@@ -32,7 +32,6 @@
             :matrix-data="matrixData"
             :selected-norad="selectedNorad"
             @select-satellite="handleSelectSatellite"
-            @fly-to-view="handleFlyToView"
           />
         </div>
         <!-- 中间 3D Cesium 地球 -->
@@ -64,14 +63,7 @@
           <keep-alive
             include="EvaluationReport,ThreatAnalysis,SatelliteAttackabilityView,KillChain,ElectronicWarfareG6"
           >
-            <component
-              v-if="activeTabComponent"
-              :is="activeTabComponent"
-              :key="store.activetab"
-              :ref="setRef"
-              @threatAnalysis="threatAnalysis"
-              @changeEffectModel="handleChangeEffectModel"
-            />
+            <component v-if="activeTabComponent" :is="activeTabComponent" :key="store.activetab" :ref="setRef" />
           </keep-alive>
         </div>
       </div>
@@ -156,7 +148,7 @@ const tabDefs = [
 ] as const
 
 /**
- * 计算可见的tab
+ * 有权限查看的tab
  */
 const visibleTabs = computed(() => {
   // 如果是管理员，显示所有tab
@@ -267,9 +259,6 @@ function setRef(el: any) {
     }
   }
 }
-const threatAnalysis = () => {
-  switchTab('卫星威胁分析')
-}
 
 // 当前选中的敌方卫星 NORAD (未选中时为 null，表示静态展示)
 const selectedNorad = ref<number | null>(null)
@@ -343,19 +332,14 @@ watch(
   }
 )
 
-const handleFlyToView = (target: 'GLOBAL' | 'SPACE' | 'GROUND') => {
-  if (cesiumViewerRef.value && (cesiumViewerRef.value as any).flyToView) {
-    ;(cesiumViewerRef.value as any).flyToView(target)
-  }
-}
-
-async function loadBattleSituationData() {
+/**
+ * 暂停动画
+ */
+async function pauseClockAnimation() {
   // 初始进入未选择具体卫星时，默认静态展示不演示动画
   if (!selectedNorad.value) {
     nextTick(() => {
-      if (cesiumViewerRef.value && (cesiumViewerRef.value as any).pauseClockAnimation) {
-        ;(cesiumViewerRef.value as any).pauseClockAnimation()
-      }
+      ;(cesiumViewerRef.value as any).pauseClockAnimation()
     })
   }
 }
@@ -374,14 +358,20 @@ const switchTab = (tab: string) => {
   activeTabComponent.value = compMap[current.component]
 }
 
+/**
+ * 监听有权限查看的tab列表变化
+ */
 watch(
   visibleTabs,
   (tabs) => {
+    /**
+     * 如果没有权限
+     */
     if (tabs.length === 0) {
       activeTabComponent.value = undefined
       return
     }
-
+    // 如果没有激活的tab，默认激活第一个
     const hasCurrent = tabs.some((item) => item.value === store.activetab)
     if (!hasCurrent) {
       switchTab(tabs[0].value)
@@ -389,16 +379,6 @@ watch(
   },
   { immediate: true }
 )
-
-/**
- *
- */
-const handleChangeEffectModel = () => {
-  // 仅在战场态势视图时刷新 orbit 路径（其他 tab 组件不会使用该 viewer）
-  if (store.activetab === '战场态势视图') {
-    loadSatelliteEntities()
-  }
-}
 
 /**
  * 渲染卫星轨迹和实体
@@ -421,10 +401,11 @@ onMounted(() => {
 
   nextTick(() => {
     loadSatelliteEntities()
+    markBattleArea()
   })
 
   if (store.activetab === '战场态势视图') {
-    void loadBattleSituationData()
+    void pauseClockAnimation()
   }
 })
 /**
@@ -436,9 +417,10 @@ watch(
     if (tab === '战场态势视图') {
       nextTick(() => {
         loadSatelliteEntities()
+        markBattleArea()
       })
 
-      await loadBattleSituationData()
+      await pauseClockAnimation()
     }
   }
 )
@@ -451,18 +433,18 @@ watch(
   async (taskId, prevTaskId) => {
     if (!taskId || taskId === prevTaskId) return
     if (store.activetab === '战场态势视图') {
-      await loadBattleSituationData()
+      await pauseClockAnimation()
     }
   }
 )
 /**
  * 标记战场区域
  */
-// function markBattleArea() {
-//   if (store.activedTask) {
-//     cesiumViewerRef.value?.markBattle()
-//   }
-// }
+function markBattleArea() {
+  if (store.activedTask) {
+    cesiumViewerRef.value?.markBattle()
+  }
+}
 </script>
 <style lang="scss" scoped>
 .battle-page-bg {

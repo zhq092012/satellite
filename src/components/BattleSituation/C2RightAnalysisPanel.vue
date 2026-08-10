@@ -223,9 +223,10 @@ const handleClearSelection = () => {
 const transitSatCount = computed(() => {
   const data = activeMatrix.value
   if (!data) {
-    return
+    return 0
   }
   const list = data.initMatrixList
+  if (!list || list.length === 0) return 0
   return list.filter((s) => !s.satType?.includes('中继')).length
 })
 /**
@@ -234,21 +235,24 @@ const transitSatCount = computed(() => {
 const relaySatCount = computed(() => {
   const data = activeMatrix.value
   if (!data) {
-    return
+    return 0
   }
-  return data.relayRelation?.relayList?.length
+  if (!data.relayRelation || data.relayRelation.relayList.length === 0) return 0
+  return data.relayRelation.relayList.length
 })
 /**
- *
+ * 接收站的数量
  */
 const receiveStationCount = computed(() => {
   const relationData = activeMatrix.value?.stationRelationList || activeMatrix.value?.initRelationList
-  return relationData?.receiveObjList?.length
+  return relationData?.receiveObjList?.length || 0
 })
-
+/**
+ * 数据中心的数量
+ */
 const dataCenterCount = computed(() => {
   const relationData = activeMatrix.value?.stationRelationList || activeMatrix.value?.initRelationList
-  return relationData?.stationObjList?.length
+  return relationData?.stationObjList?.length || 0
 })
 
 // 当前选中卫星信息
