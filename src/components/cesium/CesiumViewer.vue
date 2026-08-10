@@ -846,20 +846,6 @@ const flyToView = (target: 'GLOBAL' | 'SPACE' | 'GROUND') => {
   }
 }
 
-/**
- * [功能]
- * 控制 3D 雷达探测包络视椎显隐
- */
-const toggleRadarFrustums = (show: boolean) => {
-  if (!viewer) return
-  electronicNodeEntityIds.forEach((id) => {
-    if (id.endsWith('-frustum')) {
-      const entity = viewer.entities.getById(id)
-      if (entity) entity.show = show
-    }
-  })
-}
-
 const showRedSatellites = ref(false)
 
 // [变量用途]
@@ -1180,8 +1166,8 @@ const satellitePrimitiveEntities = new Map<number, Cesium.Entity>()
 const satelliteRenderBusy = ref(false)
 // 渲染任务版本号，每次启动新渲染时自增，旧任务检测到 token 不匹配时主动中止
 let satelliteRenderToken = 0
-// 时间轴回放速度（倍速），默认 20 倍
-const playbackSpeed = ref(20.0)
+// 时间轴回放速度（倍速），默认 1.0 倍
+const playbackSpeed = ref(1.0)
 // 当前选中的卡座（为 null 表示未选中）
 const selectedConstellation = ref<SatelliteConstellation | null>(null)
 // 是否显示卡座内部星间连线
@@ -2480,20 +2466,7 @@ onBeforeUnmount(() => {
     viewer = null as any
   }
 })
-/**
- * 对外暴露的公共方法，供父组件调用
- *
- * [方法说明]
- * - renderSatellitePathWithPrimitive: Primitive 模式渲染卡座（全局卡座/复杂展示）
- * - clearViewer: 清空所有实体（任务切换时使用）
- * - focusConstellationByName: 按名称展示卡座
- * - renderSateliitePathWithEntity: Entity 模式渲染卡座（任务模式）
- * - markBattle: 标记战场区域
- * - highlightSatellite: 高亮指定卡座
- * - flyToView: 快速定位到指定视角
- * - toggleRadarFrustums: 显隐雷达探测包络视椒
- * - toggleRedSatellites: 显隐我方卡座
- */
+
 /**
  * [功能]
  * 暂停时钟推演动画 (用于未选择单颗卫星时静态展示)
@@ -2538,7 +2511,6 @@ defineExpose({
   markBattle,
   highlightSatellite,
   flyToView,
-  toggleRadarFrustums,
   toggleRedSatellites,
   pauseClockAnimation,
   jumpToTimeAndPlay,

@@ -9,30 +9,6 @@
       <span class="panel-badge">传输链路</span>
     </div>
 
-    <!-- 1. 视图与控件模块 -->
-    <div class="panel-section">
-      <div class="section-title">
-        <span class="title-icon">⚙️</span>
-        <span>视图控件与图层控制</span>
-      </div>
-
-      <!-- 视觉渲染 Toggle 选项 -->
-      <div class="toggle-grid">
-        <label class="toggle-item">
-          <input type="checkbox" v-model="showRadarFrustum" @change="$emit('toggle-radar-frustum', showRadarFrustum)" />
-          <span class="checkbox-custom"></span>
-          <span class="toggle-text">📡 接收站包络</span>
-        </label>
-        <label class="toggle-item">
-          <input type="checkbox" v-model="showOrbitTrails" @change="$emit('toggle-orbit-trails', showOrbitTrails)" />
-          <span class="checkbox-custom"></span>
-          <span class="toggle-text">🛰️ 卫星运行轨迹</span>
-        </label>
-      </div>
-
-
-    </div>
-
     <!-- 2. 敌方天基空间节点资产清单 (Space Layer) -->
     <div class="panel-section section-space">
       <div class="section-title">
@@ -112,7 +88,7 @@
  * [副作用]
  * - 触发视角切换与控制事件
  */
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { getDefaultMatrixData, type MatrixResult, type SatelliteMatrix, type InitMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
@@ -126,13 +102,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'select-satellite', norad: number | null): void
-  (e: 'toggle-radar-frustum', show: boolean): void
-  (e: 'toggle-orbit-trails', show: boolean): void
   (e: 'fly-to-view', target: 'GLOBAL' | 'SPACE' | 'GROUND'): void
 }>()
-
-const showRadarFrustum = ref(true)
-const showOrbitTrails = ref(false)
 
 const activeMatrix = computed<MatrixResult>(() => props.matrixData || getDefaultMatrixData())
 
@@ -153,7 +124,9 @@ const satList = computed(() => {
 
   const initList = data.initMatrixList?.length ? data.initMatrixList : defaultData.initMatrixList
   const satMatrixList = data.satelliteMatrixList?.length ? data.satelliteMatrixList : defaultData.satelliteMatrixList
-  const relayList = data.relayRelation?.relayList?.length ? data.relayRelation.relayList : defaultData.relayRelation?.relayList || []
+  const relayList = data.relayRelation?.relayList?.length
+    ? data.relayRelation.relayList
+    : defaultData.relayRelation?.relayList || []
 
   initList.forEach((s: InitMatrix) => {
     const isRelay = (s.satType || '').includes('中继') || relayList.includes(s.norad)
@@ -256,7 +229,10 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
   border-radius: 10px;
   backdrop-filter: blur(8px);
   color: #e2efff;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
   overflow-y: auto;
   gap: 12px;
 
@@ -344,8 +320,6 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
     }
   }
 }
-
-
 
 // [业务目的] 敌方天基过境与中继卫星列表样式定义
 // [实现原因] 移除 max-height 与 overflow-y 局部滚动条限制，避免出现嵌套滚动条，统一由外层 .c2-panel 进行整体滚动
