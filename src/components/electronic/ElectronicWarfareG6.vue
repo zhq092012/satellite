@@ -10,8 +10,13 @@
       <div class="header-center">
         <!-- 1. 交战烈度切换按钮组 -->
         <div class="intensity-group">
-          <button v-for="level in intensityOptions" :key="level" class="nav-tab-btn"
-            :class="{ active: currentIntensity === level }" @click="handleIntensityChange(level)">
+          <button
+            v-for="level in intensityOptions"
+            :key="level"
+            class="nav-tab-btn"
+            :class="{ active: currentIntensity === level }"
+            @click="handleIntensityChange(level)"
+          >
             {{ level }}
           </button>
         </div>
@@ -20,8 +25,13 @@
 
         <!-- 2. 拓扑显示模式切换 -->
         <div class="matrix-tab-group">
-          <button v-for="mode in viewModeOptions" :key="mode.key" class="nav-tab-btn tab-matrix"
-            :class="{ active: currentViewMode === mode.key }" @click="currentViewMode = mode.key">
+          <button
+            v-for="mode in viewModeOptions"
+            :key="mode.key"
+            class="nav-tab-btn tab-matrix"
+            :class="{ active: currentViewMode === mode.key }"
+            @click="currentViewMode = mode.key"
+          >
             {{ mode.name }}
           </button>
         </div>
@@ -46,8 +56,11 @@
     </div>
 
     <!-- 当切换为武器打击窗口列表模式时，渲染武器打击窗口列表组件 -->
-    <div v-show="currentViewMode === 'WEAPON_ATTACK'" class="cema-workspace"
-      style="height: calc(100vh - 60px); padding: 0">
+    <div
+      v-show="currentViewMode === 'WEAPON_ATTACK'"
+      class="cema-workspace"
+      style="height: calc(100vh - 60px); padding: 0"
+    >
       <WeaponAttackList :matrix-data="matrixData" />
     </div>
 
@@ -57,23 +70,33 @@
       <div class="topo-summary-bar">
         <div class="stat-badge">
           <span class="stat-dot dot-sat"></span>
-          <span>卫星节点: <strong>{{ satNodeCount }}</strong> 颗</span>
+          <span
+            >卫星节点: <strong>{{ satNodeCount }}</strong> 颗</span
+          >
         </div>
         <div class="stat-badge">
           <span class="stat-dot dot-rec"></span>
-          <span>地面站节点: <strong>{{ receiveNodeCount }}</strong> 个</span>
+          <span
+            >地面站节点: <strong>{{ receiveNodeCount }}</strong> 个</span
+          >
         </div>
         <div class="stat-badge">
           <span class="stat-dot dot-station"></span>
-          <span>数据中心: <strong>{{ stationNodeCount }}</strong> 个</span>
+          <span
+            >数据中心: <strong>{{ stationNodeCount }}</strong> 个</span
+          >
         </div>
         <div class="stat-badge">
           <span class="stat-dot dot-normal-link"></span>
-          <span>正常链路: <strong>{{ normalLinkCount }}</strong> 条</span>
+          <span
+            >正常链路: <strong>{{ normalLinkCount }}</strong> 条</span
+          >
         </div>
         <div class="stat-badge alert-stat">
           <span class="stat-dot dot-struck-link"></span>
-          <span>打压/中断链路: <strong>{{ struckLinkCount }}</strong> 条 (红色虚线标识)</span>
+          <span
+            >打压/中断链路: <strong>{{ struckLinkCount }}</strong> 条 (红色虚线标识)</span
+          >
         </div>
       </div>
 
@@ -121,8 +144,9 @@
           <span class="node-filter-tip" v-if="selectedNodeInfo">
             已选择节点: <strong class="glow-text-cyan">{{ selectedNodeInfo.name }}</strong> (共
             {{ displayedWindowsList.length }} 个过境/可见窗口)
-            <el-button type="primary" link size="small" style="margin-left: 8px"
-              @click="clearSelectedNode">重置筛选</el-button>
+            <el-button type="primary" link size="small" style="margin-left: 8px" @click="clearSelectedNode"
+              >重置筛选</el-button
+            >
           </span>
         </div>
       </div>
@@ -132,17 +156,26 @@
         <div v-if="displayedWindowsList.length === 0" class="empty-window-card">
           <span>暂无相关节点的过境/打击时间窗口数据</span>
         </div>
-        <div v-else v-for="(win, idx) in displayedWindowsList" :key="win.id || idx"
-          :ref="(el) => setCardRef(el, win.id)" class="window-card" :class="{
+        <div
+          v-else
+          v-for="(win, idx) in displayedWindowsList"
+          :key="win.id || idx"
+          :ref="(el) => setCardRef(el, win.id)"
+          class="window-card"
+          :class="{
             'card-struck': win.strikeStatus === 1,
             'card-relay': win.isRelayWindow,
             'card-active': isWindowActiveAtCurrentTime(win),
             'card-selected': selectedWindowId === win.id,
-          }" @click="selectWindowItem(win)">
+          }"
+          @click="selectWindowItem(win)"
+        >
           <div class="card-header">
             <span class="win-time">{{ win.startTimeShort }} ~ {{ win.endTimeShort }}</span>
-            <span class="win-status-badge"
-              :class="win.isRelayWindow ? 'badge-relay' : win.strikeStatus === 1 ? 'badge-danger' : 'badge-success'">
+            <span
+              class="win-status-badge"
+              :class="win.isRelayWindow ? 'badge-relay' : win.strikeStatus === 1 ? 'badge-danger' : 'badge-success'"
+            >
               {{ win.isRelayWindow ? '中继可见' : win.strikeStatus === 1 ? '受毁伤打压' : '正常过境' }}
             </span>
           </div>
@@ -151,8 +184,9 @@
             <div class="win-link-info">
               <span class="sat-name" :title="win.satName">🛰️ {{ win.satName }}</span>
               <span class="arrow-icon">➔</span>
-              <span class="rec-name" :title="win.receiveName">{{ win.isRelayWindow ? '🛰️' : '📡' }} {{ win.receiveName
-                }}</span>
+              <span class="rec-name" :title="win.receiveName"
+                >{{ win.isRelayWindow ? '🛰️' : '📡' }} {{ win.receiveName }}</span
+              >
             </div>
 
             <div class="win-meta-info" v-if="win.strikeStatus === 1">
@@ -275,10 +309,6 @@ interface WindowItemWrapper {
 const selectedWindowId = ref<string | null>(null)
 
 // [变量用途]
-// 自动播放 Timer 定时器句柄
-let playTimer: any = null
-
-// [变量用途]
 // 当前时间轴推演时刻的 Unix 毫秒时间戳
 const currentTimestamp = ref<number>(0)
 
@@ -350,526 +380,6 @@ const scrollToActiveCard = (force = false) => {
   }
 }
 
-// [数据来源]
-// 接口真实参考数据（当 API 无响应或本地调试时作为兜底使用）
-const demoMatrixData: MatrixResult = {
-  series: 'Capella',
-  attackPlanList: [
-    {
-      weaponName: '网络病毒',
-      weaponType: '网络病毒',
-      beginTime: '2026-08-03 16:20:00',
-      endTime: '2026-08-03 16:50:00',
-      angle: 180,
-      windows: [
-        {
-          beginWindow: '2026-08-03 16:20:00',
-          endWindow: '2026-08-03 16:50:00',
-        },
-      ],
-      target: 'CAPELLA-13',
-      targetType: '地球观测',
-    },
-  ],
-  initMatrixList: [
-    {
-      norad: 60419,
-      name: 'CAPELLA-13',
-      satType: '地球观测',
-      line1: '',
-      line2: '',
-      initWindows: [
-        {
-          receiveId: '6a66cf9e1ce9af52c9cd82b2',
-          receiveName: '爱尔兰Ireland',
-          receiveLat: 53.3,
-          receiveLon: 8.15,
-          peakWindow: '2026-07-28 00:23:41',
-          endWindow: '2026-07-28 00:32:39',
-        },
-      ],
-    },
-    {
-      norad: 48643,
-      name: 'STARLINK-V1-0-L28-6',
-      satType: '通信',
-      line1: '',
-      line2: '',
-      initWindows: [
-        {
-          receiveId: '6a66cf0f1ce9af52c9cd82b1',
-          receiveName: '夏威夷Kapolei',
-          receiveLat: 21.3368,
-          receiveLon: 158.09,
-          peakWindow: '2026-07-28 05:40:48',
-          endWindow: '2026-07-28 05:47:38',
-        },
-      ],
-    },
-    {
-      norad: 59444,
-      name: 'CAPELLA-14',
-      satType: '地球观测',
-      line1: '',
-      line2: '',
-      initWindows: [
-        {
-          receiveId: '6a6037d76a3f9e9695ef4716',
-          receiveName: '俄勒冈Oregon',
-          receiveLat: 45.21,
-          receiveLon: 123.11,
-          peakWindow: '2026-07-28 01:32:57',
-          endWindow: '2026-07-28 01:40:27',
-        },
-      ],
-    },
-    {
-      norad: 58136,
-      name: 'STARLINK-30776',
-      satType: '地球观测',
-      line1: '',
-      line2: '',
-      initWindows: [
-        {
-          receiveId: '6a66d00a1ce9af52c9cd82b3',
-          receiveName: '澳大利亚达博',
-          receiveLat: 32.25,
-          receiveLon: 148.61,
-          peakWindow: '2026-07-28 00:43:24',
-          endWindow: '2026-07-28 00:49:36',
-        },
-      ],
-    },
-    {
-      norad: 22314,
-      name: 'TDRS-6',
-      satType: '通信/数据中继',
-      line1: '1 22314U 93003B   26190.86332351 -.00000293  00000-0  00000+0 0  9990',
-      line2: '2 22314  14.1831 356.8885 0008000 183.3729  12.1505  1.00281718122632',
-      initWindows: [
-        {
-          receiveId: '6a66d2391ce9af52c9cd82b8',
-          receiveName: '南非开普敦',
-          receiveLat: 33.97,
-          receiveLon: 18.42,
-          peakWindow: '2026-07-28 05:02:45',
-          endWindow: '2026-07-28 19:25:22',
-        },
-      ],
-    },
-    {
-      norad: 57693,
-      name: 'CAPELLA-11',
-      satType: '地球观测',
-      line1: '',
-      line2: '',
-      initWindows: [
-        {
-          receiveId: '6a6037d76a3f9e9695ef4716',
-          receiveName: '俄勒冈Oregon',
-          receiveLat: 45.21,
-          receiveLon: 123.11,
-          peakWindow: '2026-07-28 01:30:18',
-          endWindow: '2026-07-28 01:38:27',
-        },
-      ],
-    },
-  ],
-  relayRelation: {
-    relayList: [22314],
-    satelliteList: [48643, 57693, 58136],
-    relations: [
-      {
-        from: '48643',
-        to: '22314',
-        visibilityWindows: [
-          {
-            beginWindow: '2026-07-28 20:55:20',
-            endWindow: '2026-07-28 21:51:39',
-          },
-        ],
-      },
-      {
-        from: '57693',
-        to: '22314',
-        visibilityWindows: [
-          {
-            beginWindow: '2026-07-28 20:55:20',
-            endWindow: '2026-07-28 21:51:39',
-          },
-        ],
-      },
-      {
-        from: '58136',
-        to: '22314',
-        visibilityWindows: [
-          {
-            beginWindow: '2026-07-28 20:55:20',
-            endWindow: '2026-07-28 21:51:39',
-          },
-        ],
-      },
-    ],
-  },
-  initRelationList: {
-    receiveObjList: [
-      {
-        receiveId: '6a66d27f1ce9af52c9cd82b9',
-        receiveName: '加拿大伊努维克',
-        receiveLatLon: '68.350,133.500',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d48f1ce9af52c9cd82bb',
-        receiveName: '加州特拉西',
-        receiveLatLon: '37.760,121.430',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a6037d76a3f9e9695ef4716',
-        receiveName: '俄勒冈Oregon',
-        receiveLatLon: '45.210,123.110',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d1e61ce9af52c9cd82b7',
-        receiveName: '新西兰阿瓦鲁阿',
-        receiveLatLon: '46.540,168.220',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66cf9e1ce9af52c9cd82b2',
-        receiveName: '爱尔兰Ireland',
-        receiveLatLon: '53.300,8.150',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d1971ce9af52c9cd82b6',
-        receiveName: '智利蓬塔阿雷纳斯',
-        receiveLatLon: '53.160,70.910',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d00a1ce9af52c9cd82b3',
-        receiveName: '澳大利亚达博',
-        receiveLatLon: '32.250,148.610',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d0dd1ce9af52c9cd82b4',
-        receiveName: '斯瓦尔巴SvalSat',
-        receiveLatLon: '78.223,15.620',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66cf0f1ce9af52c9cd82b1',
-        receiveName: '夏威夷Kapolei',
-        receiveLatLon: '21.3368,158.0900',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d2391ce9af52c9cd82b8',
-        receiveName: '南非开普敦',
-        receiveLatLon: '33.970,18.420',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d4011ce9af52c9cd82ba',
-        receiveName: '美国蒙大拿',
-        receiveLatLon: '45.680,111.040',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d13d1ce9af52c9cd82b5',
-        receiveName: '南极TrollSat',
-        receiveLatLon: '72.010,2.530',
-        receiveStatus: 0,
-      },
-    ],
-    stationObjList: [
-      {
-        stationId: '6a66d7d71ce9af52c9cd82bc',
-        stationName: '亚马逊AWS北美云集群',
-        stationLatLon: '37.7751,122.4194',
-        stationStatus: 0,
-      },
-    ],
-    relations: [
-      { from: '6a6037d76a3f9e9695ef4716', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66cf0f1ce9af52c9cd82b1', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66cf9e1ce9af52c9cd82b2', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d00a1ce9af52c9cd82b3', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d0dd1ce9af52c9cd82b4', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d13d1ce9af52c9cd82b5', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d1971ce9af52c9cd82b6', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d1e61ce9af52c9cd82b7', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d2391ce9af52c9cd82b8', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d27f1ce9af52c9cd82b9', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d4011ce9af52c9cd82ba', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d48f1ce9af52c9cd82bb', to: '6a66d7d71ce9af52c9cd82bc' },
-    ],
-  },
-  satelliteMatrixList: [
-    {
-      norad: 60419,
-      name: 'CAPELLA-13',
-      satType: '地球观测',
-      delayMin: 0.0,
-      satelliteStatus: 0,
-      weapons: [],
-      stationWindows: [
-        {
-          receiveId: '6a66cf9e1ce9af52c9cd82b2',
-          receiveName: '爱尔兰Ireland',
-          peakWindow: '2026-07-28 00:23:41',
-          endWindow: '2026-07-28 00:32:39',
-          strikeStatus: 0,
-          weapons: null as any,
-        },
-      ],
-    },
-    {
-      norad: 48643,
-      name: 'STARLINK-V1-0-L28-6',
-      satType: '通信',
-      delayMin: 0.0,
-      satelliteStatus: 0,
-      weapons: [],
-      stationWindows: [
-        {
-          receiveId: '6a66cf0f1ce9af52c9cd82b1',
-          receiveName: '夏威夷Kapolei',
-          peakWindow: '2026-07-28 05:40:48',
-          endWindow: '2026-07-28 05:47:38',
-          strikeStatus: 0,
-          weapons: null as any,
-        },
-      ],
-    },
-    {
-      norad: 59444,
-      name: 'CAPELLA-14',
-      satType: '地球观测',
-      delayMin: 0.0,
-      satelliteStatus: 0,
-      weapons: [],
-      stationWindows: [
-        {
-          receiveId: '6a6037d76a3f9e9695ef4716',
-          receiveName: '俄勒冈Oregon',
-          peakWindow: '2026-07-28 01:32:57',
-          endWindow: '2026-07-28 01:40:27',
-          strikeStatus: 0,
-          weapons: null as any,
-        },
-      ],
-    },
-    {
-      norad: 58136,
-      name: 'STARLINK-30776',
-      satType: '地球观测',
-      delayMin: 2835.6,
-      satelliteStatus: 1,
-      weapons: [
-        {
-          id: '2',
-          name: 'ASAT导弹基地',
-          country: '中国',
-          type: '动能',
-          latitude: 20.017,
-          longitude: 110.349,
-          range: 1500.0,
-        },
-      ],
-      stationWindows: [
-        {
-          receiveId: '6a66d00a1ce9af52c9cd82b3',
-          receiveName: '澳大利亚达博',
-          peakWindow: '2026-07-28 00:43:24',
-          endWindow: '2026-07-28 00:49:36',
-          strikeStatus: 1,
-          weapons: null as any,
-        },
-        {
-          receiveId: '6a6037d76a3f9e9695ef4716',
-          receiveName: '俄勒冈Oregon',
-          peakWindow: '2026-07-28 02:17:28',
-          endWindow: '2026-07-28 02:23:20',
-          strikeStatus: 1,
-          weapons: null as any,
-        },
-        {
-          receiveId: '6a66cf0f1ce9af52c9cd82b1',
-          receiveName: '夏威夷Kapolei',
-          peakWindow: '2026-07-28 05:41:52',
-          endWindow: '2026-07-28 05:47:46',
-          strikeStatus: 1,
-          weapons: null as any,
-        },
-        {
-          receiveId: '6a66cf9e1ce9af52c9cd82b2',
-          receiveName: '爱尔兰Ireland',
-          peakWindow: '2026-07-28 11:40:48',
-          endWindow: '2026-07-28 11:44:57',
-          strikeStatus: 1,
-          weapons: null as any,
-        },
-      ],
-    },
-    {
-      norad: 57693,
-      name: 'CAPELLA-11',
-      satType: '地球观测',
-      delayMin: 2788.7,
-      satelliteStatus: 1,
-      weapons: [
-        {
-          id: '2',
-          name: 'ASAT导弹基地',
-          country: '中国',
-          type: '动能',
-          latitude: 20.017,
-          longitude: 110.349,
-          range: 1500.0,
-        },
-      ],
-      stationWindows: [
-        {
-          receiveId: '6a6037d76a3f9e9695ef4716',
-          receiveName: '俄勒冈Oregon',
-          peakWindow: '2026-07-28 01:30:18',
-          endWindow: '2026-07-28 01:38:27',
-          strikeStatus: 1,
-          weapons: null as any,
-        },
-        {
-          receiveId: '6a66d00a1ce9af52c9cd82b3',
-          receiveName: '澳大利亚达博',
-          peakWindow: '2026-07-28 03:19:06',
-          endWindow: '2026-07-28 03:27:09',
-          strikeStatus: 1,
-          weapons: null as any,
-        },
-        {
-          receiveId: '6a66cf0f1ce9af52c9cd82b1',
-          receiveName: '夏威夷Kapolei',
-          peakWindow: '2026-07-28 03:23:28',
-          endWindow: '2026-07-28 03:30:37',
-          strikeStatus: 1,
-          weapons: null as any,
-        },
-        {
-          receiveId: '6a66cf9e1ce9af52c9cd82b2',
-          receiveName: '爱尔兰Ireland',
-          peakWindow: '2026-07-28 06:15:47',
-          endWindow: '2026-07-28 06:23:15',
-          strikeStatus: 1,
-          weapons: null as any,
-        },
-      ],
-    },
-  ],
-  stationRelationList: {
-    receiveObjList: [
-      {
-        receiveId: '6a66d27f1ce9af52c9cd82b9',
-        receiveName: '加拿大伊努维克',
-        receiveLatLon: '68.350,133.500',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d48f1ce9af52c9cd82bb',
-        receiveName: '加州特拉西',
-        receiveLatLon: '37.760,121.430',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a6037d76a3f9e9695ef4716',
-        receiveName: '俄勒冈Oregon',
-        receiveLatLon: '45.210,123.110',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d1e61ce9af52c9cd82b7',
-        receiveName: '新西兰阿瓦鲁阿',
-        receiveLatLon: '46.540,168.220',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66cf9e1ce9af52c9cd82b2',
-        receiveName: '爱尔兰Ireland',
-        receiveLatLon: '53.300,8.150',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d1971ce9af52c9cd82b6',
-        receiveName: '智利蓬塔阿雷纳斯',
-        receiveLatLon: '53.160,70.910',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d00a1ce9af52c9cd82b3',
-        receiveName: '澳大利亚达博',
-        receiveLatLon: '32.250,148.610',
-        receiveStatus: 1,
-      },
-      {
-        receiveId: '6a66d0dd1ce9af52c9cd82b4',
-        receiveName: '斯瓦尔巴SvalSat',
-        receiveLatLon: '78.223,15.620',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66cf0f1ce9af52c9cd82b1',
-        receiveName: '夏威夷Kapolei',
-        receiveLatLon: '21.3368,158.0900',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d2391ce9af52c9cd82b8',
-        receiveName: '南非开普敦',
-        receiveLatLon: '33.970,18.420',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d4011ce9af52c9cd82ba',
-        receiveName: '美国蒙大拿',
-        receiveLatLon: '45.680,111.040',
-        receiveStatus: 0,
-      },
-      {
-        receiveId: '6a66d13d1ce9af52c9cd82b5',
-        receiveName: '南极TrollSat',
-        receiveLatLon: '72.010,2.530',
-        receiveStatus: 0,
-      },
-    ],
-    stationObjList: [
-      {
-        stationId: '6a66d7d71ce9af52c9cd82bc',
-        stationName: '亚马逊AWS北美云集群',
-        stationLatLon: '37.7751,122.4194',
-        stationStatus: 0,
-      },
-    ],
-    relations: [
-      { from: '6a6037d76a3f9e9695ef4716', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66cf0f1ce9af52c9cd82b1', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66cf9e1ce9af52c9cd82b2', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d00a1ce9af52c9cd82b3', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d0dd1ce9af52c9cd82b4', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d13d1ce9af52c9cd82b5', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d1971ce9af52c9cd82b6', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d1e61ce9af52c9cd82b7', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d2391ce9af52c9cd82b8', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d27f1ce9af52c9cd82b9', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d4011ce9af52c9cd82ba', to: '6a66d7d71ce9af52c9cd82bc' },
-      { from: '6a66d48f1ce9af52c9cd82bb', to: '6a66d7d71ce9af52c9cd82bc' },
-    ],
-  },
-  battleMatrixList: [],
-}
-
 /**
  * [功能说明]
  * 注册 AntV G6 自定义边 `struck-cubic`
@@ -918,7 +428,7 @@ const registerCustomG6Edge = () => {
 
 /**
  * [功能说明]
- * 调用后端 API 获取算法矩阵数据，失败时使用 demoMatrixData 兜底。
+ * 调用后端 API 获取算法矩阵数据
  */
 const fetchMatrixData = async () => {
   loading.value = true
@@ -931,12 +441,9 @@ const fetchMatrixData = async () => {
 
     if (matrixRes && matrixRes.code === 200 && matrixRes.data) {
       matrixData.value = matrixRes.data
-    } else {
-      matrixData.value = demoMatrixData
     }
   } catch (err: any) {
     console.warn('调用后端算法矩阵接口提示，改用兜底展示数据:', err)
-    matrixData.value = demoMatrixData
   } finally {
     loading.value = false
     nextTick(() => {
@@ -989,8 +496,8 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
   const list: WindowItemWrapper[] = []
   const satMap = new Map<number, string>()
 
-    ; (data.initMatrixList || []).forEach((s) => satMap.set(s.norad, s.name))
-    ; (data.satelliteMatrixList || []).forEach((s) => satMap.set(s.norad, s.name))
+  ;(data.initMatrixList || []).forEach((s) => satMap.set(s.norad, s.name))
+  ;(data.satelliteMatrixList || []).forEach((s) => satMap.set(s.norad, s.name))
 
   // 1. 从 satelliteMatrixList 提取 (包含打击状态 strikeStatus)
   const satMatrixList = data.satelliteMatrixList || []
@@ -1190,13 +697,6 @@ const isWindowActiveAtCurrentTime = (win: WindowItemWrapper) => {
   return currentTimestamp.value >= win.startTimestamp && currentTimestamp.value <= win.endTimestamp
 }
 
-const stopPlaybackTimer = () => {
-  if (playTimer) {
-    clearInterval(playTimer)
-    playTimer = null
-  }
-}
-
 /**
  * 点击单个时间轴窗口卡片，高亮 G6 画布中对应的节点与边
  */
@@ -1307,16 +807,23 @@ const buildG6GraphData = () => {
   const nodeSet = new Set<string>()
 
   // 1. 提取普通卫星 (Layer 1) 与 中继卫星 (Layer 2)
+  // [变量用途] 保存节点 NORAD 到卫星详细信息及打击状态的映射
   const satMap = new Map<number, { norad: number; name: string; satType: string; status: number }>()
-    ; (data.initMatrixList || []).forEach((s) => {
-      satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: 0 })
-    })
-    ; (data.satelliteMatrixList || []).forEach((s) => {
-      satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: s.satelliteStatus || 0 })
-    })
+  ;(data.initMatrixList || []).forEach((s) => {
+    satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: 0 })
+  })
+
+  // 判断是否有卫星/中继卫星被打击
+  ;(data.satelliteMatrixList || []).forEach((s) => {
+    // [处理规则]
+    // 当处于打击前拓扑 (PRE_STRIKE) 视图模式时，卫星状态强制置为 0 (未打击/正常)；
+    // 当处于打击后拓扑 (POST_STRIKE) 或全景对比 (COMBINED) 视图模式时，读取后端返回的 satelliteStatus 确定毁伤打压状态 (0-正常, 1-受打击/毁伤)
+    const satStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : s.satelliteStatus || 0
+    satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: satStatus })
+  })
   // [逻辑说明] 提取星间中继拓扑关系中的中继卫星节点
   if (data.relayRelation) {
-    ; (data.relayRelation.relayList || []).forEach((norad) => {
+    ;(data.relayRelation.relayList || []).forEach((norad) => {
       if (!satMap.has(norad)) {
         satMap.set(norad, { norad, name: `TDRS-${norad}`, satType: '通信/数据中继', status: 0 })
       }
@@ -1344,7 +851,7 @@ const buildG6GraphData = () => {
       : [data.stationRelationList, data.initRelationList].filter(Boolean)
 
   relLists.forEach((rl) => {
-    ; (rl.receiveObjList || []).forEach((rec) => {
+    ;(rl.receiveObjList || []).forEach((rec) => {
       const recStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : rec.receiveStatus || 0
       if (!receiveMap.has(rec.receiveId)) {
         receiveMap.set(rec.receiveId, {
@@ -1366,7 +873,7 @@ const buildG6GraphData = () => {
   // 3. Layer 3: 中心云数据中心 (Data Centers)
   const stationMap = new Map<string, { stationId: string; stationName: string; status: number }>()
   relLists.forEach((rl) => {
-    ; (rl.stationObjList || []).forEach((st) => {
+    ;(rl.stationObjList || []).forEach((st) => {
       const stStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : st.stationStatus || 0
       if (!stationMap.has(st.stationId)) {
         stationMap.set(st.stationId, {
@@ -1680,57 +1187,57 @@ const buildG6GraphData = () => {
   // 1. Layer 1 -> Layer 2 边 (卫星 -> 地面站)
   if (currentViewMode.value === 'PRE_STRIKE') {
     // 打击前: 取 initMatrixList
-    ; (data.initMatrixList || []).forEach((sat) => {
+    ;(data.initMatrixList || []).forEach((sat) => {
       const satId = `sat-${sat.norad}`
-        ; (sat.initWindows || []).forEach((win) => {
-          const edgeId = `edge-${satId}-${win.receiveId}`
-          if (!edgeSet.has(edgeId) && nodeSet.has(satId) && nodeSet.has(win.receiveId)) {
-            edgeSet.add(edgeId)
-            normalCount++
-            edges.push({
-              id: edgeId,
-              source: satId,
-              target: win.receiveId,
-              sourceAnchor: 1, // 源节点下边中心
-              targetAnchor: 0, // 目标节点上边中心
-              type: 'struck-cubic',
-              isStruck: false,
-              style: {
-                stroke: '#00e1ff',
-                lineWidth: 2,
-              },
-            })
-          }
-        })
+      ;(sat.initWindows || []).forEach((win) => {
+        const edgeId = `edge-${satId}-${win.receiveId}`
+        if (!edgeSet.has(edgeId) && nodeSet.has(satId) && nodeSet.has(win.receiveId)) {
+          edgeSet.add(edgeId)
+          normalCount++
+          edges.push({
+            id: edgeId,
+            source: satId,
+            target: win.receiveId,
+            sourceAnchor: 1, // 源节点下边中心
+            targetAnchor: 0, // 目标节点上边中心
+            type: 'struck-cubic',
+            isStruck: false,
+            style: {
+              stroke: '#00e1ff',
+              lineWidth: 2,
+            },
+          })
+        }
+      })
     })
   } else {
     // 全景对比 / 打击后: 取 satelliteMatrixList
-    ; (data.satelliteMatrixList || []).forEach((sat) => {
+    ;(data.satelliteMatrixList || []).forEach((sat) => {
       const satId = `sat-${sat.norad}`
-        ; (sat.stationWindows || []).forEach((win) => {
-          const edgeId = `edge-${satId}-${win.receiveId}`
-          if (!edgeSet.has(edgeId) && nodeSet.has(satId) && nodeSet.has(win.receiveId)) {
-            edgeSet.add(edgeId)
-            const isStruck = win.strikeStatus === 1 || sat.satelliteStatus === 1
-            if (isStruck) struckCount++
-            else normalCount++
+      ;(sat.stationWindows || []).forEach((win) => {
+        const edgeId = `edge-${satId}-${win.receiveId}`
+        if (!edgeSet.has(edgeId) && nodeSet.has(satId) && nodeSet.has(win.receiveId)) {
+          edgeSet.add(edgeId)
+          const isStruck = win.strikeStatus === 1 || sat.satelliteStatus === 1
+          if (isStruck) struckCount++
+          else normalCount++
 
-            edges.push({
-              id: edgeId,
-              source: satId,
-              target: win.receiveId,
-              sourceAnchor: 1, // 源节点下边中心
-              targetAnchor: 0, // 目标节点上边中心
-              type: 'struck-cubic',
-              isStruck,
-              style: {
-                stroke: isStruck ? '#ff4d4f' : '#00e1ff',
-                lineWidth: isStruck ? 2.2 : 2,
-                lineDash: isStruck ? [6, 4] : undefined,
-              },
-            })
-          }
-        })
+          edges.push({
+            id: edgeId,
+            source: satId,
+            target: win.receiveId,
+            sourceAnchor: 1, // 源节点下边中心
+            targetAnchor: 0, // 目标节点上边中心
+            type: 'struck-cubic',
+            isStruck,
+            style: {
+              stroke: isStruck ? '#ff4d4f' : '#00e1ff',
+              lineWidth: isStruck ? 2.2 : 2,
+              lineDash: isStruck ? [6, 4] : undefined,
+            },
+          })
+        }
+      })
     })
   }
 
@@ -1812,6 +1319,7 @@ const buildG6GraphData = () => {
 const initOrUpdateGraph = () => {
   if (!g6Container.value) return
 
+  // 自定义边
   registerCustomG6Edge()
   const width = g6Container.value.clientWidth || 1100
   const height = g6Container.value.clientHeight || 560
@@ -2030,7 +1538,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  stopPlaybackTimer()
   window.removeEventListener('resize', initOrUpdateGraph)
   if (graph) {
     graph.destroy()

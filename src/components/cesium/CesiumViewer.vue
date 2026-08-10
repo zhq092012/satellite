@@ -238,76 +238,8 @@ const initViewer = async () => {
         })
       )
 
-      // [业务目的] 限制相机高度与俯仰角，防止将地球拖到屏幕下方
-      // [实现原因] 用户向上拖拽鼠标时相机仰角过大，会导致地球球体被推到屏幕下方外框
-      // [关键规则] 限制相机高度范围，并在 preRender 监听中动态约束俯仰角 (-90° ~ -20°) 及中心点 Y 坐标
-      viewer.scene.screenSpaceCameraController.minimumZoomDistance = 100000
-      viewer.scene.screenSpaceCameraController.maximumZoomDistance = 25000000
-
       // 禁止相机跑到地面以下
       viewer.scene.globe.depthTestAgainstTerrain = false
-
-      // [动态几何约束] 绑定 preRender 监听，限制地球不能被拖移至屏幕下方边缘之外
-      // 原因: 静态限制俯仰角(-20°)在高视角高度(如 20000km)下仍会导致视角偏离地心，将地球推到屏幕下方之外。
-      // 解决: 根据相机高度计算地球视角半角 theta，高高度下自动将 Pitch 上限收紧至接近 -90°(直视地心)，确保地球始终居中在视野内。
-      viewer.scene.preRender.addEventListener(() => {
-        if (!viewer || viewer.isDestroyed()) return
-
-        // [异常处理] 防止 preRender 的约束逻辑与 flyTo 动画或 trackedEntity 视角跟随发生冲突导致“来回摆动”
-        if (currentTrackedNorad !== null || viewer.trackedEntity) return
-        if ((viewer.scene as any).tweens && (viewer.scene as any).tweens.length > 0) return
-
-        const cam = viewer.camera
-        const carto = cam.positionCartographic
-        if (!carto) return
-
-        // [地心与视角几何计算] 地球平均半径约 6,371,000 米
-        const EARTH_RADIUS = 6371000
-        const distance = EARTH_RADIUS + Math.max(0, carto.height)
-        // 计算当前高度下地球视盘的半角 (0 ~ PI/2)
-        const sinTheta = Math.min(1.0, EARTH_RADIUS / distance)
-        const theta = Math.asin(sinTheta)
-
-        // [动态俯仰角限制]
-        // -90° (-PI/2) 对应相机直视地心。
-        // 高高度(如 25,000km)下 theta 仅约 14°，地心为 -90°。
-        // 允许倾斜范围控制在 theta 的 0.65 动态比例以内，高高度时自动收紧至接近 -90°，低空允许 -20° 看地平线
-        const dynamicMaxPitch = Math.min(Cesium.Math.toRadians(-20), -Math.PI / 2 + theta * 0.65)
-        const minPitch = Cesium.Math.toRadians(-89)
-
-        let targetPitch = cam.pitch
-        let needUpdate = false
-
-        // 1. 检查相机俯仰角是否超出当前高度下的允许范围
-        if (cam.pitch > dynamicMaxPitch) {
-          targetPitch = dynamicMaxPitch
-          needUpdate = true
-        } else if (cam.pitch < minPitch) {
-          targetPitch = minPitch
-          needUpdate = true
-        }
-
-        // 2. 检查地心 (0,0,0) 的二维屏幕坐标，防止拖拽导致地球超出屏幕中心下侧
-        const centerPos = Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, Cesium.Cartesian3.ZERO)
-        const canvasHeight = viewer.canvas.clientHeight
-
-        // 如果地心坐标无效(已被推到相机后方)或地心 Y 坐标被拖到屏幕下侧 60% 以下
-        if (!centerPos || centerPos.y > canvasHeight * 0.6) {
-          targetPitch = Math.min(targetPitch, dynamicMaxPitch - Cesium.Math.toRadians(5))
-          needUpdate = true
-        }
-
-        if (needUpdate) {
-          cam.setView({
-            destination: Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, carto.height),
-            orientation: {
-              heading: cam.heading,
-              pitch: targetPitch,
-              roll: 0,
-            },
-          })
-        }
-      })
 
       // 只在有变化时渲染，提高切换路由/隐藏时性能
       viewer.scene.requestRenderMode = true
