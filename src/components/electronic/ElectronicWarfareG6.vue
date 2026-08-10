@@ -434,7 +434,7 @@ const fetchMatrixData = async () => {
   loading.value = true
   try {
     const matrixRes = await getMatrixList({
-      norad: 57693,
+      norad: store.selectedSatellite?.norad || 0,
       taskId: store.activedTask?.id || 0,
       intensityLevel: currentIntensity.value,
     })

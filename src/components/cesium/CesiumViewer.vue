@@ -705,6 +705,7 @@ const renderElectronicInfrastructureNodes = () => {
   // 4. 渲染敌方天基过境与中继卫星集群 3D 实体
   const matrixSats = props.matrixData?.initMatrixList || []
   matrixSats.forEach((sat) => {
+    if (!sat || !sat.satType) return
     const satEntityId = `sat-node-${sat.norad}`
     if (viewer.entities.getById(satEntityId)) return
 
