@@ -598,14 +598,6 @@ const trackSatelliteByNorad = (norad: number, force = false) => {
     })
     return
   }
-
-  if (pos) {
-    const boundingSphere = new Cesium.BoundingSphere(pos, 0)
-    viewer.camera.flyToBoundingSphere(boundingSphere, {
-      duration: 1.2,
-      offset,
-    })
-  }
 }
 
 // 监听 store 中选中的地面基础设施节点，如果外部选择变更则定位相机
@@ -682,7 +674,7 @@ const renderElectronicInfrastructureNodes = () => {
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         showBackground: true,
-        backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
+        backgroundColor: new Cesium.Color(0, 0, 0, 0.3),
         pixelOffset: new Cesium.Cartesian2(0, -28),
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 20_000_000),
       },
@@ -719,7 +711,7 @@ const renderElectronicInfrastructureNodes = () => {
     const initialPos = getSatellitePositionInCesium(sat.norad)
     if (!initialPos) return
 
-    const isRelay = sat.norad === 22314 || (sat.satType || '').includes('中继')
+    const isRelay = sat.satType.includes('中继')
     const satColor = isRelay ? Cesium.Color.PURPLE : Cesium.Color.CYAN
 
     viewer.entities.add({
@@ -742,19 +734,13 @@ const renderElectronicInfrastructureNodes = () => {
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         showBackground: true,
-        backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
+        backgroundColor: new Cesium.Color(0, 0, 0, 0.3),
         pixelOffset: new Cesium.Cartesian2(0, -28),
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 30_000_000),
       },
     })
     electronicNodeEntityIds.add(satEntityId)
   })
-
-  // 仅在未选择卫星且未选择地面节点时，渲染完敌方节点后才自动平滑飞赴地面网络区域
-  // 若当前已在追踪卫星，切勿重复触发 flyTo，保障一次平滑直达卫星视角
-  if (!currentTrackedNorad && !props.selectedNorad && !store.selectedSatellite && !store.selectedInfrastructureNode) {
-    flyToEnemyNetwork()
-  }
 }
 
 /**
@@ -923,15 +909,6 @@ const toggleRedSatellites = (show: boolean) => {
   }
 }
 
-const satelliteCoordMap = new Map<number, [number, number, number]>([
-  [60419, [-8.15, 53.3, 500000]],
-  [48643, [-158.09, 21.33, 550000]],
-  [59444, [-123.11, 45.21, 500000]],
-  [58136, [15.65, 78.22, 550000]],
-  [57693, [-121.42, 37.73, 500000]],
-  [22314, [-45.1, 12.4, 35786000]],
-])
-
 const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null => {
   const primitive = satellitePointPrimitives.get(norad)
   if (primitive && primitive.position) {
@@ -982,10 +959,6 @@ const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null =
     }
   }
 
-  const fallbackCoords = satelliteCoordMap.get(norad)
-  if (fallbackCoords) {
-    return Cesium.Cartesian3.fromDegrees(fallbackCoords[0], fallbackCoords[1], fallbackCoords[2])
-  }
   return null
 }
 
@@ -1682,7 +1655,9 @@ const renderSatellitePathWithPrimitive = async (satellites: SatelliteInfo[]) => 
   }
 }
 
-// 监听鼠标左键点击事件并处理实体选择
+/**
+ *  监听鼠标左键点击事件并处理实体选择
+ */
 function handleViewerClickEvent() {
   viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
   viewer.screenSpaceEventHandler.setInputAction(async function (event: Cesium.ScreenSpaceEventHandler.PositionedEvent) {
@@ -1911,8 +1886,11 @@ const ensureOrbitData = (norad: number, satel: any): Cesium.SampledPositionPrope
   satellitePositionPropertyCache.set(norad, positionProperty)
   return positionProperty
 }
-
-// 渲染卫星轨迹（路径实体方式，支持大量卫星）
+/**
+ * 根据任务Id查询所有过境卫星的tle数据，并在cesium视图上渲染
+ * @param taskId
+ * @param namespace
+ */
 const renderSateliitePathWithEntity = async (taskId: number, namespace?: string) => {
   if (!viewer) return
   const currentViewer = viewer
@@ -2026,7 +2004,7 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           pixelOffset: new Cesium.Cartesian2(0, -20),
           showBackground: true,
-          backgroundColor: new Cesium.Color(0, 0, 0, 0.3),
+          backgroundColor: new Cesium.Color(0, 0, 0, 0.1),
           show: true,
         },
         path: {

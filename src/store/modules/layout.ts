@@ -19,7 +19,7 @@ interface State {
 
   /** 当前选中的 3D 敌方地面基础设施节点 (地面接收站 / 中心云数据中心) */
   selectedInfrastructureNode: InfrastructureLocation | null
-
+  /** 当前任务下所有过境卫星数据*/
   allSatelliteOfTask: SatelliteData[]
   effectModel: boolean // 是否惯性参考系
   showNetView: boolean

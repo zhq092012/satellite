@@ -1515,7 +1515,7 @@ const renderConstellationSatellites = async (constellation: ConstellationListIte
 
   cesiumViewerRef.value?.clearViewer()
   if (filteredSatellites.length) {
-    await cesiumViewerRef.value?.renderSatellitePathWithPrimitive(filteredSatellites)
+    cesiumViewerRef.value?.renderSatellitePathWithPrimitive(filteredSatellites)
   }
   await cesiumViewerRef.value?.focusConstellationByName(constellation.name)
 }

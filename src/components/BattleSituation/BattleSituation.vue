@@ -88,6 +88,7 @@ import { useAuthStore } from '@/store/modules/auth'
 import { getMatrixList, type MatrixResult } from '@/api/electronic'
 import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
+import { getSatelliteDetail } from '@/api/dashboard'
 const store = useLayoutStore()
 const authStore = useAuthStore()
 useSatelliteProfileDialog()
@@ -365,7 +366,7 @@ watch(
   visibleTabs,
   (tabs) => {
     /**
-     * 如果没有权限
+     * 如果没有权限，则不显示任何tab页面
      */
     if (tabs.length === 0) {
       activeTabComponent.value = undefined
@@ -383,10 +384,10 @@ watch(
 /**
  * 渲染卫星轨迹和实体
  */
-const loadSatelliteEntities = () => {
+const loadSatelliteEntities = async () => {
   if (store.activedTask?.id && store.activetab === '战场态势视图') {
     // 显示卫星轨迹（仅在战场态势视图激活时）
-    cesiumViewerRef.value?.renderSateliitePathWithEntity(store.activedTask?.id, undefined)
+    await cesiumViewerRef.value?.renderSateliitePathWithEntity(store.activedTask?.id, undefined)
   }
 }
 
@@ -398,13 +399,27 @@ onMounted(() => {
     const hasCurrent = visibleTabs.value.some((item) => item.value === store.activetab)
     switchTab(hasCurrent ? store.activetab : visibleTabs.value[0].value)
   }
-
-  nextTick(() => {
-    loadSatelliteEntities()
-    markBattleArea()
-  })
-
   if (store.activetab === '战场态势视图') {
+    nextTick(async () => {
+      await loadSatelliteEntities()
+      if (store.allSatelliteOfTask.length > 0) {
+        const norad = Number(store.allSatelliteOfTask[0].norad_id)
+        if (Number.isFinite(norad) && selectedNorad.value !== norad) {
+          try {
+            const res = await getSatelliteDetail({ norad: Number(norad) })
+            if (res.code === 200 && res.data) {
+              // 设置选中的卫星
+              store.setSelectedSatellite(res.data)
+              // 渲染该卫星对应的矩阵数据
+              void handleSelectSatellite(norad)
+            }
+          } catch (error) {
+            console.error('查询卫星详细信息接口失败:', error)
+          }
+        }
+      }
+      markBattleArea()
+    })
     void pauseClockAnimation()
   }
 })
