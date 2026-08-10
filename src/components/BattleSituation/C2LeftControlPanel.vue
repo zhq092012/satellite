@@ -89,13 +89,13 @@
  * - 触发视角切换与控制事件
  */
 import { computed } from 'vue'
-import { getDefaultMatrixData, type MatrixResult, type SatelliteMatrix, type InitMatrix } from '@/api/electronic'
+import { type MatrixResult, type SatelliteMatrix, type InitMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 
 const props = defineProps<{
   /** 算法矩阵响应式数据 */
-  matrixData?: MatrixResult | null
+  matrixData: MatrixResult | null
   /** 当前选中的敌方卫星 NORAD */
   selectedNorad?: number | null
 }>()
@@ -104,8 +104,6 @@ const emit = defineEmits<{
   (e: 'select-satellite', norad: number | null): void
   (e: 'fly-to-view', target: 'GLOBAL' | 'SPACE' | 'GROUND'): void
 }>()
-
-const activeMatrix = computed<MatrixResult>(() => props.matrixData || getDefaultMatrixData())
 
 // 触发选择卫星事件 (再次点击已选中的卫星可取消选择)
 const handleSelectSatellite = (norad: number) => {
@@ -118,15 +116,13 @@ const handleSelectSatellite = (norad: number) => {
 
 // 提取敌方卫星列表 (包含过境卫星与中继卫星)
 const satList = computed(() => {
-  const data = activeMatrix.value
+  const matrixData = props.matrixData
   const map = new Map<number, { norad: number; name: string; satType: string; isRelay: boolean }>()
-  const defaultData = getDefaultMatrixData()
+  if (!matrixData) return []
 
-  const initList = data.initMatrixList?.length ? data.initMatrixList : defaultData.initMatrixList
-  const satMatrixList = data.satelliteMatrixList?.length ? data.satelliteMatrixList : defaultData.satelliteMatrixList
-  const relayList = data.relayRelation?.relayList?.length
-    ? data.relayRelation.relayList
-    : defaultData.relayRelation?.relayList || []
+  const initList = matrixData.initMatrixList?.length ? matrixData.initMatrixList : []
+  const satMatrixList = matrixData.satelliteMatrixList?.length ? matrixData.satelliteMatrixList : []
+  const relayList = matrixData.relayRelation?.relayList?.length ? matrixData.relayRelation.relayList : []
 
   initList.forEach((s: InitMatrix) => {
     const isRelay = (s.satType || '').includes('中继') || relayList.includes(s.norad)
@@ -171,16 +167,13 @@ const handleSelectGroundNode = (node: InfrastructureLocation) => {
 
 // 提取敌方地面设施列表 (接收站 + 数据中心)
 const groundNodes = computed<InfrastructureLocation[]>(() => {
-  const data = activeMatrix.value
+  const matrixData = props.matrixData
+  if (!matrixData) return []
   const nodes: InfrastructureLocation[] = []
-  const defaultData = getDefaultMatrixData()
 
-  let relationData = data.stationRelationList
+  let relationData = matrixData.stationRelationList
   if (!relationData?.receiveObjList?.length) {
-    relationData = data.initRelationList
-  }
-  if (!relationData?.receiveObjList?.length) {
-    relationData = defaultData.stationRelationList
+    relationData = matrixData.initRelationList
   }
 
   if (relationData?.receiveObjList) {

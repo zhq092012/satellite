@@ -93,8 +93,7 @@ import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import { useAuthStore } from '@/store/modules/auth'
-import { getSatelliteList } from '@/api/dashboard'
-import { getMatrixList, getDefaultMatrixData, type MatrixResult } from '@/api/electronic'
+import { getMatrixList, type MatrixResult } from '@/api/electronic'
 import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 const store = useLayoutStore()
@@ -274,7 +273,7 @@ const threatAnalysis = () => {
 
 // 当前选中的敌方卫星 NORAD (未选中时为 null，表示静态展示)
 const selectedNorad = ref<number | null>(null)
-const matrixData = ref<MatrixResult | null>(getDefaultMatrixData())
+const matrixData = ref<MatrixResult | null>(null)
 
 /**
  * [功能]
@@ -296,49 +295,15 @@ const handleSelectSatellite = async (norad: number | null) => {
     if (cesiumViewerRef.value && (cesiumViewerRef.value as any).pauseClockAnimation) {
       ;(cesiumViewerRef.value as any).pauseClockAnimation()
     }
-    if (taskId) {
-      await loadMatrixData(taskId)
-    }
     return
   }
 
   // 2. 选择具体卫星，加载对应的算法传输矩阵
   try {
-    const res = await getMatrixList({ norad, taskId, intensityLevel: '中度交战' })
+    const res = await getMatrixList({ norad, taskId, intensityLevel: '低烈度' })
     if (res.code === 200 && res.data) {
       // [业务目的] 保持全网资产拓扑不丢失：当针对特定卫星返回的矩阵未包含/清空全量资产列表时，合并保留原有/默认拓扑数据
-      const defaultTopology = getDefaultMatrixData()
-      const currentMatrix = matrixData.value || defaultTopology
-
-      matrixData.value = {
-        ...res.data,
-        initMatrixList: res.data.initMatrixList?.length
-          ? res.data.initMatrixList
-          : currentMatrix.initMatrixList?.length
-            ? currentMatrix.initMatrixList
-            : defaultTopology.initMatrixList,
-        satelliteMatrixList: res.data.satelliteMatrixList?.length
-          ? res.data.satelliteMatrixList
-          : currentMatrix.satelliteMatrixList?.length
-            ? currentMatrix.satelliteMatrixList
-            : defaultTopology.satelliteMatrixList,
-        stationRelationList: res.data.stationRelationList?.receiveObjList?.length
-          ? res.data.stationRelationList
-          : currentMatrix.stationRelationList?.receiveObjList?.length
-            ? currentMatrix.stationRelationList
-            : defaultTopology.stationRelationList,
-        initRelationList: res.data.initRelationList?.receiveObjList?.length
-          ? res.data.initRelationList
-          : currentMatrix.initRelationList?.receiveObjList?.length
-            ? currentMatrix.initRelationList
-            : defaultTopology.initRelationList,
-        relayRelation: res.data.relayRelation?.relayList?.length
-          ? res.data.relayRelation
-          : currentMatrix.relayRelation?.relayList?.length
-            ? currentMatrix.relayRelation
-            : defaultTopology.relayRelation,
-      }
-
+      matrixData.value = res.data
       // 寻找该卫星的最早/有效传输窗口
       let windowStartTime: string | undefined
 
@@ -378,33 +343,13 @@ watch(
   }
 )
 
-/**
- * 加载初始算法矩阵 (未选择卫星时展示全量资产拓扑)
- * @param taskId 任务ID
- */
-async function loadMatrixData(taskId: number) {
-  try {
-    const res = await getMatrixList({ norad: 60419, taskId, intensityLevel: '中度交战' })
-    if (res.code === 200 && res.data && (res.data.initMatrixList?.length || res.data.satelliteMatrixList?.length)) {
-      matrixData.value = res.data
-    } else {
-      matrixData.value = getDefaultMatrixData()
-    }
-  } catch (err) {
-    console.error('加载算法矩阵失败，使用默认矩阵:', err)
-    matrixData.value = getDefaultMatrixData()
-  }
-}
-
 const handleFlyToView = (target: 'GLOBAL' | 'SPACE' | 'GROUND') => {
   if (cesiumViewerRef.value && (cesiumViewerRef.value as any).flyToView) {
     ;(cesiumViewerRef.value as any).flyToView(target)
   }
 }
 
-async function loadBattleSituationData(taskId: number) {
-  await loadMatrixData(taskId)
-
+async function loadBattleSituationData() {
   // 初始进入未选择具体卫星时，默认静态展示不演示动画
   if (!selectedNorad.value) {
     nextTick(() => {
@@ -445,21 +390,6 @@ watch(
   { immediate: true }
 )
 
-const satelliteList = ref<Satellite[]>([])
-const satellite_total = ref(0)
-const satellite_loadnum = ref(0)
-const pageNum = ref(1)
-const pageSize = ref(10)
-
-//卫星列表数据
-const loadSatelliteList = async () => {
-  const res = await getSatelliteList(pageNum.value, pageSize.value, undefined, store.activedTask?.id!)
-  if (res.code === 200) {
-    satelliteList.value = res.data.content
-    satellite_total.value = res.data.totalElements
-    satellite_loadnum.value = res.data.numberOfElements
-  }
-}
 /**
  *
  */
@@ -492,10 +422,9 @@ onMounted(() => {
   nextTick(() => {
     loadSatelliteEntities()
   })
-  // 卫星列表
-  loadSatelliteList()
-  if (store.activetab === '战场态势视图' && store.activedTask?.id) {
-    void loadBattleSituationData(store.activedTask.id)
+
+  if (store.activetab === '战场态势视图') {
+    void loadBattleSituationData()
   }
 })
 /**
@@ -508,10 +437,8 @@ watch(
       nextTick(() => {
         loadSatelliteEntities()
       })
-      loadSatelliteList()
-      if (store.activedTask?.id) {
-        await loadBattleSituationData(store.activedTask.id)
-      }
+
+      await loadBattleSituationData()
     }
   }
 )
@@ -523,9 +450,8 @@ watch(
   () => store.activedTask?.id,
   async (taskId, prevTaskId) => {
     if (!taskId || taskId === prevTaskId) return
-    loadSatelliteList()
     if (store.activetab === '战场态势视图') {
-      await loadBattleSituationData(taskId)
+      await loadBattleSituationData()
     }
   }
 )

@@ -43,16 +43,16 @@
         <div class="section-title">
           <span class="title-icon">🔗</span>
           <span>目标卫星数据传输链路与窗口</span>
-          <span class="active-badge" v-if="selectedSatelliteNorad">
-            NORAD: #{{ selectedSatelliteNorad }}
-          </span>
+          <span class="active-badge" v-if="selectedSatelliteNorad"> NORAD: #{{ selectedSatelliteNorad }} </span>
         </div>
 
         <!-- A. 未点击/未选择任何卫星时的静态提示 -->
         <div v-if="!selectedSatelliteNorad" class="empty-sat-box">
           <span class="empty-icon">🛰️</span>
           <p class="empty-text">当前处于全网静态展示模式</p>
-          <small class="empty-sub">点击左侧列表或地图上的敌方卫星，系统将自动加载其专属传输矩阵，并推进时间轴至过境窗口</small>
+          <small class="empty-sub"
+            >点击左侧列表或地图上的敌方卫星，系统将自动加载其专属传输矩阵，并推进时间轴至过境窗口</small
+          >
         </div>
 
         <!-- B. 已选中某颗敌方卫星时的传输分析 -->
@@ -188,17 +188,11 @@
  */
 import { computed } from 'vue'
 import { useLayoutStore } from '@/store/modules/layout'
-import {
-  getDefaultMatrixData,
-  type MatrixResult,
-  type SatelliteMatrix,
-  type InitMatrix,
-  type BattleWindow,
-} from '@/api/electronic'
+import { type MatrixResult, type SatelliteMatrix, type InitMatrix, type BattleWindow } from '@/api/electronic'
 
 const props = defineProps<{
   /** 算法矩阵数据 */
-  matrixData?: MatrixResult | null
+  matrixData: MatrixResult | null
   /** 当前选中的卫星 NORAD */
   selectedSatelliteNorad?: number | null
 }>()
@@ -209,7 +203,10 @@ const emit = defineEmits<{
 
 const store = useLayoutStore()
 
-const activeMatrix = computed<MatrixResult>(() => props.matrixData || getDefaultMatrixData())
+/**
+ * 算法矩阵数据
+ */
+const activeMatrix = computed<MatrixResult | null>(() => props.matrixData)
 
 // 选中的地面节点
 const selectedNode = computed(() => store.selectedInfrastructureNode)
@@ -225,23 +222,33 @@ const handleClearSelection = () => {
 // 全网资产统计
 const transitSatCount = computed(() => {
   const data = activeMatrix.value
-  const list = data.initMatrixList || []
-  return list.filter((s) => !s.satType?.includes('中继')).length || 6
+  if (!data) {
+    return
+  }
+  const list = data.initMatrixList
+  return list.filter((s) => !s.satType?.includes('中继')).length
 })
-
+/**
+ * 中继卫星数量
+ */
 const relaySatCount = computed(() => {
   const data = activeMatrix.value
-  return data.relayRelation?.relayList?.length || 1
+  if (!data) {
+    return
+  }
+  return data.relayRelation?.relayList?.length
 })
-
+/**
+ *
+ */
 const receiveStationCount = computed(() => {
-  const relationData = activeMatrix.value.stationRelationList || activeMatrix.value.initRelationList
-  return relationData?.receiveObjList?.length || 12
+  const relationData = activeMatrix.value?.stationRelationList || activeMatrix.value?.initRelationList
+  return relationData?.receiveObjList?.length
 })
 
 const dataCenterCount = computed(() => {
-  const relationData = activeMatrix.value.stationRelationList || activeMatrix.value.initRelationList
-  return relationData?.stationObjList?.length || 3
+  const relationData = activeMatrix.value?.stationRelationList || activeMatrix.value?.initRelationList
+  return relationData?.stationObjList?.length
 })
 
 // 当前选中卫星信息
@@ -249,7 +256,7 @@ const currentSatItem = computed(() => {
   if (!props.selectedSatelliteNorad) return null
   const norad = props.selectedSatelliteNorad
   const data = activeMatrix.value
-
+  if (!data) return null
   const matchInit = (data.initMatrixList || []).find((item: InitMatrix) => item.norad === norad)
   if (matchInit) return matchInit
 
@@ -273,29 +280,38 @@ const currentSatType = computed(() => {
 // 解析传输路径 (中继/接收站 & 数据中心)
 const hasRelayNode = computed(() => {
   const data = activeMatrix.value
+  if (!data) return false
   return (data.relayRelation?.relayList?.length || 0) > 0
 })
-
+/**
+ * 计算目标中继卫星或者接收站的名称
+ */
 const targetRelayOrStation = computed(() => {
+  if (!activeMatrix.value) return
   const relationData = activeMatrix.value.stationRelationList || activeMatrix.value.initRelationList
   const rec = relationData?.receiveObjList?.[0]
   if (hasRelayNode.value) {
-    return 'TDRS-6 (中继) / ReceiveStation-1'
+    const relayNodeId = activeMatrix.value.relayRelation?.relayList?.[0]
+    return relayNodeId
   }
-  return rec ? rec.receiveName : '基站 ReceiveStation-1'
+  return rec ? rec.receiveName : ''
 })
 
+/**
+ * 计算数据中心的名称
+ */
 const targetDataCenter = computed(() => {
+  if (!activeMatrix.value) return
   const relationData = activeMatrix.value.stationRelationList || activeMatrix.value.initRelationList
   const st = relationData?.stationObjList?.[0]
-  return st ? st.stationName : '中心云 Station-1'
+  return st ? st.stationName : ''
 })
 
 // 最新/最早的过境传输窗口
 const latestTransmissionWindow = computed<BattleWindow | null>(() => {
   if (!props.selectedSatelliteNorad) return null
   const data = activeMatrix.value
-
+  if (!data) return null
   // 查 battleMatrixList
   const battleMatch = (data.battleMatrixList || []).find((b) => b.norad === props.selectedSatelliteNorad)
   if (battleMatch?.windows?.length) {
@@ -313,12 +329,7 @@ const latestTransmissionWindow = computed<BattleWindow | null>(() => {
       endTime: initMatch.initWindows[0].endWindow,
     }
   }
-
-  // 兜底默认时间窗口
-  return {
-    startTime: '2026-08-03 16:20:00',
-    endTime: '2026-08-03 16:38:30',
-  }
+  return null
 })
 
 // 计算窗口持续时长
@@ -366,7 +377,10 @@ const minTimeText = computed(() => {
   border-radius: 10px;
   backdrop-filter: blur(8px);
   color: #e2efff;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
   overflow: hidden;
 
   .panel-body-scroll {
