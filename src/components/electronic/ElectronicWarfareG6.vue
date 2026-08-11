@@ -478,6 +478,24 @@ const registerCustomG6Edge = () => {
 
 /**
  * [功能说明]
+ * 格式化并去重卫星类型描述字符串
+ *
+ * [处理规则]
+ * 按斜杠 / 拆分字符串，去除两端空白，使用 Set 进行去重，再重新用斜杠拼接。
+ * 例: "地球观测/雷达/地球观测" -> "地球观测/雷达"
+ *
+ * @param typeStr 原始类型字符串
+ * @returns 去重后的类型描述字符串
+ */
+const formatSatType = (typeStr?: string): string => {
+  if (!typeStr) return ''
+  const parts = typeStr.split('/').map((s) => s.trim()).filter(Boolean)
+  const uniqueParts = Array.from(new Set(parts))
+  return uniqueParts.join('/')
+}
+
+/**
+ * [功能说明]
  * 切换卫星分类 (侦察卫星 vs 通讯卫星) 并全量刷新矩阵数据与三个组件布局
  *
  * @param cat 卫星分类 key
@@ -918,7 +936,7 @@ const buildG6GraphData = () => {
 
       nodes.push({
         id,
-        label: `${sat.name}\n[${sat.satType}]`,
+        label: `${sat.name}\n[${formatSatType(sat.satType)}]`,
         layer: 1,
         x,
         y: 90,
@@ -941,6 +959,39 @@ const buildG6GraphData = () => {
             fill: textColor,
             fontSize: 12,
             fontWeight: 600,
+          },
+        },
+        stateStyles: {
+          active: {
+            fill: bgFill,
+            stroke: strokeColor,
+            lineWidth: 3,
+            shadowColor: strokeColor,
+            shadowBlur: 16,
+          },
+          highlight: {
+            fill: bgFill,
+            stroke: strokeColor,
+            lineWidth: 3,
+            shadowColor: strokeColor,
+            shadowBlur: 20,
+          },
+          hover: {
+            fill: bgFill,
+            stroke: strokeColor,
+            lineWidth: 2.5,
+            shadowColor: strokeColor,
+            shadowBlur: 14,
+          },
+          selected: {
+            fill: bgFill,
+            stroke: strokeColor,
+            lineWidth: 3,
+          },
+          inactive: {
+            fill: bgFill,
+            stroke: strokeColor,
+            opacity: 0.6,
           },
         },
       })
@@ -974,6 +1025,39 @@ const buildG6GraphData = () => {
           fill: '#e6f7ff',
           fontSize: 14,
           fontWeight: 700,
+        },
+      },
+      stateStyles: {
+        active: {
+          fill: '#0f2742',
+          stroke: '#1890ff',
+          lineWidth: 3,
+          shadowColor: '#1890ff',
+          shadowBlur: 18,
+        },
+        highlight: {
+          fill: '#0f2742',
+          stroke: '#1890ff',
+          lineWidth: 3,
+          shadowColor: '#1890ff',
+          shadowBlur: 22,
+        },
+        hover: {
+          fill: '#0f2742',
+          stroke: '#40a9ff',
+          lineWidth: 2.5,
+          shadowColor: '#40a9ff',
+          shadowBlur: 16,
+        },
+        selected: {
+          fill: '#0f2742',
+          stroke: '#1890ff',
+          lineWidth: 3,
+        },
+        inactive: {
+          fill: '#0f2742',
+          stroke: '#1890ff',
+          opacity: 0.6,
         },
       },
     })
@@ -1121,7 +1205,7 @@ const buildG6GraphData = () => {
 
     nodes.push({
       id,
-      label: `${sat.name}\n[${sat.satType}]`,
+      label: `${sat.name}\n[${formatSatType(sat.satType)}]`,
       layer: 1,
       x,
       y: 80,
@@ -1192,7 +1276,7 @@ const buildG6GraphData = () => {
 
     nodes.push({
       id,
-      label: `${sat.name}\n[${sat.satType}]`,
+      label: `${sat.name}\n[${formatSatType(sat.satType)}]`,
       layer: 2,
       x,
       y: 230,
