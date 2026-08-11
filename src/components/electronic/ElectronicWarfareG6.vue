@@ -3,9 +3,11 @@
     <!-- 顶部导航与控制栏 Header -->
     <div class="cema-header">
       <div class="header-left">
-        <span class="header-title glow-text">{{ currentSatCategory === 'COMM' ? '通讯卫星拓扑与服务分析' : '三层链路拓扑毁伤分析' }}</span>
+        <span class="header-title glow-text">{{
+          currentSatCategory === 'COMM' ? '通讯卫星拓扑与服务分析' : '三层链路拓扑毁伤分析'
+        }}</span>
         <!-- 卫星矩阵类型分类切换按钮组 -->
-        <div class="category-group" style="margin-left: 16px; display: inline-flex; gap: 6px;">
+        <div class="category-group" style="margin-left: 16px; display: inline-flex; gap: 6px">
           <button
             class="nav-tab-btn tab-cat"
             :class="{ active: currentSatCategory === 'RECON' }"
@@ -190,6 +192,15 @@
               >重置筛选</el-button
             >
           </span>
+          <!-- AI: 通讯卫星矩阵下在底部工具栏展示打击前/打击后服务时长指标 (字段为 serviceDuration) -->
+          <span class="service-duration-badge pre-strike-badge" v-if="currentSatCategory === 'COMM'">
+            <span class="badge-label">打击前服务时长:</span>
+            <strong class="glow-text-cyan badge-val">{{ formattedPreServiceDuration }}</strong>
+          </span>
+          <span class="service-duration-badge post-strike-badge" v-if="currentSatCategory === 'COMM'">
+            <span class="badge-label">打击后服务时长:</span>
+            <strong class="glow-text-orange badge-val">{{ formattedPostServiceDuration }}</strong>
+          </span>
         </div>
       </div>
 
@@ -285,11 +296,11 @@ type ViewModeType = 'COMBINED' | 'PRE_STRIKE' | 'POST_STRIKE' | 'GANTT' | 'WEAPO
 // [变量用途]
 // 拓扑视图切换选项列表
 const viewModeOptions: { key: ViewModeType; name: string }[] = [
-  { key: 'COMBINED', name: '打击前后全景对比' },
-  { key: 'PRE_STRIKE', name: '打击前拓扑(未打击)' },
-  { key: 'POST_STRIKE', name: '打击后拓扑(毁伤分析)' },
-  { key: 'GANTT', name: '打击过境甘特图矩阵' },
-  { key: 'WEAPON_ATTACK', name: '武器打击窗口列表' },
+  { key: 'COMBINED', name: '前后全量对比' },
+  { key: 'PRE_STRIKE', name: '打击前拓扑' },
+  { key: 'POST_STRIKE', name: '打击后拓扑' },
+  { key: 'GANTT', name: '甘特图矩阵' },
+  { key: 'WEAPON_ATTACK', name: '武器打击窗口' },
 ]
 
 // [变量用途]
@@ -489,7 +500,10 @@ const registerCustomG6Edge = () => {
  */
 const formatSatType = (typeStr?: string): string => {
   if (!typeStr) return ''
-  const parts = typeStr.split('/').map((s) => s.trim()).filter(Boolean)
+  const parts = typeStr
+    .split('/')
+    .map((s) => s.trim())
+    .filter(Boolean)
   const uniqueParts = Array.from(new Set(parts))
   return uniqueParts.join('/')
 }
@@ -571,6 +585,172 @@ const formatTimeStr = (ts: number): string => {
   const pad = (n: number) => (n < 10 ? '0' + n : String(n))
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
+
+/**
+ * [功能]
+ * 计算打击前服务时长（字段为 serviceDuration）。
+ *
+ * [处理规则]
+ * - 优先从后端 initMatrixList 提取选中节点或整体卫星矩阵的 serviceDuration 字段。
+ * - 如果单个节点选中且存在 serviceDuration，直接使用该数值。
+ * - 若无直接数值，从 initWindows 计算窗口时间差作为兜底。
+ * - 若未选中单节点，累加 initMatrixList 中所有卫星的 serviceDuration。
+ *
+ * [副作用]
+ * 无
+ *
+ * [异常处理]
+ * 当 matrixData 为空或字段不存在时返回 0。
+ *
+ * [修改约束]
+ * 保持字段 serviceDuration 优先，防止逻辑覆盖。
+ */
+const preStrikeServiceDuration = computed<number | string>(() => {
+  if (!matrixData.value) return 0
+  const data: any = matrixData.value
+
+  // 如果选中了具体卫星节点
+  if (selectedNodeInfo.value?.norad) {
+    const norad = selectedNodeInfo.value.norad
+    const initSat = (data.initMatrixList || []).find((s: any) => s.norad === norad)
+    if (initSat && typeof initSat.serviceDuration !== 'undefined' && initSat.serviceDuration !== null) {
+      return initSat.serviceDuration
+    }
+    if (initSat?.initWindows && Array.isArray(initSat.initWindows) && initSat.initWindows.length > 0) {
+      const totalMs = initSat.initWindows.reduce((acc: number, win: any) => {
+        const start = parseToTimestamp(win.peakWindow || win.startWindow || win.beginWindow || '')
+        const end = parseToTimestamp(win.endWindow || '')
+        return acc + Math.max(0, end - start)
+      }, 0)
+      return Math.round(totalMs / (1000 * 60))
+    }
+    return 0
+  }
+
+  // 未选中具体节点时，优先读取根节点 preStrikeServiceDuration 或 serviceDuration
+  if (typeof data.preStrikeServiceDuration !== 'undefined' && data.preStrikeServiceDuration !== null) {
+    return data.preStrikeServiceDuration
+  }
+
+  const initList = data.initMatrixList || []
+  if (initList.length > 0) {
+    let hasField = false
+    const totalField = initList.reduce((acc: number, sat: any) => {
+      if (typeof sat.serviceDuration !== 'undefined' && sat.serviceDuration !== null) {
+        hasField = true
+        return acc + Number(sat.serviceDuration)
+      }
+      return acc
+    }, 0)
+    if (hasField) return totalField
+
+    const totalMs = initList.reduce((accSat: number, sat: any) => {
+      const windows = sat.initWindows || []
+      const satMs = windows.reduce((accWin: number, win: any) => {
+        const start = parseToTimestamp(win.peakWindow || win.startWindow || win.beginWindow || '')
+        const end = parseToTimestamp(win.endWindow || '')
+        return accWin + Math.max(0, end - start)
+      }, 0)
+      return accSat + satMs
+    }, 0)
+    return Math.round(totalMs / (1000 * 60))
+  }
+
+  return 0
+})
+
+/**
+ * [功能]
+ * 计算打击后服务时长（字段为 serviceDuration）。
+ *
+ * [处理规则]
+ * - 优先从后端 satelliteMatrixList 提取选中节点或整体卫星矩阵的 serviceDuration 字段。
+ * - 如果单个节点选中且存在 serviceDuration，直接使用该数值。
+ * - 若无直接数值，从 stationWindows 计算非毁伤窗口时间差作为兜底。
+ * - 若未选中单节点，累加 satelliteMatrixList 中所有卫星的 serviceDuration。
+ *
+ * [副作用]
+ * 无
+ *
+ * [异常处理]
+ * 当 matrixData 为空或字段不存在时返回 0。
+ *
+ * [修改约束]
+ * 保持字段 serviceDuration 优先。
+ */
+const postStrikeServiceDuration = computed<number | string>(() => {
+  if (!matrixData.value) return 0
+  const data: any = matrixData.value
+
+  // 如果选中了具体卫星节点
+  if (selectedNodeInfo.value?.norad) {
+    const norad = selectedNodeInfo.value.norad
+    const sat = (data.satelliteMatrixList || []).find((s: any) => s.norad === norad)
+    if (sat && typeof sat.serviceDuration !== 'undefined' && sat.serviceDuration !== null) {
+      return sat.serviceDuration
+    }
+    if (sat?.stationWindows && Array.isArray(sat.stationWindows) && sat.stationWindows.length > 0) {
+      const totalMs = sat.stationWindows.reduce((acc: number, win: any) => {
+        if (win.strikeStatus === 1) return acc
+        const start = parseToTimestamp(win.peakWindow || win.startWindow || win.beginWindow || '')
+        const end = parseToTimestamp(win.endWindow || '')
+        return acc + Math.max(0, end - start)
+      }, 0)
+      return Math.round(totalMs / (1000 * 60))
+    }
+    return 0
+  }
+
+  // 未选中具体节点时，优先读取根节点 postStrikeServiceDuration
+  if (typeof data.postStrikeServiceDuration !== 'undefined' && data.postStrikeServiceDuration !== null) {
+    return data.postStrikeServiceDuration
+  }
+
+  const satList = data.satelliteMatrixList || []
+  if (satList.length > 0) {
+    let hasField = false
+    const totalField = satList.reduce((acc: number, sat: any) => {
+      if (typeof sat.serviceDuration !== 'undefined' && sat.serviceDuration !== null) {
+        hasField = true
+        return acc + Number(sat.serviceDuration)
+      }
+      return acc
+    }, 0)
+    if (hasField) return totalField
+
+    const totalMs = satList.reduce((accSat: number, sat: any) => {
+      const windows = sat.stationWindows || sat.initWindows || []
+      const satMs = windows.reduce((accWin: number, win: any) => {
+        if (win.strikeStatus === 1) return accWin
+        const start = parseToTimestamp(win.peakWindow || win.startWindow || win.beginWindow || '')
+        const end = parseToTimestamp(win.endWindow || '')
+        return accWin + Math.max(0, end - start)
+      }, 0)
+      return accSat + satMs
+    }, 0)
+    return Math.round(totalMs / (1000 * 60))
+  }
+
+  return 0
+})
+
+/**
+ * [功能]
+ * 格式化服务时长数字展示 (追加 "分钟" 单位)
+ *
+ * @param val 原始时长数值或字符串
+ * @returns 格式化后的字符串，如 "120 分钟"
+ */
+const formatServiceDurationText = (val: number | string | undefined | null): string => {
+  if (val === undefined || val === null || val === '') return '0 分钟'
+  const num = typeof val === 'number' ? val : parseFloat(String(val))
+  if (isNaN(num)) return '0 分钟'
+  const formattedNum = Number.isInteger(num) ? num.toString() : num.toFixed(1)
+  return `${formattedNum} 分钟`
+}
+
+const formattedPreServiceDuration = computed(() => formatServiceDurationText(preStrikeServiceDuration.value))
+const formattedPostServiceDuration = computed(() => formatServiceDurationText(postStrikeServiceDuration.value))
 
 /**
  * [功能说明]
@@ -2090,6 +2270,13 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
 
+  .ctrl-left {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
   .timeline-title {
     font-size: 13px;
     font-weight: 700;
@@ -2100,6 +2287,44 @@ onUnmounted(() => {
   .time-range-text {
     font-size: 11px;
     color: #64748b;
+  }
+
+  .service-duration-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 4px;
+    padding: 2px 10px;
+    font-size: 12px;
+
+    .badge-label {
+      color: #94a3b8;
+    }
+
+    .badge-val {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    &.pre-strike-badge {
+      border: 1px solid rgba(0, 225, 255, 0.35);
+      background: rgba(0, 225, 255, 0.08);
+
+      .badge-val {
+        color: #00e1ff;
+        text-shadow: 0 0 6px rgba(0, 225, 255, 0.4);
+      }
+    }
+
+    &.post-strike-badge {
+      border: 1px solid rgba(255, 120, 117, 0.35);
+      background: rgba(255, 77, 79, 0.08);
+
+      .badge-val {
+        color: #ff7875;
+        text-shadow: 0 0 6px rgba(255, 120, 117, 0.4);
+      }
+    }
   }
 
   .current-time-display {
