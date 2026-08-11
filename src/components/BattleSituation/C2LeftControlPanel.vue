@@ -17,6 +17,30 @@
         <span class="count-tag">{{ satList.length }} 颗</span>
       </div>
 
+      <!-- 卫星类型与系列级联筛选框 -->
+      <div class="filter-cascade-bar">
+        <el-select
+          v-model="selectedType"
+          placeholder="选择类型"
+          clearable
+          size="small"
+          class="filter-select"
+          @change="handleTypeChange"
+        >
+          <el-option v-for="item in typeOptions" :key="item" :label="item" :value="item" />
+        </el-select>
+        <el-select
+          v-model="selectedSeries"
+          placeholder="选择系列"
+          clearable
+          size="small"
+          class="filter-select"
+          :disabled="!selectedType"
+        >
+          <el-option v-for="item in seriesOptions" :key="item" :label="item" :value="item" />
+        </el-select>
+      </div>
+
       <div class="asset-scroll-list">
         <div
           v-for="sat in satList"
@@ -82,14 +106,15 @@
  *
  * [处理规则]
  * - 重点展示敌方过境卫星、中继卫星、地面接收站及数据中心
+ * - 支持根据接口 getSatelliteTypeSerials 获取的类型与系列联动筛选卫星列表
  * - 点击天基卫星卡片时向父组件抛出 select-satellite 事件
  * - 不包含任何攻击/毁伤/打压控制
  *
  * [副作用]
  * - 触发视角切换与控制事件
  */
-import { computed } from 'vue'
-import { type MatrixResult, type SatelliteMatrix, type InitMatrix } from '@/api/electronic'
+import { ref, computed, watch } from 'vue'
+import { getSatelliteTypeSerials, type MatrixResult, type SatelliteMatrix, type InitMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 
@@ -105,6 +130,115 @@ const emit = defineEmits<{
   (e: 'fly-to-view', target: 'GLOBAL' | 'SPACE' | 'GROUND'): void
 }>()
 
+const store = useLayoutStore()
+
+// [变量用途]
+// 存储从接口 getSatelliteTypeSerials 获取的卫星类型与对应系列字典数据
+//
+// [数据来源]
+// 通过 getSatelliteTypeSerials(taskId) 接口异步返回
+//
+// [取值规则]
+// Key 为卫星类型名称 (如 "导航卫星")，Value 为该类型下的系列名称数组 (如 ["GPS-2A", "GPS-2R"])
+//
+// [修改约束]
+// 任务 ID 变化时重新请求并更新
+const typeSerialsMap = ref<Record<string, string[]>>({})
+
+// [变量用途]
+// 当前选中的卫星类型筛选值
+
+const selectedType = ref<string>('')
+
+// [变量用途]
+// 当前选中的卫星系列筛选值
+
+const selectedSeries = ref<string>('')
+
+// [变量用途]
+// 可供选择的卫星类型下拉选项列表
+
+const typeOptions = computed<string[]>(() => {
+  return Object.keys(typeSerialsMap.value)
+})
+
+// [变量用途]
+// 当前选中的卫星类型下可供选择的系列下拉选项列表
+
+const seriesOptions = computed<string[]>(() => {
+  if (!selectedType.value) {
+    return []
+  }
+  return typeSerialsMap.value[selectedType.value] || []
+})
+
+/**
+ * [功能]
+ * 响应卫星类型下拉选择框变更事件
+ *
+ * [处理规则]
+ * 当用户选择或重置卫星类型时，自动将选中的系列 selectedSeries 清空
+ *
+ * [副作用]
+ * 重置 selectedSeries.value 为空字符串
+ *
+ * [异常处理]
+ * 无
+ *
+ * [修改约束]
+ * 保持类型与系列的联动清空逻辑
+ */
+const handleTypeChange = () => {
+  selectedSeries.value = ''
+}
+
+/**
+ * [功能]
+ * 根据任务 ID 从后端异步加载卫星类型与系列映射数据
+ *
+ * [处理规则]
+ * - 校验 taskId 是否有效，若无效清空 typeSerialsMap 并返回
+ * - 调用 getSatelliteTypeSerials(taskId)
+ * - 成功后将返回的数据保存至 typeSerialsMap
+ *
+ * [副作用]
+ * - 发送网络 HTTP 请求
+ * - 更新 typeSerialsMap 响应式数据
+ *
+ * [异常处理]
+ * 捕获请求异常并在控制台记录 error
+ *
+ * [修改约束]
+ * 保持入参格式与异步更新逻辑一致
+ *
+ * @param taskId 任务 ID
+ */
+const fetchTypeSerials = async (taskId?: number) => {
+  if (!taskId) {
+    typeSerialsMap.value = {}
+    return
+  }
+  try {
+    const res = await getSatelliteTypeSerials(taskId)
+    if (res.code === 200 && res.data) {
+      typeSerialsMap.value = res.data
+    }
+  } catch (err) {
+    console.error('获取卫星类型与系列映射失败:', err)
+  }
+}
+
+// 监听当前激活的任务 ID 变化，自动查询对应任务的类型与系列列表
+watch(
+  () => store.activedTask?.id,
+  (newTaskId) => {
+    selectedType.value = ''
+    selectedSeries.value = ''
+    void fetchTypeSerials(newTaskId)
+  },
+  { immediate: true }
+)
+
 // 触发选择卫星事件 (再次点击已选中的卫星可取消选择)
 const handleSelectSatellite = (norad: number) => {
   if (props.selectedNorad === norad) {
@@ -114,7 +248,7 @@ const handleSelectSatellite = (norad: number) => {
   }
 }
 
-// 提取敌方卫星列表 (包含过境卫星与中继卫星)
+// 提取敌方卫星列表 (包含过境卫星与中继卫星)，并执行类型和系列筛选
 const satList = computed(() => {
   const matrixData = props.matrixData
   const map = new Map<number, { norad: number; name: string; satType: string; isRelay: boolean }>()
@@ -141,7 +275,6 @@ const satList = computed(() => {
   return Array.from(map.values())
 })
 
-const store = useLayoutStore()
 const selectedInfrastructureNode = computed(() => store.selectedInfrastructureNode)
 
 /**
@@ -291,6 +424,37 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
       padding: 1px 6px;
       border-radius: 10px;
       background: rgba(64, 242, 255, 0.15);
+      color: #7dd3fc;
+    }
+  }
+}
+
+.filter-cascade-bar {
+  display: flex;
+  gap: 8px;
+
+  .filter-select {
+    flex: 1;
+    min-width: 0;
+
+    :deep(.el-input__wrapper) {
+      background-color: rgba(18, 32, 54, 0.85);
+      box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.25) inset;
+      border-radius: 4px;
+
+      &.is-focus,
+      &:hover {
+        box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.6) inset;
+      }
+    }
+
+    :deep(.el-input__inner) {
+      color: #e2efff;
+      font-size: 12px;
+      height: 26px;
+    }
+
+    :deep(.el-select__caret) {
       color: #7dd3fc;
     }
   }

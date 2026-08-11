@@ -447,3 +447,11 @@ export const getCommunicationsAttackMatrix = (data: { taskId: number; norad: num
   const url = `/api/algorithm/calTxSeriesChain`
   return requestAPI.post<AxiosResponseType<CommucationMatrix>>(url, data)
 }
+
+/**
+ * 获取卫星类型-卫星系列对应的关系
+ */
+export const getSatelliteTypeSerials = (taskId: number) => {
+  const url = `/api/algorithm/getSysSeries?taskId=${taskId}`
+  return requestAPI.get<AxiosResponseType<Record<string, string[]>>>(url)
+}
