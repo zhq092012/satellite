@@ -339,7 +339,7 @@
 
           <!-- 时间窗口 Section (整块高亮包覆 Label + 数值) -->
           <div class="info-section">
-            <div class="section-title">⏱️ 过境 / 干扰时间窗口</div>
+            <div class="section-title">⏱️ 打击时间窗口</div>
             <div class="info-grid">
               <!-- 开始时间 peakWindow (整块高亮包覆) -->
               <div class="info-row vertical-stack">
@@ -421,7 +421,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getMatrixList } from '@/api/electronic'
+import { getReconnaissanceAttackMatrix } from '@/api/electronic'
 import type { MatrixResult, SatelliteMatrix, Weapon } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
 const store = useLayoutStore()
@@ -539,7 +539,7 @@ const loadMatrixData = async () => {
   if (props.matrixData) return
   loading.value = true
   try {
-    const res = await getMatrixList({
+    const res = await getReconnaissanceAttackMatrix({
       norad: 57693,
       taskId: store.activedTask?.id || 0,
       intensityLevel: '高烈度',

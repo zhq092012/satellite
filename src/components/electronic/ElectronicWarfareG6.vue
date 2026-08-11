@@ -209,7 +209,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import G6 from '@antv/g6'
 import { useLayoutStore } from '@/store/modules/layout'
-import { getMatrixList } from '@/api/electronic'
+import { getReconnaissanceAttackMatrix } from '@/api/electronic'
 import type { MatrixResult, Weapon } from '@/api/electronic'
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import WeaponAttackList from '@/components/electronic/WeaponAttackList.vue'
@@ -433,7 +433,7 @@ const registerCustomG6Edge = () => {
 const fetchMatrixData = async () => {
   loading.value = true
   try {
-    const matrixRes = await getMatrixList({
+    const matrixRes = await getReconnaissanceAttackMatrix({
       norad: store.selectedSatellite?.norad || 0,
       taskId: store.activedTask?.id || 0,
       intensityLevel: currentIntensity.value,

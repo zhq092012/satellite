@@ -85,7 +85,7 @@ import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import { useAuthStore } from '@/store/modules/auth'
-import { getMatrixList, type MatrixResult } from '@/api/electronic'
+import { getReconnaissanceAttackMatrix, type MatrixResult } from '@/api/electronic'
 import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import { getSatelliteDetail } from '@/api/dashboard'
@@ -141,8 +141,8 @@ const tabDefs = [
   //   permissionCode: 'battle:confront',
   // },
   {
-    label: '侦察卫星电磁对抗分析',
-    value: '侦察卫星电磁对抗分析',
+    label: '电磁对抗分析',
+    value: '电磁对抗分析',
     component: 'ElectronicWarfareG6',
     permissionCode: 'battle:electronicWarfare',
   },
@@ -290,7 +290,7 @@ const handleSelectSatellite = async (norad: number | null) => {
 
   // 2. 选择具体卫星，加载对应的算法传输矩阵
   try {
-    const res = await getMatrixList({ norad, taskId, intensityLevel: '低烈度' })
+    const res = await getReconnaissanceAttackMatrix({ norad, taskId, intensityLevel: '低烈度' })
     if (res.code === 200 && res.data) {
       // [业务目的] 保持全网资产拓扑不丢失：当针对特定卫星返回的矩阵未包含/清空全量资产列表时，合并保留原有/默认拓扑数据
       matrixData.value = res.data

@@ -6,63 +6,63 @@ import type { AxiosResponseType } from '@/types/http'
 
 // 接收站基础信息（用于关系列表）
 export interface ReceiveObj {
-  receiveId: string;//接收站id
-  receiveName: string;//接收站名称
-  receiveLatLon: string;//接收站经纬度 格式为："68.350,133.500"
-  receiveStatus: number;//接收站状态 0-未打击（可用） 1-被打击（不可用） 如果是1就没有relations数组了
+  receiveId: string //接收站id
+  receiveName: string //接收站名称
+  receiveLatLon: string //接收站经纬度 格式为："68.350,133.500"
+  receiveStatus: number //接收站状态 0-未打击（可用） 1-被打击（不可用） 如果是1就没有relations数组了
 }
 
 // 中心云站基础信息（用于关系列表）
 export interface StationObj {
-  stationId: string;//中心站id
-  stationName: string;//中心站名称
-  stationLatLon: string;//中心站经纬度  格式为:"68.350,133.500"
-  stationStatus: number;//中心站状态 0-未打击（可用） 1-被打击（不可用） 如果是1就没有relations数组了
+  stationId: string //中心站id
+  stationName: string //中心站名称
+  stationLatLon: string //中心站经纬度  格式为:"68.350,133.500"
+  stationStatus: number //中心站状态 0-未打击（可用） 1-被打击（不可用） 如果是1就没有relations数组了
 }
 
 // 站与站之间的拓扑关联映射
 export interface RelationMap {
-  from: string; // 发起方id，与 receiveId 或 stationId 对应 接收站Id
-  to: string;   // 接收方id，与 receiveId 或 stationId 对应 中心云站id
+  from: string // 发起方id，与 receiveId 或 stationId 对应 接收站Id
+  to: string // 接收方id，与 receiveId 或 stationId 对应 中心云站id
 }
 
 // 武器 / 拦截系统配置
 export interface Weapon {
-  id: string; //武器Id
-  name: string; //武器名称
-  country: string;//武器所属国家
-  type: string;//武器类型 ()
-  latitude: number;//武器纬度
-  longitude: number; //武器经度
-  range: number;//武器射程（km）
+  id: string //武器Id
+  name: string //武器名称
+  country: string //武器所属国家
+  type: string //武器类型 ()
+  latitude: number //武器纬度
+  longitude: number //武器经度
+  range: number //武器射程（km）
 }
 
 // ==================== 业务主要结构 ====================
 
 // 初始状态下的过境窗口
 export interface InitWindow {
-  receiveId: string;//地面接收站id
-  receiveName: string;//地面接收站名称
-  receiveLat: number;//地面接收站纬度
-  receiveLon: number;//地面接收站经度
-  peakWindow: string;//开始过境时间窗口
-  endWindow: string;//结束过境时间窗口
+  receiveId: string //地面接收站id
+  receiveName: string //地面接收站名称
+  receiveLat: number //地面接收站纬度
+  receiveLon: number //地面接收站经度
+  peakWindow: string //开始过境时间窗口
+  endWindow: string //结束过境时间窗口
 }
 
 // 初始状态下的卫星矩阵元素
 export interface InitMatrix {
-  norad: number;//卫星id
-  name: string;//卫星名称
-  satType: string;//卫星类型
-  line1: string;//卫星tle轨道一
-  line2: string;//卫星tle轨道二
-  initWindows: InitWindow[];//卫星过境时间窗口
+  norad: number //卫星id
+  name: string //卫星名称
+  satType: string //卫星类型
+  line1: string //卫星tle轨道一
+  line2: string //卫星tle轨道二
+  initWindows: InitWindow[] //卫星过境时间窗口
 }
 
 export interface StationRelationList {
-  receiveObjList: ReceiveObj[];// 接收站列表
-  stationObjList: StationObj[];// 中心站列表
-  relations: RelationMap[];// 站与站之间的拓扑关联映射
+  receiveObjList: ReceiveObj[] // 接收站列表
+  stationObjList: StationObj[] // 中心站列表
+  relations: RelationMap[] // 站与站之间的拓扑关联映射
 }
 /**
  * [类型用途]
@@ -77,9 +77,9 @@ export interface StationRelationList {
  */
 export interface RelayRelationMap {
   /** 发起方卫星 NORAD/Id 字符串 */
-  from: string;
+  from: string
   /** 接收方中继卫星 NORAD/Id 字符串 */
-  to: string;
+  to: string
   /** 中继卫星过境时间窗口列表 */
   visibilityWindows: SatelliteRelayWindow[]
 }
@@ -98,13 +98,12 @@ export interface RelayRelationMap {
  */
 export interface RelayRelation {
   /** 中继卫星 NORAD 编号数组 */
-  relayList: number[];
+  relayList: number[]
   /** 普通/观测卫星 NORAD 编号数组 */
-  satelliteList: number[];
+  satelliteList: number[]
   /** 星间中继拓扑链路映射列表 */
-  relations: RelayRelationMap[];
+  relations: RelayRelationMap[]
 }
-
 
 /**
  * 卫星矩阵中的地面站接收窗口数据结构。
@@ -122,30 +121,30 @@ export interface RelayRelation {
  */
 export interface StationWindow {
   /** 接收站 Id */
-  receiveId: string;
+  receiveId: string
   /** 接收站名称 */
-  receiveName: string;
+  receiveName: string
   /** 开始过境时间窗口 */
-  peakWindow: string;
+  peakWindow: string
   /** 结束过境时间窗口 */
-  endWindow: string;
+  endWindow: string
   /** 打击状态 0-未打击 1-被打击 */
-  strikeStatus: number;
+  strikeStatus: number
   /** 单个接收窗口延时（分钟，可选） */
-  delayMin?: number;
+  delayMin?: number
   /** 兼容数据中可能出现的 null 值 武器/拦截系统配置 */
-  weapons: Weapon[];
+  weapons: Weapon[]
 }
 
 // 卫星矩阵元素（包含攻击/干扰及延迟信息）
 export interface SatelliteMatrix {
-  norad: number;//卫星id
-  name: string;//卫星名称
-  satType: string;//卫星类型
-  delayMin: number;//过基站延迟
-  satelliteStatus: number;//卫星状态 0-未打击 1-被打击
-  weapons: Weapon[];//武器/拦截系统配置
-  stationWindows: StationWindow[];
+  norad: number //卫星id
+  name: string //卫星名称
+  satType: string //卫星类型
+  delayMin: number //过基站延迟
+  satelliteStatus: number //卫星状态 0-未打击 1-被打击
+  weapons: Weapon[] //武器/拦截系统配置
+  stationWindows: StationWindow[]
 }
 
 /**
@@ -164,9 +163,9 @@ export interface SatelliteMatrix {
  */
 export interface BattleWindow {
   /** 开始过境时间 */
-  startTime: string;
+  startTime: string
   /** 结束过境时间 */
-  endTime: string;
+  endTime: string
 }
 
 /**
@@ -188,36 +187,35 @@ export interface BattleWindow {
  */
 export interface BattleMatrixItem {
   /** 卫星 NORAD 编号 */
-  norad: number;
+  norad: number
   /** 卫星名称 */
-  name: string;
+  name: string
   /** 卫星类型 */
-  satType: string;
+  satType: string
   /** 过境次数 */
-  gjNum: number;
+  gjNum: number
   /** 过境时间窗口列表 */
-  windows: BattleWindow[];
+  windows: BattleWindow[]
 }
 
 // 针对 windows 数组项的接口定义
 export interface WeaponWindow {
-  beginWindow: string; // 时间格式："YYYY-MM-DD HH:mm:ss"
-  endWindow: string;   // 时间格式："YYYY-MM-DD HH:mm:ss"
+  beginWindow: string // 时间格式："YYYY-MM-DD HH:mm:ss"
+  endWindow: string // 时间格式："YYYY-MM-DD HH:mm:ss"
 }
 
 export type SatelliteRelayWindow = WeaponWindow
 // 主数据项接口定义
 export interface WeaponAttackRecord {
-  weaponName: string;   // 武器名称
-  weaponType: string;   // 武器类型（如："网络病毒" | "电子干扰"）
-  beginTime: string;    // 开始时间
-  endTime: string;      // 结束时间
-  angle: number;        // 角度
-  windows: WeaponWindow[]; // 时间窗口列表
-  target: string;       // 目标名称
-  targetType: string;   // 目标类型（如："接收站"）
+  weaponName: string // 武器名称
+  weaponType: string // 武器类型（如："网络病毒" | "电子干扰"）
+  beginTime: string // 开始时间
+  endTime: string // 结束时间
+  angle: number // 角度
+  windows: WeaponWindow[] // 时间窗口列表
+  target: string // 目标名称
+  targetType: string // 目标类型（如："接收站"）
 }
-
 
 // ==================== 根数据结构 ====================
 
@@ -242,21 +240,21 @@ export interface WeaponAttackRecord {
  */
 export interface MatrixResult {
   /** 攻击计划列表 */
-  attackPlanList: WeaponAttackRecord[];
+  attackPlanList: WeaponAttackRecord[]
   /** 卫星过境战场矩阵 */
-  battleMatrixList: BattleMatrixItem[];
+  battleMatrixList: BattleMatrixItem[]
   /** 初始状态下的过境时间窗口 */
-  initMatrixList: InitMatrix[];
+  initMatrixList: InitMatrix[]
   /** 初始状态下的站与站之间的拓扑关联映射 */
-  initRelationList: StationRelationList;
+  initRelationList: StationRelationList
   /** 卫星矩阵（包含攻击/干扰及延迟信息） */
-  satelliteMatrixList: SatelliteMatrix[];
+  satelliteMatrixList: SatelliteMatrix[]
   /** 站与站之间的拓扑关联映射 */
-  stationRelationList: StationRelationList;
+  stationRelationList: StationRelationList
   /** 星间中继拓扑关系映射 (可选) */
-  relayRelation?: RelayRelation;
+  relayRelation?: RelayRelation
   /** 卫星系列 */
-  series: string;
+  series: string
 }
 
 /**
@@ -278,16 +276,174 @@ export interface MatrixResult {
  * @param data 请求参数对象 (norad, taskId, intensityLevel)
  * @returns 包含 MatrixResult 的 Axios 响应 Promise
  */
-export const getMatrixList = (data: {
-  norad: number;
-  taskId: number;
-  intensityLevel: string;
-  stationIds?: string[];
-  noradIds?: number[];
+export const getReconnaissanceAttackMatrix = (data: {
+  norad: number
+  taskId: number
+  intensityLevel: string
+  stationIds?: string[]
+  noradIds?: number[]
 }) => {
   const url = `/api/algorithm/calSeriesChain`
   return requestAPI.post<AxiosResponseType<MatrixResult>>(url, data)
 }
+// ==================== 通讯卫星过境打击计划 ====================
+/**
+ * 过境时间窗口
+ */
+export interface InitWindow {
+  startWindow: string
+  endWindow: string
+  duration: number
+}
 
+// initMatrixList 数组项类型
+export interface InitMatrixItem {
+  /**
+   * 卫星 NORAD 编号
+   */
+  norad: number
+  /**
+   * 卫星名称
+   */
+  name: string
+  /**
+   * 卫星类型
+   */
+  satType: string
+  /**
+   * 卫星轨道 TLE 第一行
+   */
+  line1: string
+  /**
+   * 卫星轨道 TLE 第二行
+   */
+  line2: string
+  /**
+   * 初始时间窗口列表
+   */
+  initWindows: InitWindow[]
+  /**
+   * 卫星过境服务时长（单位：分钟）
+   */
+  serviceDuration: number
+  /**
+   * 卫星高度（单位：公里）
+   */
+  height: number
+}
 
+/**
+ * 武器装备类型
+ */
+export interface Weapon {
+  id: string
+  name: string
+  country: string
+  type: string
+  /**
+   * 可打击卫星类型
+   */
+  satellite_type: string | null
+  /**
+   * 武器坐标
+   */
+  latitude: number
+  longitude: number
+  /**
+   * 武器作用距离
+   */
+  range: number
+}
 
+// satelliteMatrixList 数组项类型
+export interface SatelliteMatrixItem {
+  norad: number
+  name: string
+  satType: string
+  /**
+   * 服务时长(分钟)
+   */
+  serviceDuration: number
+  /**
+   * 卫星状态 0-未打击 1-被打击
+   */
+  satelliteStatus: number
+  /**
+   * 拦截系统配置
+   */
+  weapons: Weapon[]
+  /**
+   * 初始时间窗口
+   */
+  initWindows: InitWindow[] | null
+}
+
+// attackPlanList 数组项类型
+export interface CommunicationAttackPlanItem {
+  /**
+   * 武器名称
+   */
+  weaponName: string
+  /**
+   * 武器类型
+   */
+  weaponType: string
+  /**
+   * 开始时间
+   */
+  beginTime: string | null
+  /**
+   * 结束时间
+   */
+  endTime: string | null
+  /**
+   * 角度
+   */
+  angle: number
+  /**
+   * 时间窗口列表
+   */
+  windows: InitWindow[]
+  /**
+   * 目标名称
+   */
+  target: string
+  /**
+   * 目标ID
+   */
+  targetId: string
+  /**
+   * 目标类型
+   */
+  targetType: string
+}
+
+// 顶层 data 对象类型
+export interface CommucationMatrix {
+  /**
+   * 初始时间窗口列表
+   */
+  initMatrixList: InitMatrixItem[]
+  /**
+   * 卫星矩阵（包含攻击/干扰及延迟信息）
+   */
+  satelliteMatrixList: SatelliteMatrixItem[]
+  /**
+   * 卫星系列
+   */
+  series: string
+  /**
+   * 攻击计划列表
+   */
+  attackPlanList: CommunicationAttackPlanItem[]
+}
+
+/**
+ * 获取通讯卫星过境打击计划数据
+ *  @param data 请求参数对象 (taskId, norad)
+ *  @returns 包含 CommucationMatrix 的 Axios 响应 Promise
+ */
+export const getCommunicationsAttackMatrix = (data: { taskId: number; norad: number }) => {
+  const url = `/api/algorithm/calTxSeriesChain`
+  return requestAPI.post<AxiosResponseType<CommucationMatrix>>(url, data)
+}
