@@ -3,13 +3,30 @@
     <!-- 顶部导航与控制栏 Header -->
     <div class="cema-header">
       <div class="header-left">
-        <span class="header-title glow-text">三层链路拓扑毁伤分析</span>
+        <span class="header-title glow-text">{{ currentSatCategory === 'COMM' ? '通讯卫星拓扑与服务分析' : '三层链路拓扑毁伤分析' }}</span>
+        <!-- 卫星矩阵类型分类切换按钮组 -->
+        <div class="category-group" style="margin-left: 16px; display: inline-flex; gap: 6px;">
+          <button
+            class="nav-tab-btn tab-cat"
+            :class="{ active: currentSatCategory === 'RECON' }"
+            @click="handleCategoryChange('RECON')"
+          >
+            🛰️ 侦察卫星矩阵
+          </button>
+          <button
+            class="nav-tab-btn tab-cat"
+            :class="{ active: currentSatCategory === 'COMM' }"
+            @click="handleCategoryChange('COMM')"
+          >
+            📡 通讯卫星矩阵
+          </button>
+        </div>
       </div>
 
       <!-- 烈度与视图模式切换选项 -->
       <div class="header-center">
-        <!-- 1. 交战烈度切换按钮组 -->
-        <div class="intensity-group">
+        <!-- 1. 交战烈度切换按钮组 (仅侦察卫星模式显示) -->
+        <div class="intensity-group" v-if="currentSatCategory === 'RECON'">
           <button
             v-for="level in intensityOptions"
             :key="level"
@@ -21,7 +38,7 @@
           </button>
         </div>
 
-        <div class="v-divider"></div>
+        <div class="v-divider" v-if="currentSatCategory === 'RECON'"></div>
 
         <!-- 2. 拓扑显示模式切换 -->
         <div class="matrix-tab-group">
@@ -74,22 +91,28 @@
             >卫星节点: <strong>{{ satNodeCount }}</strong> 颗</span
           >
         </div>
-        <div class="stat-badge">
+        <div class="stat-badge" v-if="currentSatCategory === 'RECON'">
           <span class="stat-dot dot-rec"></span>
           <span
             >地面站节点: <strong>{{ receiveNodeCount }}</strong> 个</span
           >
         </div>
-        <div class="stat-badge">
+        <div class="stat-badge" v-if="currentSatCategory === 'RECON'">
           <span class="stat-dot dot-station"></span>
           <span
             >数据中心: <strong>{{ stationNodeCount }}</strong> 个</span
           >
         </div>
+        <div class="stat-badge" v-else>
+          <span class="stat-dot dot-rec"></span>
+          <span
+            >通信目标: <strong>{{ store.battle?.name || '战场目标区域' }}</strong></span
+          >
+        </div>
         <div class="stat-badge">
           <span class="stat-dot dot-normal-link"></span>
           <span
-            >正常链路: <strong>{{ normalLinkCount }}</strong> 条</span
+            >正常通信链路: <strong>{{ normalLinkCount }}</strong> 条</span
           >
         </div>
         <div class="stat-badge alert-stat">
@@ -104,29 +127,48 @@
       <div class="topo-main-body">
         <!-- 左侧：图层标注独立一栏 -->
         <div class="layer-sidebar">
-          <div class="layer-sidebar-item layer-1-item">
-            <span class="layer-icon">🛰️</span>
-            <div class="layer-text">
-              <span class="layer-title">第一层：普通卫星</span>
-              <span class="layer-sub">Ordinary Satellites</span>
+          <template v-if="currentSatCategory === 'RECON'">
+            <div class="layer-sidebar-item layer-1-item">
+              <span class="layer-icon">🛰️</span>
+              <div class="layer-text">
+                <span class="layer-title">第一层：普通卫星</span>
+                <span class="layer-sub">Ordinary Satellites</span>
+              </div>
             </div>
-          </div>
 
-          <div class="layer-sidebar-item layer-2-item">
-            <span class="layer-icon">🛰️</span>
-            <div class="layer-text">
-              <span class="layer-title">第二层：中继卫星</span>
-              <span class="layer-sub">Relay Satellites</span>
+            <div class="layer-sidebar-item layer-2-item">
+              <span class="layer-icon">🛰️</span>
+              <div class="layer-text">
+                <span class="layer-title">第二层：中继卫星</span>
+                <span class="layer-sub">Relay Satellites</span>
+              </div>
             </div>
-          </div>
 
-          <div class="layer-sidebar-item layer-3-item">
-            <span class="layer-icon">📡</span>
-            <div class="layer-text">
-              <span class="layer-title">第三层：接收站/数据中心</span>
-              <span class="layer-sub">Ground & Data Layer</span>
+            <div class="layer-sidebar-item layer-3-item">
+              <span class="layer-icon">📡</span>
+              <div class="layer-text">
+                <span class="layer-title">第三层：接收站/数据中心</span>
+                <span class="layer-sub">Ground & Data Layer</span>
+              </div>
             </div>
-          </div>
+          </template>
+          <template v-else>
+            <div class="layer-sidebar-item layer-1-item">
+              <span class="layer-icon">🛰️</span>
+              <div class="layer-text">
+                <span class="layer-title">第一层：通讯卫星</span>
+                <span class="layer-sub">Communication Satellites</span>
+              </div>
+            </div>
+
+            <div class="layer-sidebar-item layer-2-item">
+              <span class="layer-icon">🎯</span>
+              <div class="layer-text">
+                <span class="layer-title">第二层：{{ store.battle?.name || '战场目标区域' }}</span>
+                <span class="layer-sub">Target Battle Area</span>
+              </div>
+            </div>
+          </template>
         </div>
 
         <!-- 右侧：G6 画布容器 (独立分栏，节点绝对不会重叠左侧) -->
@@ -209,8 +251,8 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import G6 from '@antv/g6'
 import { useLayoutStore } from '@/store/modules/layout'
-import { getReconnaissanceAttackMatrix } from '@/api/electronic'
-import type { MatrixResult, Weapon } from '@/api/electronic'
+import { getReconnaissanceAttackMatrix, getCommunicationsAttackMatrix } from '@/api/electronic'
+import type { MatrixResult, Weapon, CommucationMatrix } from '@/api/electronic'
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import WeaponAttackList from '@/components/electronic/WeaponAttackList.vue'
 
@@ -218,6 +260,14 @@ defineOptions({
   name: 'ElectronicWarfareG6',
 })
 const store = useLayoutStore()
+
+// [类型用途]
+// 卫星分类选项类型
+type SatCategoryType = 'RECON' | 'COMM'
+
+// [变量用途]
+// 当前选择的卫星分类 (RECON: 侦察卫星，COMM: 通讯卫星)
+const currentSatCategory = ref<SatCategoryType>('RECON')
 
 // [类型用途]
 // 交战烈度选项类型定义
@@ -428,22 +478,42 @@ const registerCustomG6Edge = () => {
 
 /**
  * [功能说明]
- * 调用后端 API 获取算法矩阵数据
+ * 切换卫星分类 (侦察卫星 vs 通讯卫星) 并全量刷新矩阵数据与三个组件布局
+ *
+ * @param cat 卫星分类 key
+ */
+const handleCategoryChange = (cat: SatCategoryType) => {
+  if (currentSatCategory.value === cat) return
+  currentSatCategory.value = cat
+  fetchMatrixData()
+}
+
+/**
+ * [功能说明]
+ * 调用后端 API 获取算法矩阵数据 (根据 currentSatCategory 按需切换侦察与通讯卫星接口)
  */
 const fetchMatrixData = async () => {
   loading.value = true
   try {
-    const matrixRes = await getReconnaissanceAttackMatrix({
-      norad: store.selectedSatellite?.norad || 0,
-      taskId: store.activedTask?.id || 0,
-      intensityLevel: currentIntensity.value,
-    })
+    let matrixRes: any = null
+    if (currentSatCategory.value === 'COMM') {
+      matrixRes = await getCommunicationsAttackMatrix({
+        taskId: store.activedTask?.id || 0,
+        norad: store.selectedSatellite?.norad || 0,
+      })
+    } else {
+      matrixRes = await getReconnaissanceAttackMatrix({
+        norad: store.selectedSatellite?.norad || 0,
+        taskId: store.activedTask?.id || 0,
+        intensityLevel: currentIntensity.value,
+      })
+    }
 
     if (matrixRes && matrixRes.code === 200 && matrixRes.data) {
       matrixData.value = matrixRes.data
     }
   } catch (err: any) {
-    console.warn('调用后端算法矩阵接口提示，改用兜底展示数据:', err)
+    console.warn('调用后端算法矩阵接口提示:', err)
   } finally {
     loading.value = false
     nextTick(() => {
@@ -492,33 +562,40 @@ const formatTimeStr = (ts: number): string => {
  */
 const allWindowsList = computed<WindowItemWrapper[]>(() => {
   if (!matrixData.value) return []
-  const data = matrixData.value
+  const data: any = matrixData.value
   const list: WindowItemWrapper[] = []
   const satMap = new Map<number, string>()
+  const defaultTargetName = store.battle?.name || '战场目标区域'
 
-  ;(data.initMatrixList || []).forEach((s) => satMap.set(s.norad, s.name))
-  ;(data.satelliteMatrixList || []).forEach((s) => satMap.set(s.norad, s.name))
+  ;(data.initMatrixList || []).forEach((s: any) => satMap.set(s.norad, s.name))
+  ;(data.satelliteMatrixList || []).forEach((s: any) => satMap.set(s.norad, s.name))
 
   // 1. 从 satelliteMatrixList 提取 (包含打击状态 strikeStatus)
   const satMatrixList = data.satelliteMatrixList || []
-  satMatrixList.forEach((sat) => {
-    const windows = sat.stationWindows || []
-    windows.forEach((win, index) => {
-      const startTs = parseToTimestamp(win.peakWindow)
-      const endTs = parseToTimestamp(win.endWindow)
+  satMatrixList.forEach((sat: any) => {
+    const windows = sat.stationWindows || sat.initWindows || []
+    windows.forEach((win: any, index: number) => {
+      const startStr = win.peakWindow || win.startWindow || win.beginWindow || ''
+      const endStr = win.endWindow || ''
+      const startTs = parseToTimestamp(startStr)
+      const endTs = parseToTimestamp(endStr)
+      const recName = win.receiveName || defaultTargetName
+      const recId = win.receiveId || 'target-area'
+      const strikeVal = typeof win.strikeStatus === 'number' ? win.strikeStatus : sat.satelliteStatus === 1 ? 1 : 0
+
       list.push({
-        id: `win-sat-${sat.norad}-${win.receiveId}-${index}`,
+        id: `win-sat-${sat.norad}-${recId}-${index}`,
         satName: sat.name || satMap.get(sat.norad) || `Sat-${sat.norad}`,
         satNorad: sat.norad,
-        receiveName: win.receiveName || win.receiveId,
-        receiveId: win.receiveId,
-        startTime: win.peakWindow,
-        endTime: win.endWindow,
-        startTimeShort: win.peakWindow ? win.peakWindow.split(' ')[1] || win.peakWindow : '',
-        endTimeShort: win.endWindow ? win.endWindow.split(' ')[1] || win.endWindow : '',
+        receiveName: recName,
+        receiveId: recId,
+        startTime: startStr,
+        endTime: endStr,
+        startTimeShort: startStr ? startStr.split(' ')[1] || startStr : '',
+        endTimeShort: endStr ? endStr.split(' ')[1] || endStr : '',
         startTimestamp: startTs,
         endTimestamp: endTs,
-        strikeStatus: win.strikeStatus === 1 || sat.satelliteStatus === 1 ? 1 : 0,
+        strikeStatus: strikeVal,
         delayMin: win.delayMin || sat.delayMin,
         weapons: win.weapons || sat.weapons,
       })
@@ -527,26 +604,31 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
 
   // 2. 补充 initMatrixList 中独有的过境窗口
   const initMatrixList = data.initMatrixList || []
-  initMatrixList.forEach((sat) => {
+  initMatrixList.forEach((sat: any) => {
     const windows = sat.initWindows || []
-    windows.forEach((win, index) => {
-      const winId = `win-init-${sat.norad}-${win.receiveId}-${index}`
+    windows.forEach((win: any, index: number) => {
+      const startStr = win.peakWindow || win.startWindow || win.beginWindow || ''
+      const endStr = win.endWindow || ''
+      const recName = win.receiveName || defaultTargetName
+      const recId = win.receiveId || 'target-area'
+      const winId = `win-init-${sat.norad}-${recId}-${index}`
+
       const exists = list.some(
-        (item) => item.satNorad === sat.norad && item.receiveId === win.receiveId && item.startTime === win.peakWindow
+        (item) => item.satNorad === sat.norad && item.receiveId === recId && item.startTime === startStr
       )
       if (!exists) {
-        const startTs = parseToTimestamp(win.peakWindow)
-        const endTs = parseToTimestamp(win.endWindow)
+        const startTs = parseToTimestamp(startStr)
+        const endTs = parseToTimestamp(endStr)
         list.push({
           id: winId,
           satName: sat.name,
           satNorad: sat.norad,
-          receiveName: win.receiveName || win.receiveId,
-          receiveId: win.receiveId,
-          startTime: win.peakWindow,
-          endTime: win.endWindow,
-          startTimeShort: win.peakWindow ? win.peakWindow.split(' ')[1] || win.peakWindow : '',
-          endTimeShort: win.endWindow ? win.endWindow.split(' ')[1] || win.endWindow : '',
+          receiveName: recName,
+          receiveId: recId,
+          startTime: startStr,
+          endTime: endStr,
+          startTimeShort: startStr ? startStr.split(' ')[1] || startStr : '',
+          endTimeShort: endStr ? endStr.split(' ')[1] || endStr : '',
           startTimestamp: startTs,
           endTimestamp: endTs,
           strikeStatus: 0,
@@ -800,8 +882,138 @@ const struckLinkCount = ref(0)
  */
 const buildG6GraphData = () => {
   if (!matrixData.value) return { nodes: [], edges: [] }
-  const data = matrixData.value
+  const data: any = matrixData.value
 
+  // ==================== 通讯卫星模式两层拓扑构建 ====================
+  if (currentSatCategory.value === 'COMM') {
+    const nodes: any[] = []
+    const edges: any[] = []
+    const satMap = new Map<number, { norad: number; name: string; satType: string; status: number }>()
+
+    ;(data.initMatrixList || []).forEach((s: any) => {
+      satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType || '通讯卫星', status: 0 })
+    })
+    ;(data.satelliteMatrixList || []).forEach((s: any) => {
+      const satStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : s.satelliteStatus || 0
+      satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType || '通讯卫星', status: satStatus })
+    })
+
+    const satList = Array.from(satMap.values())
+    satNodeCount.value = satList.length
+    receiveNodeCount.value = 1
+    stationNodeCount.value = 0
+
+    const containerW = g6Container.value ? g6Container.value.clientWidth : 950
+    const startX = 30
+    const availableW = Math.max(containerW - startX - 30, 400)
+
+    // 1. 排布第一层 通讯卫星 (y = 90)
+    satList.forEach((sat, i) => {
+      const id = `sat-${sat.norad}`
+      const x = startX + (availableW / (satList.length + 1)) * (i + 1)
+      const isStruck = sat.status === 1
+      const bgFill = isStruck ? '#2d1215' : '#092638'
+      const strokeColor = isStruck ? '#ff4d4f' : '#00e1ff'
+      const textColor = isStruck ? '#ff7875' : '#e6f7ff'
+
+      nodes.push({
+        id,
+        label: `${sat.name}\n[${sat.satType}]`,
+        layer: 1,
+        x,
+        y: 90,
+        type: 'rect',
+        size: [140, 44],
+        anchorPoints: [
+          [0.5, 0],
+          [0.5, 1],
+        ],
+        style: {
+          fill: bgFill,
+          stroke: strokeColor,
+          lineWidth: 2,
+          radius: 6,
+          shadowColor: isStruck ? 'rgba(255, 77, 79, 0.4)' : 'rgba(0, 225, 255, 0.3)',
+          shadowBlur: 10,
+        },
+        labelCfg: {
+          style: {
+            fill: textColor,
+            fontSize: 12,
+            fontWeight: 600,
+          },
+        },
+      })
+    })
+
+    // 2. 排布第二层 战场目标区域节点 (y = 350, 居中)
+    const targetNodeId = 'target-area'
+    const targetName = store.battle?.name || '战场目标区域'
+    nodes.push({
+      id: targetNodeId,
+      label: `🎯 ${targetName}\n[通信目标区域]`,
+      layer: 2,
+      x: containerW / 2,
+      y: 350,
+      type: 'rect',
+      size: [220, 50],
+      anchorPoints: [
+        [0.5, 0],
+        [0.5, 1],
+      ],
+      style: {
+        fill: '#0f2742',
+        stroke: '#1890ff',
+        lineWidth: 2,
+        radius: 8,
+        shadowColor: 'rgba(24, 144, 255, 0.4)',
+        shadowBlur: 12,
+      },
+      labelCfg: {
+        style: {
+          fill: '#e6f7ff',
+          fontSize: 14,
+          fontWeight: 700,
+        },
+      },
+    })
+
+    // 3. 构建通讯链路连线 (通讯卫星 -> 战场目标区域)
+    let normCount = 0
+    let struckCount = 0
+
+    satList.forEach((sat) => {
+      const satId = `sat-${sat.norad}`
+      const isStruck = sat.status === 1
+      if (isStruck) {
+        struckCount++
+      } else {
+        normCount++
+      }
+
+      edges.push({
+        source: satId,
+        target: targetNodeId,
+        type: 'struck-cubic',
+        style: {
+          stroke: isStruck ? '#ff4d4f' : '#00e1ff',
+          lineWidth: 2,
+          lineDash: isStruck ? [6, 4] : undefined,
+          endArrow: {
+            path: G6.Arrow.triangle(6, 8, 0),
+            fill: isStruck ? '#ff4d4f' : '#00e1ff',
+          },
+        },
+      })
+    })
+
+    normalLinkCount.value = normCount
+    struckLinkCount.value = struckCount
+
+    return { nodes, edges }
+  }
+
+  // ==================== 侦察卫星模式三层拓扑构建 ====================
   const nodes: any[] = []
   const edges: any[] = []
   const nodeSet = new Set<string>()

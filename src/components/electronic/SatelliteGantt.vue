@@ -422,14 +422,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getReconnaissanceAttackMatrix } from '@/api/electronic'
-import type { MatrixResult, SatelliteMatrix, Weapon } from '@/api/electronic'
+import type { MatrixResult, SatelliteMatrix, Weapon, CommucationMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
 const store = useLayoutStore()
 // [类型定义]
 // 组件接收的 Props 参数类型
 interface SatelliteGanttProps {
-  /** 算法矩阵根接口返回数据 MatrixResult (可选) */
-  matrixData?: MatrixResult | null
+  /** 算法矩阵根接口返回数据 MatrixResult 或 CommucationMatrix (可选) */
+  matrixData?: MatrixResult | CommucationMatrix | any
   /** 烈度 */
   intensity?: string
 }
@@ -443,7 +443,7 @@ const props = withDefaults(defineProps<SatelliteGanttProps>(), {
 
 // [变量用途]
 // 组件内部自主管理的 MatrixResult 矩阵数据引用
-const internalMatrixData = ref<MatrixResult | null>(null)
+const internalMatrixData = ref<MatrixResult | CommucationMatrix | any>(null)
 
 // [变量用途]
 // 数据加载 Loading 状态
@@ -687,10 +687,13 @@ const timeBounds = computed<{ minTs: number; maxTs: number }>(() => {
   let minTs = Infinity
   let maxTs = -Infinity
 
-  filteredSatellites.value.forEach((sat) => {
-    ;(sat.stationWindows || []).forEach((win) => {
-      const start = parseToTimestamp(win.peakWindow)
-      const end = parseToTimestamp(win.endWindow)
+  filteredSatellites.value.forEach((sat: any) => {
+    const rawWindows = sat.stationWindows || sat.initWindows || []
+    rawWindows.forEach((win: any) => {
+      const startStr = win.peakWindow || win.startWindow || win.beginWindow || ''
+      const endStr = win.endWindow || ''
+      const start = parseToTimestamp(startStr)
+      const end = parseToTimestamp(endStr)
       if (start < minTs) minTs = start
       if (end > maxTs) maxTs = end
     })
@@ -760,24 +763,28 @@ const processedGanttRows = computed<ProcessedSatRow[]>(() => {
   const totalSec = maxTs - minTs
   const canvasWidth = ganttCanvasWidth.value
 
-  return filteredSatellites.value.map((sat) => {
-    const rawWindows = sat.stationWindows || []
+  const defaultTargetName = store.battle?.name || '战场目标区域'
+
+  return filteredSatellites.value.map((sat: any) => {
+    const rawWindows = sat.stationWindows || sat.initWindows || []
 
     // 1. 按照开始时间戳升序排序
     const sortedWindows = rawWindows
-      .map((win, idx) => {
-        const start = parseToTimestamp(win.peakWindow)
-        const end = parseToTimestamp(win.endWindow)
-        return { win, start, end, idx }
+      .map((win: any, idx: number) => {
+        const startStr = win.peakWindow || win.startWindow || win.beginWindow || ''
+        const endStr = win.endWindow || ''
+        const start = parseToTimestamp(startStr)
+        const end = parseToTimestamp(endStr)
+        return { win, start, end, idx, startStr, endStr }
       })
-      .sort((a, b) => a.start - b.start)
+      .sort((a: any, b: any) => a.start - b.start)
 
     // 2. 多层排道 Lane 分配算法 (类似 Chrome Network Timing / Timer Timeline，防止任何视觉与物理碰撞)
     const laneEndTimes: number[] = [] // 记录每个 lane 当前最后一个块的结束时间戳
     const laneRightPx: number[] = [] // 记录每个 lane 当前最后一个块的最右侧物理像素位置
     const bars: ProcessedGanttBar[] = []
 
-    sortedWindows.forEach(({ win, start, end, idx }) => {
+    sortedWindows.forEach(({ win, start, end, idx, startStr, endStr }: any) => {
       // 计算位置像素
       const startRatio = (start - minTs) / totalSec
       const endRatio = (end - minTs) / totalSec
@@ -809,34 +816,37 @@ const processedGanttRows = computed<ProcessedSatRow[]>(() => {
 
       // 合并武器列表 (去重)
       const weaponMap = new Map<string, Weapon>()
-      ;(sat.weapons || []).forEach((w) => weaponMap.set(w.id, w))
-      ;(win.weapons || []).forEach((w) => weaponMap.set(w.id, w))
+      ;(sat.weapons || []).forEach((w: Weapon) => weaponMap.set(w.id, w))
+      ;(win.weapons || []).forEach((w: Weapon) => weaponMap.set(w.id, w))
       const combinedWeapons = Array.from(weaponMap.values())
 
       // 4色击毁状态判定名
+      const strikeStatusVal = typeof win.strikeStatus === 'number' ? win.strikeStatus : sat.satelliteStatus === 1 ? 1 : 0
       let colorStatusClass: 'status-normal' | 'status-sat-struck' | 'status-rec-struck' | 'status-both-struck' =
         'status-normal'
-      if (sat.satelliteStatus === 1 && win.strikeStatus === 1) {
+      if (sat.satelliteStatus === 1 && strikeStatusVal === 1) {
         colorStatusClass = 'status-both-struck'
       } else if (sat.satelliteStatus === 1) {
         colorStatusClass = 'status-sat-struck'
-      } else if (win.strikeStatus === 1) {
+      } else if (strikeStatusVal === 1) {
         colorStatusClass = 'status-rec-struck'
       }
 
-      const peakWindowShort = win.peakWindow.length >= 16 ? win.peakWindow.substring(11, 16) : win.peakWindow
-      const endWindowShort = win.endWindow.length >= 16 ? win.endWindow.substring(11, 16) : win.endWindow
+      const peakWindowShort = startStr.length >= 16 ? startStr.substring(11, 16) : startStr
+      const endWindowShort = endStr.length >= 16 ? endStr.substring(11, 16) : endStr
+      const recName = win.receiveName || defaultTargetName
+      const recId = win.receiveId || 'target-area'
 
       bars.push({
-        id: `bar-${sat.norad}-${win.receiveId}-${idx}`,
+        id: `bar-${sat.norad}-${recId}-${idx}`,
         satNorad: sat.norad,
         satName: sat.name,
-        satStatus: sat.satelliteStatus,
-        receiveId: win.receiveId,
-        receiveName: win.receiveName,
-        strikeStatus: win.strikeStatus,
-        peakWindow: win.peakWindow,
-        endWindow: win.endWindow,
+        satStatus: sat.satelliteStatus || 0,
+        receiveId: recId,
+        receiveName: recName,
+        strikeStatus: strikeStatusVal,
+        peakWindow: startStr,
+        endWindow: endStr,
         peakWindowShort,
         endWindowShort,
         startTimestamp: start,

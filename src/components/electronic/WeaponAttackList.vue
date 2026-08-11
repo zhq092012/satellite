@@ -91,11 +91,11 @@
               <div v-for="(win, wIdx) in plan.windows" :key="wIdx" class="window-item">
                 <div class="win-index">窗口 #{{ wIdx + 1 }}</div>
                 <div class="win-time-span">
-                  <span class="time-start">{{ win.beginWindow }}</span>
+                  <span class="time-start">{{ getWindowStart(win) }}</span>
                   <span class="time-arrow">➔</span>
-                  <span class="time-end">{{ win.endWindow }}</span>
+                  <span class="time-end">{{ getWindowEnd(win) }}</span>
                 </div>
-                <div class="win-span-length">时长: {{ formatDuration(win.beginWindow, win.endWindow) }}</div>
+                <div class="win-span-length">时长: {{ formatDuration(getWindowStart(win), getWindowEnd(win)) }}</div>
               </div>
             </div>
             <div v-else class="no-windows-tip">暂无独立子时间窗口数据</div>
@@ -108,14 +108,14 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { MatrixResult, WeaponAttackRecord } from '@/api/electronic'
+import type { MatrixResult, WeaponAttackRecord, CommucationMatrix } from '@/api/electronic'
 
 /**
  * [组件属性定义]
- * 接收来自父组件 ElectronicWarfareG6 的 matrixData 矩阵数据结构
+ * 接收来自父组件 ElectronicWarfareG6 的 matrixData 矩阵数据结构 (支持侦察卫星与通讯卫星)
  */
 interface Props {
-  matrixData?: MatrixResult | null
+  matrixData?: MatrixResult | CommucationMatrix | any
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -160,6 +160,30 @@ const filteredPlans = computed<WeaponAttackRecord[]>(() => {
     return nameMatch || typeMatch || targetMatch || targetTypeMatch
   })
 })
+
+/**
+ * [功能说明]
+ * 安全获取窗口对象的开始时间（兼容侦察卫星 beginWindow/peakWindow 与通讯卫星 startWindow 字段）
+ *
+ * @param win 窗口对象
+ * @returns 开始时间字符串
+ */
+const getWindowStart = (win: any): string => {
+  if (!win) return ''
+  return win.beginWindow || win.startWindow || win.peakWindow || ''
+}
+
+/**
+ * [功能说明]
+ * 安全获取窗口对象的结束时间（兼容侦察卫星与通讯卫星字段）
+ *
+ * @param win 窗口对象
+ * @returns 结束时间字符串
+ */
+const getWindowEnd = (win: any): string => {
+  if (!win) return ''
+  return win.endWindow || ''
+}
 
 /**
  * [功能说明]
@@ -245,20 +269,22 @@ const formatDuration = (startStr: string, endStr: string): string => {
  * 计算某项武器打击计划中所有打击窗口 (windows) 时长的累加总和
  *
  * [处理规则]
- * - 优先遍历 plan.windows 列表中每一个子窗口的 beginWindow ~ endWindow，计算时长秒数并求和。
+ * - 优先遍历 plan.windows 列表中每一个子窗口的起止时间，计算时长秒数并求和。
  * - 当 plan.windows 为空或无效时，兜底计算整体起止时间 beginTime ~ endTime 的时间差。
  *
  * @param plan 武器打击计划记录对象
  * @returns 累加格式化后的总时长描述字符串
  */
-const formatTotalWindowsDuration = (plan: WeaponAttackRecord): string => {
+const formatTotalWindowsDuration = (plan: WeaponAttackRecord | any): string => {
   if (!plan) return '未知'
 
   // 1. 优先累加所有子时间窗口的时长秒数
   if (plan.windows && plan.windows.length > 0) {
     let totalSecs = 0
-    plan.windows.forEach((win) => {
-      totalSecs += calcSecondsSpan(win.beginWindow, win.endWindow)
+    plan.windows.forEach((win: any) => {
+      const s = getWindowStart(win)
+      const e = getWindowEnd(win)
+      totalSecs += calcSecondsSpan(s, e)
     })
     if (totalSecs > 0) {
       return formatSecondsToText(totalSecs)
