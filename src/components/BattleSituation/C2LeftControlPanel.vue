@@ -30,10 +30,10 @@
         </button>
       </div>
 
-      <!-- 选择卫星类型后带出的卫星系列列表 (排成一列 list) -->
-      <div class="series-list-box" v-if="selectedType && seriesOptions.length > 0">
+      <!-- 卫星系列列表 (排成一列 list，全部类型或指定类型下均可展示) -->
+      <div class="series-list-box" v-if="seriesOptions.length > 0">
         <div class="series-list-header">
-          <span class="series-title">📋 {{ selectedType }} · 包含系列列表</span>
+          <span class="series-title">📋 {{ selectedType ? `${selectedType} · 包含系列` : '全部系列列表' }}</span>
           <span class="series-count">{{ seriesOptions.length }} 个</span>
         </div>
         <div class="series-list">
@@ -181,12 +181,14 @@ const typeOptions = computed<string[]>(() => {
   return Object.keys(typeSerialsMap.value)
 })
 
-// [变量用途]
-// 当前选中的卫星类型下可供选择的系列下拉选项列表
-
+/**
+ * [计算属性说明]
+ * 当前选中的卫星类型下可供选择的系列列表（若选择"全部类型"或未选类型，则汇总合并展示所有类型下的所有系列）
+ */
 const seriesOptions = computed<string[]>(() => {
   if (!selectedType.value) {
-    return []
+    const allSeries = Object.values(typeSerialsMap.value).flat()
+    return Array.from(new Set(allSeries))
   }
   return typeSerialsMap.value[selectedType.value] || []
 })

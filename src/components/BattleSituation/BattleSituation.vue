@@ -65,7 +65,50 @@ const matrixData = ref<MatrixResult | null>(null)
 
 /**
  * [函数说明]
- * 选择某颗敌方卫星并加载其专属数据传输矩阵与过境时间窗口
+ * 根据选择的卫星系列，异步查询算法传输矩阵并从矩阵中加载相关资产
+ * @param series 选中的卫星系列名称
+ */
+const fetchMatrixDataBySeries = async (series: string) => {
+  const taskId = store.activedTask?.id
+  if (!taskId || !series) {
+    matrixData.value = null
+    selectedNorad.value = null
+    return
+  }
+
+  try {
+    const res = await getReconnaissanceAttackMatrix({
+      taskId,
+      intensityLevel: '低烈度',
+      series,
+    })
+    if (res.code === 200 && res.data) {
+      matrixData.value = res.data
+
+      // 从已经查询出来的矩阵中提取首个卫星节点进行锁定与时间轴定位
+      const firstSat = res.data.battleMatrixList?.[0] || res.data.initMatrixList?.[0]
+      if (firstSat?.norad) {
+        selectedNorad.value = firstSat.norad
+        let windowStartTime: string | undefined
+        if (firstSat.windows?.length) {
+          windowStartTime = firstSat.windows[0].startTime
+        } else if ((firstSat as any).initWindows?.length) {
+          windowStartTime = (firstSat as any).initWindows[0].peakWindow
+        }
+
+        if (cesiumViewerRef.value && (cesiumViewerRef.value as any).jumpToTimeAndPlay) {
+          ;(cesiumViewerRef.value as any).jumpToTimeAndPlay(windowStartTime)
+        }
+      }
+    }
+  } catch (err) {
+    console.error('获取算法传输矩阵失败:', err)
+  }
+}
+
+/**
+ * [函数说明]
+ * 手动选择某颗敌方卫星并加载其专属数据传输矩阵与过境时间窗口
  * @param norad 选中的敌方卫星 NORAD 编号
  */
 const handleSelectSatellite = async (norad: number | null) => {
@@ -112,15 +155,21 @@ const handleSelectSatellite = async (norad: number | null) => {
 
 /**
  * [监听器说明]
- * 监听选中的卫星系列变更，当用户选择新系列且已有选中卫星时自动重新加载矩阵
+ * 监听选中的卫星系列变更。
+ * 选择系列后，重新查询对应的算法矩阵，并从已查询出的矩阵中加载地面站、数据中心及天基传输资产。
  */
 watch(
   () => store.selectedSatSeries,
   (newSeries) => {
-    if (selectedNorad.value && store.activedTask?.id) {
-      void handleSelectSatellite(selectedNorad.value)
+    if (newSeries) {
+      void fetchMatrixDataBySeries(newSeries)
+    } else {
+      matrixData.value = null
+      selectedNorad.value = null
+      void pauseClockAnimation()
     }
-  }
+  },
+  { immediate: true }
 )
 
 /**
@@ -153,16 +202,6 @@ async function pauseClockAnimation() {
 
 /**
  * [函数说明]
- * 渲染战场任务相关卫星轨迹与实体
- */
-const loadSatelliteEntities = async () => {
-  if (store.activedTask?.id) {
-    await cesiumViewerRef.value?.renderSateliitePathWithEntity(store.activedTask?.id, undefined)
-  }
-}
-
-/**
- * [函数说明]
  * 标记战场区域网格与交互实体
  */
 function markBattleArea() {
@@ -172,23 +211,12 @@ function markBattleArea() {
 }
 
 onMounted(() => {
-  nextTick(async () => {
-    await loadSatelliteEntities()
-    if (store.allSatelliteOfTask.length > 0) {
-      const norad = Number(store.allSatelliteOfTask[0].norad_id)
-      if (Number.isFinite(norad) && selectedNorad.value !== norad) {
-        try {
-          const res = await getSatelliteDetail({ norad: Number(norad) })
-          if (res.code === 200 && res.data) {
-            store.setSelectedSatellite(res.data)
-            void handleSelectSatellite(norad)
-          }
-        } catch (error) {
-          console.error('查询卫星详细信息失败:', error)
-        }
-      }
-    }
+  nextTick(() => {
+    // 组件开始加载时仅标记战场边界网格，不全量加载全库卫星资产，保持地图洁净
     markBattleArea()
+    if (store.selectedSatSeries) {
+      void fetchMatrixDataBySeries(store.selectedSatSeries)
+    }
   })
   void pauseClockAnimation()
 })
@@ -196,16 +224,17 @@ onMounted(() => {
 /**
  * [监听器说明]
  * 监听当前激活的任务 ID 改变。
- * 当任务选择发生变更或从未选中状态变更为激活状态时，
- * 自动暂停推演动画，并重新加载渲染对应任务的卫星实体轨迹与战场网格。
+ * 当任务选择发生变更时，自动重置视角与推演，并在有选中系列时加载对应矩阵资产。
  */
 watch(
   () => store.activedTask?.id,
   async (taskId, prevTaskId) => {
     if (!taskId || taskId === prevTaskId) return
     await pauseClockAnimation()
-    await loadSatelliteEntities()
     markBattleArea()
+    if (store.selectedSatSeries) {
+      await fetchMatrixDataBySeries(store.selectedSatSeries)
+    }
   }
 )
 </script>

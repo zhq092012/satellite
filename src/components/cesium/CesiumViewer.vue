@@ -681,25 +681,7 @@ const renderElectronicInfrastructureNodes = () => {
     })
     electronicNodeEntityIds.add(entityId)
 
-    // 3. 渲染 3D 地面站雷达包络视椎 (Radar Envelope Frustum Cone)
-    if (isReceive) {
-      const coneLength = 500000 // 500km 高度
-      const coneCenterPos = Cesium.Cartesian3.fromDegrees(node.longitude, node.latitude, coneLength / 2)
-      viewer.entities.add({
-        id: `${entityId}-frustum`,
-        position: coneCenterPos,
-        cylinder: {
-          length: coneLength,
-          topRadius: 320000, // 320km 顶部辐射半径
-          bottomRadius: 2000,
-          material: new Cesium.Color(0, 0.88, 1, 0.12),
-          outline: true,
-          outlineColor: new Cesium.Color(0, 0.88, 1, 0.35),
-          outlineWidth: 1.0,
-        },
-      })
-      electronicNodeEntityIds.add(`${entityId}-frustum`)
-    }
+    // 3. (取消渲染 3D 地面站雷达包络视椎圆锥体)
   })
 
   // 4. 渲染敌方天基过境与中继卫星集群 3D 实体
@@ -968,70 +950,17 @@ const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null =
  * 根据当前 Cesium 时钟时间更新敌方星地过境连线、星中中继连线与地地光纤网
  */
 const updateElectronicDynamicLinks = () => {
-  if (!viewer || viewer.isDestroyed() || !props.matrixData) return
+  if (!viewer || viewer.isDestroyed()) return
 
   const currentTime = Cesium.JulianDate.toDate(viewer.clock.currentTime)
   updateSimulationTime(currentTime)
 
-  const activeLinkKeys = new Set<string>()
-
-  // 1. 遍历敌方过境卫星矩阵解析星地过境窗口连线 (忽略中继卫星与地面站之间的直接连线)
-  const satelliteMatrixList = props.matrixData.satelliteMatrixList || []
-  satelliteMatrixList.forEach((satItem) => {
-    const norad = satItem.norad
-    // 去掉中继卫星与地面站之间的连线
-    const isRelay = norad === 22314 || (satItem.satType || '').includes('中继')
-    if (isRelay) return
-
-    const satPos = getSatellitePositionInCesium(norad)
-    if (!satPos) return
-
-    const stationWindows = satItem.stationWindows || []
-    stationWindows.forEach((win: StationWindow) => {
-      const active = isTimeInWindow(currentTime, win.peakWindow, win.endWindow)
-      if (!active) return
-
-      const infraNode = infrastructureNodes.value.find((n) => n.id === win.receiveId)
-      if (!infraNode) return
-      const recPos = Cesium.Cartesian3.fromDegrees(infraNode.longitude, infraNode.latitude, infraNode.altitude)
-
-      const linkKey = `link-transit-${norad}-${win.receiveId}`
-      activeLinkKeys.add(linkKey)
-
-      const isStruck = win.strikeStatus === 1
-
-      const existingEntity = viewer.entities.getById(linkKey)
-      if (!existingEntity) {
-        viewer.entities.add({
-          id: linkKey,
-          polyline: {
-            positions: [satPos, recPos],
-            width: isStruck ? 3.0 : 2.5,
-            material: isStruck
-              ? new Cesium.PolylineDashMaterialProperty({
-                  color: Cesium.Color.YELLOW,
-                  dashLength: 16.0,
-                })
-              : new Cesium.PolylineGlowMaterialProperty({
-                  glowPower: 0.25,
-                  taperPower: 0.6,
-                  color: Cesium.Color.CYAN,
-                }),
-          },
-        })
-        electronicDynamicLinkEntityIds.add(linkKey)
-      }
-    })
-  })
-
-  // 清理非激活动态连线
+  // 清理现有全部传输动态链路实体 (按要求禁用卫星与地面站、卫星与中继、地面站与数据中心间链路)
   electronicDynamicLinkEntityIds.forEach((linkId) => {
-    if (!activeLinkKeys.has(linkId)) {
-      const entity = viewer.entities.getById(linkId)
-      if (entity) viewer.entities.remove(entity)
-      electronicDynamicLinkEntityIds.delete(linkId)
-    }
+    const entity = viewer.entities.getById(linkId)
+    if (entity) viewer.entities.remove(entity)
   })
+  electronicDynamicLinkEntityIds.clear()
 }
 
 /**
@@ -2211,19 +2140,7 @@ const highlightSatellite = (sate: { norad_id: string }) => {
     }
 
     if (entity.path) {
-      entity.path.show = new CallbackProperty(() => true, false)
-      entity.path.width = new Cesium.ConstantProperty(4)
-    } else {
-      entity.path = new Cesium.PathGraphics({
-        show: new CallbackProperty(() => true, false),
-        leadTime: 90 * 60,
-        trailTime: 0,
-        width: 4,
-        material: new Cesium.PolylineGlowMaterialProperty({
-          glowPower: 0.2,
-          color: Cesium.Color.YELLOW,
-        }),
-      }) as any
+      entity.path.show = new CallbackProperty(() => false, false)
     }
   }
 
