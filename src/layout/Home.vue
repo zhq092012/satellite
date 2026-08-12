@@ -428,37 +428,81 @@ onMounted(async () => {
   }
 }
 
-/* 战场与任务选择模态框样式 */
+/* 战场与任务选择模态框深色主旨样式 */
+:deep(.task-selector-dialog) {
+  .el-dialog {
+    background: #0d1e36 !important;
+    border: 1px solid rgba(79, 147, 221, 0.35) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+    border-radius: 10px;
+
+    .el-dialog__header {
+      padding: 16px 20px 10px 20px;
+      border-bottom: 1px solid rgba(79, 147, 221, 0.2);
+
+      .el-dialog__title {
+        color: #ffffff !important;
+        font-size: 16px;
+        font-weight: bold;
+      }
+
+      .el-dialog__headerbtn .el-dialog__close {
+        color: #94a3b8 !important;
+
+        &:hover {
+          color: #00e1ff !important;
+        }
+      }
+    }
+
+    .el-dialog__body {
+      padding: 16px 20px;
+      color: #e2e8f0;
+    }
+
+    .el-dialog__footer {
+      padding: 12px 20px;
+      border-top: 1px solid rgba(79, 147, 221, 0.2);
+    }
+  }
+}
+
 .dialog-body {
   .form-tip {
     font-size: 13px;
-    color: #909399;
-    margin-bottom: 14px;
+    color: #94a3b8;
+    margin-bottom: 16px;
+  }
+
+  :deep(.el-form-item__label) {
+    color: #cbd5e1 !important;
+    font-weight: 500;
   }
 
   .quick-battle-tree {
     margin-top: 16px;
-    border-top: 1px dashed rgba(255, 255, 255, 0.12);
-    padding-top: 12px;
+    border-top: 1px dashed rgba(79, 147, 221, 0.25);
+    padding-top: 14px;
 
     .tree-title {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: bold;
-      color: #303133;
-      margin-bottom: 10px;
+      color: #ffffff; /* 快捷选择列表字样改为白色 */
+      margin-bottom: 12px;
     }
 
     .battle-group {
       margin-bottom: 12px;
-      padding: 8px 12px;
-      background: rgba(0, 0, 0, 0.03);
-      border-radius: 6px;
+      padding: 10px 14px;
+      background: rgba(16, 36, 62, 0.6);
+      border: 1px solid rgba(79, 147, 221, 0.25);
+      border-radius: 8px;
 
       .battle-group-name {
         font-size: 14px;
         font-weight: bold;
-        color: #409eff;
-        margin-bottom: 6px;
+        color: #00e1ff;
+        margin-bottom: 8px;
       }
 
       .task-chips {
@@ -467,29 +511,34 @@ onMounted(async () => {
         gap: 8px;
 
         .task-chip {
-          padding: 4px 12px;
+          padding: 5px 14px;
           font-size: 12px;
-          background: #ffffff;
-          border: 1px solid #dcdfe6;
-          border-radius: 4px;
+          color: #e2e8f0;
+          background: rgba(8, 20, 36, 0.9);
+          border: 1px solid rgba(79, 147, 221, 0.3);
+          border-radius: 6px;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: all 0.25s ease;
 
           &:hover {
-            border-color: #409eff;
-            color: #409eff;
+            border-color: #00e1ff;
+            color: #00e1ff;
+            background: rgba(0, 225, 255, 0.12);
+            box-shadow: 0 0 8px rgba(0, 225, 255, 0.2);
           }
 
           &.active {
-            background: #409eff;
+            background: linear-gradient(135deg, rgba(79, 147, 221, 0.8) 0%, rgba(0, 180, 216, 0.9) 100%);
             color: #ffffff;
-            border-color: #409eff;
+            font-weight: 600;
+            border-color: #00e1ff;
+            box-shadow: 0 0 10px rgba(0, 225, 255, 0.4);
           }
         }
 
         .no-task {
           font-size: 12px;
-          color: #c0c4cc;
+          color: #64748b;
         }
       }
     }
