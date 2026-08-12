@@ -3,10 +3,53 @@
     <!-- 面板标题 Header -->
     <div class="panel-header">
       <div class="header-title-box">
-        <span class="header-icon">🛰️</span>
         <span class="header-title glow-text-cyan">敌方网络与资产拓扑</span>
       </div>
       <span class="panel-badge">传输链路</span>
+    </div>
+
+    <!-- 卫星类型与系列按钮/列表筛选区 -->
+    <div class="filter-section">
+      <!-- 卫星类型选择按钮组 (占满一行) -->
+      <div class="type-button-bar">
+        <button
+          class="type-btn"
+          :class="{ active: selectedType === '' }"
+          @click="selectType('')"
+        >
+          🌐 全部类型
+        </button>
+        <button
+          v-for="item in typeOptions"
+          :key="item"
+          class="type-btn"
+          :class="{ active: selectedType === item }"
+          @click="selectType(item)"
+        >
+          {{ item }}
+        </button>
+      </div>
+
+      <!-- 选择卫星类型后带出的卫星系列列表 (排成一列 list) -->
+      <div class="series-list-box" v-if="selectedType && seriesOptions.length > 0">
+        <div class="series-list-header">
+          <span class="series-title">📋 {{ selectedType }} · 包含系列列表</span>
+          <span class="series-count">{{ seriesOptions.length }} 个</span>
+        </div>
+        <div class="series-list">
+          <div
+            v-for="series in seriesOptions"
+            :key="series"
+            class="series-item"
+            :class="{ active: selectedSeries === series }"
+            @click="selectSeries(series)"
+          >
+            <span class="series-icon">🏷️</span>
+            <span class="series-name">{{ series }}</span>
+            <span class="series-status">{{ selectedSeries === series ? '✓ 已筛选' : '点击筛选' }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 2. 敌方天基空间节点资产清单 (Space Layer) -->
@@ -15,30 +58,6 @@
         <span class="title-icon">🌌</span>
         <span>敌方天基过境与中继卫星</span>
         <span class="count-tag">{{ satList.length }} 颗</span>
-      </div>
-
-      <!-- 卫星类型与系列级联筛选框 -->
-      <div class="filter-cascade-bar">
-        <el-select
-          v-model="selectedType"
-          placeholder="选择类型"
-          clearable
-          size="small"
-          class="filter-select"
-          @change="handleTypeChange"
-        >
-          <el-option v-for="item in typeOptions" :key="item" :label="item" :value="item" />
-        </el-select>
-        <el-select
-          v-model="selectedSeries"
-          placeholder="选择系列"
-          clearable
-          size="small"
-          class="filter-select"
-          :disabled="!selectedType"
-        >
-          <el-option v-for="item in seriesOptions" :key="item" :label="item" :value="item" />
-        </el-select>
       </div>
 
       <div class="asset-scroll-list">
@@ -173,27 +192,37 @@ const seriesOptions = computed<string[]>(() => {
 })
 
 /**
- * [功能]
- * 响应卫星类型下拉选择框变更事件
- *
- * [处理规则]
- * 当用户选择或重置卫星类型时，自动将选中的系列 selectedSeries 清空
- *
- * [副作用]
- * 重置 selectedSeries.value 为空字符串
- *
- * [异常处理]
- * 无
- *
- * [修改约束]
- * 保持类型与系列的联动清空逻辑
+ * [函数说明]
+ * 选择或切换选中的卫星类型，并同步保存至 Store
+ * @param type 选中的卫星类型名称，传空字符串表示选择全部
  */
-const handleTypeChange = () => {
+const selectType = (type: string) => {
+  if (selectedType.value === type) {
+    selectedType.value = ''
+  } else {
+    selectedType.value = type
+  }
   selectedSeries.value = ''
+  store.setSelectedSatType(selectedType.value)
+  store.setSelectedSatSeries('')
 }
 
 /**
- * [功能]
+ * [函数说明]
+ * 选择或切换选中的卫星系列，并同步保存至 Store
+ * @param series 选中的卫星系列名称
+ */
+const selectSeries = (series: string) => {
+  if (selectedSeries.value === series) {
+    selectedSeries.value = ''
+  } else {
+    selectedSeries.value = series
+  }
+  store.setSelectedSatSeries(selectedSeries.value)
+}
+
+/**
+ * [函数说明]
  * 根据任务 ID 从后端异步加载卫星类型与系列映射数据
  *
  * [处理规则]
@@ -248,7 +277,10 @@ const handleSelectSatellite = (norad: number) => {
   }
 }
 
-// 提取敌方卫星列表 (包含过境卫星与中继卫星)，并执行类型和系列筛选
+/**
+ * [计算属性说明]
+ * 提取敌方卫星列表 (包含过境卫星与中继卫星)，并根据选择的类型和系列动态过滤
+ */
 const satList = computed(() => {
   const matrixData = props.matrixData
   const map = new Map<number, { norad: number; name: string; satType: string; isRelay: boolean }>()
@@ -272,7 +304,18 @@ const satList = computed(() => {
     })
   })
 
-  return Array.from(map.values())
+  let list = Array.from(map.values())
+
+  // 类型过滤
+  if (selectedType.value) {
+    list = list.filter((item) => (item.satType || '').includes(selectedType.value))
+  }
+  // 系列过滤
+  if (selectedSeries.value) {
+    list = list.filter((item) => (item.name || '').toUpperCase().includes(selectedSeries.value.toUpperCase()))
+  }
+
+  return list
 })
 
 const selectedInfrastructureNode = computed(() => store.selectedInfrastructureNode)
@@ -429,33 +472,150 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
   }
 }
 
-.filter-cascade-bar {
+.filter-section {
   display: flex;
+  flex-direction: column;
   gap: 8px;
 
-  .filter-select {
-    flex: 1;
-    min-width: 0;
+  .type-button-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    flex-wrap: wrap;
 
-    :deep(.el-input__wrapper) {
-      background-color: rgba(18, 32, 54, 0.85);
-      box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.25) inset;
+    .type-btn {
+      flex: 1 1 auto;
+      min-width: 60px;
+      height: 28px;
+      padding: 0 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 500;
+      color: #9ec5ed;
+      background: rgba(18, 32, 54, 0.85);
+      border: 1px solid rgba(0, 225, 255, 0.25);
       border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      outline: none;
+      white-space: nowrap;
 
-      &.is-focus,
       &:hover {
-        box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.6) inset;
+        color: #ffffff;
+        border-color: rgba(0, 225, 255, 0.6);
+        background: rgba(24, 48, 80, 0.9);
+        box-shadow: 0 0 6px rgba(0, 225, 255, 0.2);
+      }
+
+      &.active {
+        color: #ffffff;
+        font-weight: 600;
+        background: linear-gradient(135deg, rgba(0, 180, 216, 0.4) 0%, rgba(0, 225, 255, 0.25) 100%);
+        border-color: #00e1ff;
+        box-shadow: 0 0 10px rgba(0, 225, 255, 0.35);
+      }
+    }
+  }
+
+  .series-list-box {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    background: rgba(12, 22, 38, 0.75);
+    border: 1px dashed rgba(0, 225, 255, 0.25);
+    border-radius: 6px;
+
+    .series-list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #7dd3fc;
+      padding-bottom: 4px;
+      border-bottom: 1px rgba(0, 225, 255, 0.15) solid;
+
+      .series-title {
+        font-weight: 600;
+      }
+
+      .series-count {
+        color: #38bdf8;
+        background: rgba(56, 189, 248, 0.15);
+        padding: 1px 6px;
+        border-radius: 8px;
       }
     }
 
-    :deep(.el-input__inner) {
-      color: #e2efff;
-      font-size: 12px;
-      height: 26px;
-    }
+    .series-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 150px;
+      overflow-y: auto;
 
-    :deep(.el-select__caret) {
-      color: #7dd3fc;
+      &::-webkit-scrollbar {
+        width: 3px;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: rgba(0, 225, 255, 0.3);
+        border-radius: 3px;
+      }
+
+      .series-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 10px;
+        font-size: 12px;
+        color: #c4e0ff;
+        background: rgba(18, 36, 62, 0.6);
+        border: 1px solid rgba(79, 147, 221, 0.2);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        .series-icon {
+          margin-right: 6px;
+          font-size: 12px;
+        }
+
+        .series-name {
+          flex: 1;
+          font-weight: 500;
+        }
+
+        .series-status {
+          font-size: 11px;
+          color: #64748b;
+        }
+
+        &:hover {
+          color: #ffffff;
+          border-color: rgba(0, 225, 255, 0.5);
+          background: rgba(24, 52, 88, 0.8);
+
+          .series-status {
+            color: #38bdf8;
+          }
+        }
+
+        &.active {
+          color: #40f2ff;
+          font-weight: 600;
+          background: rgba(0, 225, 255, 0.15);
+          border-color: #00e1ff;
+          box-shadow: 0 0 8px rgba(0, 225, 255, 0.25);
+
+          .series-status {
+            color: #00e1ff;
+            font-weight: 600;
+          }
+        }
+      }
     }
   }
 }

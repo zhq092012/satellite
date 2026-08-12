@@ -277,11 +277,12 @@ export interface MatrixResult {
  * @returns 包含 MatrixResult 的 Axios 响应 Promise
  */
 export const getReconnaissanceAttackMatrix = (data: {
-  norad: number
   taskId: number
   intensityLevel: string
+  series: string
   stationIds?: string[]
   noradIds?: number[]
+
 }) => {
   const url = `/api/algorithm/calSeriesChain`
   return requestAPI.post<AxiosResponseType<MatrixResult>>(url, data)

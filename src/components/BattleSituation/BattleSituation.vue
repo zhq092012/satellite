@@ -82,7 +82,11 @@ const handleSelectSatellite = async (norad: number | null) => {
 
   // 2. 选择具体卫星，加载算法传输矩阵
   try {
-    const res = await getReconnaissanceAttackMatrix({ norad, taskId, intensityLevel: '低烈度' })
+    const res = await getReconnaissanceAttackMatrix({
+      taskId,
+      intensityLevel: '低烈度',
+      series: store.selectedSatSeries || '',
+    })
     if (res.code === 200 && res.data) {
       matrixData.value = res.data
       let windowStartTime: string | undefined
@@ -105,6 +109,19 @@ const handleSelectSatellite = async (norad: number | null) => {
     console.error('获取卫星传输矩阵失败:', err)
   }
 }
+
+/**
+ * [监听器说明]
+ * 监听选中的卫星系列变更，当用户选择新系列且已有选中卫星时自动重新加载矩阵
+ */
+watch(
+  () => store.selectedSatSeries,
+  (newSeries) => {
+    if (selectedNorad.value && store.activedTask?.id) {
+      void handleSelectSatellite(selectedNorad.value)
+    }
+  }
+)
 
 /**
  * [监听器说明]
@@ -178,13 +195,17 @@ onMounted(() => {
 
 /**
  * [监听器说明]
- * 监听当前激活的任务 ID 改变
+ * 监听当前激活的任务 ID 改变。
+ * 当任务选择发生变更或从未选中状态变更为激活状态时，
+ * 自动暂停推演动画，并重新加载渲染对应任务的卫星实体轨迹与战场网格。
  */
 watch(
   () => store.activedTask?.id,
   async (taskId, prevTaskId) => {
     if (!taskId || taskId === prevTaskId) return
     await pauseClockAnimation()
+    await loadSatelliteEntities()
+    markBattleArea()
   }
 )
 </script>
@@ -279,9 +300,13 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
         flex-direction: column;
         height: 100%;
         min-width: 0;
+        min-height: 0;
+        overflow: hidden;
 
         .battle-grid__earth {
           flex: 1;
+          height: 100%;
+          min-height: 0;
           position: relative;
           border-radius: 8px;
           overflow: hidden;

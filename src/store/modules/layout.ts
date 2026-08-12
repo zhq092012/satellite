@@ -21,6 +21,10 @@ interface State {
   selectedInfrastructureNode: InfrastructureLocation | null
   /** 当前任务下所有过境卫星数据*/
   allSatelliteOfTask: SatelliteData[]
+  /** 当前选中的卫星类型 */
+  selectedSatType: string
+  /** 当前选中的卫星系列 */
+  selectedSatSeries: string
   effectModel: boolean // 是否惯性参考系
   showNetView: boolean
 
@@ -45,6 +49,8 @@ export const useLayoutStore = defineStore('layout-store', {
       showAnalysisPanel: true,
       selectedSatellite: null,
       selectedInfrastructureNode: null,
+      selectedSatType: '',
+      selectedSatSeries: '',
 
       allSatelliteOfTask: [],
       effectModel: true,
@@ -170,9 +176,25 @@ export const useLayoutStore = defineStore('layout-store', {
       this.battleCenterCartensian = cartesian
       this.battleCenterOritentation = orientation
     },
+    /**
+     * [功能]
+     * 设置当前选中的卫星类型并保存至全局 Store
+     * @param type 卫星类型名称
+     */
+    setSelectedSatType(type: string) {
+      this.selectedSatType = type
+    },
+    /**
+     * [功能]
+     * 设置当前选中的卫星系列并保存至全局 Store
+     * @param series 卫星系列名称
+     */
+    setSelectedSatSeries(series: string) {
+      this.selectedSatSeries = series
+    },
   },
   persist: {
     storage: localStorage,
-    pick: ['activedTask', 'battle', 'showBattleList', 'allSatelliteOfTask', 'satelliteTotal'],
+    pick: ['activedTask', 'battle', 'showBattleList', 'allSatelliteOfTask', 'satelliteTotal', 'selectedSatType', 'selectedSatSeries'],
   },
 })

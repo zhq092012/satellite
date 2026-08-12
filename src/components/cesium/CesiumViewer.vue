@@ -2429,8 +2429,10 @@ defineExpose({
 <style lang="scss" scoped>
 .cesium-container {
   position: relative;
+  width: 100%;
   height: 100%;
-  min-height: 600px;
+  min-height: 0;
+  overflow: hidden;
   /* 1. 进入前：藏在左边 */
   .slide-enter-from {
     transform: translateX(-100%);
