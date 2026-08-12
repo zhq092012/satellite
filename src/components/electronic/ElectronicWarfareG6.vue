@@ -263,7 +263,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import G6 from '@antv/g6'
 import { useLayoutStore } from '@/store/modules/layout'
 import { getReconnaissanceAttackMatrix, getCommunicationsAttackMatrix } from '@/api/electronic'
-import type { MatrixResult, Weapon, CommucationMatrix } from '@/api/electronic'
+import type { MatrixResult, Weapon } from '@/api/electronic'
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import WeaponAttackList from '@/components/electronic/WeaponAttackList.vue'
 
@@ -522,7 +522,7 @@ const handleCategoryChange = (cat: SatCategoryType) => {
 
 /**
  * [功能说明]
- * 调用后端 API 获取算法矩阵数据 (根据 currentSatCategory 按需切换侦察与通讯卫星接口)
+ * 调用后端 API 获取算法矩阵数据 (根据 currentSatCategory 按需切换侦察与通讯卫星接口，并按 store 中的 selectedSatSeries 检索)
  */
 const fetchMatrixData = async () => {
   loading.value = true
@@ -531,12 +531,13 @@ const fetchMatrixData = async () => {
     if (currentSatCategory.value === 'COMM') {
       matrixRes = await getCommunicationsAttackMatrix({
         taskId: store.activedTask?.id || 0,
+        series: store.selectedSatSeries || '',
         norad: store.selectedSatellite?.norad || 0,
       })
     } else {
       matrixRes = await getReconnaissanceAttackMatrix({
-        norad: store.selectedSatellite?.norad || 0,
         taskId: store.activedTask?.id || 0,
+        series: store.selectedSatSeries || '',
         intensityLevel: currentIntensity.value,
       })
     }
@@ -554,6 +555,18 @@ const fetchMatrixData = async () => {
     })
   }
 }
+
+/**
+ * [监听器说明]
+ * 监听 store 中选中的卫星系列和激活的任务改变，自动重新拉取矩阵数据并更新图谱
+ */
+watch(
+  [() => store.selectedSatSeries, () => store.activedTask?.id],
+  () => {
+    void fetchMatrixData()
+  },
+  { immediate: true }
+)
 
 /**
  * [功能说明]

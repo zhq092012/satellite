@@ -24,7 +24,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import type { MatrixResult, StationWindow } from '@/api/electronic'
+import type { MatrixResult } from '@/api/electronic'
 import { useElectronicCesiumBridge, type InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import { useTimelineSync } from '@/composables/useTimelineSync'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
@@ -437,7 +437,7 @@ const electronicNodeEntityIds = new Set<string>()
 const electronicDynamicLinkEntityIds = new Set<string>()
 
 // 电子信息战录 composable：解析地面站、中继卡号集和过境窗口判断工具
-const { infrastructureNodes, isTimeInWindow } = useElectronicCesiumBridge(toRef(props, 'matrixData'))
+const { infrastructureNodes } = useElectronicCesiumBridge(toRef(props, 'matrixData'))
 // 时间轴同步：将 Cesium 时钟时间同步到全局仿真时间状态
 const { updateSimulationTime } = useTimelineSync()
 // Cesium 时钟 onTick 监听器的移除函数（组件销毁时必须调用）
@@ -858,88 +858,73 @@ const renderRedWeaponsOnCesium = () => {
   redWeaponEntities.value = newEntities
 }
 
+// [变量用途]
+// 防重入防死循环集合：避免 CallbackProperty 计算 position 时触发递归调用导致栈溢出
+const positionCalculatingSet = new Set<number>()
+
 /**
- * [功能]
- * 控制我方武器与卡座显隐 (切换复选框时触发)
+ * [功能说明]
+ * 根据 NORAD 唯一编号获取卫星在 Cesium 场景中的 3D 笛卡尔坐标 Cartesian3。
+ *
+ * [处理规则]
+ * 1. 检查防重入集合，若当前 NORAD 已在计算栈中则直接返回 null，防止递归死循环。
+ * 2. 优先从 satellitePointPrimitives 图元集合获取当前位置。
+ * 3. 兜底通过 TLE 轨道根数（line1, line2）结合当前 Cesium 时钟时间使用 satellitejs 实时推算 3D 坐标。
+ *
+ * @param norad 卫星 NORAD 编号
+ * @returns Cesium.Cartesian3 坐标对象或 null
  */
-const toggleRedSatellites = (show: boolean) => {
-  showRedSatellites.value = show
-
-  // 显隐我方武器实体
-  redWeaponEntities.value.forEach((entity) => {
-    entity.show = show
-  })
-
-  // 如果武器列表尚未拉取，且主动勾选显示，则补充加载一次
-  if (show && redWeaponDataList.value.length === 0) {
-    void loadAndRenderRedWeapons()
+const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null => {
+  if (!norad || positionCalculatingSet.has(norad)) {
+    return null
   }
 
-  if (!pointCollection) return
-  const matrixSats = props.matrixData?.initMatrixList || props.matrixData?.satelliteMatrixList || []
-  const enemyNoradSet = new Set(matrixSats.map((s) => s.norad))
+  positionCalculatingSet.add(norad)
 
-  for (let i = 0; i < pointCollection.length; i++) {
-    const point = pointCollection.get(i)
-    if (point) {
-      const norad = (point as any).noradId
-      if (!showRedSatellites.value && norad && !enemyNoradSet.has(Number(norad))) {
-        point.show = false
-      } else {
-        point.show = true
+  try {
+    // 1. 优先从图元集合获取
+    const primitive = satellitePointPrimitives.get(norad)
+    if (primitive && primitive.position) {
+      return primitive.position
+    }
+
+    // 2. 尝试从 TLE 两行数据中推算当前时刻 3D 位置
+    const matrixSats = props.matrixData?.initMatrixList || []
+    const initSat = matrixSats.find((s) => s.norad === norad)
+    let line1 = initSat?.line1
+    let line2 = initSat?.line2
+    if (!line1 || !line2) {
+      const tleCache = satelliteTleCache.get(norad)
+      if (tleCache?.line1 && tleCache?.line2) {
+        line1 = tleCache.line1
+        line2 = tleCache.line2
       }
     }
-  }
-}
 
-const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null => {
-  const primitive = satellitePointPrimitives.get(norad)
-  if (primitive && primitive.position) {
-    return primitive.position
-  }
-  // 核心防止无限递归逻辑：切勿检索 sat-node-${norad} 实体本身，
-  // 因为该实体的 position 使用了基于 getSatellitePositionInCesium 的 CallbackProperty，
-  // 若再次读取其 position.getValue() 会触发死循环调用 (Maximum call stack size exceeded)。
-  const entity = viewer?.entities?.getById(`satellite-${norad}`)
-  if (entity && entity.position) {
-    const pos = entity.position.getValue(viewer.clock.currentTime)
-    if (pos) return pos
-  }
-
-  // 尝试从 TLE 两行数据中推算当前时刻 3D 位置
-  const matrixSats = props.matrixData?.initMatrixList || []
-  const initSat = matrixSats.find((s) => s.norad === norad)
-  let line1 = initSat?.line1
-  let line2 = initSat?.line2
-  if (!line1 || !line2) {
-    const tleCache = satelliteTleCache.get(norad)
-    if (tleCache?.line1 && tleCache?.line2) {
-      line1 = tleCache.line1
-      line2 = tleCache.line2
-    }
-  }
-
-  if (line1 && line2 && viewer) {
-    try {
-      const satrec = satellitejs.twoline2satrec(line1, line2)
-      if (satrec) {
-        const now = viewer.clock.currentTime
-        const date = Cesium.JulianDate.toDate(now)
-        const posVel = satellitejs.propagate(satrec, date)
-        if (posVel && posVel.position) {
-          const gmst = satellitejs.gstime(date)
-          let posEcf = satellitejs.eciToEcf(posVel.position, gmst)
-          if (store.effectModel) {
-            posEcf = posVel.position
-          }
-          if (posEcf) {
-            return new Cesium.Cartesian3(posEcf.x * 1000, posEcf.y * 1000, posEcf.z * 1000)
+    if (line1 && line2 && viewer) {
+      try {
+        const satrec = satellitejs.twoline2satrec(line1, line2)
+        if (satrec) {
+          const now = viewer.clock.currentTime
+          const date = Cesium.JulianDate.toDate(now)
+          const posVel = satellitejs.propagate(satrec, date)
+          if (posVel && posVel.position) {
+            const gmst = satellitejs.gstime(date)
+            let posEcf = satellitejs.eciToEcf(posVel.position, gmst)
+            if (store.effectModel) {
+              posEcf = posVel.position
+            }
+            if (posEcf) {
+              return new Cesium.Cartesian3(posEcf.x * 1000, posEcf.y * 1000, posEcf.z * 1000)
+            }
           }
         }
+      } catch (e) {
+        // ignore parse error
       }
-    } catch (e) {
-      // ignore
     }
+  } finally {
+    positionCalculatingSet.delete(norad)
   }
 
   return null
@@ -2338,7 +2323,6 @@ defineExpose({
   markBattle,
   highlightSatellite,
   flyToView,
-  toggleRedSatellites,
   pauseClockAnimation,
   jumpToTimeAndPlay,
 })

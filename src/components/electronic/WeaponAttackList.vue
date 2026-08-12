@@ -107,8 +107,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import type { MatrixResult, WeaponAttackRecord, CommucationMatrix } from '@/api/electronic'
+import { ref, computed, watch, onMounted } from 'vue'
+import {
+  getReconnaissanceAttackMatrix,
+  type MatrixResult,
+  type CommucationMatrix,
+  type AttackPlanItem,
+} from '@/api/electronic'
+import { useLayoutStore } from '@/store/modules/layout'
 
 /**
  * [组件属性定义]
@@ -122,14 +128,70 @@ const props = withDefaults(defineProps<Props>(), {
   matrixData: null,
 })
 
+const store = useLayoutStore()
+
+// [变量用途]
+// 组件内部自主管理的 MatrixResult 矩阵数据引用
+const internalMatrixData = ref<MatrixResult | CommucationMatrix | any>(null)
+
 // [变量用途]
 // 用户在顶部输入的搜索关键字
 const searchKeyword = ref('')
 
-// [数据来源]
-// 提取打击计划列表数据
-const attackPlans = computed<WeaponAttackRecord[]>(() => {
-  return props.matrixData?.attackPlanList || []
+/**
+ * [数据来源]
+ * 组合使用外部传入或内部根据 store 系列拉取的矩阵数据
+ */
+const currentData = computed<MatrixResult | CommucationMatrix | null>(() => {
+  return props.matrixData || internalMatrixData.value
+})
+
+/**
+ * [数据来源]
+ * 提取打击计划列表数据 (兼容侦察卫星与通讯卫星的打击计划类型)
+ */
+const attackPlans = computed<AttackPlanItem[]>(() => {
+  return currentData.value?.attackPlanList || []
+})
+
+/**
+ * [功能说明]
+ * 自主异步拉取后端打击窗口矩阵数据 (当 props.matrixData 为空时，按 store 中的 selectedSatSeries 检索)。
+ */
+const loadMatrixData = async () => {
+  if (props.matrixData) return
+  try {
+    const res = await getReconnaissanceAttackMatrix({
+      taskId: store.activedTask?.id || 0,
+      intensityLevel: '低烈度',
+      series: store.selectedSatSeries || '',
+    })
+    if (res.code === 200 && res.data) {
+      internalMatrixData.value = res.data
+    }
+  } catch (err: any) {
+    console.error('获取武器打击窗口矩阵数据失败:', err)
+  }
+}
+
+/**
+ * [监听器说明]
+ * 监听 store 中选中的卫星系列和激活的任务改变，在没有透传 props.matrixData 时自动重新拉取矩阵数据
+ */
+watch(
+  [() => store.selectedSatSeries, () => store.activedTask?.id],
+  () => {
+    if (!props.matrixData) {
+      void loadMatrixData()
+    }
+  },
+  { immediate: true }
+)
+
+onMounted(() => {
+  if (!props.matrixData) {
+    void loadMatrixData()
+  }
 })
 
 // [数据来源]
@@ -148,7 +210,7 @@ const targetCount = computed(() => {
 
 // [数据来源]
 // 结合关键字检索过滤打击计划列表
-const filteredPlans = computed<WeaponAttackRecord[]>(() => {
+const filteredPlans = computed<AttackPlanItem[]>(() => {
   const kw = searchKeyword.value.trim().toLowerCase()
   if (!kw) return attackPlans.value
 
@@ -256,10 +318,12 @@ const calcSecondsSpan = (startStr: string, endStr: string): number => {
  * [功能说明]
  * 计算单段时间字符串的持续时长描述
  *
- * @param startStr 开始时间字符串
- * @param endStr 结束时间字符串
+ * @param startStr 开始时间字符串 (支持 null / undefined)
+ * @param endStr 结束时间字符串 (支持 null / undefined)
+ * @returns 格式化后的时长描述字符串
  */
-const formatDuration = (startStr: string, endStr: string): string => {
+const formatDuration = (startStr?: string | null, endStr?: string | null): string => {
+  if (!startStr || !endStr) return '即时/未知'
   const secs = calcSecondsSpan(startStr, endStr)
   return secs > 0 ? formatSecondsToText(secs) : '即时/未知'
 }
@@ -275,7 +339,7 @@ const formatDuration = (startStr: string, endStr: string): string => {
  * @param plan 武器打击计划记录对象
  * @returns 累加格式化后的总时长描述字符串
  */
-const formatTotalWindowsDuration = (plan: WeaponAttackRecord | any): string => {
+const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   if (!plan) return '未知'
 
   // 1. 优先累加所有子时间窗口的时长秒数
@@ -291,7 +355,8 @@ const formatTotalWindowsDuration = (plan: WeaponAttackRecord | any): string => {
     }
   }
 
-  // 2. 若无子窗口数据，兜底计算全局 beginTime 到 endTime
+  // 2. 若无子窗口数据，判断起止时间是否存在
+  if (!plan.beginTime || !plan.endTime) return '即时/未知'
   return formatDuration(plan.beginTime, plan.endTime)
 }
 </script>

@@ -533,16 +533,16 @@ const currentData = computed<MatrixResult | null>(() => {
 
 /**
  * [功能说明]
- * 自主异步拉取后端矩阵数据 (当 props.matrixData 为空时自动调用)。
+ * 自主异步拉取后端矩阵数据 (当 props.matrixData 为空时自动根据 store 中的 selectedSatSeries 检索)。
  */
 const loadMatrixData = async () => {
   if (props.matrixData) return
   loading.value = true
   try {
     const res = await getReconnaissanceAttackMatrix({
-      norad: 57693,
       taskId: store.activedTask?.id || 0,
-      intensityLevel: '高烈度',
+      intensityLevel: props.intensity || '低烈度',
+      series: store.selectedSatSeries || '',
     })
     if (res.code === 200 && res.data) {
       internalMatrixData.value = res.data
@@ -556,6 +556,26 @@ const loadMatrixData = async () => {
     loading.value = false
   }
 }
+
+/**
+ * [监听器说明]
+ * 监听 store 中选中的卫星系列和激活的任务改变，在没有透传 props.matrixData 时自动重新拉取矩阵数据
+ */
+watch(
+  [() => store.selectedSatSeries, () => store.activedTask?.id],
+  () => {
+    if (!props.matrixData) {
+      void loadMatrixData()
+    }
+  },
+  { immediate: true }
+)
+
+onMounted(() => {
+  if (!props.matrixData) {
+    void loadMatrixData()
+  }
+})
 
 /**
  * [功能说明]

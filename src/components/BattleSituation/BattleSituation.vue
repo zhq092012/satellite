@@ -46,7 +46,6 @@ import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPa
 import { useLayoutStore } from '@/store/modules/layout'
 import { getReconnaissanceAttackMatrix, type MatrixResult } from '@/api/electronic'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
-import { getSatelliteDetail } from '@/api/dashboard'
 
 /** [变量说明] 全局布局 Store */
 const store = useLayoutStore()

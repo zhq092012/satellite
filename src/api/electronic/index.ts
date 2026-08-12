@@ -419,6 +419,15 @@ export interface CommunicationAttackPlanItem {
   targetType: string
 }
 
+/**
+ * [类型用途]
+ * 武器攻击计划统一单项数据结构类型（兼容侦察卫星打击记录 WeaponAttackRecord 与通讯卫星打击记录 CommunicationAttackPlanItem）。
+ *
+ * [数据来源]
+ * MatrixResult.attackPlanList 或 CommucationMatrix.attackPlanList 元素。
+ */
+export type AttackPlanItem = WeaponAttackRecord | CommunicationAttackPlanItem
+
 // 顶层 data 对象类型
 export interface CommucationMatrix {
   /**
@@ -441,10 +450,10 @@ export interface CommucationMatrix {
 
 /**
  * 获取通讯卫星过境打击计划数据
- *  @param data 请求参数对象 (taskId, norad)
+ *  @param data 请求参数对象 (taskId, norad, series)
  *  @returns 包含 CommucationMatrix 的 Axios 响应 Promise
  */
-export const getCommunicationsAttackMatrix = (data: { taskId: number; norad: number }) => {
+export const getCommunicationsAttackMatrix = (data: { taskId: number; norad?: number; series?: string }) => {
   const url = `/api/algorithm/calTxSeriesChain`
   return requestAPI.post<AxiosResponseType<CommucationMatrix>>(url, data)
 }
