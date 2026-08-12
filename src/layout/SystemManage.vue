@@ -1,13 +1,6 @@
 <template>
   <div class="system-manage-page">
     <el-card shadow="never" class="system-manage-card">
-      <div class="system-manage-header">
-        <div>
-          <h2>系统管理</h2>
-          <p>用户、角色与菜单权限统一管理</p>
-        </div>
-      </div>
-
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
         <el-tab-pane label="用户管理" name="users" />
         <el-tab-pane label="角色管理" name="roles" />
@@ -69,10 +62,6 @@ const handleTabChange = (tabName: string) => {
 </script>
 
 <style scoped lang="scss">
-.system-manage-page {
-  padding: 16px;
-}
-
 .system-manage-card {
   min-height: calc(100vh - 92px);
   background: var(--surface-bg-color);

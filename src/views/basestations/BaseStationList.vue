@@ -1,32 +1,11 @@
 <template>
   <div class="container">
-      <section class="hero-card">
-      <div>
-        <p class="hero-card__eyebrow">系统管理 / 基站管理</p>
-        <h1>基站资源管理</h1>
-        <p class="hero-card__desc">
-          统一维护基站基础数据，支持新增、编辑、删除与条件筛选。
-          <!-- 页面权限由 `system:weapon:list`、
-          `system:weapon:add`、`system:weapon:edit`、`system:weapon:delete` 控制。 -->
-        </p>
-      </div>
-      <div class="hero-card__stats">
-        <div class="stat-card">
-          <span>基站总数</span>
-          <strong>{{ totalElements }}</strong>
-        </div>
-        <div class="stat-card">
-          <span>国家/地区</span>
-          <strong>{{ countryCount }}</strong>
-        </div>
-      </div>
-    </section>
-      <section class="panel-card toolbar-card">
+    <section class="panel-card toolbar-card">
       <el-form :inline="true" :model="queryForm" class="toolbar" @submit.prevent>
         <el-form-item label="基站名称">
           <el-input v-model="queryForm.name" clearable placeholder="模糊搜索名称" />
         </el-form-item>
-     
+
         <el-form-item label="基站类型">
           <el-input v-model="queryForm.type" clearable placeholder="输入基站类型" />
         </el-form-item>
@@ -43,12 +22,12 @@
 
     <section class="panel-card table-card">
       <el-table :data="stations" v-loading="loading" stripe border height="calc(100vh - 362px)">
-        <el-table-column prop="name" label="基站名称"  />
-        <el-table-column prop="country" label="所属国家/地区"  />
-        <el-table-column prop="location" label="地理位置"  />
-        <el-table-column prop="type" label="基站类型"   />
-        <el-table-column prop="latLon" label="经纬度"  />
-        <el-table-column prop="function" label="功能"  />
+        <el-table-column prop="name" label="基站名称" />
+        <el-table-column prop="country" label="所属国家/地区" />
+        <el-table-column prop="location" label="地理位置" />
+        <el-table-column prop="type" label="基站类型" />
+        <el-table-column prop="latLon" label="经纬度" />
+        <el-table-column prop="function" label="功能" />
         <el-table-column prop="introduction" label="介绍" width="800" />
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="scope">
@@ -93,7 +72,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="位置" prop="location">
-             <el-input v-model.trim="form.location" placeholder="请输入基站位置" />
+              <el-input v-model.trim="form.location" placeholder="请输入基站位置" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -126,7 +105,12 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { getBattleCountrys } from '@/api/dashboard'
-import { deleteBaseStations, getBaseStationList, saveOrUpdateBaseStation, type BaseStationInfo } from '@/api/system/satellite-system-api'
+import {
+  deleteBaseStations,
+  getBaseStationList,
+  saveOrUpdateBaseStation,
+  type BaseStationInfo,
+} from '@/api/system/satellite-system-api'
 const loading = ref(false)
 const saving = ref(false)
 const stations = ref<BaseStationInfo[]>([])
@@ -151,7 +135,7 @@ const createEmptyForm = (): BaseStationInfo => ({
   latLon: '',
   location: '',
   function: '',
-  introduction: ''
+  introduction: '',
 })
 
 const form = reactive<BaseStationInfo>(createEmptyForm())
@@ -163,7 +147,7 @@ const rules = reactive<FormRules<BaseStationInfo>>({
   latLon: { required: true, message: '请输入经纬度', trigger: 'blur' },
   location: { required: true, message: '请输入基站位置', trigger: 'blur' },
   function: { required: true, message: '请输入基站功能', trigger: 'blur' },
-  introduction: { required: true, message: '请输入基站介绍', trigger: 'blur' }
+  introduction: { required: true, message: '请输入基站介绍', trigger: 'blur' },
 })
 
 // const canCreate = computed(() => hasPermission(authStore.permissions, ['system:weapon:add']))
@@ -171,9 +155,6 @@ const rules = reactive<FormRules<BaseStationInfo>>({
 // const canDelete = computed(() => hasPermission(authStore.permissions, ['system:weapon:delete']))
 
 const countryCount = computed(() => new Set(stations.value.map((item) => item.country).filter(Boolean)).size)
-
-
-
 
 const dialogTitle = computed(() => (form._id ? '编辑基站' : '新增基站'))
 
@@ -192,10 +173,14 @@ const totalElements = ref(0)
 async function loadStations() {
   loading.value = true
   try {
-    const res = await getBaseStationList({pageNum: page.pageNum, pageSize: page.pageSize, name: queryForm.name, type: queryForm.type})
+    const res = await getBaseStationList({
+      pageNum: page.pageNum,
+      pageSize: page.pageSize,
+      name: queryForm.name,
+      type: queryForm.type,
+    })
     stations.value = res.code === 200 ? (res.data?.content ?? []) : []
     totalElements.value = res.code === 200 ? (res.data?.totalElements ?? 0) : 0
-  
   } finally {
     loading.value = false
   }
@@ -207,7 +192,7 @@ function handleSearch() {
 }
 
 function resetQuery() {
-  ;(queryForm.name = ''),  (queryForm.type = '')
+  ;(queryForm.name = ''), (queryForm.type = '')
   page.pageNum = 1
   loadStations()
 }
@@ -270,10 +255,9 @@ onMounted(async () => {
 .container {
   padding: 16px;
   border-radius: 8px;
-
 }
 .hero-card {
-    display: flex;
+  display: flex;
   align-items: stretch;
   justify-content: space-between;
   gap: 24px;

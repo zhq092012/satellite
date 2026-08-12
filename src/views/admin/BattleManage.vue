@@ -71,21 +71,23 @@
                   <span v-else class="text-muted">未开始或未获取</span>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="150" fixed="right">
+              <el-table-column label="操作" width="160" fixed="right" align="center">
                 <template #default="scope">
-                  <el-button
-                    type="success"
-                    icon="Edit"
-                    size="small"
-                    plain
-                    round
-                    @click="handleEditTask(scope.row, battle)"
-                  >
-                    修改
-                  </el-button>
-                  <el-button type="danger" icon="Delete" size="small" plain round @click="handleDeleteTask(scope.row)">
-                    删除
-                  </el-button>
+                  <div class="table-action-group">
+                    <el-button
+                      type="success"
+                      icon="Edit"
+                      size="small"
+                      plain
+                      round
+                      @click="handleEditTask(scope.row, battle)"
+                    >
+                      修改
+                    </el-button>
+                    <el-button type="danger" icon="Delete" size="small" plain round @click="handleDeleteTask(scope.row)">
+                      删除
+                    </el-button>
+                  </div>
                 </template>
               </el-table-column>
             </el-table>
@@ -95,7 +97,7 @@
     </div>
 
     <!-- 新建 / 编辑战场弹窗 -->
-    <el-dialog :title="battleDialogTitle" v-model="battleDialogVisible" width="600px">
+    <el-dialog :title="battleDialogTitle" v-model="battleDialogVisible" width="680px">
       <el-form :model="battleForm" ref="battleFormRef" :rules="createBattleRules" label-width="110px">
         <el-form-item label="战场名称" prop="name">
           <el-input v-model="battleForm.name" placeholder="请输入战场名称" />
@@ -134,7 +136,7 @@
     </el-dialog>
 
     <!-- 新建 / 编辑任务弹窗 -->
-    <el-dialog :title="taskDialogTitle" v-model="taskDialogVisible" width="950px" class="task-manage-dialog">
+    <el-dialog :title="taskDialogTitle" v-model="taskDialogVisible" width="1220px" class="task-manage-dialog">
       <div class="section-dialog-title">作战任务属性</div>
       <el-form :model="taskForm" ref="taskFormRef" :rules="createTaskRules" label-width="110px">
         <el-form-item label="任务名称" prop="name">
@@ -186,13 +188,13 @@
           <el-button type="primary" size="small" round @click="handleAddBattleSegment">新增作战阶段</el-button>
         </div>
         <el-table :data="tableData" style="width: 100%" border size="small">
-          <el-table-column type="index" label="序号" width="60" />
-          <el-table-column prop="name" label="阶段名称">
+          <el-table-column type="index" label="序号" width="60" align="center" />
+          <el-table-column prop="name" label="阶段名称" width="160">
             <template #default="scope">
-              <el-input v-model="scope.row.name" placeholder="阶段名称" />
+              <el-input v-model="scope.row.name" placeholder="阶段名称" style="width: 100%" />
             </template>
           </el-table-column>
-          <el-table-column prop="startTime" label="开始时间" width="220">
+          <el-table-column prop="startTime" label="开始时间" width="200">
             <template #default="scope">
               <el-date-picker
                 v-model="scope.row.startTime"
@@ -201,10 +203,11 @@
                 placeholder="开始时间"
                 format="YYYY-MM-DD HH:mm"
                 value-format="YYYY-MM-DD HH:mm"
+                style="width: 100%"
               />
             </template>
           </el-table-column>
-          <el-table-column prop="endTime" label="结束时间" width="220">
+          <el-table-column prop="endTime" label="结束时间" width="200">
             <template #default="scope">
               <el-date-picker
                 v-model="scope.row.endTime"
@@ -213,26 +216,34 @@
                 placeholder="结束时间"
                 format="YYYY-MM-DD HH:mm"
                 value-format="YYYY-MM-DD HH:mm"
+                style="width: 100%"
               />
             </template>
           </el-table-column>
-          <el-table-column prop="sateType" label="卫星类型">
+          <el-table-column prop="sateType" label="卫星类型" min-width="220">
             <template #default="scope">
-              <el-select v-model="scope.row.sateTypeShow" placeholder="选择类型" multiple>
+              <el-select
+                v-model="scope.row.sateTypeShow"
+                placeholder="选择类型"
+                multiple
+                collapse-tags
+                collapse-tags-tooltip
+                style="width: 100%"
+              >
                 <el-option v-for="item in taskSateTypes" :key="item" :label="item" :value="item" />
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column prop="target" label="目标">
+          <el-table-column prop="target" label="目标" min-width="180">
             <template #default="scope">
-              <el-select v-model="scope.row.target" placeholder="选择目标">
+              <el-select v-model="scope.row.target" placeholder="选择目标" style="width: 100%">
                 <el-option v-for="item in targetOptions" :key="item" :label="item" :value="item" />
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="90">
+          <el-table-column label="操作" width="100" align="center">
             <template #default="scope">
-              <el-button icon="Delete" type="danger" plain round size="small" @click="handleRemoveSegment(scope.row)">
+              <el-button icon="Delete" type="danger" plain size="small" @click="handleRemoveSegment(scope.row)">
                 删除
               </el-button>
             </template>
@@ -1089,6 +1100,18 @@ onMounted(async () => {
   }
 }
 
+.table-action-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+
+  .el-button {
+    margin-left: 0 !important;
+  }
+}
+
 .section-dialog-title {
   font-size: 14px;
   font-weight: bold;
@@ -1113,21 +1136,78 @@ onMounted(async () => {
 
   .lonlat-row {
     display: flex;
-    gap: 12px;
+    gap: 16px;
     margin-top: 8px;
+    width: 100%;
 
     .coord-field {
       display: flex;
       align-items: center;
       gap: 6px;
+      flex: 1;
+      min-width: 0;
+
+      span {
+        white-space: nowrap;
+        flex-shrink: 0;
+        font-size: 13px;
+      }
+
+      .el-input {
+        flex: 1;
+        min-width: 0;
+      }
     }
   }
 }
 
 .dialog-table-box {
   margin-top: 12px;
+
   .table-nav {
     margin-bottom: 8px;
+  }
+
+  :deep(.el-table) {
+    th.el-table__cell {
+      padding: 8px 6px;
+      .cell {
+        white-space: nowrap;
+        overflow: visible;
+        text-overflow: clip;
+      }
+    }
+
+    td.el-table__cell {
+      padding: 6px 6px;
+      .cell {
+        padding-left: 4px;
+        padding-right: 4px;
+        overflow: visible;
+      }
+    }
+
+    .el-input {
+      width: 100%;
+    }
+
+    .el-button {
+      white-space: nowrap;
+      margin-left: 0;
+      padding: 4px 10px;
+    }
+
+    .el-select {
+      width: 100%;
+    }
+
+    .el-date-editor {
+      width: 100% !important;
+    }
+
+    .el-tag {
+      white-space: nowrap;
+    }
   }
 }
 

@@ -1,26 +1,5 @@
 <template>
   <div class="container">
-    <section class="hero-card">
-      <div>
-        <p class="hero-card__eyebrow">系统管理 / 导弹管理</p>
-        <h1>导弹管理</h1>
-        <p class="hero-card__desc">
-          统一维护导弹基础数据，支持新增、编辑、删除与条件筛选。
-          <!-- 页面权限由 `system:missiles:list`、
-          `system:missiles:add`、`system:missiles:edit`、`system:missiles:delete` 控制。 -->
-        </p>
-      </div>
-      <div class="hero-card__stats">
-        <div class="stat-card">
-          <span>导弹总数</span>
-          <strong>{{ totalElements }}</strong>
-        </div>
-        <div class="stat-card">
-          <span>国家/地区</span>
-          <strong>{{ countryCount }}</strong>
-        </div>
-      </div>
-    </section>
     <section class="panel-card toolbar-card">
       <el-form :inline="true" :model="queryForm" class="toolbar" @submit.prevent>
         <el-form-item label="导弹名称">

@@ -1,31 +1,5 @@
 <template>
   <div class="weapon-manage-page">
-    <section class="hero-card">
-      <div>
-        <p class="hero-card__eyebrow">系统管理 / 武器管理</p>
-        <h1>武器资源管理</h1>
-        <p class="hero-card__desc">
-          统一维护武器基础数据，支持新增、编辑、删除与条件筛选。
-          <!-- 页面权限由 `system:weapon:list`、
-          `system:weapon:add`、`system:weapon:edit`、`system:weapon:delete` 控制。 -->
-        </p>
-      </div>
-      <div class="hero-card__stats">
-        <div class="stat-card">
-          <span>武器总数</span>
-          <strong>{{ totalCount }}</strong>
-        </div>
-        <div class="stat-card">
-          <span>当前筛选</span>
-          <strong>{{ filteredCount }}</strong>
-        </div>
-        <div class="stat-card">
-          <span>国家/地区</span>
-          <strong>{{ countryCount }}</strong>
-        </div>
-      </div>
-    </section>
-
     <section class="panel-card toolbar-card">
       <el-form :inline="true" :model="queryForm" class="toolbar" @submit.prevent>
         <el-form-item label="武器名称">

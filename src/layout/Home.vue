@@ -2,11 +2,6 @@
   <div class="home-container">
     <!-- 顶层菜单栏 -->
     <header class="top-nav-bar">
-      <div class="brand-title">
-        <span class="brand-icon">🛰️</span>
-        <span class="brand-text">态势分析决策平台</span>
-      </div>
-
       <!-- 中间：四个功能切换按钮 -->
       <div class="menu-tabs">
         <button
@@ -33,9 +28,7 @@
 
         <!-- 场景 B：尚未选择战场任务，突出提醒 -->
         <div v-else class="task-prompt-badge" @click="openTaskSelector">
-          <el-tag type="warning" effect="dark" round class="prompt-tag">
-            ⚠️ 尚未选择战场任务（点击选择）
-          </el-tag>
+          <el-tag type="warning" effect="dark" round class="prompt-tag"> ⚠️ 尚未选择战场任务（点击选择） </el-tag>
         </div>
       </div>
     </header>
@@ -98,13 +91,7 @@
 
       <template #footer>
         <el-button @click="selectorDialogVisible = false">取消</el-button>
-        <el-button
-          type="primary"
-          :disabled="!pendingSelection"
-          @click="confirmTaskSelection"
-        >
-          确认选择
-        </el-button>
+        <el-button type="primary" :disabled="!pendingSelection" @click="confirmTaskSelection"> 确认选择 </el-button>
       </template>
     </el-dialog>
   </div>
