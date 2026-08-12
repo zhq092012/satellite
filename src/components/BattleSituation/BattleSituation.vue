@@ -1,19 +1,9 @@
 <template>
   <div class="container">
     <main class="main">
-      <div class="tabs-bar">
-        <div class="tabs">
-          <div
-            v-for="tab in visibleTabs"
-            :key="tab.value"
-            :class="{ active: store.activetab === tab.value }"
-            @click="switchTab(tab.value)"
-          >
-            {{ tab.label }}
-          </div>
-        </div>
-        <!-- 显示当前战场和任务名称（面包屑） -->
-        <div class="filter filter-breadcrumb" v-if="store.activedTask">
+      <!-- 顶部信息栏：战场与任务名称面包屑 -->
+      <div class="tabs-bar" v-if="store.activedTask">
+        <div class="filter filter-breadcrumb">
           <span class="crumb">
             <i class="el-icon-s-platform"></i>
             <strong>{{ store.battle?.name || '未选择战场' }}</strong>
@@ -25,7 +15,9 @@
           </span>
         </div>
       </div>
-      <div v-if="store.activetab === '战场态势视图'" class="battle-grid">
+
+      <!-- GIS 战场态势视图核心三栏布局 -->
+      <div class="battle-grid">
         <!-- C2 敌方网络与资产拓扑左侧边栏 -->
         <div class="battle-grid__side battle-grid__side--left">
           <C2LeftControlPanel
@@ -34,14 +26,12 @@
             @select-satellite="handleSelectSatellite"
           />
         </div>
+
         <!-- 中间 3D Cesium 地球 -->
         <div class="battle-grid__center">
           <div class="battle-grid__earth">
-            <component
-              v-if="activeTabComponent"
-              :is="activeTabComponent"
-              :key="store.activetab"
-              :ref="setRef"
+            <CesiumViewer
+              ref="cesiumViewerRef"
               :showTimeLine="true"
               :showAnimation="true"
               :matrix-data="matrixData"
@@ -49,6 +39,7 @@
             />
           </div>
         </div>
+
         <!-- C2 敌方数据传输与链路效能右侧边栏 -->
         <div class="battle-grid__side battle-grid__side--right">
           <C2RightAnalysisPanel
@@ -58,160 +49,45 @@
           />
         </div>
       </div>
-      <div v-else class="map-box">
-        <div class="tab-content">
-          <keep-alive
-            include="ElectronicWarfareG6"
-          >
-            <component v-if="activeTabComponent" :is="activeTabComponent" :key="store.activetab" :ref="setRef" />
-          </keep-alive>
-        </div>
-      </div>
     </main>
   </div>
 </template>
+
 <script setup lang="ts">
+import { nextTick, onMounted, ref, watch } from 'vue'
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
-import SatelliteNetView from '@/components/cesium/SatelliteNetView.vue'
-import ConfrontView from '@/components/cesium/ConfrontationAnalysis.vue'
-import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue'
-import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import { useLayoutStore } from '@/store/modules/layout'
-import { useAuthStore } from '@/store/modules/auth'
 import { getReconnaissanceAttackMatrix, type MatrixResult } from '@/api/electronic'
-import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import { getSatelliteDetail } from '@/api/dashboard'
+
+/** [变量说明] 全局布局 Store */
 const store = useLayoutStore()
-const authStore = useAuthStore()
+
+/** [Hook 引入] 卫星档案弹窗 */
 useSatelliteProfileDialog()
-const compMap = {
-  CesiumViewer,
-  SatelliteNetView,
-  ConfrontView,
-  ElectronicWarfareG6,
-  SatelliteGantt,
-}
-/**
- * 定义tab对象数组
- */
-const tabDefs = [
-  { label: '战场态势视图', value: '战场态势视图', component: 'CesiumViewer', permissionCode: 'battle:situation' },
-  {
-    label: '电磁对抗分析',
-    value: '电磁对抗分析',
-    component: 'ElectronicWarfareG6',
-    permissionCode: 'battle:electronicWarfare',
-  },
-] as const
 
-/**
- * 有权限查看的tab
- */
-const visibleTabs = computed(() => {
-  // 如果是管理员，显示所有tab
-  if (authStore.roles.includes('admin')) {
-    return [...tabDefs]
-  }
-  // 根据权限过滤tab
-  const permissionSet = new Set(authStore.permissions)
-  const filtered = tabDefs.filter((tab) => permissionSet.has(tab.permissionCode))
-  return filtered
-})
-/**
- * 获取组件实例类型
- */
-type InstanceOf<T> = T extends new (...args: any[]) => infer R ? R : never
-/**
- * 战场态势视图组件实例类型
- */
-type CesiumViewerInst = InstanceOf<typeof CesiumViewer>
-/**
- * 卫星网络视图组件实例类型
- */
-type SatelliteNetViewInst = InstanceOf<typeof SatelliteNetView>
-/**
- * 红蓝对抗分析组件实例类型
- */
-type ConfrontInst = InstanceOf<typeof ConfrontView>
+/** [变量说明] 3D Cesium Viewer 组件实例引用 */
+const cesiumViewerRef = ref<InstanceType<typeof CesiumViewer> | null>(null)
 
-/**
- * 当前激活组件的实例类型
- */
-type ActiveInst =
-  | CesiumViewerInst
-  | SatelliteNetViewInst
-  | ConfrontInst
-
-/**
- * 获取当前激活的组件
- */
-const activeTabComponent = shallowRef()
-/**
- * 当前激活组件的引用
- */
-const activeRef = shallowRef<ActiveInst | null>(null)
-/**
- * 战场态势视图组件的引用
- */
-const cesiumViewerRef = shallowRef<CesiumViewerInst | null>()
-/**
- * 卫星网络视图组件的引用
- */
-const netViewerRef = shallowRef<SatelliteNetViewInst | null>()
-/**
- * 红蓝对抗分析组件的引用
- */
-const confrontRef = shallowRef<ConfrontInst | null>()
-
-/**
- * 设置组件引用
- * @param el 组件实例
- */
-function setRef(el: any) {
-  activeRef.value = el as ActiveInst
-  // 切换时清理上一个 tab 的引用，避免旧组件方法继续调用（如视图切换时）
-  cesiumViewerRef.value = null
-  netViewerRef.value = null
-  confrontRef.value = null
-
-  if (activeRef.value) {
-    switch (store.activetab) {
-      case '战场态势视图':
-        cesiumViewerRef.value = activeRef.value as CesiumViewerInst
-        break
-      case '卫星网络视图':
-        netViewerRef.value = activeRef.value as SatelliteNetViewInst
-        break
-      case '红蓝对抗分析':
-        confrontRef.value = activeRef.value as ConfrontInst
-        break
-    }
-  }
-}
-
-// 当前选中的敌方卫星 NORAD (未选中时为 null，表示静态展示)
+/** [变量说明] 当前选中的敌方卫星 NORAD 编号 (未选中时为 null，代表静态展示) */
 const selectedNorad = ref<number | null>(null)
+
+/** [变量说明] 侦察/打击算法矩阵结果 */
 const matrixData = ref<MatrixResult | null>(null)
 
 /**
- * [功能]
+ * [函数说明]
  * 选择某颗敌方卫星并加载其专属数据传输矩阵与过境时间窗口
- *
- * [处理规则]
- * - 如果 norad 为 null，进入全网静态展示模式：重置选择并暂停 Cesium 时钟推演
- * - 如果 norad 为有效数字：请求算法矩阵 getMatrixList({ norad, taskId })
- * - 获取该卫星最早/有效传输窗口，跳转 Cesium 时钟至窗口发生时刻，并开启动画连通展示
- *
- * @param norad 选中的敌方卫星 NORAD
+ * @param norad 选中的敌方卫星 NORAD 编号
  */
 const handleSelectSatellite = async (norad: number | null) => {
   selectedNorad.value = norad
   const taskId = store.activedTask?.id
 
-  // 1. 如果没有选择卫星 (静态展示模式)
+  // 1. 未选择卫星 (进入静态展示模式)
   if (!norad || !taskId) {
     if (cesiumViewerRef.value && (cesiumViewerRef.value as any).pauseClockAnimation) {
       ;(cesiumViewerRef.value as any).pauseClockAnimation()
@@ -219,29 +95,23 @@ const handleSelectSatellite = async (norad: number | null) => {
     return
   }
 
-  // 2. 选择具体卫星，加载对应的算法传输矩阵
+  // 2. 选择具体卫星，加载算法传输矩阵
   try {
     const res = await getReconnaissanceAttackMatrix({ norad, taskId, intensityLevel: '低烈度' })
     if (res.code === 200 && res.data) {
-      // [业务目的] 保持全网资产拓扑不丢失：当针对特定卫星返回的矩阵未包含/清空全量资产列表时，合并保留原有/默认拓扑数据
       matrixData.value = res.data
-      // 寻找该卫星的最早/有效传输窗口
       let windowStartTime: string | undefined
 
       const battleMatch = (res.data.battleMatrixList || []).find((b) => b.norad === norad)
       if (battleMatch?.windows?.length) {
         windowStartTime = battleMatch.windows[0].startTime
       } else {
-        // [业务目的] 当战场过境矩阵匹配不到时，兜底从初始过境时间窗口列表中读取过境开始时刻
-        // [实现原因] InitMatrix 接口类型定义的过境窗口数组字段为 initWindows，单项时间窗口为 InitWindow (包含 peakWindow 字段)
-        // [关键规则] 使用 initMatch.initWindows[0].peakWindow 提取初始窗口开始时间
         const initMatch = (res.data.initMatrixList || []).find((i) => i.norad === norad)
         if (initMatch?.initWindows?.length) {
           windowStartTime = initMatch.initWindows[0].peakWindow
         }
       }
 
-      // 使用 Cesium 时钟推进到窗口发生时刻，并开启连线推演动画
       if (cesiumViewerRef.value && (cesiumViewerRef.value as any).jumpToTimeAndPlay) {
         ;(cesiumViewerRef.value as any).jumpToTimeAndPlay(windowStartTime)
       }
@@ -251,7 +121,10 @@ const handleSelectSatellite = async (norad: number | null) => {
   }
 }
 
-// 监听 3D 地球中鼠标点击卫星的选择状态
+/**
+ * [监听器说明]
+ * 监听 3D 地球中鼠标点击选中的卫星状态
+ */
 watch(
   () => store.selectedSatellite,
   (newSat) => {
@@ -265,133 +138,72 @@ watch(
 )
 
 /**
- * 暂停动画
+ * [函数说明]
+ * 暂停 Cesium 时钟推演动画
  */
 async function pauseClockAnimation() {
-  // 初始进入未选择具体卫星时，默认静态展示不演示动画
   if (!selectedNorad.value) {
     nextTick(() => {
-      ;(cesiumViewerRef.value as any).pauseClockAnimation()
+      ;(cesiumViewerRef.value as any)?.pauseClockAnimation?.()
     })
   }
 }
 
 /**
- * 切换tab页面
- * @param tab tab名称
- */
-const switchTab = (tab: string) => {
-  store.activetab = tab
-  const current = tabDefs.find((item) => item.value === tab)
-  if (!current) {
-    activeTabComponent.value = undefined
-    return
-  }
-  activeTabComponent.value = compMap[current.component]
-}
-
-/**
- * 监听有权限查看的tab列表变化
- */
-watch(
-  visibleTabs,
-  (tabs) => {
-    /**
-     * 如果没有权限，则不显示任何tab页面
-     */
-    if (tabs.length === 0) {
-      activeTabComponent.value = undefined
-      return
-    }
-    // 如果没有激活的tab，默认激活第一个
-    const hasCurrent = tabs.some((item) => item.value === store.activetab)
-    if (!hasCurrent) {
-      switchTab(tabs[0].value)
-    }
-  },
-  { immediate: true }
-)
-
-/**
- * 渲染卫星轨迹和实体
+ * [函数说明]
+ * 渲染战场任务相关卫星轨迹与实体
  */
 const loadSatelliteEntities = async () => {
-  if (store.activedTask?.id && store.activetab === '战场态势视图') {
-    // 显示卫星轨迹（仅在战场态势视图激活时）
+  if (store.activedTask?.id) {
     await cesiumViewerRef.value?.renderSateliitePathWithEntity(store.activedTask?.id, undefined)
   }
 }
 
-onMounted(() => {
-  /**
-   * 如果当前没有激活的页面，自动切换到第一个页面
-   */
-  if (visibleTabs.value.length > 0) {
-    const hasCurrent = visibleTabs.value.some((item) => item.value === store.activetab)
-    switchTab(hasCurrent ? store.activetab : visibleTabs.value[0].value)
-  }
-  if (store.activetab === '战场态势视图') {
-    nextTick(async () => {
-      await loadSatelliteEntities()
-      if (store.allSatelliteOfTask.length > 0) {
-        const norad = Number(store.allSatelliteOfTask[0].norad_id)
-        if (Number.isFinite(norad) && selectedNorad.value !== norad) {
-          try {
-            const res = await getSatelliteDetail({ norad: Number(norad) })
-            if (res.code === 200 && res.data) {
-              // 设置选中的卫星
-              store.setSelectedSatellite(res.data)
-              // 渲染该卫星对应的矩阵数据
-              void handleSelectSatellite(norad)
-            }
-          } catch (error) {
-            console.error('查询卫星详细信息接口失败:', error)
-          }
-        }
-      }
-      markBattleArea()
-    })
-    void pauseClockAnimation()
-  }
-})
 /**
- * 监听 tab 页面切换
- */
-watch(
-  () => store.activetab,
-  async (tab) => {
-    if (tab === '战场态势视图') {
-      nextTick(() => {
-        loadSatelliteEntities()
-        markBattleArea()
-      })
-
-      await pauseClockAnimation()
-    }
-  }
-)
-
-/**
- * 监听任务改变
- */
-watch(
-  () => store.activedTask?.id,
-  async (taskId, prevTaskId) => {
-    if (!taskId || taskId === prevTaskId) return
-    if (store.activetab === '战场态势视图') {
-      await pauseClockAnimation()
-    }
-  }
-)
-/**
- * 标记战场区域
+ * [函数说明]
+ * 标记战场区域网格与交互实体
  */
 function markBattleArea() {
   if (store.activedTask) {
     cesiumViewerRef.value?.markBattle()
   }
 }
+
+onMounted(() => {
+  nextTick(async () => {
+    await loadSatelliteEntities()
+    if (store.allSatelliteOfTask.length > 0) {
+      const norad = Number(store.allSatelliteOfTask[0].norad_id)
+      if (Number.isFinite(norad) && selectedNorad.value !== norad) {
+        try {
+          const res = await getSatelliteDetail({ norad: Number(norad) })
+          if (res.code === 200 && res.data) {
+            store.setSelectedSatellite(res.data)
+            void handleSelectSatellite(norad)
+          }
+        } catch (error) {
+          console.error('查询卫星详细信息失败:', error)
+        }
+      }
+    }
+    markBattleArea()
+  })
+  void pauseClockAnimation()
+})
+
+/**
+ * [监听器说明]
+ * 监听当前激活的任务 ID 改变
+ */
+watch(
+  () => store.activedTask?.id,
+  async (taskId, prevTaskId) => {
+    if (!taskId || taskId === prevTaskId) return
+    await pauseClockAnimation()
+  }
+)
 </script>
+
 <style lang="scss" scoped>
 .battle-page-bg {
   background: var(--app-bg-gradient);
@@ -417,48 +229,23 @@ $bs-accent-cool: var(--accent-color);
 $bs-accent-line: rgba(79, 147, 221, 0.35);
 
 .container {
+  width: 100%;
+  height: 100%;
+
   .main {
-    .nav-bar {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: start;
-      gap: 10px;
-    }
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 
     .tabs-bar {
-      height: 40px;
+      height: 36px;
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-end;
       align-items: center;
-      padding: 5px 0;
+      padding: 0 15px;
       background: $bs-page-bg;
       box-sizing: border-box;
-
-      .tabs {
-        display: flex;
-        gap: 15px;
-        font-size: 14px;
-
-        div {
-          background: $bs-surface-bg-muted;
-          padding: 5px 10px;
-          cursor: pointer;
-          border-radius: 2px;
-          color: $bs-text-main;
-          border: 1px solid $bs-surface-border;
-
-          &:hover {
-            background: $bs-accent-hover;
-            transition: all 0.3s ease-in-out;
-          }
-        }
-
-        & > div.active {
-          background: $bs-accent-active;
-          color: $bs-text-strong;
-        }
-      }
 
       .filter {
         display: flex;
@@ -466,7 +253,7 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
         gap: 10px;
         color: $bs-text-main;
         font-size: 13px;
-        padding: 6px 10px;
+        padding: 4px 10px;
         border-radius: 6px;
         background: rgba(12, 38, 64, 0.6);
         border: 1px solid $bs-surface-border;
@@ -475,397 +262,46 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
           display: inline-flex;
           align-items: center;
           gap: 4px;
+
+          strong {
+            color: $bs-text-strong;
+          }
         }
 
         .sep {
-          color: $bs-text-soft;
-        }
-
-        i {
-          color: $bs-accent-active;
-        }
-
-        strong {
-          color: $bs-text-strong;
-          font-weight: 700;
-        }
-
-        &.active {
-          background: rgba(79, 147, 221, 0.3);
-          border-radius: 3px;
-        }
-      }
-    }
-
-    .map-box {
-      position: relative;
-      height: calc(100vh - 100px);
-
-      .filter-panel {
-        height: 100%;
-        width: 100%;
-        position: absolute;
-        top: 0;
-        left: 0;
-        font-size: 12px;
-        z-index: 999;
-
-        .nav-bar-filter {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 5px;
-          background: $bs-surface-bg-muted;
-        }
-
-        .filter-content {
-          display: grid;
-          grid-template-columns: 1fr 100px;
-          background: $bs-surface-bg-soft;
-
-          .filter-list {
-            padding: 10px;
-
-            .filter-item {
-              display: flex;
-              align-items: center;
-              gap: 20px;
-              padding-top: 10px;
-
-              .filter-type {
-                color: $bs-text-muted;
-              }
-
-              .filter-condition {
-                display: flex;
-                gap: 10px;
-
-                span {
-                  cursor: pointer;
-
-                  &.active {
-                    border-bottom: 2px solid $bs-accent-active;
-                  }
-                }
-              }
-            }
-          }
-
-          .show-all {
-            color: $bs-accent-active;
-            padding: 20px 10px 10px 10px;
-            display: flex;
-            gap: 2px;
-            cursor: pointer;
-          }
-        }
-      }
-
-      .tab-content {
-        height: 100%;
-        // AI:
-        // - 允许 Tab 页组件在内容超出容器高度时纵向滚动
-        // - 保持横向溢出隐藏，避免出现底部横向滚动条
-        overflow-y: auto;
-        overflow-x: hidden;
-
-        /* 自定义滚动条样式，使其与整体暗色暗青主题契合 */
-        &::-webkit-scrollbar {
-          width: 6px;
-        }
-
-        &::-webkit-scrollbar-thumb {
-          background: rgba(79, 147, 221, 0.3);
-          border-radius: 3px;
-
-          &:hover {
-            background: rgba(79, 147, 221, 0.6);
-          }
-        }
-
-        &::-webkit-scrollbar-track {
-          background: transparent;
+          color: $bs-text-muted;
         }
       }
     }
 
     .battle-grid {
-      height: calc(100vh - 100px);
-      display: grid;
-      grid-template-columns: 380px minmax(0, 1fr) 380px;
-      grid-template-rows: minmax(0, 1fr) 320px;
-      box-sizing: border-box;
-      position: relative;
-      border: 1px solid $bs-surface-border;
-      background:
-        radial-gradient(circle at top left, rgba(79, 147, 221, 0.12), transparent 36%),
-        radial-gradient(circle at bottom right, rgba(79, 147, 221, 0.08), transparent 30%), $bs-page-bg;
-      box-shadow:
-        0 22px 48px $bs-surface-shadow,
-        inset 0 1px 0 rgba(255, 255, 255, 0.05);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      overflow: hidden;
-
-      &::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 18%);
-      }
-
-      &::after {
-        content: '';
-        position: absolute;
-        inset: 1px;
-        pointer-events: none;
-        border-radius: 19px;
-        border: 1px solid rgba(255, 255, 255, 0.04);
-      }
-    }
-
-    .battle-grid__side {
-      height: 100%;
-      max-height: 100%;
-      min-height: 0;
-      overflow: hidden;
-      position: relative;
-      z-index: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 6px;
-      box-sizing: border-box;
-    }
-
-    .battle-grid__side--left {
-      grid-column: 1;
-      grid-row: 1 / span 2;
-    }
-
-    .battle-grid__side--right {
-      grid-column: 3;
-      grid-row: 1 / span 2;
-    }
-
-    .battle-grid__center {
-      display: grid;
-      grid-column: 2;
-      grid-row: 1/-1;
-      min-height: 0;
-      position: relative;
-      z-index: 1;
-    }
-
-    .battle-grid__earth {
-      min-height: 0;
-      overflow: hidden;
-      background: $bs-surface-bg-strong;
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-    }
-
-    .battle-grid__earth :deep(.cesium-container) {
-      height: 100%;
-    }
-
-    .battle-grid__center .satellite-list-panel {
-      position: static;
-      height: auto;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border-radius: 12px;
-      background: $bs-surface-bg;
-      border: 1px solid $bs-surface-border;
-    }
-
-    .battle-grid__center .satellite-list {
       flex: 1;
-      min-height: 0;
-      overflow: auto;
-    }
-
-    .satellite-list-panel {
+      display: grid;
+      grid-template-columns: 460px 1fr 480px;
+      gap: 12px;
+      padding: 12px;
+      box-sizing: border-box;
       background: $bs-page-bg;
-      width: 100%;
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      z-index: 999;
-      height: 320px;
+      overflow: hidden;
 
-      .tabs {
-        div {
-          width: 80px;
-          font-size: 14px;
-          padding: 3px;
-        }
+      .battle-grid__side {
+        height: 100%;
+        overflow: hidden;
       }
 
-      .satellite-list {
-        .page-box {
-          display: flex;
-          justify-content: end;
-        }
+      .battle-grid__center {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-width: 0;
 
-        :deep(.atlas-app-table) {
-          --atlas-app-table-border-color: var(--surface-border-color);
-          --atlas-app-table-header-bg-color: var(--surface-bg-color-strong);
-          --atlas-app-table-tr-bg-color: var(--surface-bg-color);
-          --atlas-app-table-row-hover-bg-color: var(--surface-hover-bg-color);
-          --atlas-app-table-current-row-bg-color: var(--surface-hover-bg-color);
-          --atlas-app-table-text-color: var(--text-color-primary);
-          --atlas-app-table-header-text-color: var(--text-color-secondary);
-          background: transparent;
-          color: var(--text-color-primary);
-        }
-
-        :deep(.atlas-app-table__header-wrapper th) {
-          background: var(--surface-bg-color-strong);
-          color: var(--text-color-secondary);
-          border-bottom: 1px solid var(--surface-border-color);
-        }
-
-        :deep(.atlas-app-table__body tr) {
-          background: var(--surface-bg-color);
-        }
-
-        :deep(.atlas-app-table__body td) {
-          background: var(--surface-bg-color);
-          border-bottom: 1px solid var(--surface-border-color);
-        }
-
-        :deep(.atlas-app-table__body tr:hover > td) {
-          background: var(--surface-hover-bg-color);
-        }
-
-        :deep(.atlas-app-pagination) {
-          --atlas-app-text-color-primary: var(--text-color-primary);
-          --atlas-app-fill-color-blank: var(--surface-bg-color);
-        }
-      }
-    }
-
-    .left-panel {
-      background: $bs-surface-bg;
-      position: absolute;
-      left: 0;
-      top: 50px;
-      z-index: 999;
-      width: 400px;
-
-      .battle-box {
-        .battle-count {
-          display: flex;
-          gap: 10px;
-          padding: 5px;
-
-          & > div {
-            background: $bs-surface-bg-muted;
-            flex: 1;
-            padding: 5px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-
-            & > span:first-child {
-              font-size: 18px;
-              font-weight: bold;
-            }
-
-            & > span:last-child {
-              font-size: 14px;
-              color: $bs-text-muted;
-            }
-          }
-        }
-      }
-
-      .left-panel-scroll {
-        padding-right: 10px;
-        height: calc(100vh - 210px);
-
-        .collapse-item {
-          .title {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px;
-            background: $bs-surface-bg-muted;
-          }
-
-          .task-item {
-            background: $bs-surface-bg-muted;
-            padding: 10px 5px 10px 10px;
-            margin: 5px 0;
-            display: grid;
-            grid-template-columns: 1.5fr 1fr;
-
-            .task-item__left {
-              & > div {
-                text-align: left;
-              }
-            }
-
-            .task-item__right {
-              justify-content: end;
-              color: $bs-accent-active;
-              cursor: pointer;
-            }
-          }
-        }
-      }
-    }
-
-    .right-panel {
-      background: $bs-surface-bg;
-      position: absolute;
-      right: 0;
-      top: 50px;
-      z-index: 999;
-      width: 400px;
-
-      .right-panel-scroll {
-        height: calc(100vh - 145px);
-        padding-right: 10px;
-
-        .focus-list {
-          .focus-item {
-            background: $bs-surface-bg-muted;
-            margin: 5px 0;
-            padding: 10px 0 10px 10px;
-            font-size: 12px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: 80px repeat(4, 30px);
-            gap: 5px;
-
-            .focus-item-1 {
-              display: flex;
-              flex-direction: column;
-              align-items: start;
-              justify-content: space-around;
-            }
-
-            .focus-item-flex {
-              display: grid;
-              grid-template-columns: 1.2fr 2fr;
-
-              & > span:first-child {
-                align-self: center;
-                text-align: right;
-                padding-right: 10px;
-                color: $bs-text-muted;
-              }
-
-              & > span:last-child {
-                text-align: left;
-                align-self: center;
-                white-space: normal;
-                word-break: break-word;
-                overflow-wrap: break-word;
-              }
-            }
-          }
+        .battle-grid__earth {
+          flex: 1;
+          position: relative;
+          border-radius: 8px;
+          overflow: hidden;
+          border: 1px solid $bs-surface-border;
+          box-shadow: 0 4px 20px $bs-surface-shadow;
         }
       }
     }
