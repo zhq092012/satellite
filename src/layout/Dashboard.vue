@@ -159,7 +159,7 @@ const homeMenu = computed<DashboardMenuNode[]>(() => [
   {
     path: '/home',
     meta: {
-      title: '战场列表',
+      title: '战场态势分析',
       icon: 'icon-situation',
       showInMenu: true,
     },
@@ -255,9 +255,71 @@ const adminMenus = computed(() => {
   ]
 })
 
+/** 算法分析管理前端静态菜单配置 */
+const algorithmMenus = computed<DashboardMenuNode[]>(() => [
+  {
+    path: '/algorithm',
+    meta: {
+      title: '算法分析管理',
+      icon: 'icon-layer',
+      showInMenu: true,
+    },
+    children: [
+      {
+        path: '/algorithm/threat',
+        meta: {
+          title: '卫星威胁分析',
+          icon: 'icon-situation',
+          showInMenu: true,
+        },
+        children: [],
+      },
+      {
+        path: '/algorithm/attackability',
+        meta: {
+          title: '可打击度分析',
+          icon: 'icon-situation',
+          showInMenu: true,
+        },
+        children: [],
+      },
+      {
+        path: '/algorithm/killchain',
+        meta: {
+          title: '杀伤链方案',
+          icon: 'icon-situation',
+          showInMenu: true,
+        },
+        children: [],
+      },
+      {
+        path: '/algorithm/evaluation',
+        meta: {
+          title: '打击结果评估',
+          icon: 'icon-situation',
+          showInMenu: true,
+        },
+        children: [],
+      },
+      {
+        path: '/algorithm/simulation',
+        meta: {
+          title: '打击方案仿真',
+          icon: 'icon-situation',
+          showInMenu: true,
+        },
+        children: [],
+      },
+    ],
+  },
+])
+
 const visibleMenus = computed<RouteRecordRaw[]>(() => {
   const backendMenus = filterMenusByPermission(buildMenuRoutes(authStore.menuTree))
-  const mergedMenus = mergeMenus(mergeMenus(homeMenu.value, backendMenus), filterMenusByPermission(adminMenus.value))
+  const mergedMenus = mergeMenus(
+    mergeMenus(mergeMenus(homeMenu.value, backendMenus), filterMenusByPermission(algorithmMenus.value)),
+    filterMenusByPermission(adminMenus.value)
+  )
   return mergedMenus as RouteRecordRaw[]
 })
 

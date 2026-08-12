@@ -61,7 +61,7 @@
       <div v-else class="map-box">
         <div class="tab-content">
           <keep-alive
-            include="EvaluationReport,ThreatAnalysis,SatelliteAttackabilityView,KillChain,ElectronicWarfareG6"
+            include="ElectronicWarfareG6"
           >
             <component v-if="activeTabComponent" :is="activeTabComponent" :key="store.activetab" :ref="setRef" />
           </keep-alive>
@@ -75,11 +75,6 @@ import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
 import SatelliteNetView from '@/components/cesium/SatelliteNetView.vue'
-import SatelliteUnReal from '@/components/cesium/SatelliteUnReal.vue'
-import SatelliteThreatView from '@/components/cesium/SatelliteThreatView.vue'
-import SatelliteAttackabilityView from '@/components/cesium/SatelliteAttackabilityView.vue'
-import EvaluationReport from '@/components/cesium/EvaluationReport.vue'
-import KillChain from '@/components/cesium/KillChain.vue'
 import ConfrontView from '@/components/cesium/ConfrontationAnalysis.vue'
 import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue'
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
@@ -95,11 +90,6 @@ useSatelliteProfileDialog()
 const compMap = {
   CesiumViewer,
   SatelliteNetView,
-  SatelliteUnReal,
-  SatelliteThreatView,
-  SatelliteAttackabilityView,
-  EvaluationReport,
-  KillChain,
   ConfrontView,
   ElectronicWarfareG6,
   SatelliteGantt,
@@ -109,37 +99,6 @@ const compMap = {
  */
 const tabDefs = [
   { label: '战场态势视图', value: '战场态势视图', component: 'CesiumViewer', permissionCode: 'battle:situation' },
-  { label: '卫星威胁分析', value: '卫星威胁分析', component: 'SatelliteThreatView', permissionCode: 'battle:threat' },
-  {
-    label: '可打击度分析',
-    value: '可打击度分析',
-    component: 'SatelliteAttackabilityView',
-    permissionCode: 'battle:strike',
-  },
-  {
-    label: '杀伤链方案',
-    value: '杀伤链方案',
-    component: 'KillChain',
-    permissionCode: 'battle:killChain',
-  },
-  {
-    label: '打击结果评估',
-    value: '异常事件分析',
-    component: 'EvaluationReport',
-    permissionCode: 'battle:evaluation',
-  },
-  {
-    label: '打击方案仿真',
-    value: '打击方案仿真',
-    component: 'SatelliteUnReal',
-    permissionCode: 'battle:unreal',
-  },
-  // {
-  //   label: '红蓝对抗分析',
-  //   value: '红蓝对抗分析',
-  //   component: 'ConfrontView',
-  //   permissionCode: 'battle:confront',
-  // },
   {
     label: '电磁对抗分析',
     value: '电磁对抗分析',
@@ -174,22 +133,6 @@ type CesiumViewerInst = InstanceOf<typeof CesiumViewer>
  */
 type SatelliteNetViewInst = InstanceOf<typeof SatelliteNetView>
 /**
- * 打击方案仿真组件实例类型
- */
-type SatelliteUnRealInst = InstanceOf<typeof SatelliteUnReal>
-/**
- * 卫星威胁分析组件实例类型
- */
-type SatelliteThreatViewInst = InstanceOf<typeof SatelliteThreatView>
-/**
- * 可打击度分析组件实例类型
- */
-type SatelliteAttackabilityViewInst = InstanceOf<typeof SatelliteAttackabilityView>
-/**
- * 打击结果评估组件实例类型
- */
-type EvaluationReportInst = InstanceOf<typeof EvaluationReport>
-/**
  * 红蓝对抗分析组件实例类型
  */
 type ConfrontInst = InstanceOf<typeof ConfrontView>
@@ -200,10 +143,6 @@ type ConfrontInst = InstanceOf<typeof ConfrontView>
 type ActiveInst =
   | CesiumViewerInst
   | SatelliteNetViewInst
-  | SatelliteUnRealInst
-  | SatelliteThreatViewInst
-  | SatelliteAttackabilityViewInst
-  | EvaluationReportInst
   | ConfrontInst
 
 /**
@@ -223,10 +162,6 @@ const cesiumViewerRef = shallowRef<CesiumViewerInst | null>()
  */
 const netViewerRef = shallowRef<SatelliteNetViewInst | null>()
 /**
- * 打击方案仿真组件的引用
- */
-const satelliteUnRealRef = shallowRef<SatelliteUnRealInst | null>()
-/**
  * 红蓝对抗分析组件的引用
  */
 const confrontRef = shallowRef<ConfrontInst | null>()
@@ -240,7 +175,6 @@ function setRef(el: any) {
   // 切换时清理上一个 tab 的引用，避免旧组件方法继续调用（如视图切换时）
   cesiumViewerRef.value = null
   netViewerRef.value = null
-  satelliteUnRealRef.value = null
   confrontRef.value = null
 
   if (activeRef.value) {
@@ -250,9 +184,6 @@ function setRef(el: any) {
         break
       case '卫星网络视图':
         netViewerRef.value = activeRef.value as SatelliteNetViewInst
-        break
-      case '打击方案仿真':
-        satelliteUnRealRef.value = activeRef.value as SatelliteUnRealInst
         break
       case '红蓝对抗分析':
         confrontRef.value = activeRef.value as ConfrontInst

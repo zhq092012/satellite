@@ -154,6 +154,81 @@ const routes: Array<RouteRecordRaw> = [
           },
         ],
       },
+      {
+        path: 'algorithm',
+        name: 'AlgorithmManage',
+        component: () => import('@/layout/AlgorithmManage.vue'),
+        redirect: '/algorithm/threat',
+        beforeEnter: (to: { path: string }) => {
+          if (to.path === '/algorithm') {
+            return '/algorithm/threat'
+          }
+          return true
+        },
+        meta: {
+          title: '算法分析管理',
+          icon: 'icon-layer',
+          showInMenu: true,
+          requiresAuth: true,
+        },
+        children: [
+          {
+            path: 'threat',
+            name: 'SatelliteThreat',
+            component: () => import('@/views/algorithm/SatelliteThreat.vue'),
+            meta: {
+              title: '卫星威胁分析',
+              icon: 'icon-situation',
+              showInMenu: true,
+              requiresAuth: true,
+            },
+          },
+          {
+            path: 'attackability',
+            name: 'SatelliteAttackability',
+            component: () => import('@/views/algorithm/SatelliteAttackability.vue'),
+            meta: {
+              title: '可打击度分析',
+              icon: 'icon-situation',
+              showInMenu: true,
+              requiresAuth: true,
+            },
+          },
+          {
+            path: 'killchain',
+            name: 'KillChainPlan',
+            component: () => import('@/views/algorithm/KillChainPlan.vue'),
+            meta: {
+              title: '杀伤链方案',
+              icon: 'icon-situation',
+              showInMenu: true,
+              requiresAuth: true,
+            },
+          },
+          {
+            path: 'evaluation',
+            name: 'EvaluationResult',
+            component: () => import('@/views/algorithm/EvaluationResult.vue'),
+            meta: {
+              title: '打击结果评估',
+              icon: 'icon-situation',
+              showInMenu: true,
+              requiresAuth: true,
+            },
+          },
+          {
+            path: 'simulation',
+            name: 'StrikeSimulation',
+            component: () => import('@/views/algorithm/StrikeSimulation.vue'),
+            meta: {
+              title: '打击方案仿真',
+              icon: 'icon-situation',
+              showInMenu: true,
+              requiresAuth: true,
+            },
+          },
+        ],
+      },
     ],
   },
 ]
