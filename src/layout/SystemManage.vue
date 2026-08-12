@@ -16,6 +16,7 @@
         <el-tab-pane label="基站管理" name="basestations" />
         <el-tab-pane label="导弹管理" name="missiles" />
         <el-tab-pane label="导弹基地管理" name="missileBases" />
+        <el-tab-pane label="战场管理" name="battles" />
       </el-tabs>
 
       <router-view />
@@ -38,6 +39,7 @@ const tabNameMap: Record<string, string> = {
   BaseStationManage: 'basestations',
   MissileManage: 'missiles',
   MissileBaseManage: 'missileBases',
+  BattleManage: 'battles',
 }
 
 const activeTab = computed({
@@ -60,6 +62,8 @@ const handleTabChange = (tabName: string) => {
     router.push({ name: 'MissileManage' })
   } else if (tabName === 'missileBases') {
     router.push({ name: 'MissileBaseManage' })
+  } else if (tabName === 'battles') {
+    router.push({ name: 'BattleManage' })
   }
 }
 </script>

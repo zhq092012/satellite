@@ -250,6 +250,15 @@ const adminMenus = computed(() => {
           },
           children: [],
         },
+        {
+          path: '/system/battles',
+          meta: {
+            title: '战场管理',
+            icon: 'icon-situation',
+            showInMenu: true,
+          },
+          children: [],
+        },
       ],
     },
   ]

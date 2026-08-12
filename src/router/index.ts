@@ -152,6 +152,18 @@ const routes: Array<RouteRecordRaw> = [
               permission: 'system:missileBases:list',
             },
           },
+          {
+            path: 'battles',
+            name: 'BattleManage',
+            component: () => import('@/views/admin/BattleManage.vue'),
+            meta: {
+              title: '战场管理',
+              icon: 'icon-situation',
+              showInMenu: true,
+              requiresAuth: true,
+              roles: ['admin'],
+            },
+          },
         ],
       },
       {
