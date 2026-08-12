@@ -162,18 +162,15 @@ const store = useLayoutStore()
 const typeSerialsMap = ref<Record<string, string[]>>({})
 
 // [变量用途]
-// 当前选中的卫星类型筛选值
-
-const selectedType = ref<string>('')
+// 当前选中的卫星类型筛选值，优先从 Store 持久化状态中恢复
+const selectedType = ref<string>(store.selectedSatType || '')
 
 // [变量用途]
-// 当前选中的卫星系列筛选值
-
-const selectedSeries = ref<string>('')
+// 当前选中的卫星系列筛选值，优先从 Store 持久化状态中恢复
+const selectedSeries = ref<string>(store.selectedSatSeries || '')
 
 // [变量用途]
 // 可供选择的卫星类型下拉选项列表
-
 const typeOptions = computed<string[]>(() => {
   return Object.keys(typeSerialsMap.value)
 })
@@ -204,29 +201,57 @@ const isTypeDisabled = (type: string): boolean => {
 
 /**
  * [函数说明]
- * 选择并切换选中的卫星类型，并同步保存至 Store
+ * 选择并切换选中的卫星类型，并同步保存至 Store，自动联动选中该类型下的首个可用系列
  *
  * @param type 选中的卫星类型名称
  */
 const selectType = (type: string) => {
   if (!type || isTypeDisabled(type)) return
   selectedType.value = type
-  selectedSeries.value = ''
   store.setSelectedSatType(selectedType.value)
-  store.setSelectedSatSeries('')
+
+  const availSeries = typeSerialsMap.value[type] || []
+  const newSeries = availSeries.length > 0 ? availSeries[0] : ''
+  selectedSeries.value = newSeries
+  store.setSelectedSatSeries(newSeries)
 }
 
 /**
  * [监听器说明]
- * 监听卫星类型选项列表，自动选中第一个未禁用的卫星类型 (如 "侦察")
+ * 监听卫星类型选项列表，保持现有有效类型或自动选中第一个未禁用的卫星类型 (如 "侦察")
  */
 watch(
   typeOptions,
   (options) => {
     if (!options || options.length === 0) return
-    const validOption = options.find((opt) => !isTypeDisabled(opt))
-    if (validOption && (!selectedType.value || isTypeDisabled(selectedType.value))) {
-      selectType(validOption)
+    let currentType = selectedType.value || store.selectedSatType || ''
+    if (!currentType || isTypeDisabled(currentType) || !options.includes(currentType)) {
+      const validOption = options.find((opt) => !isTypeDisabled(opt))
+      if (validOption) {
+        selectType(validOption)
+      }
+    } else if (selectedType.value !== currentType) {
+      selectedType.value = currentType
+    }
+  },
+  { immediate: true }
+)
+
+/**
+ * [监听器说明]
+ * 监听当前可用卫星系列列表，切换 Tab 组件挂载后自动恢复/对齐选中的系列，防止 Store 中系列清空导致敌方天基过境与中继卫星数据为空
+ */
+watch(
+  seriesOptions,
+  (sOptions) => {
+    if (!sOptions || sOptions.length === 0) return
+    let currentSeries = selectedSeries.value || store.selectedSatSeries || ''
+    if (!currentSeries || !sOptions.includes(currentSeries)) {
+      currentSeries = sOptions[0]
+    }
+    if (currentSeries && (selectedSeries.value !== currentSeries || store.selectedSatSeries !== currentSeries)) {
+      selectedSeries.value = currentSeries
+      store.setSelectedSatSeries(currentSeries)
     }
   },
   { immediate: true }
@@ -286,8 +311,12 @@ const fetchTypeSerials = async (taskId?: number) => {
 watch(
   () => store.activedTask?.id,
   (newTaskId) => {
-    selectedType.value = ''
-    selectedSeries.value = ''
+    if (!newTaskId) {
+      selectedType.value = ''
+      selectedSeries.value = ''
+      store.setSelectedSatType('')
+      store.setSelectedSatSeries('')
+    }
     void fetchTypeSerials(newTaskId)
   },
   { immediate: true }
@@ -304,12 +333,14 @@ const handleSelectSatellite = (norad: number) => {
 
 /**
  * [计算属性说明]
- * 提取敌方卫星列表 (包含过境卫星与中继卫星)，并根据选择的类型和系列动态过滤
+ * 提取当前矩阵中的敌方天基过境与中继卫星列表。
+ * 数据源直接来自于后端算法根据 selectedSeries 计算并返回的 matrixData 传输矩阵。
  */
 const satList = computed(() => {
   const matrixData = props.matrixData
-  const map = new Map<number, { norad: number; name: string; satType: string; isRelay: boolean }>()
   if (!matrixData) return []
+
+  const map = new Map<number, { norad: number; name: string; satType: string; isRelay: boolean }>()
 
   const initList = matrixData.initMatrixList?.length ? matrixData.initMatrixList : []
   const satMatrixList = matrixData.satelliteMatrixList?.length ? matrixData.satelliteMatrixList : []
@@ -329,18 +360,7 @@ const satList = computed(() => {
     })
   })
 
-  let list = Array.from(map.values())
-
-  // 类型过滤
-  if (selectedType.value) {
-    list = list.filter((item) => (item.satType || '').includes(selectedType.value))
-  }
-  // 系列过滤
-  if (selectedSeries.value) {
-    list = list.filter((item) => (item.name || '').toUpperCase().includes(selectedSeries.value.toUpperCase()))
-  }
-
-  return list
+  return Array.from(map.values())
 })
 
 const selectedInfrastructureNode = computed(() => store.selectedInfrastructureNode)

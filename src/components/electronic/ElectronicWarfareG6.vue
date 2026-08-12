@@ -30,7 +30,7 @@
             :key="mode.key"
             class="nav-tab-btn tab-matrix"
             :class="{ active: currentViewMode === mode.key }"
-            @click="currentViewMode = mode.key"
+            @click="handleViewModeChange(mode.key)"
           >
             {{ mode.name }}
           </button>
@@ -50,22 +50,8 @@
       </div>
     </div>
 
-    <!-- 当切换为甘特图模式时，渲染卫星击毁甘特图组件 -->
-    <div v-show="currentViewMode === 'GANTT'" class="cema-workspace" style="height: calc(100vh - 60px); padding: 0">
-      <SatelliteGantt :matrix-data="matrixData" :intensity="currentIntensity" />
-    </div>
-
-    <!-- 当切换为武器打击窗口列表模式时，渲染武器打击窗口列表组件 -->
-    <div
-      v-show="currentViewMode === 'WEAPON_ATTACK'"
-      class="cema-workspace"
-      style="height: calc(100vh - 60px); padding: 0"
-    >
-      <WeaponAttackList :matrix-data="matrixData" />
-    </div>
-
     <!-- 中间主视图与拓扑画布区域 -->
-    <div v-show="currentViewMode !== 'GANTT' && currentViewMode !== 'WEAPON_ATTACK'" class="cema-workspace">
+    <div class="cema-workspace">
       <!-- 状态与统计看板小条 -->
       <div class="topo-summary-bar">
         <div class="stat-badge">
@@ -160,7 +146,7 @@
     </div>
 
     <!-- 底部时间轴控制与过境窗口面板 -->
-    <div class="cema-timeline-footer" v-if="currentViewMode !== 'GANTT' && currentViewMode !== 'WEAPON_ATTACK'">
+    <div class="cema-timeline-footer">
       <div class="timeline-ctrl-bar">
         <div class="ctrl-left">
           <span class="timeline-title"> <i class="el-icon-timer"></i> 打击/过境时间轴 </span>
@@ -246,8 +232,6 @@ import { useLayoutStore } from '@/store/modules/layout'
 import { getReconnaissanceAttackMatrix } from '@/api/electronic'
 import type { MatrixResult, Weapon } from '@/api/electronic'
 import type { FuncType } from '@/types/electronic'
-import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
-import WeaponAttackList from '@/components/electronic/WeaponAttackList.vue'
 
 defineOptions({
   name: 'ElectronicWarfareG6',
@@ -265,7 +249,7 @@ const currentIntensity = ref<IntensityLevelType>('低烈度')
 
 // [类型用途]
 // 拓扑视图显示模式选项
-type ViewModeType = 'COMBINED' | 'PRE_STRIKE' | 'POST_STRIKE' | 'GANTT' | 'WEAPON_ATTACK'
+type ViewModeType = 'COMBINED' | 'PRE_STRIKE' | 'POST_STRIKE'
 
 // [变量用途]
 // 拓扑视图切换选项列表
@@ -273,8 +257,6 @@ const viewModeOptions: { key: ViewModeType; name: string }[] = [
   { key: 'COMBINED', name: '前后全量对比' },
   { key: 'PRE_STRIKE', name: '打击前拓扑' },
   { key: 'POST_STRIKE', name: '打击后拓扑' },
-  { key: 'GANTT', name: '甘特图矩阵' },
-  { key: 'WEAPON_ATTACK', name: '武器打击窗口' },
 ]
 
 // [变量用途]
@@ -298,7 +280,9 @@ const matrixData = ref<MatrixResult | null>(null)
  * @returns FuncType 对应的分类标识 ('COMM' | 'RECON')
  */
 const currentSatCategory = computed<FuncType>(() => {
-  const data = matrixData.value as (MatrixResult & { satCategory?: string; category?: string; func_type?: string }) | null
+  const data = matrixData.value as
+    | (MatrixResult & { satCategory?: string; category?: string; func_type?: string })
+    | null
   if (data) {
     if (data.satCategory) return data.satCategory as FuncType
     if (data.category) return data.category as FuncType
@@ -566,6 +550,26 @@ const handleIntensityChange = (level: IntensityLevelType) => {
   currentIntensity.value = level
   fetchMatrixData()
 }
+
+/**
+ * [功能说明]
+ * 切换拓扑显示模式 (前后全量对比 / 打击前拓扑 / 打击后拓扑)，并重新绘制 G6 拓扑图
+ *
+ * @param mode 拓扑视图模式 Key
+ */
+const handleViewModeChange = (mode: ViewModeType) => {
+  if (currentViewMode.value === mode) return
+  currentViewMode.value = mode
+  initOrUpdateGraph()
+}
+
+/**
+ * [监听器说明]
+ * 监听拓扑视图显示模式变更，自动更新 G6 图谱与状态
+ */
+watch(currentViewMode, () => {
+  initOrUpdateGraph()
+})
 
 // ==================== 时间轴算法与转换函数 ====================
 
@@ -1997,18 +2001,6 @@ const updateGraphHighlightState = () => {
     }
   })
 }
-
-// [功能说明]
-// 监听拓扑视图模式改变
-// 当从甘特图矩阵模式 (GANTT) 切回拓扑视图模式时，在 DOM 更新 (nextTick) 后刷新 G6 画布并高亮当前活跃元素
-watch(currentViewMode, (mode) => {
-  if (mode !== 'GANTT' && mode !== 'WEAPON_ATTACK') {
-    nextTick(() => {
-      initOrUpdateGraph()
-      highlightActiveElements()
-    })
-  }
-})
 
 onMounted(() => {
   fetchMatrixData()
