@@ -6,6 +6,8 @@
         <span class="brand-icon">🛰️</span>
         <span class="brand-text">态势分析决策平台</span>
       </div>
+
+      <!-- 中间：四个功能切换按钮 -->
       <div class="menu-tabs">
         <button
           v-for="tab in menuTabs"
@@ -18,6 +20,24 @@
           <span class="btn-label">{{ tab.name }}</span>
         </button>
       </div>
+
+      <!-- 右侧：战场与任务显示 / 切换区域 -->
+      <div class="task-status-bar">
+        <!-- 场景 A：已选择战场和任务 -->
+        <div v-if="store.battle && store.activedTask" class="task-info-badge" @click="openTaskSelector">
+          <span class="battle-name">⚔️ {{ store.battle.name }}</span>
+          <span class="divider">/</span>
+          <span class="task-name">📋 {{ store.activedTask.name }}</span>
+          <el-button type="primary" size="small" link class="switch-btn">切换任务</el-button>
+        </div>
+
+        <!-- 场景 B：尚未选择战场任务，突出提醒 -->
+        <div v-else class="task-prompt-badge" @click="openTaskSelector">
+          <el-tag type="warning" effect="dark" round class="prompt-tag">
+            ⚠️ 尚未选择战场任务（点击选择）
+          </el-tag>
+        </div>
+      </div>
     </header>
 
     <!-- 下层内容展示区域 -->
@@ -26,43 +46,101 @@
         <component :is="currentComponent" :key="activeTab" />
       </keep-alive>
     </main>
+
+    <!-- 战场与任务选择模态弹窗 -->
+    <el-dialog
+      v-model="selectorDialogVisible"
+      title="🎯 选择战场与任务"
+      width="540px"
+      append-to-body
+      class="task-selector-dialog"
+    >
+      <div class="dialog-body" v-loading="loadingData">
+        <div class="form-tip">请选择当前分析所基于的战场及关联任务：</div>
+
+        <!-- 级联选择器 -->
+        <el-form label-width="90px">
+          <el-form-item label="选择任务">
+            <el-cascader
+              v-model="selectedCascadeValue"
+              :options="battleTaskOptions"
+              :props="{ expandTrigger: 'hover', value: 'id', label: 'name', children: 'children' }"
+              placeholder="请选择 战场 / 任务"
+              style="width: 100%"
+              filterable
+              @change="handleCascaderChange"
+            />
+          </el-form-item>
+        </el-form>
+
+        <!-- 战场-任务 快捷选择列表 -->
+        <div class="quick-battle-tree" v-if="battleListWithTasks.length > 0">
+          <div class="tree-title">快捷选择列表：</div>
+          <el-scrollbar max-height="260px">
+            <div v-for="battle in battleListWithTasks" :key="battle.id" class="battle-group">
+              <div class="battle-group-name">⚔️ {{ battle.name }}</div>
+              <div class="task-chips">
+                <div
+                  v-for="task in battle.tasks"
+                  :key="task.id"
+                  class="task-chip"
+                  :class="{ active: store.activedTask?.id === task.id }"
+                  @click="selectBattleAndTask(battle, task)"
+                >
+                  📋 {{ task.name }}
+                </div>
+                <div v-if="!battle.tasks || battle.tasks.length === 0" class="no-task">暂无所属任务</div>
+              </div>
+            </div>
+          </el-scrollbar>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="selectorDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :disabled="!pendingSelection"
+          @click="confirmTaskSelection"
+        >
+          确认选择
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type Component } from 'vue'
+import { computed, onMounted, ref, type Component } from 'vue'
 import BattleSituation from '@/components/BattleSituation/BattleSituation.vue'
 import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue'
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import WeaponAttackList from '@/components/electronic/WeaponAttackList.vue'
+import { useLayoutStore } from '@/store/modules/layout'
+import { getBattleList, getTaskList } from '@/api/dashboard'
+import type { BattleForm, TaskForm } from '@/types/dashboard'
+import { ElMessage } from 'element-plus'
 
 defineOptions({ name: 'Home' })
+
+/** [变量说明] 全局 Store */
+const store = useLayoutStore()
 
 /**
  * [类型定义]
  * 顶部导航菜单项配置接口
  */
 interface MenuTabItem {
-  /** 菜单项唯一标识 Key */
   key: string
-  /** 菜单按钮显示文本 */
   name: string
-  /** 菜单按钮前置图标 */
   icon: string
-  /** 关联的视图组件引用 */
   component: Component
 }
 
-/**
- * [变量说明]
- * 当前激活的菜单项 Key，默认选中 "GIS态势分析"
- */
+/** [变量说明] 当前激活的菜单项 Key */
 const activeTab = ref<string>('GIS态势分析')
 
-/**
- * [变量说明]
- * 顶层四个切换菜单按钮配置
- */
+/** [变量说明] 顶层四个切换菜单按钮配置 */
 const menuTabs: MenuTabItem[] = [
   { key: 'GIS态势分析', name: 'GIS态势分析', icon: '🌐', component: BattleSituation },
   { key: 'G6图谱态势分析', name: 'G6图谱态势分析', icon: '🕸️', component: ElectronicWarfareG6 },
@@ -70,23 +148,133 @@ const menuTabs: MenuTabItem[] = [
   { key: '武器打击窗口分析', name: '武器打击窗口分析', icon: '🎯', component: WeaponAttackList },
 ]
 
-/**
- * [计算属性说明]
- * 根据当前选中的 activeTab 返回目标切换组件
- */
+/** [计算属性说明] 动态组件引用 */
 const currentComponent = computed<Component>(() => {
   const targetTab = menuTabs.find((item) => item.key === activeTab.value)
   return targetTab ? targetTab.component : BattleSituation
 })
 
 /**
- * [函数说明]
- * 切换顶部导航菜单
+ * [函数说明] 切换顶部导航菜单
  * @param key 目标菜单 Key
  */
 const switchTab = (key: string) => {
   activeTab.value = key
 }
+
+/** [变量说明] 任务选择弹窗显隐控制 */
+const selectorDialogVisible = ref(false)
+/** [变量说明] 战场与任务数据加载状态 */
+const loadingData = ref(false)
+/** [变量说明] 包含完整任务列表的战场数据列表 */
+const battleListWithTasks = ref<BattleForm[]>([])
+/** [变量说明] Cascader 级联选择器绑定的路径 */
+const selectedCascadeValue = ref<string[]>([])
+/** [变量说明] 暂存待确认的战场与任务 */
+const pendingSelection = ref<{ battle: BattleForm; task: TaskForm } | null>(null)
+
+/** [计算属性说明] 转换为 Cascader 选项数据 */
+const battleTaskOptions = computed(() => {
+  return battleListWithTasks.value.map((battle) => ({
+    id: `battle_${battle.id}`,
+    name: `⚔️ ${battle.name}`,
+    battleObj: battle,
+    children: (battle.tasks || []).map((task) => ({
+      id: `task_${task.id}`,
+      name: `📋 ${task.name}`,
+      taskObj: task,
+      battleObj: battle,
+    })),
+  }))
+})
+
+/**
+ * [函数说明] 加载战场及其对应的关联任务列表
+ */
+const loadBattleAndTaskData = async () => {
+  loadingData.value = true
+  try {
+    const res = await getBattleList()
+    if (res.code === 200 && Array.isArray(res.data)) {
+      const list = res.data
+      await Promise.all(
+        list.map(async (battle) => {
+          if (battle.id) {
+            const taskRes = await getTaskList(battle.id)
+            if (taskRes.code === 200 && Array.isArray(taskRes.data)) {
+              battle.tasks = taskRes.data
+            }
+          }
+        })
+      )
+      battleListWithTasks.value = list
+    }
+  } catch (error) {
+    console.error('加载战场任务列表失败:', error)
+  } finally {
+    loadingData.value = false
+  }
+}
+
+/**
+ * [函数说明] 打开战场任务选择弹窗
+ */
+const openTaskSelector = async () => {
+  selectorDialogVisible.value = true
+  if (battleListWithTasks.value.length === 0) {
+    await loadBattleAndTaskData()
+  }
+}
+
+/**
+ * [函数说明] Cascader 选择变更回调
+ * @param val 选中的节点 ID 路径数组
+ */
+const handleCascaderChange = (val: any) => {
+  if (Array.isArray(val) && val.length === 2) {
+    const taskIdStr = val[1]
+    for (const battle of battleListWithTasks.value) {
+      const matchedTask = (battle.tasks || []).find((t) => `task_${t.id}` === taskIdStr)
+      if (matchedTask) {
+        pendingSelection.value = { battle, task: matchedTask }
+        break
+      }
+    }
+  }
+}
+
+/**
+ * [函数说明] 快捷芯片列表项选择任务
+ * @param battle 战场对象
+ * @param task 任务对象
+ */
+const selectBattleAndTask = (battle: BattleForm, task: TaskForm) => {
+  pendingSelection.value = { battle, task }
+  selectedCascadeValue.value = [`battle_${battle.id}`, `task_${task.id}`]
+}
+
+/**
+ * [函数说明] 确认选择并写入全局 Store
+ */
+const confirmTaskSelection = () => {
+  if (pendingSelection.value) {
+    const { battle, task } = pendingSelection.value
+    store.setActivedBattle(battle)
+    store.setActivedTask(task)
+    selectorDialogVisible.value = false
+    ElMessage.success(`已设置当前任务：${battle.name} / ${task.name}`)
+  }
+}
+
+onMounted(async () => {
+  // 异步预加载战场与任务数据
+  await loadBattleAndTaskData()
+
+  // 如果 Store 中没有战场或任务信息，自动弹出选择框提示用户选择
+  if (!store.battle || !store.activedTask) {
+    selectorDialogVisible.value = true
+  }
+})
 </script>
 
 <style lang="scss" scoped>
@@ -171,6 +359,63 @@ const switchTab = (key: string) => {
         }
       }
     }
+
+    /* 右侧：战场与任务指示状态栏 */
+    .task-status-bar {
+      display: flex;
+      align-items: center;
+
+      .task-info-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 14px;
+        background: rgba(14, 38, 66, 0.8);
+        border: 1px solid rgba(79, 147, 221, 0.35);
+        border-radius: 20px;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        font-size: 13px;
+
+        &:hover {
+          border-color: #00e1ff;
+          box-shadow: 0 0 12px rgba(0, 225, 255, 0.25);
+        }
+
+        .battle-name {
+          color: #00e1ff;
+          font-weight: bold;
+        }
+
+        .divider {
+          color: #8eb3d6;
+        }
+
+        .task-name {
+          color: #ffffff;
+        }
+
+        .switch-btn {
+          margin-left: 4px;
+          color: #4f93dd;
+        }
+      }
+
+      .task-prompt-badge {
+        cursor: pointer;
+
+        .prompt-tag {
+          font-size: 13px;
+          padding: 6px 14px;
+          cursor: pointer;
+          transition: transform 0.2s ease;
+
+          &:hover {
+            transform: scale(1.04);
+          }
+        }
+      }
+    }
   }
 
   /* 下层内容展示区域 */
@@ -180,6 +425,74 @@ const switchTab = (key: string) => {
     width: 100%;
     height: calc(100vh - 52px);
     overflow: hidden;
+  }
+}
+
+/* 战场与任务选择模态框样式 */
+.dialog-body {
+  .form-tip {
+    font-size: 13px;
+    color: #909399;
+    margin-bottom: 14px;
+  }
+
+  .quick-battle-tree {
+    margin-top: 16px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.12);
+    padding-top: 12px;
+
+    .tree-title {
+      font-size: 13px;
+      font-weight: bold;
+      color: #303133;
+      margin-bottom: 10px;
+    }
+
+    .battle-group {
+      margin-bottom: 12px;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.03);
+      border-radius: 6px;
+
+      .battle-group-name {
+        font-size: 14px;
+        font-weight: bold;
+        color: #409eff;
+        margin-bottom: 6px;
+      }
+
+      .task-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+
+        .task-chip {
+          padding: 4px 12px;
+          font-size: 12px;
+          background: #ffffff;
+          border: 1px solid #dcdfe6;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+
+          &:hover {
+            border-color: #409eff;
+            color: #409eff;
+          }
+
+          &.active {
+            background: #409eff;
+            color: #ffffff;
+            border-color: #409eff;
+          }
+        }
+
+        .no-task {
+          font-size: 12px;
+          color: #c0c4cc;
+        }
+      }
+    }
   }
 }
 </style>
