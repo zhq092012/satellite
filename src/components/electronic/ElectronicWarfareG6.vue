@@ -3,32 +3,13 @@
     <!-- 顶部导航与控制栏 Header -->
     <div class="cema-header">
       <div class="header-left">
-        <span class="header-title glow-text">{{
-          currentSatCategory === 'COMM' ? '通讯卫星拓扑与服务分析' : '三层链路拓扑毁伤分析'
-        }}</span>
-        <!-- 卫星矩阵类型分类切换按钮组 -->
-        <div class="category-group" style="margin-left: 16px; display: inline-flex; gap: 6px">
-          <button
-            class="nav-tab-btn tab-cat"
-            :class="{ active: currentSatCategory === 'RECON' }"
-            @click="handleCategoryChange('RECON')"
-          >
-            🛰️ 侦察卫星矩阵
-          </button>
-          <button
-            class="nav-tab-btn tab-cat"
-            :class="{ active: currentSatCategory === 'COMM' }"
-            @click="handleCategoryChange('COMM')"
-          >
-            📡 通讯卫星矩阵
-          </button>
-        </div>
+        <span class="header-title glow-text">三层链路拓扑毁伤分析</span>
       </div>
 
       <!-- 烈度与视图模式切换选项 -->
       <div class="header-center">
-        <!-- 1. 交战烈度切换按钮组 (仅侦察卫星模式显示) -->
-        <div class="intensity-group" v-if="currentSatCategory === 'RECON'">
+        <!-- 1. 交战烈度切换按钮组 -->
+        <div class="intensity-group">
           <button
             v-for="level in intensityOptions"
             :key="level"
@@ -40,7 +21,7 @@
           </button>
         </div>
 
-        <div class="v-divider" v-if="currentSatCategory === 'RECON'"></div>
+        <div class="v-divider"></div>
 
         <!-- 2. 拓扑显示模式切换 -->
         <div class="matrix-tab-group">
@@ -262,8 +243,9 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import G6 from '@antv/g6'
 import { useLayoutStore } from '@/store/modules/layout'
-import { getReconnaissanceAttackMatrix, getCommunicationsAttackMatrix } from '@/api/electronic'
+import { getReconnaissanceAttackMatrix } from '@/api/electronic'
 import type { MatrixResult, Weapon } from '@/api/electronic'
+import type { FuncType } from '@/types/electronic'
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import WeaponAttackList from '@/components/electronic/WeaponAttackList.vue'
 
@@ -271,14 +253,6 @@ defineOptions({
   name: 'ElectronicWarfareG6',
 })
 const store = useLayoutStore()
-
-// [类型用途]
-// 卫星分类选项类型
-type SatCategoryType = 'RECON' | 'COMM'
-
-// [变量用途]
-// 当前选择的卫星分类 (RECON: 侦察卫星，COMM: 通讯卫星)
-const currentSatCategory = ref<SatCategoryType>('RECON')
 
 // [类型用途]
 // 交战烈度选项类型定义
@@ -310,6 +284,42 @@ const currentViewMode = ref<ViewModeType>('COMBINED')
 // [变量用途]
 // 后端算法接口返回的矩阵数据对象
 const matrixData = ref<MatrixResult | null>(null)
+
+/**
+ * [功能说明]
+ * 根据算法矩阵数据或当前选中的卫星系列，自动推导出卫星分类类别 ('COMM' | 'RECON')。
+ *
+ * [处理规则]
+ * 1. 优先提取 matrixData 中携带的 satCategory / category / func_type 属性。
+ * 2. 检查 initMatrixList 中首个卫星节点的 satType 是否包含 "通信"/"通讯"/"COMM"。
+ * 3. 检查 store.selectedSatSeries 系列名称中是否包含 "通信"/"通讯"/"COMM"。
+ * 4. 若以上条件均不满足，默认判定为侦察卫星 'RECON'。
+ *
+ * @returns FuncType 对应的分类标识 ('COMM' | 'RECON')
+ */
+const currentSatCategory = computed<FuncType>(() => {
+  const data = matrixData.value as (MatrixResult & { satCategory?: string; category?: string; func_type?: string }) | null
+  if (data) {
+    if (data.satCategory) return data.satCategory as FuncType
+    if (data.category) return data.category as FuncType
+    if (data.func_type) return data.func_type as FuncType
+
+    if (Array.isArray(data.initMatrixList) && data.initMatrixList.length > 0) {
+      const firstSat = data.initMatrixList[0]
+      const satType = firstSat?.satType || ''
+      if (satType.includes('通信') || satType.includes('通讯') || satType.toUpperCase().includes('COMM')) {
+        return 'COMM'
+      }
+    }
+  }
+
+  const series = store.selectedSatSeries || ''
+  if (series.includes('通信') || series.includes('通讯') || series.toUpperCase().includes('COMM')) {
+    return 'COMM'
+  }
+
+  return 'RECON'
+})
 
 // [变量用途]
 // 数据加载状态标记
@@ -510,37 +520,16 @@ const formatSatType = (typeStr?: string): string => {
 
 /**
  * [功能说明]
- * 切换卫星分类 (侦察卫星 vs 通讯卫星) 并全量刷新矩阵数据与三个组件布局
- *
- * @param cat 卫星分类 key
- */
-const handleCategoryChange = (cat: SatCategoryType) => {
-  if (currentSatCategory.value === cat) return
-  currentSatCategory.value = cat
-  fetchMatrixData()
-}
-
-/**
- * [功能说明]
- * 调用后端 API 获取算法矩阵数据 (根据 currentSatCategory 按需切换侦察与通讯卫星接口，并按 store 中的 selectedSatSeries 检索)
+ * 调用后端 API 获取算法矩阵数据 (按 store 中的 selectedSatSeries 检索)
  */
 const fetchMatrixData = async () => {
   loading.value = true
   try {
-    let matrixRes: any = null
-    if (currentSatCategory.value === 'COMM') {
-      matrixRes = await getCommunicationsAttackMatrix({
-        taskId: store.activedTask?.id || 0,
-        series: store.selectedSatSeries || '',
-        norad: store.selectedSatellite?.norad || 0,
-      })
-    } else {
-      matrixRes = await getReconnaissanceAttackMatrix({
-        taskId: store.activedTask?.id || 0,
-        series: store.selectedSatSeries || '',
-        intensityLevel: currentIntensity.value,
-      })
-    }
+    const matrixRes = await getReconnaissanceAttackMatrix({
+      taskId: store.activedTask?.id || 0,
+      series: store.selectedSatSeries || '',
+      intensityLevel: currentIntensity.value,
+    })
 
     if (matrixRes && matrixRes.code === 200 && matrixRes.data) {
       matrixData.value = matrixRes.data

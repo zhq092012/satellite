@@ -13,17 +13,14 @@
       <!-- 卫星类型选择按钮组 (占满一行) -->
       <div class="type-button-bar">
         <button
-          class="type-btn"
-          :class="{ active: selectedType === '' }"
-          @click="selectType('')"
-        >
-          🌐 全部类型
-        </button>
-        <button
           v-for="item in typeOptions"
           :key="item"
           class="type-btn"
-          :class="{ active: selectedType === item }"
+          :class="{
+            active: selectedType === item,
+            disabled: isTypeDisabled(item),
+          }"
+          :disabled="isTypeDisabled(item)"
           @click="selectType(item)"
         >
           {{ item }}
@@ -194,20 +191,46 @@ const seriesOptions = computed<string[]>(() => {
 })
 
 /**
+ * [功能说明]
+ * 判断当前卫星类型按钮是否需要禁用（禁用“导航”、“通信”、“导弹预警”）
+ *
+ * @param type 卫星类型名称
+ * @returns 是否禁用
+ */
+const isTypeDisabled = (type: string): boolean => {
+  if (!type) return false
+  return type.includes('导航') || type.includes('通信') || type.includes('导弹预警')
+}
+
+/**
  * [函数说明]
- * 选择或切换选中的卫星类型，并同步保存至 Store
- * @param type 选中的卫星类型名称，传空字符串表示选择全部
+ * 选择并切换选中的卫星类型，并同步保存至 Store
+ *
+ * @param type 选中的卫星类型名称
  */
 const selectType = (type: string) => {
-  if (selectedType.value === type) {
-    selectedType.value = ''
-  } else {
-    selectedType.value = type
-  }
+  if (!type || isTypeDisabled(type)) return
+  selectedType.value = type
   selectedSeries.value = ''
   store.setSelectedSatType(selectedType.value)
   store.setSelectedSatSeries('')
 }
+
+/**
+ * [监听器说明]
+ * 监听卫星类型选项列表，自动选中第一个未禁用的卫星类型 (如 "侦察")
+ */
+watch(
+  typeOptions,
+  (options) => {
+    if (!options || options.length === 0) return
+    const validOption = options.find((opt) => !isTypeDisabled(opt))
+    if (validOption && (!selectedType.value || isTypeDisabled(selectedType.value))) {
+      selectType(validOption)
+    }
+  },
+  { immediate: true }
+)
 
 /**
  * [函数说明]
@@ -518,6 +541,24 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
         background: linear-gradient(135deg, rgba(0, 180, 216, 0.4) 0%, rgba(0, 225, 255, 0.25) 100%);
         border-color: #00e1ff;
         box-shadow: 0 0 10px rgba(0, 225, 255, 0.35);
+      }
+
+      &:disabled,
+      &.disabled {
+        opacity: 0.45;
+        color: #64748b;
+        background: rgba(15, 23, 42, 0.6);
+        border-color: rgba(100, 116, 139, 0.2);
+        cursor: not-allowed;
+        pointer-events: none;
+        box-shadow: none;
+
+        &:hover {
+          color: #64748b;
+          background: rgba(15, 23, 42, 0.6);
+          border-color: rgba(100, 116, 139, 0.2);
+          box-shadow: none;
+        }
       }
     }
   }
