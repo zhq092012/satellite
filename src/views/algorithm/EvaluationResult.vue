@@ -14,7 +14,6 @@ import EvaluationReport from '@/components/cesium/EvaluationReport.vue'
 <style scoped lang="scss">
 .algorithm-view-container {
   width: 100%;
-  min-height: calc(100vh - 160px);
-  margin-top: 16px;
+  margin-top: 0;
 }
 </style>

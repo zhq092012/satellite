@@ -1,21 +1,6 @@
 <template>
   <div class="container">
     <main class="main">
-      <!-- 顶部信息栏：战场与任务名称面包屑 -->
-      <div class="tabs-bar" v-if="store.activedTask">
-        <div class="filter filter-breadcrumb">
-          <span class="crumb">
-            <i class="el-icon-s-platform"></i>
-            <strong>{{ store.battle?.name || '未选择战场' }}</strong>
-          </span>
-          <span class="sep">/</span>
-          <span class="crumb">
-            <i class="el-icon-s-order"></i>
-            {{ store.activedTask.name || '未选择任务' }}
-          </span>
-        </div>
-      </div>
-
       <!-- GIS 战场态势视图核心三栏布局 -->
       <div class="battle-grid">
         <!-- C2 敌方网络与资产拓扑左侧边栏 -->

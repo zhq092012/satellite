@@ -250,11 +250,22 @@ const router = createRouter({
   routes,
 })
 
+import { useLayoutStore } from '@/store/modules/layout'
+
 router.beforeEach((to) => {
   const authStore = useAuthStore()
+  const layoutStore = useLayoutStore()
   const requiredRoles = (to.meta.roles as string[] | undefined) ?? []
   const routeMeta = to.meta as { permission?: string; permissions?: string[] }
   const isAdmin = authStore.roles.includes('admin')
+
+  // 未选择任务时，禁止访问算法管理相关子菜单与路由
+  if (to.path.startsWith('/algorithm')) {
+    if (!layoutStore.activedTask) {
+      ElMessage.warning('尚未选择战场任务，请先在首页选择战场及任务！')
+      return '/home'
+    }
+  }
 
   if (requiredRoles.length > 0 && !hasRole(authStore.roles, requiredRoles)) {
     ElMessage.warning('您没有权限访问该页面')

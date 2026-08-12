@@ -2687,9 +2687,9 @@ function dispose() {
     .title {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 8px;
       align-items: start;
-      margin-bottom: 18px;
+      margin-bottom: 8px;
 
       /* 顶部4模式 Radio 改造为赛博玻璃 Tab */
       .threat-model-tabs {

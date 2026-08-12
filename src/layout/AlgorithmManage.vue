@@ -1,13 +1,6 @@
 <template>
   <div class="algorithm-manage-page">
     <el-card shadow="never" class="algorithm-manage-card">
-      <div class="algorithm-manage-header">
-        <div>
-          <h2>算法分析管理</h2>
-          <p>卫星威胁分析、可打击度、杀伤链方案与仿真评估综合管理</p>
-        </div>
-      </div>
-
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
         <el-tab-pane label="卫星威胁分析" name="threat" />
         <el-tab-pane label="可打击度分析" name="attackability" />
@@ -70,29 +63,22 @@ const handleTabChange = (tabName: string) => {
 
 <style scoped lang="scss">
 .algorithm-manage-page {
-  padding: 16px;
+  padding: 8px 12px;
+  box-sizing: border-box;
 }
 
 .algorithm-manage-card {
-  min-height: calc(100vh - 92px);
   background: var(--surface-bg-color);
   border: 1px solid var(--surface-border-color);
   color: var(--text-color-strong);
-}
+  box-sizing: border-box;
 
-.algorithm-manage-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  h2 {
-    margin: 0;
-    font-size: 22px;
+  :deep(.el-card__body) {
+    padding: 6px 12px 12px 12px;
   }
 
-  p {
-    margin: 8px 0 0;
-    color: var(--text-color-secondary);
+  :deep(.el-tabs__header) {
+    margin-bottom: 4px;
   }
 }
 </style>
