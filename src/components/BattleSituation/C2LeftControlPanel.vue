@@ -66,6 +66,7 @@
             'card-active': selectedNorad === sat.norad,
             'card-relay': sat.isRelay,
           }"
+          @click="handleSelectSatellite(sat.norad)"
         >
           <div class="card-top">
             <span class="sat-name">
@@ -138,6 +139,15 @@ const props = defineProps<{
   matrixData: MatrixResult | null
   /** 当前选中的敌方卫星 NORAD */
   selectedNorad?: number | null
+}>()
+
+const emit = defineEmits<{
+  /**
+   * [事件说明]
+   * 触发选择/取消选择敌方卫星事件
+   * @param norad 选中的敌方卫星 NORAD 编号，取消选中时为 null
+   */
+  (e: 'select-satellite', norad: number | null): void
 }>()
 
 const store = useLayoutStore()
@@ -304,6 +314,19 @@ watch(
   },
   { immediate: true }
 )
+
+/**
+ * [函数说明]
+ * 触发选择卫星事件 (再次点击已选中的卫星可取消选择)
+ * @param norad 选中的敌方卫星 NORAD 编号
+ */
+const handleSelectSatellite = (norad: number) => {
+  if (props.selectedNorad === norad) {
+    emit('select-satellite', null)
+  } else {
+    emit('select-satellite', norad)
+  }
+}
 
 /**
  * [计算属性说明]

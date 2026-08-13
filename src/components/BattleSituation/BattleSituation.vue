@@ -5,7 +5,11 @@
       <div class="battle-grid">
         <!-- C2 敌方网络与资产拓扑左侧边栏 -->
         <div class="battle-grid__side battle-grid__side--left">
-          <C2LeftControlPanel :matrix-data="matrixData" :selected-norad="selectedNorad" />
+          <C2LeftControlPanel
+            :matrix-data="matrixData"
+            :selected-norad="selectedNorad"
+            @select-satellite="handleSelectSatellite"
+          />
         </div>
 
         <!-- 中间 3D Cesium 地球 -->
@@ -23,7 +27,11 @@
 
         <!-- C2 敌方数据传输与链路效能右侧边栏 -->
         <div class="battle-grid__side battle-grid__side--right">
-          <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad" />
+          <C2RightAnalysisPanel
+            :matrix-data="matrixData"
+            :selected-satellite-norad="selectedNorad"
+            @clear-satellite-selection="handleSelectSatellite(null)"
+          />
         </div>
       </div>
     </main>
@@ -48,7 +56,7 @@ useSatelliteProfileDialog()
 /** [变量说明] 3D Cesium Viewer 组件实例引用 */
 const cesiumViewerRef = ref<InstanceType<typeof CesiumViewer> | null>(null)
 
-/** [变量说明] 当前选中的敌方卫星 NORAD 编号 (未选中时为 null，代表静态展示) */
+/** [变量说明] 当前选中的敌方卫星 NORAD 编号 (默认未选中任何卫星为 null，代表静态视图定位战场) */
 const selectedNorad = ref<number | null>(null)
 
 /** [计算属性说明] 全局共享的侦察/打击算法矩阵结果 */
@@ -56,7 +64,9 @@ const matrixData = computed<MatrixResult | null>(() => store.matrixData)
 
 /**
  * [函数说明]
- * 根据选择的卫星系列，在第一个 Tab (GIS态势) 触发全局算法矩阵查询，并从矩阵中加载相关资产
+ * 根据选择的卫星系列，在第一个 Tab (GIS态势) 触发全局算法矩阵查询，并从矩阵中加载相关资产。
+ * 默认不自动选择任何卫星或地面站节点，地图定位战场包围框。
+ *
  * @param series 选中的卫星系列名称
  */
 const fetchMatrixDataBySeries = async (series: string) => {
@@ -74,26 +84,85 @@ const fetchMatrixDataBySeries = async (series: string) => {
       intensityLevel: store.intensityLevel || '低烈度',
     })
     if (data) {
-      // 从已经查询出来的矩阵中提取首个卫星节点进行锁定与时间轴定位
-      const firstSat = data.battleMatrixList?.[0] || data.initMatrixList?.[0]
-      if (firstSat?.norad) {
-        selectedNorad.value = firstSat.norad
-        let windowStartTime: string | undefined
-        if (firstSat.windows?.length) {
-          windowStartTime = firstSat.windows[0].startTime
-        } else if ((firstSat as any).initWindows?.length) {
-          windowStartTime = (firstSat as any).initWindows[0].peakWindow
-        }
-
-        if (cesiumViewerRef.value && (cesiumViewerRef.value as any).jumpToTimeAndPlay) {
-          ;(cesiumViewerRef.value as any).jumpToTimeAndPlay(windowStartTime)
-        }
-      }
+      // 默认保持不选择任何卫星 (selectedNorad 为 null)，相机视角直接定位战场
+      selectedNorad.value = null
+      nextTick(() => {
+        markBattleArea()
+      })
     }
   } catch (err) {
     console.error('获取算法传输矩阵失败:', err)
   }
 }
+
+/**
+ * [函数说明]
+ * 手动选择/取消选择某颗敌方卫星。
+ * - 当在左侧面板或 3D 地球点击选择具体卫星时，相机视角定位该卫星并开启视角跟随。
+ * - 当取消选择时，相机重新定位至战场中心。
+ *
+ * @param norad 选中的敌方卫星 NORAD 编号 (取消选择时为 null)
+ */
+const handleSelectSatellite = async (norad: number | null) => {
+  selectedNorad.value = norad
+  const taskId = store.activedTask?.id
+
+  // 1. 未选择卫星/取消选择 (相机定位战场，暂停推演动画)
+  if (!norad || !taskId) {
+    if (cesiumViewerRef.value) {
+      cesiumViewerRef.value.pauseClockAnimation()
+      cesiumViewerRef.value.markBattle()
+    }
+    return
+  }
+
+  // 2. 选中具体卫星，高亮该实体并使 3D 相机视角定位并开启跟随
+  if (cesiumViewerRef.value) {
+    cesiumViewerRef.value.highlightSatellite({ norad_id: String(norad) })
+  }
+
+  // 3. 读取该卫星窗口数据并开启时间轴跳转播放
+  const data =
+    matrixData.value ||
+    (await store.fetchReconnaissanceAttackMatrix({
+      taskId,
+      series: store.selectedSatSeries || '',
+      intensityLevel: store.intensityLevel || '低烈度',
+    }))
+  if (data) {
+    let windowStartTime: string | undefined
+
+    const battleMatch = (data.battleMatrixList || []).find((b) => b.norad === norad)
+    if (battleMatch?.windows?.length) {
+      windowStartTime = battleMatch.windows[0].startTime
+    } else {
+      const initMatch = (data.initMatrixList || []).find((i) => i.norad === norad)
+      if (initMatch?.initWindows?.length) {
+        windowStartTime = initMatch.initWindows[0].peakWindow
+      }
+    }
+
+    if (cesiumViewerRef.value) {
+      cesiumViewerRef.value.jumpToTimeAndPlay(windowStartTime)
+    }
+  }
+}
+
+/**
+ * [监听器说明]
+ * 监听 3D 地球中鼠标点击选中的卫星状态，自动触发相机定位与跟随
+ */
+watch(
+  () => store.selectedSatellite,
+  (newSat) => {
+    if (newSat) {
+      const norad = Number(newSat.norad || (newSat as any).norad_id)
+      if (Number.isFinite(norad) && selectedNorad.value !== norad) {
+        void handleSelectSatellite(norad)
+      }
+    }
+  }
+)
 
 /**
  * [监听器说明]
@@ -121,7 +190,7 @@ watch(
 async function pauseClockAnimation() {
   if (!selectedNorad.value) {
     nextTick(() => {
-      ;(cesiumViewerRef.value as any)?.pauseClockAnimation?.()
+      cesiumViewerRef.value?.pauseClockAnimation()
     })
   }
 }

@@ -387,92 +387,12 @@ const flyToInfrastructureNode = (node: InfrastructureLocation) => {
   })
 }
 
-/**
- * [功能]
- * 视角平滑锁定与远距离 (全地球视角) 定位跟随指定的卫星
- *
- * [处理规则]
- * - 避免对同一目标反复重置相机（若 currentTrackedNorad 已是目标且没有设置 force 标志，则直接跳过，防止 watch(store.selectedSatellite) 触发竞态二次飞行）
- * - 使用 HeadingPitchRange 将视角锁定在能看到整个地球的视角 (俯角 -90°，距离 22,000,000 米)，并持续跟随卫星
- * - 若 Entity 暂不存在，则动态创建并挂载 CallbackProperty 位置，确保 viewer.trackedEntity 总是有效，跟随的卫星始终在屏幕区域内
- *
- * @param norad 目标卫星 NORAD 编号
- * @param force 是否强制重置视角并重新飞行
- */
-const trackSatelliteByNorad = (norad: number, force = false) => {
-  if (!viewer || !norad) return
-
-  // 1. 严格守卫：若当前已经在追踪/飞向该 NORAD 卫星，且未指定 force，直接拦截防二次飞行抖动
-  if (!force && currentTrackedNorad === norad) return
-
-  currentTrackedNorad = norad
-
-  // 2. 尝试同步该卫星的过境时间窗口时刻至 Cesium 时钟，确保视角飞赴时卫星在过境点的可见正面
-  if (props.matrixData) {
-    const battleMatch = (props.matrixData.battleMatrixList || []).find((b) => b.norad === norad)
-    const windowStart =
-      battleMatch?.windows?.[0]?.startTime ||
-      (props.matrixData.initMatrixList || []).find((i) => i.norad === norad)?.initWindows?.[0]?.peakWindow
-    if (windowStart) {
-      try {
-        const date = new Date(windowStart.replace(/-/g, '/'))
-        if (!isNaN(date.getTime())) {
-          viewer.clock.currentTime = Cesium.JulianDate.fromDate(date)
-        }
-      } catch (e) {
-        // ignore parse error
-      }
-    }
-  }
-
-  let entity = viewer.entities.getById(`satellite-${norad}`) || viewer.entities.getById(`sat-node-${norad}`)
-  const pos = getSatellitePositionInCesium(norad)
-
-  // 全视角地球 offset：离卫星 22,000,000 米 (22,000km)，俯视角 -90° (直视地心/俯视全球)
-  // 确保能查看到完整的地球球体，且被跟随的卫星保持在屏幕中央视野内
-  const offset = new Cesium.HeadingPitchRange(Cesium.Math.toRadians(0), Cesium.Math.toRadians(-90), 22000000)
-
-  // 若实体暂不存在，但可计算得到位置，动态创建一个带 position 属性的实体以便锁定跟随
-  if (!entity && pos) {
-    entity = viewer.entities.add({
-      id: `satellite-${norad}`,
-      position: new Cesium.CallbackProperty(
-        () => getSatellitePositionInCesium(norad) || pos,
-        false
-      ) as unknown as Cesium.PositionProperty,
-    })
-  }
-
-  if (entity) {
-    entity.viewFrom = undefined
-    // 立刻绑定 trackedEntity 保持中心跟随，并启动单次平滑视角飞行
-    viewer.trackedEntity = entity
-    viewer.flyTo(entity, {
-      duration: 1.2,
-      offset,
-    })
-    return
-  }
-}
-
 // 监听 store 中选中的地面基础设施节点，如果外部选择变更则定位相机
 watch(
   () => store.selectedInfrastructureNode,
   (newNode) => {
     if (newNode) {
       flyToInfrastructureNode(newNode)
-    }
-  }
-)
-
-// 监听 store 中选中的卫星，如果外部选择变更且存在选中的卫星，则锁定相机视角跟随
-watch(
-  () => store.selectedSatellite,
-  (newSat) => {
-    if (newSat && newSat.norad) {
-      trackSatelliteByNorad(Number(newSat.norad))
-    } else if (!newSat) {
-      currentTrackedNorad = null
     }
   }
 )
@@ -824,7 +744,6 @@ function handleViewerClickEvent() {
     if (!Number.isFinite(norad)) return
 
     highlightSatellite({ norad_id: String(norad) })
-    trackSatelliteByNorad(Number(norad)) // 点击卫星时，相机视角锁合并持续跟随该卫星
 
     // 调用 getSatelliteDetail 查询卫星详细信息并同步保存至全局 layout store，供右侧 C2 面板展示
     try {
@@ -1235,7 +1154,6 @@ watch(
     if (!viewer || viewer.isDestroyed()) return
     if (newNorad) {
       highlightSatellite({ norad_id: String(newNorad) })
-      trackSatelliteByNorad(Number(newNorad))
     } else {
       resetHighlightSatellites()
     }
@@ -1358,9 +1276,7 @@ const jumpToTimeAndPlay = (timeStr?: string) => {
     }
   }
   viewer.clock.shouldAnimate = true
-  if (currentTrackedNorad) {
-    trackSatelliteByNorad(currentTrackedNorad, true)
-  }
+
   viewer.scene.requestRender()
 }
 
