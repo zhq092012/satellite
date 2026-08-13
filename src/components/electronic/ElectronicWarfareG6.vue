@@ -226,7 +226,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
 import G6 from '@antv/g6'
 import { useLayoutStore } from '@/store/modules/layout'
 import { getReconnaissanceAttackMatrix } from '@/api/electronic'
@@ -1107,7 +1107,8 @@ const buildG6GraphData = () => {
     receiveNodeCount.value = 1
     stationNodeCount.value = 0
 
-    const containerW = g6Container.value ? g6Container.value.clientWidth : 950
+    const containerW = g6Container.value ? g6Container.value.clientWidth : 0
+    if (containerW <= 0) return { nodes: [], edges: [] }
     const startX = 30
     const availableW = Math.max(containerW - startX - 30, 400)
 
@@ -1375,7 +1376,8 @@ const buildG6GraphData = () => {
   stationNodeCount.value = stationList.length
 
   // 计算 3 层节点的坐标布局 (Layer 1 普通卫星: y=80, Layer 2 中继卫星: y=230, Layer 3 接收站: y=380, Layer 3 数据中心: y=490)
-  const containerW = g6Container.value ? g6Container.value.clientWidth : 950
+  const containerW = g6Container.value ? g6Container.value.clientWidth : 0
+  if (containerW <= 0) return { nodes: [], edges: [] }
   const startX = 30
   const availableW = Math.max(containerW - startX - 30, 400)
 
@@ -1801,13 +1803,15 @@ const buildG6GraphData = () => {
 const initOrUpdateGraph = () => {
   if (!g6Container.value) return
 
+  // 准确获取 DOM 容器宽高度 (clientWidth / clientHeight)
+  const width = g6Container.value.clientWidth
+  const height = g6Container.value.clientHeight
+
+  // 容器处于 display: none 或尚未渲染（尺寸为 0）时直接返回，避免画布尺寸坍塌
+  if (!width || !height || width <= 0 || height <= 0) return
+
   // 自定义边
   registerCustomG6Edge()
-  const width = g6Container.value.clientWidth || 1100
-  const height = g6Container.value.clientHeight || 560
-
-  // 容器处于 display: none 不可见状态时直接返回，避免画布尺寸坍塌为 0
-  if (width === 0 || height === 0) return
 
   const data = buildG6GraphData()
 
@@ -2002,13 +2006,59 @@ const updateGraphHighlightState = () => {
   })
 }
 
+// [变量用途]
+// 容器尺寸观察器与防抖定时器
+let resizeObserver: ResizeObserver | null = null
+let resizeTimer: number | null = null
+
+/**
+ * [函数说明]
+ * 监听容器尺寸变化并防抖更新 G6 画布尺寸与布局
+ */
+const handleResize = () => {
+  if (resizeTimer) window.clearTimeout(resizeTimer)
+  resizeTimer = window.setTimeout(() => {
+    initOrUpdateGraph()
+  }, 60)
+}
+
 onMounted(() => {
   fetchMatrixData()
-  window.addEventListener('resize', initOrUpdateGraph)
+  window.addEventListener('resize', handleResize)
+
+  if (g6Container.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (entry && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+        handleResize()
+      }
+    })
+    resizeObserver.observe(g6Container.value)
+  }
+})
+
+/**
+ * [Hook 说明]
+ * KeepAlive 缓存组件切回激活状态时重新计算 DOM 尺寸并绘制拓扑
+ */
+onActivated(() => {
+  nextTick(() => {
+    setTimeout(() => {
+      initOrUpdateGraph()
+    }, 50)
+  })
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', initOrUpdateGraph)
+  window.removeEventListener('resize', handleResize)
+  if (resizeTimer) {
+    window.clearTimeout(resizeTimer)
+    resizeTimer = null
+  }
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
   if (graph) {
     graph.destroy()
     graph = null
@@ -2244,8 +2294,16 @@ onUnmounted(() => {
 
 .g6-chart-container {
   flex: 1;
+  width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   position: relative;
+  overflow: hidden;
+
+  :deep(canvas) {
+    display: block;
+  }
 }
 
 /* 底部时间轴样式 */
