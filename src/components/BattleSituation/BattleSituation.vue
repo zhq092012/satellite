@@ -103,7 +103,7 @@ const fetchMatrixDataBySeries = async (series: string) => {
  *
  * @param norad 选中的敌方卫星 NORAD 编号 (取消选择时为 null)
  */
-const handleSelectSatellite = async (norad: number | null) => {
+const handleSelectSatellite = (norad: number | null) => {
   selectedNorad.value = norad
   const taskId = store.activedTask?.id
 
@@ -116,35 +116,9 @@ const handleSelectSatellite = async (norad: number | null) => {
     return
   }
 
-  // 2. 选中具体卫星，高亮该实体并使 3D 相机视角定位并开启跟随
+  // 2. 选中具体卫星，高亮该实体并使 3D 相机视角平滑飞赴定位（不触发时间轴调整）
   if (cesiumViewerRef.value) {
     cesiumViewerRef.value.highlightSatellite({ norad_id: String(norad) })
-  }
-
-  // 3. 读取该卫星窗口数据并开启时间轴跳转播放
-  const data =
-    matrixData.value ||
-    (await store.fetchReconnaissanceAttackMatrix({
-      taskId,
-      series: store.selectedSatSeries || '',
-      intensityLevel: store.intensityLevel || '低烈度',
-    }))
-  if (data) {
-    let windowStartTime: string | undefined
-
-    const battleMatch = (data.battleMatrixList || []).find((b) => b.norad === norad)
-    if (battleMatch?.windows?.length) {
-      windowStartTime = battleMatch.windows[0].startTime
-    } else {
-      const initMatch = (data.initMatrixList || []).find((i) => i.norad === norad)
-      if (initMatch?.initWindows?.length) {
-        windowStartTime = initMatch.initWindows[0].peakWindow
-      }
-    }
-
-    if (cesiumViewerRef.value) {
-      cesiumViewerRef.value.jumpToTimeAndPlay(windowStartTime)
-    }
   }
 }
 

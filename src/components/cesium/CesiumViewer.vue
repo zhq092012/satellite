@@ -350,18 +350,8 @@ let clockTickRemoveListener: Cesium.Event.RemoveCallback | null = null
  *
  * @param node 选中的 InfrastructureLocation 对象
  */
-let currentTrackedNorad: number | null = null
-
-/**
- * [功能]
- * 视角平滑直达敌方地面基础设施节点 (地面接收站 / 中心云数据中心) 上空
- *
- * @param node 选中的 InfrastructureLocation 对象
- */
 const flyToInfrastructureNode = (node: InfrastructureLocation) => {
   if (!viewer || !node) return
-  currentTrackedNorad = null
-  viewer.trackedEntity = undefined
 
   // 如果节点缺少有效的经纬度，在 infrastructureNodes 数据源中匹配
   let targetLon = node.longitude
@@ -710,14 +700,8 @@ function handleViewerClickEvent() {
   viewer.screenSpaceEventHandler.setInputAction(async function (event: Cesium.ScreenSpaceEventHandler.PositionedEvent) {
     const picked = viewer.scene.pick(event.position)
     if (!Cesium.defined(picked)) {
-      currentTrackedNorad = null
-      viewer.trackedEntity = undefined // 点击空白处解绑视角跟随
-      store.closeSatPanel() // 点到空白也关闭
       store.setSelectedSatellite(null) // 清空选择的卫星
       store.setSelectedInfrastructureNode(null) // 清空选中的地面基础设施节点
-      for (const element of satelliteEntities.values()) {
-        if (element.path) element.path.show = new Cesium.CallbackProperty(() => false, false)
-      }
       resetHighlightSatellites() // 取消高亮
       return
     }
@@ -1014,7 +998,7 @@ const HIGHLIGHT_TRAIL_ENTITY_ID = 'selected-sat-orbit-trail'
 
 /**
  * [功能]
- * 清除所有卫星的高亮样式与 3D 轨迹
+ * 清除所有卫星的高亮样式与 3D 轨迹，将其点样式、边框颜色、边框宽度与标签颜色精准还原至加载时的初始状态
  */
 const resetHighlightSatellites = () => {
   if (!viewer || viewer.isDestroyed()) return
@@ -1025,19 +1009,35 @@ const resetHighlightSatellites = () => {
     viewer.entities.remove(trailEntity)
   }
 
-  // 2. 复原 Entity 模式高亮样式与 path 路径线宽
+  // 2. 复原 Entity 模式敌方卫星高亮样式（精准还原加载时的初始颜色、边框与大小）
   const satellites = viewer.entities.values.filter(
-    (s: any) => String(s._id ?? '').startsWith('satellite-') || String(s._id ?? '').startsWith('sat-node-')
+    (s: Cesium.Entity) => String(s.id ?? '').startsWith('satellite-') || String(s.id ?? '').startsWith('sat-node-')
   )
   if (satellites && satellites.length) {
-    satellites.forEach((entity: any) => {
+    const matrixSats = props.matrixData?.initMatrixList || []
+
+    satellites.forEach((entity: Cesium.Entity) => {
+      const entityIdStr = String(entity.id ?? '')
+      const noradMatch = entityIdStr.match(/satellite-(\d+)/) || entityIdStr.match(/sat-node-(\d+)/)
+      const norad = noradMatch ? Number(noradMatch[1]) : null
+
+      const satInfo = norad ? matrixSats.find((s) => s.norad === norad) : null
+      const isRelay = norad === 22314 || (satInfo?.satType || '').includes('中继')
+
+      const satColor = isRelay ? Cesium.Color.PURPLE : Cesium.Color.CYAN
+      const outlineColor = isRelay ? Cesium.Color.GOLD : Cesium.Color.WHITE
+      const pixelSize = isRelay ? 16 : 13
+      const outlineWidth = 2.5
+
       if (entity && entity.point) {
-        entity.point.outlineColor = new Cesium.ConstantProperty(Cesium.Color.WHITE)
-        entity.point.pixelSize = new Cesium.ConstantProperty(8)
+        entity.point.color = new Cesium.ConstantProperty(satColor)
+        entity.point.outlineColor = new Cesium.ConstantProperty(outlineColor)
+        entity.point.outlineWidth = new Cesium.ConstantProperty(outlineWidth)
+        entity.point.pixelSize = new Cesium.ConstantProperty(pixelSize)
       }
-      if (entity && entity.path) {
-        entity.path.show = false
-        entity.path.width = new Cesium.ConstantProperty(1)
+
+      if (entity && entity.label) {
+        entity.label.fillColor = new Cesium.ConstantProperty(satColor)
       }
     })
   }
@@ -1142,7 +1142,20 @@ const highlightSatellite = (sate: { norad_id: string }) => {
     }
   }
 
-  // 4. 不再渲染单独插值的 Polyline 发光轨迹，仅保留并加粗 Entity 自带 Path
+  // 3. 相机视角平滑飞赴定位至目标卫星
+  const cameraOffset = new Cesium.HeadingPitchRange(Cesium.Math.toRadians(0), Cesium.Math.toRadians(-45), 2500000)
+  if (entity) {
+    viewer.flyTo(entity, {
+      duration: 1.5,
+      offset: cameraOffset,
+    })
+  } else if (satPos) {
+    const boundingSphere = new Cesium.BoundingSphere(satPos, 0)
+    viewer.camera.flyToBoundingSphere(boundingSphere, {
+      duration: 1.5,
+      offset: cameraOffset,
+    })
+  }
 
   viewer.scene.requestRender()
 }
