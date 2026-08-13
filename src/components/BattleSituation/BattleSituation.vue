@@ -134,6 +134,8 @@ watch(
       if (Number.isFinite(norad) && selectedNorad.value !== norad) {
         void handleSelectSatellite(norad)
       }
+    } else {
+      handleSelectSatellite(null)
     }
   }
 )

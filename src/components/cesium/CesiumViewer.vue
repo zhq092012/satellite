@@ -389,72 +389,103 @@ watch(
 
 /**
  * [功能]
- * 渲染敌方地面接收站与数据中心 3D 实体与地面圆环
+ * 清理上一任务或系列在 Cesium Viewer 中渲染的所有敌方电子信息网络 3D 实体（包含地面接收站、中心云数据中心及其地表波纹圆环、天基过境与中继卫星实体节点）
  */
-const renderElectronicInfrastructureNodes = () => {
-  if (!viewer || !infrastructureNodes.value.length) return
+const clearElectronicInfrastructureNodes = () => {
+  if (!viewer || viewer.isDestroyed()) return
 
-  infrastructureNodes.value.forEach((node) => {
-    const entityId = `infra-node-${node.type}-${node.id}`
-    if (viewer.entities.getById(entityId)) return
+  // 1. 根据保存的电子节点 Entity ID 集合逐个移除 Cesium 实体
+  electronicNodeEntityIds.forEach((entityId) => {
+    const entity = viewer.entities.getById(entityId)
+    if (entity) {
+      viewer.entities.remove(entity)
+    }
+  })
+  electronicNodeEntityIds.clear()
 
-    const position = Cesium.Cartesian3.fromDegrees(node.longitude, node.latitude, node.altitude)
-    const isReceive = node.type === 'RECEIVE'
-
-    const nodeColor = isReceive ? Cesium.Color.CYAN : Cesium.Color.DODGERBLUE
-
-    const labelText = `[敌方${isReceive ? '地面接收站' : '数据中心'}]\n${node.name}`
-
-    // 1. 地表高亮波纹圆环
-    viewer.entities.add({
-      id: `${entityId}-ring`,
-      position,
-      ellipse: {
-        semiMinorAxis: isReceive ? 80000 : 120000,
-        semiMajorAxis: isReceive ? 80000 : 120000,
-        material: nodeColor.withAlpha(0.25),
-        outline: true,
-        outlineColor: nodeColor,
-        height: 0,
-      },
-    })
-    electronicNodeEntityIds.add(`${entityId}-ring`)
-
-    // 2. 节点主体 3D 标示与标签
-    viewer.entities.add({
-      id: entityId,
-      position,
-      point: {
-        pixelSize: isReceive ? 12 : 14,
-        color: nodeColor,
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 3,
-        heightReference: Cesium.HeightReference.NONE,
-      },
-      label: {
-        text: labelText,
-        font: 'bold 13px sans-serif',
-        fillColor: nodeColor,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        showBackground: true,
-        backgroundColor: new Cesium.Color(0, 0, 0, 0.3),
-        pixelOffset: new Cesium.Cartesian2(0, -28),
-        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 20_000_000),
-      },
-    })
-    electronicNodeEntityIds.add(entityId)
-
-    // 3. (取消渲染 3D 地面站雷达包络视椎圆锥体)
+  // 2. 兜底扫描并清理所有以 infra-node- 和 sat-node- 开头的残留 3D 实体节点
+  const leftoverEntities = viewer.entities.values.filter((entity: Cesium.Entity) => {
+    const idStr = String(entity.id ?? '')
+    return idStr.startsWith('infra-node-') || idStr.startsWith('sat-node-')
+  })
+  leftoverEntities.forEach((entity) => {
+    viewer.entities.remove(entity)
   })
 
-  // 4. 渲染敌方天基过境与中继卫星集群 3D 实体
+  // 3. 同时重置卫星高亮状态
+  resetHighlightSatellites()
+}
+
+/**
+ * [功能]
+ * 渲染敌方地面接收站、中心云数据中心与天基过境/中继卫星集群 3D 实体
+ *
+ * [处理规则]
+ * - 渲染新矩阵前，务必先调用 clearElectronicInfrastructureNodes 彻底清空旧任务/旧系列的实体残留，防止跨任务/跨系列切换时残留节点叠加
+ */
+const renderElectronicInfrastructureNodes = () => {
+  if (!viewer || viewer.isDestroyed()) return
+
+  // 1. 每次重新渲染前，必须先彻底清理上一任务/系列的渲染残留
+  clearElectronicInfrastructureNodes()
+
+  // 2. 渲染敌方地面接收站与数据中心
+  if (infrastructureNodes.value.length) {
+    infrastructureNodes.value.forEach((node) => {
+      const entityId = `infra-node-${node.type}-${node.id}`
+      const position = Cesium.Cartesian3.fromDegrees(node.longitude, node.latitude, node.altitude)
+      const isReceive = node.type === 'RECEIVE'
+      const nodeColor = isReceive ? Cesium.Color.CYAN : Cesium.Color.DODGERBLUE
+      const labelText = `[敌方${isReceive ? '地面接收站' : '数据中心'}]\n${node.name}`
+
+      // 2.1 地表高亮波纹圆环
+      viewer.entities.add({
+        id: `${entityId}-ring`,
+        position,
+        ellipse: {
+          semiMinorAxis: isReceive ? 80000 : 120000,
+          semiMajorAxis: isReceive ? 80000 : 120000,
+          material: nodeColor.withAlpha(0.25),
+          outline: true,
+          outlineColor: nodeColor,
+          height: 0,
+        },
+      })
+      electronicNodeEntityIds.add(`${entityId}-ring`)
+
+      // 2.2 节点主体 3D 标示与标签
+      viewer.entities.add({
+        id: entityId,
+        position,
+        point: {
+          pixelSize: isReceive ? 12 : 14,
+          color: nodeColor,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 3,
+          heightReference: Cesium.HeightReference.NONE,
+        },
+        label: {
+          text: labelText,
+          font: 'bold 13px sans-serif',
+          fillColor: nodeColor,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          showBackground: true,
+          backgroundColor: new Cesium.Color(0, 0, 0, 0.3),
+          pixelOffset: new Cesium.Cartesian2(0, -28),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 20_000_000),
+        },
+      })
+      electronicNodeEntityIds.add(entityId)
+    })
+  }
+
+  // 3. 渲染敌方天基过境与中继卫星集群 3D 实体
   const matrixSats = props.matrixData?.initMatrixList || []
   matrixSats.forEach((sat) => {
     if (!sat || !sat.satType) return
     const satEntityId = `sat-node-${sat.norad}`
-    if (viewer.entities.getById(satEntityId)) return
 
     const initialPos = getSatellitePositionInCesium(sat.norad)
     if (!initialPos) return
@@ -489,6 +520,8 @@ const renderElectronicInfrastructureNodes = () => {
     })
     electronicNodeEntityIds.add(satEntityId)
   })
+
+  viewer.scene.requestRender()
 }
 
 const showRedSatellites = ref(false)
@@ -675,12 +708,15 @@ const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null =
 watch(
   () => props.matrixData,
   (newData) => {
-    if (!viewer) return
+    if (!viewer || viewer.isDestroyed()) return
     if (newData) {
       renderElectronicInfrastructureNodes()
+    } else {
+      clearElectronicInfrastructureNodes()
+      viewer.scene.requestRender()
     }
   },
-  { deep: true }
+  { deep: true, immediate: true }
 )
 
 // 卫星渲染导忙状态，为 true 时显示 Loading 蒙层
@@ -703,6 +739,7 @@ function handleViewerClickEvent() {
       store.setSelectedSatellite(null) // 清空选择的卫星
       store.setSelectedInfrastructureNode(null) // 清空选中的地面基础设施节点
       resetHighlightSatellites() // 取消高亮
+      markBattle() // 点击空白处，相机平滑复原到战场视角
       return
     }
 
@@ -1230,6 +1267,7 @@ onBeforeUnmount(() => {
 
   satelliteRenderToken += 1
   satelliteRenderBusy.value = false
+  clearElectronicInfrastructureNodes()
   satelliteEntities.clear()
   satelliteOrbitData.clear()
   satellitePositionPropertyCache.clear()
@@ -1295,6 +1333,7 @@ const jumpToTimeAndPlay = (timeStr?: string) => {
 
 defineExpose({
   clearViewer,
+  clearElectronicInfrastructureNodes,
   renderSateliitePathWithEntity,
   markBattle,
   highlightSatellite,
