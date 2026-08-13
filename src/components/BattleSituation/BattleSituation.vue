@@ -39,12 +39,12 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
 import { useLayoutStore } from '@/store/modules/layout'
-import { getReconnaissanceAttackMatrix, type MatrixResult } from '@/api/electronic'
+import type { MatrixResult } from '@/api/electronic'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 
 /** [变量说明] 全局布局 Store */
@@ -59,33 +59,31 @@ const cesiumViewerRef = ref<InstanceType<typeof CesiumViewer> | null>(null)
 /** [变量说明] 当前选中的敌方卫星 NORAD 编号 (未选中时为 null，代表静态展示) */
 const selectedNorad = ref<number | null>(null)
 
-/** [变量说明] 侦察/打击算法矩阵结果 */
-const matrixData = ref<MatrixResult | null>(null)
+/** [计算属性说明] 全局共享的侦察/打击算法矩阵结果 */
+const matrixData = computed<MatrixResult | null>(() => store.matrixData)
 
 /**
  * [函数说明]
- * 根据选择的卫星系列，异步查询算法传输矩阵并从矩阵中加载相关资产
+ * 根据选择的卫星系列，在第一个 Tab (GIS态势) 触发全局算法矩阵查询，并从矩阵中加载相关资产
  * @param series 选中的卫星系列名称
  */
 const fetchMatrixDataBySeries = async (series: string) => {
   const taskId = store.activedTask?.id
   if (!taskId || !series) {
-    matrixData.value = null
+    store.clearMatrixData()
     selectedNorad.value = null
     return
   }
 
   try {
-    const res = await getReconnaissanceAttackMatrix({
+    const data = await store.fetchReconnaissanceAttackMatrix({
       taskId,
-      intensityLevel: '低烈度',
       series,
+      intensityLevel: '低烈度',
     })
-    if (res.code === 200 && res.data) {
-      matrixData.value = res.data
-
+    if (data) {
       // 从已经查询出来的矩阵中提取首个卫星节点进行锁定与时间轴定位
-      const firstSat = res.data.battleMatrixList?.[0] || res.data.initMatrixList?.[0]
+      const firstSat = data.battleMatrixList?.[0] || data.initMatrixList?.[0]
       if (firstSat?.norad) {
         selectedNorad.value = firstSat.norad
         let windowStartTime: string | undefined
@@ -107,7 +105,7 @@ const fetchMatrixDataBySeries = async (series: string) => {
 
 /**
  * [函数说明]
- * 手动选择某颗敌方卫星并加载其专属数据传输矩阵与过境时间窗口
+ * 手动选择某颗敌方卫星，直接复用 Store 中共享的算法传输矩阵定位过境时间窗口
  * @param norad 选中的敌方卫星 NORAD 编号
  */
 const handleSelectSatellite = async (norad: number | null) => {
@@ -122,33 +120,30 @@ const handleSelectSatellite = async (norad: number | null) => {
     return
   }
 
-  // 2. 选择具体卫星，加载算法传输矩阵
-  try {
-    const res = await getReconnaissanceAttackMatrix({
+  // 2. 选择具体卫星，直接复用已保存在 Store 中的矩阵数据（避免重复发 API 请求）
+  const data =
+    store.matrixData ||
+    (await store.fetchReconnaissanceAttackMatrix({
       taskId,
-      intensityLevel: '低烈度',
       series: store.selectedSatSeries || '',
-    })
-    if (res.code === 200 && res.data) {
-      matrixData.value = res.data
-      let windowStartTime: string | undefined
+      intensityLevel: '低烈度',
+    }))
+  if (data) {
+    let windowStartTime: string | undefined
 
-      const battleMatch = (res.data.battleMatrixList || []).find((b) => b.norad === norad)
-      if (battleMatch?.windows?.length) {
-        windowStartTime = battleMatch.windows[0].startTime
-      } else {
-        const initMatch = (res.data.initMatrixList || []).find((i) => i.norad === norad)
-        if (initMatch?.initWindows?.length) {
-          windowStartTime = initMatch.initWindows[0].peakWindow
-        }
-      }
-
-      if (cesiumViewerRef.value && (cesiumViewerRef.value as any).jumpToTimeAndPlay) {
-        ;(cesiumViewerRef.value as any).jumpToTimeAndPlay(windowStartTime)
+    const battleMatch = (data.battleMatrixList || []).find((b) => b.norad === norad)
+    if (battleMatch?.windows?.length) {
+      windowStartTime = battleMatch.windows[0].startTime
+    } else {
+      const initMatch = (data.initMatrixList || []).find((i) => i.norad === norad)
+      if (initMatch?.initWindows?.length) {
+        windowStartTime = initMatch.initWindows[0].peakWindow
       }
     }
-  } catch (err) {
-    console.error('获取卫星传输矩阵失败:', err)
+
+    if (cesiumViewerRef.value && (cesiumViewerRef.value as any).jumpToTimeAndPlay) {
+      ;(cesiumViewerRef.value as any).jumpToTimeAndPlay(windowStartTime)
+    }
   }
 }
 
@@ -163,7 +158,7 @@ watch(
     if (newSeries) {
       void fetchMatrixDataBySeries(newSeries)
     } else {
-      matrixData.value = null
+      store.clearMatrixData()
       selectedNorad.value = null
       void pauseClockAnimation()
     }

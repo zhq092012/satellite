@@ -507,16 +507,24 @@ const formatSatType = (typeStr?: string): string => {
  * 调用后端 API 获取算法矩阵数据 (按 store 中的 selectedSatSeries 检索)
  */
 const fetchMatrixData = async () => {
+  if (store.matrixData) {
+    matrixData.value = store.matrixData
+    nextTick(() => {
+      initOrUpdateGraph()
+      initTimelineBounds()
+    })
+    return
+  }
   loading.value = true
   try {
-    const matrixRes = await getReconnaissanceAttackMatrix({
+    const data = await store.fetchReconnaissanceAttackMatrix({
       taskId: store.activedTask?.id || 0,
       series: store.selectedSatSeries || '',
       intensityLevel: currentIntensity.value,
     })
 
-    if (matrixRes && matrixRes.code === 200 && matrixRes.data) {
-      matrixData.value = matrixRes.data
+    if (data) {
+      matrixData.value = data
     }
   } catch (err: any) {
     console.warn('调用后端算法矩阵接口提示:', err)
@@ -531,12 +539,20 @@ const fetchMatrixData = async () => {
 
 /**
  * [监听器说明]
- * 监听 store 中选中的卫星系列和激活的任务改变，自动重新拉取矩阵数据并更新图谱
+ * 监听 store 中共享的矩阵数据、卫星系列和激活任务改变，自动同步矩阵数据并更新图谱
  */
 watch(
-  [() => store.selectedSatSeries, () => store.activedTask?.id],
-  () => {
-    void fetchMatrixData()
+  [() => store.matrixData, () => store.selectedSatSeries, () => store.activedTask?.id],
+  ([newStoreMatrix]) => {
+    if (newStoreMatrix) {
+      matrixData.value = newStoreMatrix
+      nextTick(() => {
+        initOrUpdateGraph()
+        initTimelineBounds()
+      })
+    } else {
+      void fetchMatrixData()
+    }
   },
   { immediate: true }
 )

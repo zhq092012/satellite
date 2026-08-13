@@ -143,7 +143,7 @@ const searchKeyword = ref('')
  * 组合使用外部传入或内部根据 store 系列拉取的矩阵数据
  */
 const currentData = computed<MatrixResult | CommucationMatrix | null>(() => {
-  return props.matrixData || internalMatrixData.value
+  return props.matrixData || store.matrixData || internalMatrixData.value
 })
 
 /**
@@ -156,18 +156,18 @@ const attackPlans = computed<AttackPlanItem[]>(() => {
 
 /**
  * [功能说明]
- * 自主异步拉取后端打击窗口矩阵数据 (当 props.matrixData 为空时，按 store 中的 selectedSatSeries 检索)。
+ * 自主异步拉取后端打击窗口矩阵数据 (优先使用 store 中已查询的共享矩阵数据)。
  */
 const loadMatrixData = async () => {
-  if (props.matrixData) return
+  if (props.matrixData || store.matrixData) return
   try {
-    const res = await getReconnaissanceAttackMatrix({
+    const data = await store.fetchReconnaissanceAttackMatrix({
       taskId: store.activedTask?.id || 0,
       intensityLevel: '低烈度',
       series: store.selectedSatSeries || '',
     })
-    if (res.code === 200 && res.data) {
-      internalMatrixData.value = res.data
+    if (data) {
+      internalMatrixData.value = data
     }
   } catch (err: any) {
     console.error('获取武器打击窗口矩阵数据失败:', err)
@@ -176,12 +176,12 @@ const loadMatrixData = async () => {
 
 /**
  * [监听器说明]
- * 监听 store 中选中的卫星系列和激活的任务改变，在没有透传 props.matrixData 时自动重新拉取矩阵数据
+ * 监听 store 中共享的矩阵数据、卫星系列和激活任务改变，自动同步矩阵数据
  */
 watch(
-  [() => store.selectedSatSeries, () => store.activedTask?.id],
+  [() => store.matrixData, () => store.selectedSatSeries, () => store.activedTask?.id],
   () => {
-    if (!props.matrixData) {
+    if (!props.matrixData && !store.matrixData) {
       void loadMatrixData()
     }
   },
@@ -189,7 +189,7 @@ watch(
 )
 
 onMounted(() => {
-  if (!props.matrixData) {
+  if (!props.matrixData && !store.matrixData) {
     void loadMatrixData()
   }
 })

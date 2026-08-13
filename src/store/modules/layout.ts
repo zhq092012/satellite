@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import * as Cesium from 'cesium'
+import { getReconnaissanceAttackMatrix, type MatrixResult } from '@/api/electronic'
 import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 
@@ -32,6 +33,13 @@ interface State {
   battleCenterCartensian: Cesium.Cartesian3 | null // 战场中心位置（笛卡尔坐标）
   battleCenterOritentation: Cesium.HeadingPitchRoll | null // 战场中心朝向（航向、俯仰、滚转）
   satelliteTotal: number // 卫星总数
+
+  /** [全局共享] 四个 Tab 页共用的算法侦察/打击矩阵查询结果 */
+  matrixData: MatrixResult | null
+  /** [全局共享] 算法矩阵加载状态 */
+  matrixLoading: boolean
+  /** [全局共享] 算法矩阵当前查询条件 Key 缓存 */
+  matrixQueryKey: string
 }
 export const useLayoutStore = defineStore('layout-store', {
   state: (): State => {
@@ -58,6 +66,10 @@ export const useLayoutStore = defineStore('layout-store', {
       battleCenterCartensian: null,
       battleCenterOritentation: null,
       satelliteTotal: 0,
+
+      matrixData: null,
+      matrixLoading: false,
+      matrixQueryKey: '',
     }
   },
   getters: {
@@ -191,6 +203,59 @@ export const useLayoutStore = defineStore('layout-store', {
      */
     setSelectedSatSeries(series: string) {
       this.selectedSatSeries = series
+    },
+    /**
+     * [功能说明]
+     * 统一在 Store 中执行算法侦察打击矩阵查询并全局持久共享
+     * @param params 查询参数 (taskId, series, intensityLevel)
+     * @param force 是否强制重新请求
+     */
+    async fetchReconnaissanceAttackMatrix(
+      params?: { taskId?: number; series?: string; intensityLevel?: string },
+      force = false
+    ): Promise<MatrixResult | null> {
+      const taskId = params?.taskId ?? this.activedTask?.id ?? 0
+      const series = params?.series ?? this.selectedSatSeries ?? ''
+      const intensityLevel = params?.intensityLevel ?? '低烈度'
+
+      if (!taskId) {
+        this.matrixData = null
+        this.matrixQueryKey = ''
+        return null
+      }
+
+      const queryKey = `${taskId}_${series}_${intensityLevel}`
+      // 若已有缓存且非强制刷新，直接返回 store 中的 matrixData
+      if (!force && this.matrixQueryKey === queryKey && this.matrixData) {
+        return this.matrixData
+      }
+
+      this.matrixLoading = true
+      try {
+        const res = await getReconnaissanceAttackMatrix({
+          taskId,
+          series,
+          intensityLevel,
+        })
+        if (res && res.code === 200 && res.data) {
+          this.matrixData = res.data
+          this.matrixQueryKey = queryKey
+          return res.data
+        }
+      } catch (err) {
+        console.error('全局 Store 获取算法侦察打击矩阵失败:', err)
+      } finally {
+        this.matrixLoading = false
+      }
+      return this.matrixData
+    },
+    /**
+     * [功能说明]
+     * 清空 Store 中共享的矩阵缓存数据
+     */
+    clearMatrixData() {
+      this.matrixData = null
+      this.matrixQueryKey = ''
     },
   },
   persist: {
