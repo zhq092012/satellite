@@ -12,26 +12,19 @@
 <script setup lang="ts">
 import type { MatrixResult } from '@/api/electronic'
 import { useElectronicCesiumBridge, type InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
-import { useTimelineSync } from '@/composables/useTimelineSync'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
 import * as Cesium from 'cesium'
-import * as echarts from 'echarts'
 import { getAllWeapons, getSatelliteDetail, getSatelliteTLEData, getTLEDataByTaskId } from '@/api/dashboard'
 import { createWeaponIconDataUri, getWeaponIconScale } from '@/utils/tools/svgIcons'
 import * as satellitejs from 'satellite.js'
 import { useLayoutStore } from '@/store/modules/layout'
 import { formatTimeLineAndAnimation, markBattleArea } from '@/utils/tools/functionTool'
-import { bindInfoBoxButton, createInfoBoxActionButton, unbindInfoBoxButton } from '@/utils/tools/infoBox'
 import { CallbackProperty } from 'cesium'
-import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import type { SatelliteData, Weapon } from '@/types/dashboard'
 
 // 全局布局状态管理 store
 const store = useLayoutStore()
-// 卫星详情弹窗 composable，用于打开卫星档案对话框
-const { openSatelliteProfile } = useSatelliteProfileDialog()
-// 是否显示卫星轨迹路径，默认关闭（避免大量实体导致性能下降）
-const showPaths = ref(false)
+
 // 地图瓦片服务地址（来自环境变量）
 const MATERIAL_URL = import.meta.env.VITE_MATERIAL_URL
 // Cesium 容器 DOM 引用
@@ -64,20 +57,6 @@ let resizeObserver: ResizeObserver | null = null
 let viewerInitializing = false
 // Cesium 是否已完成首次初始化（用于外部判断是否可以操作 Viewer）
 const cesiumInitialized = ref(false)
-/**
- * 战场态势面板中四个 ECharts 图表实例缓存
- *
- * [说明]
- * - 使用对象集中管理，组件销毁时统一 dispose 防止内存泄漏
- * - key 含义：redSatelliteType（红方卫星类型柱状图）、blueSatelliteType（蓝方卫星类型柱状图）
- *           redWeaponType（红方武器分类饼图）、blueWeaponType（蓝方武器分类饼图）
- */
-const chartInstances = {
-  redSatelliteType: null as echarts.ECharts | null,
-  blueSatelliteType: null as echarts.ECharts | null,
-  redWeaponType: null as echarts.ECharts | null,
-  blueWeaponType: null as echarts.ECharts | null,
-}
 
 /**
  * [功能]
@@ -251,25 +230,11 @@ const initViewer = async () => {
         }
       }
 
-      // 绑定时钟 Tick 监听更新动态过境与中继连线
-      if (!clockTickRemoveListener) {
-        clockTickRemoveListener = viewer.clock.onTick.addEventListener(() => {
-          updateElectronicDynamicLinks()
-        })
-      }
-
       // 绑定自定义的相机监听（用于显示相机位置/角度等）
       // listenCameraLocaion(viewer)
       // 监控鼠标点击事件
       handleViewerClickEvent()
-      // 绑定信息框按钮事件（使用事件委托方式，避免每个实体都绑定一次）
-      bindInfoBoxButton(viewer, {
-        handler: ({ button }) => {
-          const norad = Number(button.dataset.norad)
-          if (!Number.isFinite(norad)) return
-          showDetail(norad)
-        },
-      })
+
       // 开始监听容器尺寸变化
       startContainerSizeObserver()
       // 同步渲染循环
@@ -304,24 +269,7 @@ const clearViewer = () => {
     clockTickRemoveListener()
     clockTickRemoveListener = null
   }
-  clearElectronicNetworkEntities()
   viewer.entities.removeAll()
-
-  // 2. 只移除我们手动添加的 Primitive 集合（pointCollection、labelCollection），
-  //    不要使用 viewer.scene.primitives.removeAll()！
-  //    removeAll() 会同时销毁 Cesium DataSourceDisplay 内部维护的 PrimitiveCollection，
-  //    导致后续 _onTick → GeometryVisualizer.update 访问已销毁的对象而抛出
-  //    "This object was destroyed" 异常。
-  if (pointCollection && !pointCollection.isDestroyed()) {
-    viewer.scene.primitives.remove(pointCollection)
-  }
-  pointCollection = null
-  if (labelCollection && !labelCollection.isDestroyed()) {
-    viewer.scene.primitives.remove(labelCollection)
-  }
-  labelCollection = null
-
-  store.closeSatPanel()
 
   // 3. 恢复渲染循环和时钟动画（仅当 viewer 未被销毁时）
   if (!viewer.isDestroyed()) {
@@ -390,34 +338,11 @@ let currentRenderTaskId: number | null = null
 
 // 存储电子信息网络基础设施实体 ID (地面站、中心云站)
 const electronicNodeEntityIds = new Set<string>()
-// 存储电子信息网络动态连线实体 ID (星地过境、星中中继、地地网)
-const electronicDynamicLinkEntityIds = new Set<string>()
 
 // 电子信息战录 composable：解析地面站、中继卡号集和过境窗口判断工具
 const { infrastructureNodes } = useElectronicCesiumBridge(toRef(props, 'matrixData'))
-// 时间轴同步：将 Cesium 时钟时间同步到全局仿真时间状态
-const { updateSimulationTime } = useTimelineSync()
 // Cesium 时钟 onTick 监听器的移除函数（组件销毁时必须调用）
 let clockTickRemoveListener: Cesium.Event.RemoveCallback | null = null
-
-/**
- * [功能]
- * 清理电子信息网络相关的 3D 实体与连线
- */
-const clearElectronicNetworkEntities = () => {
-  if (!viewer) return
-  electronicNodeEntityIds.forEach((id) => {
-    const entity = viewer.entities.getById(id)
-    if (entity) viewer.entities.remove(entity)
-  })
-  electronicNodeEntityIds.clear()
-
-  electronicDynamicLinkEntityIds.forEach((id) => {
-    const entity = viewer.entities.getById(id)
-    if (entity) viewer.entities.remove(entity)
-  })
-  electronicDynamicLinkEntityIds.clear()
-}
 
 /**
  * [功能]
@@ -835,43 +760,18 @@ const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null =
 
 /**
  * [功能]
- * 根据当前 Cesium 时钟时间更新敌方星地过境连线、星中中继连线与地地光纤网
- */
-const updateElectronicDynamicLinks = () => {
-  if (!viewer || viewer.isDestroyed()) return
-
-  const currentTime = Cesium.JulianDate.toDate(viewer.clock.currentTime)
-  updateSimulationTime(currentTime)
-
-  // 清理现有全部传输动态链路实体 (按要求禁用卫星与地面站、卫星与中继、地面站与数据中心间链路)
-  electronicDynamicLinkEntityIds.forEach((linkId) => {
-    const entity = viewer.entities.getById(linkId)
-    if (entity) viewer.entities.remove(entity)
-  })
-  electronicDynamicLinkEntityIds.clear()
-}
-
-/**
- * [功能]
  * 监听矩阵数据变化，触发 3D 电子信息网络与连线更新
  */
 watch(
   () => props.matrixData,
   (newData) => {
     if (!viewer) return
-    clearElectronicNetworkEntities()
     if (newData) {
       renderElectronicInfrastructureNodes()
-      updateElectronicDynamicLinks()
     }
   },
   { deep: true }
 )
-
-let pointCollection: Cesium.PointPrimitiveCollection | null = null
-let labelCollection: Cesium.LabelCollection | null = null
-// 以 NORAD 编号为 key，存储每颗卫星对应的 Label
-// 以 NORAD 编号为 key，存储 Primitive 模式下附加的辅助 Entity
 
 // 卫星渲染导忙状态，为 true 时显示 Loading 蒙层
 const satelliteRenderBusy = ref(false)
@@ -895,7 +795,6 @@ function handleViewerClickEvent() {
       store.closeSatPanel() // 点到空白也关闭
       store.setSelectedSatellite(null) // 清空选择的卫星
       store.setSelectedInfrastructureNode(null) // 清空选中的地面基础设施节点
-      showPaths.value = false
       for (const element of satelliteEntities.values()) {
         if (element.path) element.path.show = new Cesium.CallbackProperty(() => false, false)
       }
@@ -916,9 +815,6 @@ function handleViewerClickEvent() {
         flyToInfrastructureNode(infraMatch)
         return
       }
-    } else {
-      // 点击其他 3D 实体时，重置基础设施选择状态
-      store.setSelectedInfrastructureNode(null)
     }
 
     const primitiveNorad = Number((pickedId as { norad?: number }).norad)
@@ -940,30 +836,6 @@ function handleViewerClickEvent() {
       console.error('查询卫星详细信息接口失败:', error)
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
-}
-
-/**
- * [功能]
- * 根据卡座所属国家返回红/蓝/白颜色
- *
- * [处理规则]
- * - 属于假方（meCountry）返回 RED
- * - 属于敌方（enemyCountry）返回 BLUE
- * - 其他国家返回 WHITE
- *
- * @param country 卡座所属国家字符串
- * @returns Cesium 颜色对象
- */
-function getSatelliteColor(country: string) {
-  // 根据当前任务的我方/敌方国家列表判断属局颜色
-  const ourCountries = store.activedTask?.meCountry.split(',')
-  const enemyCountries = store.activedTask?.enemyCountry.split(',')
-  const color = ourCountries?.includes(country)
-    ? Cesium.Color.RED
-    : enemyCountries?.includes(country)
-      ? Cesium.Color.BLUE
-      : Cesium.Color.WHITE
-  return color
 }
 
 /**
@@ -1170,7 +1042,7 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
         show: true,
         point: {
           pixelSize: 8,
-          color: getSatelliteColor(satel.country),
+          color: Cesium.Color.BLUE,
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: 2,
           heightReference: Cesium.HeightReference.NONE,
@@ -1189,7 +1061,7 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
           show: true,
         },
         path: {
-          show: new Cesium.CallbackProperty(() => showPaths.value, false),
+          show: false,
           leadTime: satel.orbit_type === 1 ? 90 * 60 : satel.orbit_type === 2 ? 12 * 3600 : 24 * 3600,
           trailTime: 0,
           width: 1,
@@ -1198,42 +1070,12 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
             color: Cesium.Color.YELLOW,
           }),
         },
-        description: `<div style="padding: 10px; font-family: inherit;background-color:white; color:  rgba(0, 0, 0, 0.7); border-radius: 8px;">
-      <h3 style="color: #1890ff; margin: 0 0 10px 0;display:flex; justify-content: space-between; align-items:center;"><span>🛰️ ${satel.name_en}</span> ${createInfoBoxActionButton('详情', { norad: satel.norad_id })}</h3>
-      <p><strong>NORAD:</strong> ${satel.norad_id} </p>
-      <p><strong>卫星类型:</strong> ${satel.sat_type}</p>
-      <p><strong>所属国家:</strong> ${satel.country}</p>
-      <p><strong>威胁度:</strong> ${satel.strikeListResp?.threat_score.toFixed(4)}</p>
-      <p><strong>可打击度:</strong> ${satel.strikeListResp?.kedaji_score.toFixed(4)}</p>
-      <p><strong>综合评分:</strong> ${satel.strikeListResp?.overallScore?.toFixed(4)}</p>
-
-      </div>
-     `,
       })
       satelliteEntities.set(noradId, entity)
-    } else {
-      entity.show = true
-      // 过滤条件变化时可能需要更新颜色
-      if (entity.point) {
-        entity.point.color = new Cesium.ConstantProperty(getSatelliteColor(satel.country))
-        entity.position = positionProperty
-      }
     }
 
     // 在 requestRenderMode 下需要显式请求渲染
     currentViewer.scene.requestRender()
-  }
-}
-
-/**
- * [功能]
- * 打开卡座详情对话框
- *
- * @param norad 卡座 NORAD 编号
- */
-function showDetail(norad: number) {
-  if (isFinite(norad)) {
-    openSatelliteProfile(norad)
   }
 }
 
@@ -1275,7 +1117,7 @@ const resetHighlightSatellites = () => {
         entity.point.pixelSize = new Cesium.ConstantProperty(8)
       }
       if (entity && entity.path) {
-        entity.path.show = new CallbackProperty(() => showPaths.value, false)
+        entity.path.show = false
         entity.path.width = new Cesium.ConstantProperty(1)
       }
     })
@@ -1402,17 +1244,6 @@ watch(
 )
 
 /**
- * 安全销毁 ECharts 实例，避免重复销毁报错
- *
- * @param chart ECharts 实例或 null
- */
-const disposeChart = (chart: echarts.ECharts | null) => {
-  if (chart && !chart.isDisposed()) {
-    chart.dispose()
-  }
-}
-
-/**
  * 组件挂载完成时初始化 Cesium Viewer 并绑定相机移动监听器
  *
  * [处理规刖]
@@ -1468,8 +1299,6 @@ onBeforeUnmount(() => {
 
   satelliteRenderToken += 1
   satelliteRenderBusy.value = false
-  pointCollection = null
-  labelCollection = null
   satelliteEntities.clear()
   satelliteOrbitData.clear()
   satellitePositionPropertyCache.clear()
@@ -1487,14 +1316,6 @@ onBeforeUnmount(() => {
       } catch (e) {
         console.warn('failed to stop render loop on unmount', e)
       }
-
-      try {
-        unbindInfoBoxButton(viewer)
-      } catch (e) {
-        console.warn('unbindInfoBoxButton warning on unmount', e)
-      }
-
-      Object.values(chartInstances).forEach((chart) => disposeChart(chart))
 
       try {
         viewer.destroy()
