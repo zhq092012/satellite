@@ -79,7 +79,7 @@ const fetchMatrixDataBySeries = async (series: string) => {
     const data = await store.fetchReconnaissanceAttackMatrix({
       taskId,
       series,
-      intensityLevel: '低烈度',
+      intensityLevel: store.intensityLevel || '低烈度',
     })
     if (data) {
       // 从已经查询出来的矩阵中提取首个卫星节点进行锁定与时间轴定位
@@ -126,7 +126,7 @@ const handleSelectSatellite = async (norad: number | null) => {
     (await store.fetchReconnaissanceAttackMatrix({
       taskId,
       series: store.selectedSatSeries || '',
-      intensityLevel: '低烈度',
+      intensityLevel: store.intensityLevel || '低烈度',
     }))
   if (data) {
     let windowStartTime: string | undefined

@@ -244,8 +244,8 @@ type IntensityLevelType = '高烈度' | '中烈度' | '低烈度'
 const intensityOptions: IntensityLevelType[] = ['低烈度', '中烈度', '高烈度']
 
 // [变量用途]
-// 当前选中的交战烈度
-const currentIntensity = ref<IntensityLevelType>('低烈度')
+// 当前选中的交战烈度 (与全局 Store 中的 intensityLevel 同步)
+const currentIntensity = ref<IntensityLevelType>((store.intensityLevel as IntensityLevelType) || '低烈度')
 
 // [类型用途]
 // 拓扑视图显示模式选项
@@ -504,24 +504,20 @@ const formatSatType = (typeStr?: string): string => {
 
 /**
  * [功能说明]
- * 调用后端 API 获取算法矩阵数据 (按 store 中的 selectedSatSeries 检索)
+ * 调用后端 API 获取算法矩阵数据并更新 store (按 store 中的 selectedSatSeries 检索)
+ * @param force 是否强制重新向 API 查询数据
  */
-const fetchMatrixData = async () => {
-  if (store.matrixData) {
-    matrixData.value = store.matrixData
-    nextTick(() => {
-      initOrUpdateGraph()
-      initTimelineBounds()
-    })
-    return
-  }
+const fetchMatrixData = async (force = false) => {
   loading.value = true
   try {
-    const data = await store.fetchReconnaissanceAttackMatrix({
-      taskId: store.activedTask?.id || 0,
-      series: store.selectedSatSeries || '',
-      intensityLevel: currentIntensity.value,
-    })
+    const data = await store.fetchReconnaissanceAttackMatrix(
+      {
+        taskId: store.activedTask?.id || 0,
+        series: store.selectedSatSeries || '',
+        intensityLevel: currentIntensity.value,
+      },
+      force
+    )
 
     if (data) {
       matrixData.value = data
@@ -539,7 +535,7 @@ const fetchMatrixData = async () => {
 
 /**
  * [监听器说明]
- * 监听 store 中共享的矩阵数据、卫星系列和激活任务改变，自动同步矩阵数据并更新图谱
+ * 监听 store 中共享的矩阵数据、卫星系列、激活任务和烈度改变，自动同步矩阵数据并更新图谱
  */
 watch(
   [() => store.matrixData, () => store.selectedSatSeries, () => store.activedTask?.id],
@@ -558,13 +554,28 @@ watch(
 )
 
 /**
+ * [监听器说明]
+ * 监听全局 Store 中的 intensityLevel 变动，保持组件内部选中烈度同步
+ */
+watch(
+  () => store.intensityLevel,
+  (newLevel) => {
+    if (newLevel && newLevel !== currentIntensity.value) {
+      currentIntensity.value = newLevel as IntensityLevelType
+    }
+  }
+)
+
+/**
  * [功能说明]
- * 切换交战烈度
+ * 切换交战烈度，重新向后端查询最新计算矩阵，并实时更新全局 Store 状态
+ * @param level 目标烈度名称 ('低烈度' | '中烈度' | '高烈度')
  */
 const handleIntensityChange = (level: IntensityLevelType) => {
   if (currentIntensity.value === level) return
   currentIntensity.value = level
-  fetchMatrixData()
+  store.setIntensityLevel(level)
+  void fetchMatrixData(true)
 }
 
 /**

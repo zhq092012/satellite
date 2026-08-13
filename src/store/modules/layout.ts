@@ -34,6 +34,9 @@ interface State {
   battleCenterOritentation: Cesium.HeadingPitchRoll | null // 战场中心朝向（航向、俯仰、滚转）
   satelliteTotal: number // 卫星总数
 
+  /** [全局共享] 当前选中的交战烈度 ('低烈度' | '中烈度' | '高烈度') */
+  intensityLevel: string
+
   /** [全局共享] 四个 Tab 页共用的算法侦察/打击矩阵查询结果 */
   matrixData: MatrixResult | null
   /** [全局共享] 算法矩阵加载状态 */
@@ -59,6 +62,7 @@ export const useLayoutStore = defineStore('layout-store', {
       selectedInfrastructureNode: null,
       selectedSatType: '',
       selectedSatSeries: '',
+      intensityLevel: '低烈度',
 
       allSatelliteOfTask: [],
       effectModel: true,
@@ -205,6 +209,14 @@ export const useLayoutStore = defineStore('layout-store', {
       this.selectedSatSeries = series
     },
     /**
+     * [功能]
+     * 设置当前选中的交战烈度并保存至全局 Store
+     * @param intensity 烈度名称 ('低烈度' | '中烈度' | '高烈度')
+     */
+    setIntensityLevel(intensity: string) {
+      this.intensityLevel = intensity
+    },
+    /**
      * [功能说明]
      * 统一在 Store 中执行算法侦察打击矩阵查询并全局持久共享
      * @param params 查询参数 (taskId, series, intensityLevel)
@@ -216,7 +228,11 @@ export const useLayoutStore = defineStore('layout-store', {
     ): Promise<MatrixResult | null> {
       const taskId = params?.taskId ?? this.activedTask?.id ?? 0
       const series = params?.series ?? this.selectedSatSeries ?? ''
-      const intensityLevel = params?.intensityLevel ?? '低烈度'
+
+      if (params?.intensityLevel) {
+        this.intensityLevel = params.intensityLevel
+      }
+      const intensityLevel = this.intensityLevel || '低烈度'
 
       if (!taskId) {
         this.matrixData = null
@@ -260,6 +276,6 @@ export const useLayoutStore = defineStore('layout-store', {
   },
   persist: {
     storage: localStorage,
-    pick: ['activedTask', 'battle', 'showBattleList', 'allSatelliteOfTask', 'satelliteTotal', 'selectedSatType', 'selectedSatSeries'],
+    pick: ['activedTask', 'battle', 'showBattleList', 'allSatelliteOfTask', 'satelliteTotal', 'selectedSatType', 'selectedSatSeries', 'intensityLevel'],
   },
 })
