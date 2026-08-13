@@ -258,21 +258,7 @@ export interface MatrixResult {
 }
 
 /**
- * [功能]
- * 获取过境、过基站、延迟、打击以及战场矩阵的数据。
- *
- * [处理规则]
- * 向后端算法计算接口发送 POST 请求并返回 MatrixResult。
- *
- * [副作用]
- * 发送网络 HTTP 请求。
- *
- * [异常处理]
- * 异常由调用方 Axios 拦截器与 catch 逻辑捕获处理。
- *
- * [修改约束]
- * 保持请求参数 data 格式一致。
- *
+ * 获取（侦察卫星）过境、过基站、延迟、打击以及战场矩阵的数据。
  * @param data 请求参数对象 (norad, taskId, intensityLevel)
  * @returns 包含 MatrixResult 的 Axios 响应 Promise
  */

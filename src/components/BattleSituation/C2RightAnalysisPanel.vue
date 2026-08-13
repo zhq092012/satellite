@@ -63,7 +63,6 @@
               <span class="sat-name-large">{{ currentSatName }}</span>
               <span class="sat-type-tag">{{ currentSatType }}</span>
             </div>
-            <button class="clear-btn" @click="handleClearSelection" title="重置回到静态视图">重置静态</button>
           </div>
 
           <!-- 传输路径 Flow Diagram -->
@@ -212,11 +211,6 @@ const activeMatrix = computed<MatrixResult | null>(() => props.matrixData)
 const selectedNode = computed(() => store.selectedInfrastructureNode)
 const clearSelectedNode = () => {
   store.setSelectedInfrastructureNode(null)
-}
-
-// 清除选择
-const handleClearSelection = () => {
-  emit('clear-satellite-selection')
 }
 
 // 全网资产统计

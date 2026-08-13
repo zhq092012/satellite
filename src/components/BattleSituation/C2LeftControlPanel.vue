@@ -66,7 +66,6 @@
             'card-active': selectedNorad === sat.norad,
             'card-relay': sat.isRelay,
           }"
-          @click="handleSelectSatellite(sat.norad)"
         >
           <div class="card-top">
             <span class="sat-name">
@@ -141,35 +140,19 @@ const props = defineProps<{
   selectedNorad?: number | null
 }>()
 
-const emit = defineEmits<{
-  (e: 'select-satellite', norad: number | null): void
-  (e: 'fly-to-view', target: 'GLOBAL' | 'SPACE' | 'GROUND'): void
-}>()
-
 const store = useLayoutStore()
 
-// [变量用途]
-// 存储从接口 getSatelliteTypeSerials 获取的卫星类型与对应系列字典数据
-//
-// [数据来源]
-// 通过 getSatelliteTypeSerials(taskId) 接口异步返回
-//
-// [取值规则]
-// Key 为卫星类型名称 (如 "导航卫星")，Value 为该类型下的系列名称数组 (如 ["GPS-2A", "GPS-2R"])
-//
-// [修改约束]
-// 任务 ID 变化时重新请求并更新
+//存储从接口 getSatelliteTypeSerials 获取的卫星类型与对应系列字典数据
 const typeSerialsMap = ref<Record<string, string[]>>({})
 
-// [变量用途]
 // 当前选中的卫星类型筛选值，优先从 Store 持久化状态中恢复
 const selectedType = ref<string>(store.selectedSatType || '')
 
-// [变量用途]
+
 // 当前选中的卫星系列筛选值，优先从 Store 持久化状态中恢复
 const selectedSeries = ref<string>(store.selectedSatSeries || '')
 
-// [变量用途]
+
 // 可供选择的卫星类型下拉选项列表
 const typeOptions = computed<string[]>(() => {
   return Object.keys(typeSerialsMap.value)
@@ -321,15 +304,6 @@ watch(
   },
   { immediate: true }
 )
-
-// 触发选择卫星事件 (再次点击已选中的卫星可取消选择)
-const handleSelectSatellite = (norad: number) => {
-  if (props.selectedNorad === norad) {
-    emit('select-satellite', null)
-  } else {
-    emit('select-satellite', norad)
-  }
-}
 
 /**
  * [计算属性说明]

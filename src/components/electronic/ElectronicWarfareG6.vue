@@ -229,7 +229,6 @@
 import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
 import G6 from '@antv/g6'
 import { useLayoutStore } from '@/store/modules/layout'
-import { getReconnaissanceAttackMatrix } from '@/api/electronic'
 import type { MatrixResult, Weapon } from '@/api/electronic'
 import type { FuncType } from '@/types/electronic'
 

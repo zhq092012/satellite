@@ -420,8 +420,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { getReconnaissanceAttackMatrix } from '@/api/electronic'
 import type { MatrixResult, SatelliteMatrix, Weapon, CommucationMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
 const store = useLayoutStore()
@@ -838,7 +836,8 @@ const processedGanttRows = computed<ProcessedSatRow[]>(() => {
       const combinedWeapons = Array.from(weaponMap.values())
 
       // 4色击毁状态判定名
-      const strikeStatusVal = typeof win.strikeStatus === 'number' ? win.strikeStatus : sat.satelliteStatus === 1 ? 1 : 0
+      const strikeStatusVal =
+        typeof win.strikeStatus === 'number' ? win.strikeStatus : sat.satelliteStatus === 1 ? 1 : 0
       let colorStatusClass: 'status-normal' | 'status-sat-struck' | 'status-rec-struck' | 'status-both-struck' =
         'status-normal'
       if (sat.satelliteStatus === 1 && strikeStatusVal === 1) {

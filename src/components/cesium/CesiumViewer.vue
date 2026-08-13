@@ -7,20 +7,6 @@
         <div class="render-loading__text">正在加载数据...</div>
       </div>
     </div>
-    <!-- 星座工具栏 -->
-    <div v-if="selectedConstellation" class="constellation-toolbar">
-      <span class="constellation-toolbar__badge">{{
-        selectedConstellation.chineseName || selectedConstellation.name
-      }}</span>
-      <el-switch
-        v-model="showConstellationLinks"
-        active-action-icon="Connection"
-        inactive-action-icon="Hide"
-        active-text="星间链路"
-        @change="handleConstellationLinkToggle"
-      />
-      <el-button size="small" text @click="clearConstellationSelection">清除星座选择</el-button>
-    </div>
   </div>
 </template>
 <script setup lang="ts">
@@ -30,14 +16,7 @@ import { useTimelineSync } from '@/composables/useTimelineSync'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
 import * as Cesium from 'cesium'
 import * as echarts from 'echarts'
-import {
-  getAllWeapons,
-  getSatelliteConstellations,
-  getSatelliteDetail,
-  getSatelliteTLEData,
-  getTLEDataByTaskId,
-  type SatelliteConstellation,
-} from '@/api/dashboard'
+import { getAllWeapons, getSatelliteDetail, getSatelliteTLEData, getTLEDataByTaskId } from '@/api/dashboard'
 import { createWeaponIconDataUri, getWeaponIconScale } from '@/utils/tools/svgIcons'
 import * as satellitejs from 'satellite.js'
 import { useLayoutStore } from '@/store/modules/layout'
@@ -279,22 +258,6 @@ const initViewer = async () => {
         })
       }
 
-      // 绑定相机移动监听，实现高处视角聚合与低处视角具体 Label 的动态无缝切换
-      let lastIsCloseView: boolean | null = null
-      if (!cameraMoveEndListener) {
-        viewer.camera.percentageChanged = 0.05
-        cameraMoveEndListener = viewer.camera.changed.addEventListener(() => {
-          if (selectedConstellation.value) {
-            const currentCloseView = isConstellationCloseView()
-            // 只有当高度临界状态改变（低处 ↔ 高处）时，才触发视觉显隐更新，且跳过 Polyline 图层重绘，避免拖动地球时线路闪烁
-            if (lastIsCloseView === null || lastIsCloseView !== currentCloseView) {
-              lastIsCloseView = currentCloseView
-              applyConstellationVisualState(true)
-            }
-          }
-        })
-      }
-
       // 绑定自定义的相机监听（用于显示相机位置/角度等）
       // listenCameraLocaion(viewer)
       // 监控鼠标点击事件
@@ -358,12 +321,6 @@ const clearViewer = () => {
   }
   labelCollection = null
 
-  satellitePointPrimitives.clear()
-  satelliteLabelPrimitives.clear()
-  satellitePrimitiveEntities.clear()
-  renderedPrimitiveSatelliteMap.clear()
-  clearConstellationOverlayEntities()
-  selectedConstellation.value = null
   store.closeSatPanel()
 
   // 3. 恢复渲染循环和时钟动画（仅当 viewer 未被销毁时）
@@ -460,33 +417,6 @@ const clearElectronicNetworkEntities = () => {
     if (entity) viewer.entities.remove(entity)
   })
   electronicDynamicLinkEntityIds.clear()
-}
-
-/**
- * [功能]
- * 平滑飞赴敌方信息网络集群区域
- */
-const flyToEnemyNetwork = () => {
-  if (!viewer || !infrastructureNodes.value.length) return
-
-  let sumLon = 0
-  let sumLat = 0
-  infrastructureNodes.value.forEach((n) => {
-    sumLon += n.longitude
-    sumLat += n.latitude
-  })
-  const avgLon = sumLon / infrastructureNodes.value.length
-  const avgLat = sumLat / infrastructureNodes.value.length
-
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(avgLon, avgLat, 5000000),
-    orientation: {
-      heading: Cesium.Math.toRadians(0),
-      pitch: Cesium.Math.toRadians(-60),
-      roll: 0,
-    },
-    duration: 2.0,
-  })
 }
 
 /**
@@ -726,27 +656,6 @@ const renderElectronicInfrastructureNodes = () => {
   })
 }
 
-/**
- * [功能]
- * 视角快速定位
- */
-const flyToView = (target: 'GLOBAL' | 'SPACE' | 'GROUND') => {
-  if (!viewer) return
-  if (target === 'GLOBAL') {
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(100, 30, 20000000),
-      duration: 1.8,
-    })
-  } else if (target === 'SPACE') {
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(100, 20, 10000000),
-      duration: 1.8,
-    })
-  } else if (target === 'GROUND') {
-    flyToEnemyNetwork()
-  }
-}
-
 const showRedSatellites = ref(false)
 
 // [变量用途]
@@ -882,12 +791,6 @@ const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null =
   positionCalculatingSet.add(norad)
 
   try {
-    // 1. 优先从图元集合获取
-    const primitive = satellitePointPrimitives.get(norad)
-    if (primitive && primitive.position) {
-      return primitive.position
-    }
-
     // 2. 尝试从 TLE 两行数据中推算当前时刻 3D 位置
     const matrixSats = props.matrixData?.initMatrixList || []
     const initSat = matrixSats.find((s) => s.norad === norad)
@@ -965,22 +868,10 @@ watch(
   { deep: true }
 )
 
-/**
- * 占点和标签原语集合（Primitive Collection）
- *
- * [说明]
- * - 大量卫星展示时使用 Primitive 替代 Entity，性能显著优于每颗单独创建 Entity
- * - pointCollection: 占点集合，复用旧实例避免重建
- * - labelCollection: 标签集合，远距离隱藏防止 2w+ 标签性能问题
- */
 let pointCollection: Cesium.PointPrimitiveCollection | null = null
 let labelCollection: Cesium.LabelCollection | null = null
-// 以 NORAD 编号为 key，存储每颗卫星对应的 PointPrimitive
-const satellitePointPrimitives = new Map<number, Cesium.PointPrimitive>()
 // 以 NORAD 编号为 key，存储每颗卫星对应的 Label
-const satelliteLabelPrimitives = new Map<number, Cesium.Label>()
 // 以 NORAD 编号为 key，存储 Primitive 模式下附加的辅助 Entity
-const satellitePrimitiveEntities = new Map<number, Cesium.Entity>()
 
 // 卫星渲染导忙状态，为 true 时显示 Loading 蒙层
 const satelliteRenderBusy = ref(false)
@@ -988,587 +879,8 @@ const satelliteRenderBusy = ref(false)
 let satelliteRenderToken = 0
 // 时间轴回放速度（倍速），默认 1.0 倍
 const playbackSpeed = ref(1.0)
-// 当前选中的卡座（为 null 表示未选中）
-const selectedConstellation = ref<SatelliteConstellation | null>(null)
-// 是否显示卡座内部星间连线
-const showConstellationLinks = ref(true)
 
-const CONSTELLATION_CLOSE_VIEW_HEIGHT = 10_000_000
-const CONSTELLATION_COLOR_PALETTE = ['#4ea6ff', '#58c9d1', '#7cd992', '#f0b35b', '#ef6b73', '#b15cff', '#8cc6ff']
-
-const constellationNoradMap = new Map<number, SatelliteConstellation>()
-const constellationColorMap = new Map<string, Cesium.Color>()
-const constellationOverlayEntityIds = new Set<string>()
-const renderedPrimitiveSatelliteMap = new Map<number, SatelliteInfo>()
 let cameraMoveEndListener: Cesium.Event.RemoveCallback | null = null
-
-// 卫星星座列表
-const satelliteConstellations = ref<SatelliteConstellation[]>([])
-// 获取卫星星座列表
-/**
- * [功能]
- * 加载卡座列表并初始化 NORAD 和颜色映射表
- *
- * [处理规则]
- * - 已存在列表时直接返回，避免重复请求
- * - 成功后构建 constellationNoradMap 和 constellationColorMap
- *
- * [副作用]
- * - 修改 satelliteConstellations.value
- * - 修改 constellationNoradMap 和 constellationColorMap
- */
-const loadSatelliteConstellations = async () => {
-  if (satelliteConstellations.value.length) return
-  const res = await getSatelliteConstellations()
-  if (res.code === 200 && Array.isArray(res.data)) {
-    satelliteConstellations.value = res.data
-    constellationNoradMap.clear()
-    constellationColorMap.clear()
-
-    res.data.forEach((constellation, index) => {
-      constellationColorMap.set(
-        constellation.name,
-        Cesium.Color.fromCssColorString(CONSTELLATION_COLOR_PALETTE[index % CONSTELLATION_COLOR_PALETTE.length])
-      )
-      constellation.noradIds.forEach((noradId) => {
-        constellationNoradMap.set(Number(noradId), constellation)
-      })
-    })
-  }
-}
-
-/**
- * [功能]
- * 根据 NORAD 编号查询卡座信息
- *
- * @param norad 卡座内卫星的 NORAD 编号
- * @returns 卡座对象，未找到时返回 null
- */
-const getConstellationByNorad = (norad: number) => constellationNoradMap.get(Number(norad)) ?? null
-
-/**
- * [功能]
- * 获取卫星的展示颜色
- *
- * [处理规则]
- * - 如果该卫星属于卡座，返回卡座对应的固定颜色
- * - 如果不属于任何卡座，按卡座类型返回默认颜色
- *
- * @param satellite 卫星信息对象
- * @param norad NORAD 编号
- * @returns Cesium 颜色
- */
-const getConstellationColor = (satellite: SatelliteInfo, norad: number) => {
-  const constellation = getConstellationByNorad(norad)
-  if (constellation) {
-    return Cesium.Color.clone(constellationColorMap.get(constellation.name) ?? Cesium.Color.CYAN, new Cesium.Color())
-  }
-  return Cesium.Color.clone(getSatelliteColorByType(satellite.sat_type), new Cesium.Color())
-}
-
-/**
- * [功能]
- * 判断当前相机是否处于卡座近视状态
- *
- * [说明]
- * 当相机高度小于阔值时，卡座内卫星标签和连线才会显示
- *
- * @returns 是否为近视模式
- */
-const isConstellationCloseView = () => {
-  if (!viewer) return false
-  return viewer.camera.positionCartographic.height <= CONSTELLATION_CLOSE_VIEW_HEIGHT
-}
-
-/**
- * [功能]
- * 获取当前选中卡座所有 NORAD 编号的 Set
- *
- * @returns NORAD 编号的 Set，未选中时返回空 Set
- */
-const getSelectedConstellationNoradSet = () =>
-  new Set((selectedConstellation.value?.noradIds ?? []).map((noradId) => Number(noradId)))
-
-/**
- * [功能]
- * 清除卡座叠加层实体（星间连线、包络线、中心标签）
- *
- * [副作用]
- * - 从 viewer.entities 中移除并清空 constellationOverlayEntityIds
- */
-const clearConstellationOverlayEntities = () => {
-  if (!viewer) return
-  constellationOverlayEntityIds.forEach((entityId) => {
-    const entity = viewer.entities.getById(entityId)
-    if (entity) {
-      viewer.entities.remove(entity)
-    }
-  })
-  constellationOverlayEntityIds.clear()
-}
-
-/**
- * [功能]
- * 根据卡座内卫星的空间位置计算凸包络位置序列
- *
- * [业务目的]
- * 通过中心点投影到局部 ENU 坐标系，按极角排序得到顺时针的卡座包络多边形
- *
- * [关键规则]
- * - 位置数小于 2 时返回空数组
- * - 最后将第一个点加到末尾以闭合多边形
- *
- * @param positions 卡座内所有卫星的三维坐标点数组
- * @returns 按角度排序后的位置序列（闭合多边形）
- */
-const buildConstellationEnvelopePositions = (positions: Cesium.Cartesian3[]) => {
-  if (positions.length < 2) return [] as Cesium.Cartesian3[]
-
-  const center = positions.reduce(
-    (result, position) => Cesium.Cartesian3.add(result, position, result),
-    new Cesium.Cartesian3()
-  )
-  Cesium.Cartesian3.divideByScalar(center, positions.length, center)
-
-  const inverseTransform = Cesium.Matrix4.inverseTransformation(
-    Cesium.Transforms.eastNorthUpToFixedFrame(center),
-    new Cesium.Matrix4()
-  )
-
-  const sorted = positions
-    .map((position) => {
-      const local = Cesium.Matrix4.multiplyByPoint(inverseTransform, position, new Cesium.Cartesian3())
-      return {
-        position,
-        angle: Math.atan2(local.y, local.x),
-      }
-    })
-    .sort((left, right) => left.angle - right.angle)
-    .map((item) => item.position)
-
-  if (sorted.length > 2) {
-    sorted.push(sorted[0])
-  }
-
-  return sorted
-}
-
-const updateConstellationOverlayEntities = () => {
-  if (!viewer) return
-
-  clearConstellationOverlayEntities()
-
-  const constellation = selectedConstellation.value
-  if (!constellation) {
-    viewer.scene.requestRender()
-    return
-  }
-
-  const selectedNorads = getSelectedConstellationNoradSet()
-  const selectedSatellites = Array.from(renderedPrimitiveSatelliteMap.entries())
-    .filter(([norad]) => selectedNorads.has(norad))
-    .map(([norad, satellite]) => ({
-      norad,
-      satellite,
-      position: Cesium.Cartesian3.fromDegrees(
-        satellite.satellitePosition.longitude,
-        satellite.satellitePosition.latitude,
-        satellite.satellitePosition.altitude
-      ),
-    }))
-
-  if (!selectedSatellites.length) {
-    viewer.scene.requestRender()
-    return
-  }
-
-  const color = Cesium.Color.clone(
-    constellationColorMap.get(constellation.name) ?? Cesium.Color.CYAN,
-    new Cesium.Color()
-  )
-
-  const hullPositions = buildConstellationEnvelopePositions(selectedSatellites.map((item) => item.position))
-  if (hullPositions.length >= 2) {
-    const hullId = `constellation-envelope-${constellation.name}`
-    constellationOverlayEntityIds.add(hullId)
-    viewer.entities.add({
-      id: hullId,
-      polyline: {
-        positions: hullPositions,
-        width: 2,
-        material: color.withAlpha(0.72),
-      },
-    })
-  }
-
-  const center = selectedSatellites.reduce(
-    (result, item) => Cesium.Cartesian3.add(result, item.position, result),
-    new Cesium.Cartesian3()
-  )
-  Cesium.Cartesian3.divideByScalar(center, selectedSatellites.length, center)
-
-  const labelId = `constellation-label-${constellation.name}`
-  constellationOverlayEntityIds.add(labelId)
-  viewer.entities.add({
-    id: labelId,
-    position: center,
-    label: {
-      text: `${constellation.chineseName || constellation.name}\n${selectedSatellites.length} 颗卫星`,
-      font: '13px sans-serif',
-      fillColor: color,
-      outlineColor: Cesium.Color.BLACK,
-      outlineWidth: 2,
-      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-      showBackground: true,
-      backgroundColor: new Cesium.Color(0, 0, 0, 0.45),
-      pixelOffset: new Cesium.Cartesian2(0, -18),
-    },
-  })
-
-  if (showConstellationLinks.value && selectedSatellites.length > 1) {
-    const edgeKeys = new Set<string>()
-    selectedSatellites.forEach((source) => {
-      const nearestTargets = selectedSatellites
-        .filter((target) => target.norad !== source.norad)
-        .map((target) => ({
-          target,
-          distance: Cesium.Cartesian3.distance(source.position, target.position),
-        }))
-        .sort((left, right) => left.distance - right.distance)
-        .slice(0, 2)
-
-      nearestTargets.forEach(({ target }) => {
-        const edgeKey = [source.norad, target.norad].sort((left, right) => left - right).join('-')
-        if (edgeKeys.has(edgeKey)) return
-        edgeKeys.add(edgeKey)
-
-        const edgeId = `constellation-link-${edgeKey}`
-        constellationOverlayEntityIds.add(edgeId)
-        viewer.entities.add({
-          id: edgeId,
-          polyline: {
-            positions: [source.position, target.position],
-            width: 1.2,
-            material: color.withAlpha(0.32),
-          },
-        })
-      })
-    })
-  }
-
-  viewer.scene.requestRender()
-}
-/**
- * [功能]
- * 应用卡座的可视化状态：根据卡座选中状态和相机远近更新所有占点和标签的外观
- *
- * [业务目的]
- * - 卡座选中时：卡座内卫星亮度正常，卡座外变暗、变小
- * - 未选中时：所有卫星按类型/卡座颜色展示
- * - 近视时才显示标签，远视则隐藏
- *
- * [关键规则]
- * - 展示大小和透明度根据卡座选中状态和远近实时计算
- * - 不要删除所有 primitive 和 label 的更新逻辑
- */
-/**
- * [功能]
- * 应用星座的可视化状态：根据星座选中状态及视角高度控制卫星点阵与 Label 标签的层级聚合显示
- *
- * [业务目的]
- * - 星座选中时：仅在 Cesium 地图上展示该星座相关的卫星，隐藏所有其他无关卫星；
- * - 聚合策略：高处视角只显示中心聚合 Tag 标签，隐藏极其密集的单颗具体 Label；拉近至低处时才展现具体卫星的 Label 名称。
- * - 未选中时：恢复全量卫星的展示
- */
-const applyConstellationVisualState = (skipOverlayUpdate = false) => {
-  if (!viewer) return
-
-  const selectedNorads = getSelectedConstellationNoradSet()
-  const hasSelectedConstellation = Boolean(selectedConstellation.value)
-  const closeView = isConstellationCloseView()
-
-  // 1. 更新卫星占点 (PointPrimitive)
-  satellitePointPrimitives.forEach((pointPrimitive, norad) => {
-    const satellite = renderedPrimitiveSatelliteMap.get(norad)
-    if (!satellite) return
-
-    const isSelected = selectedNorads.has(norad)
-    if (hasSelectedConstellation) {
-      // 选中星座时：仅渲染展示所属星座的卫星，隐藏其他无关卫星
-      pointPrimitive.show = isSelected
-      if (isSelected) {
-        const baseColor = getConstellationColor(satellite, norad)
-        pointPrimitive.color = baseColor
-        pointPrimitive.outlineColor = Cesium.Color.WHITE
-        pointPrimitive.pixelSize = closeView ? 8 : 6
-      }
-    } else {
-      // 未选中星座时：全量恢复展示所有卫星
-      pointPrimitive.show = true
-      const baseColor = getConstellationColor(satellite, norad)
-      pointPrimitive.color = baseColor
-      pointPrimitive.outlineColor = Cesium.Color.WHITE
-      pointPrimitive.pixelSize = closeView ? 5 : 4
-    }
-  })
-
-  // 2. 更新卫星名称标签 (LabelPrimitive)
-  satelliteLabelPrimitives.forEach((labelPrimitive, norad) => {
-    const satellite = renderedPrimitiveSatelliteMap.get(norad)
-    if (!satellite) return
-
-    const isSelected = selectedNorads.has(norad)
-    if (hasSelectedConstellation) {
-      // 选中星座时：
-      // - 高处 (closeView 为 false)：隐藏单颗卫星具体 Label，防止成百上千个文本挤在一团，改为在中心展示星座聚合标签
-      // - 低处 (closeView 为 true)：拉近到低视角时展示每颗具体卫星的名称 Label
-      labelPrimitive.show = isSelected && closeView
-      if (isSelected && closeView) {
-        labelPrimitive.text = satellite.name_en || String(norad)
-        labelPrimitive.fillColor = Cesium.Color.WHITE
-        labelPrimitive.outlineColor = Cesium.Color.BLACK
-        labelPrimitive.outlineWidth = 2
-        labelPrimitive.style = Cesium.LabelStyle.FILL_AND_OUTLINE
-        labelPrimitive.showBackground = true
-        labelPrimitive.backgroundColor = new Cesium.Color(0, 0, 0, 0.65)
-        labelPrimitive.distanceDisplayCondition = undefined as any
-      }
-    } else {
-      // 未选中星座时：恢复近距离控制模式
-      labelPrimitive.show = closeView
-      labelPrimitive.fillColor = Cesium.Color.WHITE
-      labelPrimitive.distanceDisplayCondition = new Cesium.DistanceDisplayCondition(0, 6_000_000) as any
-    }
-  })
-
-  // 拖拽/移动相机时跳过更新 Polyline 线路实体，避免重清重绘造成线路一闪一闪
-  if (!skipOverlayUpdate) {
-    updateConstellationOverlayEntities()
-  }
-
-  viewer.scene.requestRender()
-}
-
-/**
- * [功能]
- * 清除卡座选中状态，并重置所有卫星的视觉应用
- */
-const clearConstellationSelection = () => {
-  selectedConstellation.value = null
-  applyConstellationVisualState()
-}
-
-/**
- * [功能]
- * 根据 NORAD 编号选择其所属卡座，并应用卡座视觉状态
- *
- * @param norad 点击的卫星 NORAD 编号
- */
-const selectConstellationByNorad = (norad: number) => {
-  const constellation = getConstellationByNorad(norad)
-  if (!constellation) {
-    clearConstellationSelection()
-    return
-  }
-  selectedConstellation.value = constellation
-  applyConstellationVisualState()
-}
-
-/**
- * [功能]
- * 外部接口：根据卡座名称聚焦到指定卡座，并自动调整视角飞行至星座中心
- *
- * @param constellationName 卡座名称（英文或中文）
- */
-const focusConstellationByName = async (constellationName?: string | null) => {
-  await loadSatelliteConstellations()
-
-  const normalizedName = String(constellationName ?? '').trim()
-  if (!normalizedName) {
-    clearConstellationSelection()
-    return
-  }
-
-  const constellation = satelliteConstellations.value.find(
-    (item) => item.name === normalizedName || item.chineseName === normalizedName
-  )
-  if (!constellation) {
-    clearConstellationSelection()
-    return
-  }
-
-  selectedConstellation.value = constellation
-  applyConstellationVisualState()
-
-  // 视角平滑飞行到星座卫星簇的中心点
-  const selectedNorads = getSelectedConstellationNoradSet()
-  const selectedSatellitesPos = Array.from(renderedPrimitiveSatelliteMap.entries())
-    .filter(([norad]) => selectedNorads.has(norad))
-    .map(([, satellite]) =>
-      Cesium.Cartesian3.fromDegrees(
-        satellite.satellitePosition.longitude,
-        satellite.satellitePosition.latitude,
-        satellite.satellitePosition.altitude
-      )
-    )
-
-  if (selectedSatellitesPos.length > 0 && viewer) {
-    const center = selectedSatellitesPos.reduce(
-      (result, pos) => Cesium.Cartesian3.add(result, pos, result),
-      new Cesium.Cartesian3()
-    )
-    Cesium.Cartesian3.divideByScalar(center, selectedSatellitesPos.length, center)
-    const cartographic = Cesium.Cartographic.fromCartesian(center)
-    const targetLon = Cesium.Math.toDegrees(cartographic.longitude)
-    const targetLat = Cesium.Math.toDegrees(cartographic.latitude)
-
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(targetLon, targetLat, 9_000_000),
-      duration: 1.5,
-    })
-  }
-}
-
-/**
- * [功能]
- * 展卡座星间连线开关切换事件处理器
- */
-const handleConstellationLinkToggle = () => {
-  updateConstellationOverlayEntities()
-}
-/**
- * [功能]
- * 以 Primitive 方式渲染卡座/全局卫星，适用于大量卫星展示场景
- *
- * [处理规则]
- * - 每次调用先取消已排队的渲染帧，防止满足已销毁资源
- * - 使用 renderToken 实现并发安全，旧任务自动中止
- * - 每 400 颗卫星退让一个渲染帧，避免单帧进行大量计算巫卡 UI
- *
- * [副作用]
- * - 修改 pointCollection / labelCollection、satellitePointPrimitives 等映射表
- * - 修改 satelliteRenderBusy 状态
- *
- * @param satellites 需要渲染的卫星信息数组
- */
-const renderSatellitePathWithPrimitive = async (satellites: SatelliteInfo[]) => {
-  const currentToken = ++satelliteRenderToken
-  satelliteRenderBusy.value = true
-
-  // 加载卫星星座数据
-  await loadSatelliteConstellations()
-
-  await nextTick()
-  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-
-  try {
-    // 如果组件已卸载、viewer 已销毁，直接跳过渲染
-    if (!viewer || ((viewer as any).isDestroyed && (viewer as any).isDestroyed())) return
-    if (!viewer.scene || ((viewer.scene as any).isDestroyed && (viewer.scene as any).isDestroyed())) return
-
-    // 如果之前的 collection 已被销毁（可能在组件卸载或 viewer 重建时），重置引用
-    if (pointCollection && pointCollection.isDestroyed()) {
-      pointCollection = null
-    }
-    if (labelCollection && labelCollection.isDestroyed()) {
-      labelCollection = null
-    }
-
-    // 复用已有的 point/label 集合，避免每次渲染都重新 new 出大量对象
-    if (!pointCollection) {
-      pointCollection = new Cesium.PointPrimitiveCollection()
-      viewer.scene.primitives.add(pointCollection)
-    }
-    if (!labelCollection) {
-      labelCollection = new Cesium.LabelCollection()
-      viewer.scene.primitives.add(labelCollection)
-    }
-
-    // 清空已有点与标签（避免 destroy 后继续渲染）
-    pointCollection.removeAll()
-    labelCollection.removeAll()
-    satellitePointPrimitives.clear()
-    satelliteLabelPrimitives.clear()
-    satellitePrimitiveEntities.clear()
-    renderedPrimitiveSatelliteMap.clear()
-    clearConstellationOverlayEntities()
-
-    const chunkSize = 400
-    for (let index = 0; index < satellites.length; index += 1) {
-      if (currentToken !== satelliteRenderToken) return
-
-      const s = satellites[index]
-      if (
-        s?.satellitePosition &&
-        !isNaN(s.satellitePosition.longitude) &&
-        !isNaN(s.satellitePosition.latitude) &&
-        !isNaN(s.satellitePosition.altitude)
-      ) {
-        const norad = Number(s.norad)
-        renderedPrimitiveSatelliteMap.set(norad, s)
-        const cartesian = Cesium.Cartesian3.fromDegrees(
-          s.satellitePosition.longitude,
-          s.satellitePosition.latitude,
-          s.satellitePosition.altitude
-        )
-
-        const constellation = getConstellationByNorad(norad)
-        const primitiveMetadata = {
-          id: `satellite-${norad}`,
-          norad,
-          constellationName: constellation?.name ?? '',
-        }
-
-        const pointPrimitive = pointCollection.add({
-          position: cartesian,
-          color: getConstellationColor(s, norad),
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: 2,
-          pixelSize: 4,
-          heightReference: Cesium.HeightReference.NONE,
-          id: primitiveMetadata,
-        })
-        satellitePointPrimitives.set(norad, pointPrimitive)
-
-        // 仅在较近距离显示标签（避免 2w+ 标签造成性能问题）
-        const labelPrimitive = labelCollection.add({
-          position: cartesian,
-          text: s.name_en,
-          font: '12px sans-serif',
-          fillColor: Cesium.Color.WHITE,
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 2,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          pixelOffset: new Cesium.Cartesian2(-30, -20),
-          showBackground: true,
-          backgroundColor: new Cesium.Color(0, 0, 0, 0.3),
-          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 6_000_000),
-          show: false,
-          id: primitiveMetadata,
-        })
-        satelliteLabelPrimitives.set(norad, labelPrimitive)
-      }
-
-      if ((index + 1) % chunkSize === 0) {
-        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-      }
-    }
-
-    if (currentToken !== satelliteRenderToken) return
-
-    viewer.clock.multiplier = 100
-    // 开启动画
-    viewer.clock.shouldAnimate = true
-
-    applyConstellationVisualState()
-    // 在 requestRenderMode 下显式触发渲染（不然会卡住）
-    viewer.scene.requestRender()
-  } finally {
-    if (currentToken === satelliteRenderToken) {
-      satelliteRenderBusy.value = false
-    }
-  }
-}
 
 /**
  *  监听鼠标左键点击事件并处理实体选择
@@ -1615,7 +927,6 @@ function handleViewerClickEvent() {
     const norad = Number.isFinite(primitiveNorad) ? primitiveNorad : noradMatch ? Number(noradMatch[1]) : null
     if (!Number.isFinite(norad)) return
 
-    selectConstellationByNorad(Number(norad))
     highlightSatellite({ norad_id: String(norad) })
     trackSatelliteByNorad(Number(norad)) // 点击卫星时，相机视角锁合并持续跟随该卫星
 
@@ -1629,50 +940,6 @@ function handleViewerClickEvent() {
       console.error('查询卫星详细信息接口失败:', error)
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
-}
-
-/**
- * [功能]
- * 根据卡座类型返回对应的 Cesium 颜色
- *
- * [处理规则]
- * - 匹配顺序从上到下，标屁属一种类型
- * - 未匹配时返回默认蛇蓝色
- *
- * @param type 卡座类型字符串（如"军事"、"通信"等）
- * @returns Cesium 颜色对象
- */
-const getSatelliteColorByType = (type: string) => {
-  if (type) {
-    if (type.includes('军事')) {
-      return Cesium.Color.CHARTREUSE
-    }
-    if (type.includes('气象')) {
-      return Cesium.Color.BLUEVIOLET
-    }
-    if (type.includes('海洋')) {
-      return Cesium.Color.BROWN
-    }
-    if (type.includes('测绘')) {
-      return Cesium.Color.BURLYWOOD
-    }
-    if (type.includes('通信')) {
-      return Cesium.Color.BLUE
-    }
-    if (type.includes('导航')) {
-      return Cesium.Color.GREEN
-    }
-    if (type.includes('侦察')) {
-      return Cesium.Color.RED
-    }
-    if (type.includes('探测')) {
-      return Cesium.Color.CHOCOLATE
-    }
-    if (type.includes('科学')) {
-      return Cesium.Color.PURPLE
-    }
-  }
-  return Cesium.Color.ROYALBLUE
 }
 
 /**
@@ -2013,21 +1280,6 @@ const resetHighlightSatellites = () => {
       }
     })
   }
-
-  // 3. 复原 Primitive 模式高亮样式
-  satellitePointPrimitives.forEach((pointPrimitive, norad) => {
-    const satellite = renderedPrimitiveSatelliteMap.get(norad)
-    if (satellite) {
-      pointPrimitive.pixelSize = 4
-      pointPrimitive.color = getConstellationColor(satellite, norad)
-      pointPrimitive.outlineColor = Cesium.Color.WHITE
-    }
-  })
-  satelliteLabelPrimitives.forEach((labelPrimitive) => {
-    labelPrimitive.fillColor = Cesium.Color.WHITE
-  })
-
-  applyConstellationVisualState()
 }
 
 /**
@@ -2129,20 +1381,6 @@ const highlightSatellite = (sate: { norad_id: string }) => {
     }
   }
 
-  // 3. Primitive 模式节点高亮 (PointPrimitive & LabelPrimitive)
-  const pointPrimitive = satellitePointPrimitives.get(norad)
-  if (pointPrimitive) {
-    pointPrimitive.pixelSize = 18
-    pointPrimitive.color = Cesium.Color.GOLD
-    pointPrimitive.outlineColor = Cesium.Color.YELLOW
-    pointPrimitive.show = true
-  }
-  const labelPrimitive = satelliteLabelPrimitives.get(norad)
-  if (labelPrimitive) {
-    // 选中的卫星若已拥有 3D Entity Label，隐藏 Primitive 集合中的对应 Label，彻底消除同位置标签文字重影
-    labelPrimitive.show = !entity || !entity.label
-  }
-
   // 4. 不再渲染单独插值的 Polyline 发光轨迹，仅保留并加粗 Entity 自带 Path
 
   viewer.scene.requestRender()
@@ -2184,10 +1422,6 @@ const disposeChart = (chart: echarts.ECharts | null) => {
 onMounted(async () => {
   await initViewer()
   if (viewer) {
-    cameraMoveEndListener = () => {
-      applyConstellationVisualState()
-    }
-    viewer.camera.moveEnd.addEventListener(cameraMoveEndListener)
     void loadAndRenderRedWeapons()
   }
   startContainerSizeObserver()
@@ -2236,12 +1470,6 @@ onBeforeUnmount(() => {
   satelliteRenderBusy.value = false
   pointCollection = null
   labelCollection = null
-  satellitePointPrimitives.clear()
-  satelliteLabelPrimitives.clear()
-  satellitePrimitiveEntities.clear()
-  renderedPrimitiveSatelliteMap.clear()
-  clearConstellationOverlayEntities()
-  selectedConstellation.value = null
   satelliteEntities.clear()
   satelliteOrbitData.clear()
   satellitePositionPropertyCache.clear()
@@ -2316,13 +1544,10 @@ const jumpToTimeAndPlay = (timeStr?: string) => {
 }
 
 defineExpose({
-  renderSatellitePathWithPrimitive,
   clearViewer,
-  focusConstellationByName,
   renderSateliitePathWithEntity,
   markBattle,
   highlightSatellite,
-  flyToView,
   pauseClockAnimation,
   jumpToTimeAndPlay,
 })

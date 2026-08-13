@@ -5,11 +5,7 @@
       <div class="battle-grid">
         <!-- C2 敌方网络与资产拓扑左侧边栏 -->
         <div class="battle-grid__side battle-grid__side--left">
-          <C2LeftControlPanel
-            :matrix-data="matrixData"
-            :selected-norad="selectedNorad"
-            @select-satellite="handleSelectSatellite"
-          />
+          <C2LeftControlPanel :matrix-data="matrixData" :selected-norad="selectedNorad" />
         </div>
 
         <!-- 中间 3D Cesium 地球 -->
@@ -27,11 +23,7 @@
 
         <!-- C2 敌方数据传输与链路效能右侧边栏 -->
         <div class="battle-grid__side battle-grid__side--right">
-          <C2RightAnalysisPanel
-            :matrix-data="matrixData"
-            :selected-satellite-norad="selectedNorad"
-            @clear-satellite-selection="handleSelectSatellite(null)"
-          />
+          <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad" />
         </div>
       </div>
     </main>
@@ -104,50 +96,6 @@ const fetchMatrixDataBySeries = async (series: string) => {
 }
 
 /**
- * [函数说明]
- * 手动选择某颗敌方卫星，直接复用 Store 中共享的算法传输矩阵定位过境时间窗口
- * @param norad 选中的敌方卫星 NORAD 编号
- */
-const handleSelectSatellite = async (norad: number | null) => {
-  selectedNorad.value = norad
-  const taskId = store.activedTask?.id
-
-  // 1. 未选择卫星 (进入静态展示模式)
-  if (!norad || !taskId) {
-    if (cesiumViewerRef.value && (cesiumViewerRef.value as any).pauseClockAnimation) {
-      ;(cesiumViewerRef.value as any).pauseClockAnimation()
-    }
-    return
-  }
-
-  // 2. 选择具体卫星，直接复用已保存在 Store 中的矩阵数据（避免重复发 API 请求）
-  const data =
-    store.matrixData ||
-    (await store.fetchReconnaissanceAttackMatrix({
-      taskId,
-      series: store.selectedSatSeries || '',
-      intensityLevel: store.intensityLevel || '低烈度',
-    }))
-  if (data) {
-    let windowStartTime: string | undefined
-
-    const battleMatch = (data.battleMatrixList || []).find((b) => b.norad === norad)
-    if (battleMatch?.windows?.length) {
-      windowStartTime = battleMatch.windows[0].startTime
-    } else {
-      const initMatch = (data.initMatrixList || []).find((i) => i.norad === norad)
-      if (initMatch?.initWindows?.length) {
-        windowStartTime = initMatch.initWindows[0].peakWindow
-      }
-    }
-
-    if (cesiumViewerRef.value && (cesiumViewerRef.value as any).jumpToTimeAndPlay) {
-      ;(cesiumViewerRef.value as any).jumpToTimeAndPlay(windowStartTime)
-    }
-  }
-}
-
-/**
  * [监听器说明]
  * 监听选中的卫星系列变更。
  * 选择系列后，重新查询对应的算法矩阵，并从已查询出的矩阵中加载地面站、数据中心及天基传输资产。
@@ -164,22 +112,6 @@ watch(
     }
   },
   { immediate: true }
-)
-
-/**
- * [监听器说明]
- * 监听 3D 地球中鼠标点击选中的卫星状态
- */
-watch(
-  () => store.selectedSatellite,
-  (newSat) => {
-    if (newSat) {
-      const norad = Number(newSat.norad || (newSat as any).norad_id)
-      if (Number.isFinite(norad) && selectedNorad.value !== norad) {
-        void handleSelectSatellite(norad)
-      }
-    }
-  }
 )
 
 /**

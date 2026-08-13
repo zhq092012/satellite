@@ -108,12 +108,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import {
-  getReconnaissanceAttackMatrix,
-  type MatrixResult,
-  type CommucationMatrix,
-  type AttackPlanItem,
-} from '@/api/electronic'
+import { type MatrixResult, type CommucationMatrix, type AttackPlanItem } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
 
 /**
