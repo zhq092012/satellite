@@ -70,11 +70,7 @@
               <span class="click-hint" v-if="selectedNorad === sat.norad">✓ 已选择分析</span>
             </div>
             <div class="card-side-actions" @click.stop>
-              <span
-                v-if="sat.threatScore != null"
-                class="threat-score"
-                :class="getThreatLevelClass(sat.threatScore)"
-              >
+              <span v-if="sat.threatScore != null" class="threat-score" :class="getThreatLevelClass(sat.threatScore)">
                 威胁度 {{ formatThreatScore(sat.threatScore) }}
               </span>
               <span v-else class="threat-score threat-unknown">威胁度 --</span>
@@ -87,15 +83,8 @@
       </div>
     </div>
 
-    <el-dialog
-      v-model="threatDialogVisible"
-      :title="`威胁度计算过程 · ${threatDialogSat?.name || ''}`"
-      width="640px"
-      class="threat-detail-dialog"
-      align-center
-      destroy-on-close
-      @closed="handleThreatDialogClosed"
-    >
+    <el-dialog v-model="threatDialogVisible" :title="`威胁度计算过程 · ${threatDialogSat?.name || ''}`" width="640px"
+      class="threat-detail-dialog" align-center destroy-on-close @closed="handleThreatDialogClosed">
       <div v-loading="threatLoading" class="threat-dialog-body">
         <template v-if="threatInfo">
           <div class="threat-summary-card">
@@ -121,7 +110,7 @@
           </div>
 
           <div class="threat-section">
-            <div class="section-label">卫星能力参数</div>
+            <div class="section-label">卫星能力指标</div>
             <div class="param-grid">
               <div class="param-item">
                 <span class="param-label">载荷类型</span>
@@ -144,7 +133,7 @@
                 <span class="param-value">{{ threatInfo.zhchLtdn ?? '--' }}</span>
               </div>
               <div class="param-item">
-                <span class="param-label">定点位置</span>
+                <span class="param-label">定点位置（高轨卫星）</span>
                 <span class="param-value">{{ threatInfo.zhchFixedPosition ?? '--' }}</span>
               </div>
               <div class="param-item">
@@ -154,6 +143,16 @@
               <div class="param-item">
                 <span class="param-label">剩余工作寿命</span>
                 <span class="param-value">{{ threatInfo.satelliteBaseModelResp.remainLifetimeIndicator ?? '--' }}</span>
+              </div>
+              <div class="param-item">
+                <span class="param-label">国别</span>
+                <span class="param-value">{{ threatInfo.satelliteBaseModelResp.countryIndicator === 1 ? '敌方卫星' : '我方卫星'
+                }}</span>
+              </div>
+              <div class="param-item">
+                <span class="param-label">用户属性</span>
+                <span class="param-value">{{ formatUsageIndicator(threatInfo.satelliteBaseModelResp.usageIndicator)
+                }}</span>
               </div>
             </div>
           </div>
@@ -402,6 +401,14 @@ const formatThreatScore = (score: number): string => {
   return Number(score.toFixed(2)).toString()
 }
 
+const formatUsageIndicator = (val?: number | null): string => {
+  if (val == null) return '--'
+  if (val === 1) return '军用'
+  if (val === 0.6) return '商用'
+  if (val === 0.3) return '民用'
+  return String(val)
+}
+
 const getThreatLevelClass = (score: number): string => {
   const normalized = score <= 1 ? score * 100 : score
   if (normalized >= 70) return 'threat-high'
@@ -457,9 +464,9 @@ const satList = computed<SatListItem[]>(() => {
   if (!matrixData) return []
 
   const threatMap = new Map<number, number>()
-  ;(matrixData.threatSats || []).forEach((item) => {
-    threatMap.set(item.norad, item.threatScore)
-  })
+    ; (matrixData.threatSats || []).forEach((item) => {
+      threatMap.set(item.norad, item.threatScore)
+    })
 
   const map = new Map<number, SatListItem>()
 
