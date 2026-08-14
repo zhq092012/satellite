@@ -217,6 +217,20 @@ export interface WeaponAttackRecord {
   targetType: string // 目标类型（如："接收站"）
 }
 
+/**
+ * 威胁卫星单项信息
+ */
+export interface ThreatSatelliteItem {
+  /** 卫星 NORAD 编号 */
+  norad: number
+  /** 卫星名称 */
+  name: string
+  /** 卫星类型 */
+  satType: string
+  /** 威胁度评分 */
+  threatScore: number
+}
+
 // ==================== 根数据结构 ====================
 
 /**
@@ -234,6 +248,7 @@ export interface WeaponAttackRecord {
  * - satelliteMatrixList: 卫星矩阵（包含攻击/干扰及延迟信息）
  * - stationRelationList: 最终拓扑关联映射
  * - series: 卫星系列名称
+ * - threatSats: 威胁卫星列表
  *
  * [使用约束]
  * 新增字段必须包含注释并明确类型。
@@ -255,6 +270,8 @@ export interface MatrixResult {
   relayRelation?: RelayRelation
   /** 卫星系列 */
   series: string
+  /** 威胁卫星列表 */
+  threatSats: ThreatSatelliteItem[]
 }
 
 /**
@@ -268,7 +285,6 @@ export const getReconnaissanceAttackMatrix = (data: {
   series: string
   stationIds?: string[]
   noradIds?: number[]
-
 }) => {
   const url = `/api/algorithm/calSeriesChain`
   return requestAPI.post<AxiosResponseType<MatrixResult>>(url, data)
@@ -450,4 +466,48 @@ export const getCommunicationsAttackMatrix = (data: { taskId: number; norad?: nu
 export const getSatelliteTypeSerials = (taskId: number) => {
   const url = `/api/algorithm/getSysSeries?taskId=${taskId}`
   return requestAPI.get<AxiosResponseType<Record<string, string[]>>>(url)
+}
+/**
+ * 卫星威胁度等相关信息数据结构
+ */
+export interface SatelliteThreatInfo {
+  satelliteBaseModelResp: {
+    /** 卫星 NORAD 编号 */
+    norad: number
+    /** 英文名称 */
+    name_en: string
+    /** 载荷类型 */
+    sat_type: string
+    /** 在轨状态 */
+    orbitStatusIndicator: number
+    /** 国别 */
+    countryIndicator: number
+    /** 用户属性 */
+    usageIndicator: number
+    /** 剩余工作寿命 */
+    remainLifetimeIndicator: number
+  }
+  /** 成像分辨率 */
+  zhchResolution: number
+  /** 成像幅宽 */
+  zhchSwathWidth: number
+  /** 高轨卫星定点位置 */
+  zhchFixedPosition: number | null
+  /** 降交点地方时 */
+  zhchLtdn: number
+  /** 重访周期 */
+  zhchCycle: number
+  /** 威胁度 */
+  threatScore: number
+  /** 威胁度计算公式 */
+  formula: string
+}
+/**
+ * 根据卫星Norad编号、卫星类型、任务ID获取卫星威胁度等相关信息
+ * @param data 请求参数对象 (norad, sysType, taskId)
+ * @returns 包含卫星威胁度等相关信息的 Axios 响应 Promise
+ */
+export const getSatelliteThreatInfo = (data: { norad: number; series: string; taskId: number }) => {
+  const url = `/api/algorithm/satelliteCapModel?sysType=${data.series}&taskId=${data.taskId}&norads=${data.norad}`
+  return requestAPI.get<AxiosResponseType<SatelliteThreatInfo[]>>(url)
 }
