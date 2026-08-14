@@ -8,41 +8,28 @@
 
       <!-- 烈度与视图模式切换选项 -->
       <div class="header-center">
-        <!-- 1. 交战烈度切换按钮组 -->
-        <div class="intensity-group">
-          <button
-            v-for="level in intensityOptions"
-            :key="level"
-            class="nav-tab-btn"
-            :class="{ active: currentIntensity === level }"
-            @click="handleIntensityChange(level)"
-          >
-            {{ level }}
-          </button>
+        <!-- 卫星系列筛选 -->
+        <div class="series-filter-group">
+          <span class="label-text">卫星系列</span>
+          <el-select v-model="selectedSeries" class="series-select" size="small" placeholder="选择系列"
+            :disabled="seriesOptions.length === 0" @change="handleSeriesChange">
+            <el-option v-for="series in seriesOptions" :key="series" :label="series" :value="series" />
+          </el-select>
         </div>
 
         <div class="v-divider"></div>
 
-        <!-- 2. 拓扑显示模式切换 -->
-        <div class="matrix-tab-group">
-          <button
-            v-for="mode in viewModeOptions"
-            :key="mode.key"
-            class="nav-tab-btn tab-matrix"
-            :class="{ active: currentViewMode === mode.key }"
-            @click="handleViewModeChange(mode.key)"
-          >
-            {{ mode.name }}
+        <!-- 1. 交战烈度切换按钮组 -->
+        <div class="intensity-group">
+          <button v-for="level in intensityOptions" :key="level" class="nav-tab-btn"
+            :class="{ active: currentIntensity === level }" @click="handleIntensityChange(level)">
+            {{ level }}
           </button>
         </div>
       </div>
 
       <!-- 右侧信息栏 -->
       <div class="header-right">
-        <div class="header-right-item" v-if="matrixData?.series">
-          <span class="label-text">卫星系列:</span>
-          <span class="digital-font time-value glow-text-cyan">{{ matrixData.series }}</span>
-        </div>
         <div class="header-right-item">
           <span class="label-text">当前任务:</span>
           <span class="digital-font time-value glow-text-cyan">{{ store.activedTask?.name || '实时推演场景' }}</span>
@@ -56,39 +43,31 @@
       <div class="topo-summary-bar">
         <div class="stat-badge">
           <span class="stat-dot dot-sat"></span>
-          <span
-            >卫星节点: <strong>{{ satNodeCount }}</strong> 颗</span
-          >
+          <span>卫星节点: <strong>{{ satNodeCount }}</strong> 颗</span>
         </div>
         <div class="stat-badge" v-if="currentSatCategory === 'RECON'">
           <span class="stat-dot dot-rec"></span>
-          <span
-            >地面站节点: <strong>{{ receiveNodeCount }}</strong> 个</span
-          >
+          <span>地面站节点: <strong>{{ receiveNodeCount }}</strong> 个</span>
         </div>
         <div class="stat-badge" v-if="currentSatCategory === 'RECON'">
           <span class="stat-dot dot-station"></span>
-          <span
-            >数据中心: <strong>{{ stationNodeCount }}</strong> 个</span
-          >
+          <span>数据中心: <strong>{{ stationNodeCount }}</strong> 个</span>
         </div>
         <div class="stat-badge" v-else>
           <span class="stat-dot dot-rec"></span>
-          <span
-            >通信目标: <strong>{{ store.battle?.name || '战场目标区域' }}</strong></span
-          >
+          <span>通信目标: <strong>{{ store.battle?.name || '战场目标区域' }}</strong></span>
         </div>
         <div class="stat-badge">
           <span class="stat-dot dot-normal-link"></span>
-          <span
-            >正常通信链路: <strong>{{ normalLinkCount }}</strong> 条</span
-          >
+          <span>打击前/正常: <strong>{{ normalLinkCount }}</strong> 条</span>
         </div>
         <div class="stat-badge alert-stat">
-          <span class="stat-dot dot-struck-link"></span>
-          <span
-            >打压/中断链路: <strong>{{ struckLinkCount }}</strong> 条 (红色虚线标识)</span
-          >
+          <span class="stat-dot dot-striking-link"></span>
+          <span>正在打击: <strong>{{ strikingLinkCount }}</strong> 条</span>
+        </div>
+        <div class="stat-badge">
+          <span class="stat-dot dot-severed-link"></span>
+          <span>打击后中断: <strong>{{ severedLinkCount }}</strong> 条</span>
         </div>
       </div>
 
@@ -140,8 +119,73 @@
           </template>
         </div>
 
-        <!-- 右侧：G6 画布容器 (独立分栏，节点绝对不会重叠左侧) -->
+        <!-- 中间：G6 画布容器 -->
         <div ref="g6Container" class="g6-chart-container" v-loading="loading"></div>
+
+        <!-- 右侧：推演汇总结算（始终显示）+ 节点打击详情（选中时追加） -->
+        <div class="topo-right-panel">
+          <div v-if="selectedNodeStrikeDetail" class="panel-block node-strike-panel">
+            <div class="panel-divider panel-divider-strong"></div>
+            <div class="panel-title panel-title-sub">节点打击详情</div>
+            <div class="node-strike-header">
+              <span class="node-type-badge">{{ selectedNodeStrikeDetail.typeLabel }}</span>
+              <strong class="node-name">{{ selectedNodeStrikeDetail.name }}</strong>
+            </div>
+            <div class="node-strike-stats">
+              <div class="node-stat-item">
+                <span class="stat-label">打击次数</span>
+                <strong class="stat-value">{{ selectedNodeStrikeDetail.strikeCount }} 次</strong>
+              </div>
+              <div class="node-stat-item">
+                <span class="stat-label">造成延时</span>
+                <strong class="stat-value glow-text-orange">{{ selectedNodeStrikeDetail.delayText }}</strong>
+              </div>
+            </div>
+            <el-button type="primary" link size="small" class="clear-node-btn" @click="clearSelectedNode">
+              清除选择
+            </el-button>
+          </div>
+          <div class="panel-block timeline-summary-panel">
+            <div class="panel-title">推演汇总结算</div>
+
+            <div class="summary-strike-grid">
+              <div class="summary-mini-card">
+                <span class="mini-label">打击卫星</span>
+                <strong class="mini-value">{{ timelineSummary.satStrikeCount }}<em>次</em></strong>
+              </div>
+              <div class="summary-mini-card">
+                <span class="mini-label">打击中继</span>
+                <strong class="mini-value">{{ timelineSummary.relayStrikeCount }}<em>次</em></strong>
+              </div>
+              <div class="summary-mini-card">
+                <span class="mini-label">打击地面站</span>
+                <strong class="mini-value">{{ timelineSummary.groundStrikeCount }}<em>次</em></strong>
+              </div>
+            </div>
+
+            <div class="panel-stat-row highlight-row">
+              <span class="stat-label">总共造成延时</span>
+              <strong class="stat-value glow-text-orange">{{ timelineSummary.totalDelayText }}</strong>
+            </div>
+
+            <div class="panel-divider"></div>
+
+            <div class="panel-stat-row compact-row">
+              <span class="stat-label">未打击时理论最早全链路完成</span>
+              <strong class="stat-value glow-text-green stat-value-sm">{{ timelineSummary.preStrikeEarliestText
+              }}</strong>
+            </div>
+            <div class="panel-stat-row compact-row">
+              <span class="stat-label">打击后最早全链路完成</span>
+              <strong class="stat-value stat-value-sm"
+                :class="timelineSummary.postStrikeBlocked ? 'glow-text-muted' : 'glow-text-cyan'">
+                {{ timelineSummary.postStrikeEarliestText }}
+              </strong>
+            </div>
+          </div>
+
+
+        </div>
       </div>
     </div>
 
@@ -151,13 +195,8 @@
         <div class="ctrl-left">
           <span class="timeline-title"> <i class="el-icon-timer"></i> 打击/过境时间轴 </span>
           <span class="time-range-text"> [{{ timeRangeText.start }} ~ {{ timeRangeText.end }}] </span>
-          <!-- AI: 显示当前点击选中的节点提示及重置筛选按钮 -->
-          <span class="node-filter-tip" v-if="selectedNodeInfo">
-            已选择节点: <strong class="glow-text-cyan">{{ selectedNodeInfo.name }}</strong> (共
-            {{ displayedWindowsList.length }} 个过境/可见窗口)
-            <el-button type="primary" link size="small" style="margin-left: 8px" @click="clearSelectedNode"
-              >重置筛选</el-button
-            >
+          <span class="current-time-display">
+            当前时刻: <span class="time-value">{{ currentTimeText }}</span>
           </span>
           <!-- AI: 通讯卫星矩阵下在底部工具栏展示打击前/打击后服务时长指标 (字段为 serviceDuration) -->
           <span class="service-duration-badge pre-strike-badge" v-if="currentSatCategory === 'COMM'">
@@ -169,6 +208,30 @@
             <strong class="glow-text-orange badge-val">{{ formattedPostServiceDuration }}</strong>
           </span>
         </div>
+
+        <div class="ctrl-right">
+          <el-button class="play-btn" size="small" :type="isTimelinePlaying ? 'warning' : 'primary'"
+            @click="toggleTimelinePlayback">
+            {{ isTimelinePlaying ? '暂停' : '播放' }}
+          </el-button>
+          <div class="timeline-option">
+            <span class="option-label">播放速度</span>
+            <el-select v-model="playbackSpeed" size="small" class="option-select" @change="handlePlaybackSpeedChange">
+              <el-option v-for="opt in playbackSpeedOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
+          </div>
+          <div class="timeline-option">
+            <span class="option-label">时间窗口</span>
+            <el-select v-model="timeWindowHours" size="small" class="option-select" @change="handleTimeWindowChange">
+              <el-option v-for="opt in timeWindowOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-slider-row">
+        <el-slider v-model="currentTimeProgress" :min="0" :max="100" :step="0.1" :show-tooltip="false"
+          @input="handleTimelineSliderInput" />
       </div>
 
       <!-- 排序过境/打击窗口列表条 (即使无关联窗口也常驻保留底部横向滚动轴) -->
@@ -176,26 +239,17 @@
         <div v-if="displayedWindowsList.length === 0" class="empty-window-card">
           <span>暂无相关节点的过境/打击时间窗口数据</span>
         </div>
-        <div
-          v-else
-          v-for="(win, idx) in displayedWindowsList"
-          :key="win.id || idx"
-          :ref="(el) => setCardRef(el, win.id)"
-          class="window-card"
-          :class="{
+        <div v-else v-for="(win, idx) in displayedWindowsList" :key="win.id || idx"
+          :ref="(el) => setCardRef(el, win.id)" class="window-card" :class="{
             'card-struck': win.strikeStatus === 1,
             'card-relay': win.isRelayWindow,
             'card-active': isWindowActiveAtCurrentTime(win),
             'card-selected': selectedWindowId === win.id,
-          }"
-          @click="selectWindowItem(win)"
-        >
+          }" @click="selectWindowItem(win)">
           <div class="card-header">
             <span class="win-time">{{ win.startTimeShort }} ~ {{ win.endTimeShort }}</span>
-            <span
-              class="win-status-badge"
-              :class="win.isRelayWindow ? 'badge-relay' : win.strikeStatus === 1 ? 'badge-danger' : 'badge-success'"
-            >
+            <span class="win-status-badge"
+              :class="win.isRelayWindow ? 'badge-relay' : win.strikeStatus === 1 ? 'badge-danger' : 'badge-success'">
               {{ win.isRelayWindow ? '中继可见' : win.strikeStatus === 1 ? '受毁伤打压' : '正常过境' }}
             </span>
           </div>
@@ -204,9 +258,8 @@
             <div class="win-link-info">
               <span class="sat-name" :title="win.satName">🛰️ {{ win.satName }}</span>
               <span class="arrow-icon">➔</span>
-              <span class="rec-name" :title="win.receiveName"
-                >{{ win.isRelayWindow ? '🛰️' : '📡' }} {{ win.receiveName }}</span
-              >
+              <span class="rec-name" :title="win.receiveName">{{ win.isRelayWindow ? '🛰️' : '📡' }} {{ win.receiveName
+              }}</span>
             </div>
 
             <div class="win-meta-info" v-if="win.strikeStatus === 1">
@@ -229,13 +282,74 @@
 import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
 import G6 from '@antv/g6'
 import { useLayoutStore } from '@/store/modules/layout'
-import type { MatrixResult, Weapon } from '@/api/electronic'
+import { getSatelliteTypeSerials, type MatrixResult, type Weapon } from '@/api/electronic'
 import type { FuncType } from '@/types/electronic'
 
 defineOptions({
   name: 'ElectronicWarfareG6',
 })
 const store = useLayoutStore()
+
+// 卫星类型与系列映射
+const typeSerialsMap = ref<Record<string, string[]>>({})
+
+const seriesOptions = computed<string[]>(() => {
+  const type = store.selectedSatType
+  if (type && typeSerialsMap.value[type]?.length) {
+    return typeSerialsMap.value[type]
+  }
+  const allSeries = Object.values(typeSerialsMap.value).flat()
+  return Array.from(new Set(allSeries))
+})
+
+const selectedSeries = computed({
+  get: () => store.selectedSatSeries,
+  set: (val: string) => store.setSelectedSatSeries(val),
+})
+
+const fetchTypeSerials = async (taskId?: number) => {
+  if (!taskId) {
+    typeSerialsMap.value = {}
+    return
+  }
+  try {
+    const res = await getSatelliteTypeSerials(taskId)
+    if (res.code === 200 && res.data) {
+      typeSerialsMap.value = res.data
+    }
+  } catch (err) {
+    console.error('获取卫星类型与系列映射失败:', err)
+  }
+}
+
+/**
+ * 切换卫星系列，同步 Store 并重新查询矩阵数据
+ */
+const handleSeriesChange = (series: string) => {
+  if (!series) return
+  store.setSelectedSatSeries(series)
+  selectedNodeInfo.value = null
+  selectedWindowId.value = null
+  stopTimelinePlayback()
+  void fetchMatrixData(true)
+}
+
+watch(
+  () => store.activedTask?.id,
+  (taskId) => {
+    void fetchTypeSerials(taskId)
+  },
+  { immediate: true }
+)
+
+watch(seriesOptions, (options) => {
+  if (!options.length) return
+  if (!options.includes(store.selectedSatSeries)) {
+    const nextSeries = options[0]
+    store.setSelectedSatSeries(nextSeries)
+    void fetchMatrixData(true)
+  }
+})
 
 // [类型用途]
 // 交战烈度选项类型定义
@@ -245,22 +359,6 @@ const intensityOptions: IntensityLevelType[] = ['低烈度', '中烈度', '高�
 // [变量用途]
 // 当前选中的交战烈度 (与全局 Store 中的 intensityLevel 同步)
 const currentIntensity = ref<IntensityLevelType>((store.intensityLevel as IntensityLevelType) || '低烈度')
-
-// [类型用途]
-// 拓扑视图显示模式选项
-type ViewModeType = 'COMBINED' | 'PRE_STRIKE' | 'POST_STRIKE'
-
-// [变量用途]
-// 拓扑视图切换选项列表
-const viewModeOptions: { key: ViewModeType; name: string }[] = [
-  { key: 'COMBINED', name: '前后全量对比' },
-  { key: 'PRE_STRIKE', name: '打击前拓扑' },
-  { key: 'POST_STRIKE', name: '打击后拓扑' },
-]
-
-// [变量用途]
-// 当前选中的拓扑视图模式
-const currentViewMode = ref<ViewModeType>('COMBINED')
 
 // [变量用途]
 // 后端算法接口返回的矩阵数据对象
@@ -369,6 +467,230 @@ const currentTimestamp = ref<number>(0)
 // [变量用途]
 // 时间轴进度条 0 - 100 百分比
 const currentTimeProgress = ref<number>(0)
+
+// 时间轴播放与时间窗口配置
+const isTimelinePlaying = ref(false)
+const playbackSpeed = ref(1)
+const timeWindowHours = ref(1)
+
+const playbackSpeedOptions = [
+  { label: '0.5x', value: 0.5 },
+  { label: '1x', value: 1 },
+  { label: '2x', value: 2 },
+  { label: '5x', value: 5 },
+  { label: '10x', value: 10 },
+]
+
+const timeWindowOptions = [
+  { label: '30分钟', value: 0.5 },
+  { label: '1小时', value: 1 },
+  { label: '2小时', value: 2 },
+  { label: '4小时', value: 4 },
+  { label: '8小时', value: 8 },
+]
+
+const timeWindowMs = computed(() => timeWindowHours.value * 3600 * 1000)
+
+let playbackFrameId: number | null = null
+let lastPlaybackTick = 0
+
+const updateTimeProgressFromTimestamp = () => {
+  const totalSpan = maxTimestamp.value - minTimestamp.value
+  if (totalSpan > 0) {
+    currentTimeProgress.value = ((currentTimestamp.value - minTimestamp.value) / totalSpan) * 100
+  } else {
+    currentTimeProgress.value = 0
+  }
+}
+
+const ensureCurrentTimestampValid = () => {
+  const min = minTimestamp.value
+  const max = maxTimestamp.value
+  if (!currentTimestamp.value || currentTimestamp.value < min || currentTimestamp.value > max) {
+    currentTimestamp.value = min
+    updateTimeProgressFromTimestamp()
+  }
+}
+
+let lastGraphRefreshAt = 0
+const GRAPH_TIME_REFRESH_MS = 400
+const nodeLayoutCache = new Map<string, { x: number; y: number }>()
+let graphTopologyKey = ''
+
+const getGraphTopologyKey = () =>
+  `${store.selectedSatSeries}|${currentIntensity.value}|${matrixData.value?.series ?? ''}|${g6Container.value?.clientWidth ?? 0}`
+
+const applyCachedNodePositions = (nodes: any[]) => {
+  nodes.forEach((node) => {
+    const cached = nodeLayoutCache.get(String(node.id))
+    if (cached) {
+      node.x = cached.x
+      node.y = cached.y
+    }
+  })
+}
+
+const saveNodePositionsToCache = (nodes: any[]) => {
+  nodes.forEach((node) => nodeLayoutCache.set(String(node.id), { x: node.x, y: node.y }))
+}
+
+const refreshGraphForTime = (fitView = false) => {
+  if (!g6Container.value) return
+  ensureCurrentTimestampValid()
+  const width = g6Container.value.clientWidth
+  const height = g6Container.value.clientHeight
+  if (!width || !height || width <= 0 || height <= 0) return
+
+  registerCustomG6Edge()
+  const topoKey = getGraphTopologyKey()
+  const structureChanged = topoKey !== graphTopologyKey
+  const graphData = buildG6GraphData()
+  applyCachedNodePositions(graphData.nodes)
+
+  if (!graph || graph.get('destroyed')) {
+    graphTopologyKey = topoKey
+    saveNodePositionsToCache(graphData.nodes)
+    initOrUpdateGraph(true)
+    return
+  }
+
+  graph.changeSize(width, height)
+
+  if (structureChanged) {
+    graphTopologyKey = topoKey
+    saveNodePositionsToCache(graphData.nodes)
+    graph.changeData(graphData)
+    if (fitView) graph.fitView([20, 40, 20, 40])
+    updateGraphHighlightState()
+    return
+  }
+
+  const nodeModelMap = new Map(graphData.nodes.map((n) => [String(n.id), n]))
+  const edgeModelMap = new Map(graphData.edges.map((e) => [String(e.id), e]))
+
+  graph.getNodes().forEach((node: any) => {
+    const id = String(node.get('id'))
+    const model = nodeModelMap.get(id)
+    if (model) {
+      graph.showItem(node)
+      graph.updateItem(node, { label: model.label, style: model.style })
+    } else {
+      graph.hideItem(node)
+    }
+  })
+
+  graphData.nodes.forEach((n) => {
+    if (!graph.findById(n.id)) graph.addItem('node', n)
+  })
+
+  graph.getEdges().forEach((edge: any) => {
+    const id = String(edge.get('id'))
+    const model = edgeModelMap.get(id)
+    if (model) {
+      graph.showItem(edge)
+      graph.updateItem(edge, { label: model.label, labelCfg: model.labelCfg, style: model.style })
+    } else {
+      graph.hideItem(edge)
+    }
+  })
+
+  graphData.edges.forEach((e) => {
+    if (!graph.findById(e.id)) graph.addItem('edge', e)
+  })
+
+  updateGraphHighlightState()
+}
+
+const setCurrentTimestamp = (ts: number, refreshGraph = true) => {
+  ensureCurrentTimestampValid()
+  const clamped = Math.min(Math.max(ts, minTimestamp.value), maxTimestamp.value)
+  currentTimestamp.value = clamped
+  updateTimeProgressFromTimestamp()
+  if (!refreshGraph) return
+
+  const now = performance.now()
+  if (!isTimelinePlaying.value || now - lastGraphRefreshAt >= GRAPH_TIME_REFRESH_MS) {
+    lastGraphRefreshAt = now
+    refreshGraphForTime(false)
+    if (!isTimelinePlaying.value) scrollToActiveCard()
+  }
+}
+
+const flushGraphTimeRefresh = () => {
+  lastGraphRefreshAt = 0
+  ensureCurrentTimestampValid()
+  refreshGraphForTime(false)
+  scrollToActiveCard()
+}
+
+const handleTimelineSliderInput = (val: number) => {
+  const totalSpan = maxTimestamp.value - minTimestamp.value
+  if (totalSpan <= 0) return
+  ensureCurrentTimestampValid()
+  currentTimestamp.value = Math.min(
+    Math.max(minTimestamp.value + (val / 100) * totalSpan, minTimestamp.value),
+    maxTimestamp.value
+  )
+  updateTimeProgressFromTimestamp()
+  lastGraphRefreshAt = performance.now()
+  refreshGraphForTime(false)
+  scrollToActiveCard()
+}
+
+const stopTimelinePlayback = () => {
+  const wasPlaying = isTimelinePlaying.value
+  isTimelinePlaying.value = false
+  if (playbackFrameId !== null) {
+    cancelAnimationFrame(playbackFrameId)
+    playbackFrameId = null
+  }
+  if (wasPlaying) {
+    flushGraphTimeRefresh()
+  }
+}
+
+const toggleTimelinePlayback = () => {
+  if (isTimelinePlaying.value) {
+    stopTimelinePlayback()
+    return
+  }
+  if (currentTimestamp.value >= maxTimestamp.value) {
+    setCurrentTimestamp(minTimestamp.value, false)
+  }
+  isTimelinePlaying.value = true
+  lastPlaybackTick = performance.now()
+  const tick = (now: number) => {
+    if (!isTimelinePlaying.value) return
+    const delta = now - lastPlaybackTick
+    lastPlaybackTick = now
+    const totalSpan = maxTimestamp.value - minTimestamp.value
+    if (totalSpan <= 0) {
+      stopTimelinePlayback()
+      return
+    }
+    const advanceMs = (delta / 1000) * playbackSpeed.value * (totalSpan / 60)
+    const nextTs = currentTimestamp.value + advanceMs
+    if (nextTs >= maxTimestamp.value) {
+      setCurrentTimestamp(maxTimestamp.value)
+      stopTimelinePlayback()
+      return
+    }
+    setCurrentTimestamp(nextTs)
+    playbackFrameId = requestAnimationFrame(tick)
+  }
+  playbackFrameId = requestAnimationFrame(tick)
+}
+
+const handlePlaybackSpeedChange = () => {
+  if (isTimelinePlaying.value) {
+    stopTimelinePlayback()
+    toggleTimelinePlayback()
+  }
+}
+
+const handleTimeWindowChange = () => {
+  flushGraphTimeRefresh()
+}
 
 // [变量用途]
 // 时间轴下方过境/打击窗口列表条 DOM ref
@@ -526,8 +848,11 @@ const fetchMatrixData = async (force = false) => {
   } finally {
     loading.value = false
     nextTick(() => {
-      initOrUpdateGraph()
+      graphTopologyKey = ''
+      nodeLayoutCache.clear()
       initTimelineBounds()
+      ensureCurrentTimestampValid()
+      refreshGraphForTime(true)
     })
   }
 }
@@ -542,8 +867,11 @@ watch(
     if (newStoreMatrix) {
       matrixData.value = newStoreMatrix
       nextTick(() => {
-        initOrUpdateGraph()
+        graphTopologyKey = ''
+        nodeLayoutCache.clear()
         initTimelineBounds()
+        ensureCurrentTimestampValid()
+        refreshGraphForTime(true)
       })
     } else {
       void fetchMatrixData()
@@ -577,26 +905,6 @@ const handleIntensityChange = (level: IntensityLevelType) => {
   void fetchMatrixData(true)
 }
 
-/**
- * [功能说明]
- * 切换拓扑显示模式 (前后全量对比 / 打击前拓扑 / 打击后拓扑)，并重新绘制 G6 拓扑图
- *
- * @param mode 拓扑视图模式 Key
- */
-const handleViewModeChange = (mode: ViewModeType) => {
-  if (currentViewMode.value === mode) return
-  currentViewMode.value = mode
-  initOrUpdateGraph()
-}
-
-/**
- * [监听器说明]
- * 监听拓扑视图显示模式变更，自动更新 G6 图谱与状态
- */
-watch(currentViewMode, () => {
-  initOrUpdateGraph()
-})
-
 // ==================== 时间轴算法与转换函数 ====================
 
 /**
@@ -617,6 +925,304 @@ const formatTimeStr = (ts: number): string => {
   const pad = (n: number) => (n < 10 ? '0' + n : String(n))
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
+
+/**
+ * 判断过境时间窗口是否与当前时刻 ± 时间窗口存在交集
+ */
+const isWindowInVisibleRange = (startStr: string, endStr: string): boolean => {
+  if (!startStr || !endStr) return false
+  const startTs = parseToTimestamp(startStr)
+  const endTs = parseToTimestamp(endStr)
+  const rangeStart = currentTimestamp.value - timeWindowMs.value
+  const rangeEnd = currentTimestamp.value + timeWindowMs.value
+  return startTs <= rangeEnd && endTs >= rangeStart
+}
+
+/**
+ * 判断卫星在可见时间范围内是否有过境窗口（融合打击前/打击后窗口）
+ */
+const satHasVisibleWindow = (sat: { initWindows?: any[]; stationWindows?: any[] } | null | undefined): boolean => {
+  if (!sat) return false
+  const windows = [...(sat.stationWindows || []), ...(sat.initWindows || [])]
+  return windows.some((win: any) => isWindowInVisibleRange(getWindowStartStr(win), getWindowEndStr(win)))
+}
+
+const getWindowStartStr = (win: any): string => win.peakWindow || win.startWindow || win.beginWindow || ''
+const getWindowEndStr = (win: any): string => win.endWindow || ''
+
+const getVisibleTransitWindows = (windows: any[]): any[] => {
+  return (windows || []).filter((win) => isWindowInVisibleRange(getWindowStartStr(win), getWindowEndStr(win)))
+}
+
+/** 融合打击前 initWindows 与打击后 stationWindows */
+const getSatTransitWindowsMerged = (data: any, norad: number): any[] => {
+  const initSat = (data.initMatrixList || []).find((s: any) => s.norad === norad)
+  const postSat = (data.satelliteMatrixList || []).find((s: any) => s.norad === norad)
+  const merged = [...(initSat?.initWindows || []), ...(postSat?.stationWindows || [])]
+  const map = new Map<string, any>()
+  merged.forEach((win) => {
+    const key = `${win.receiveId || ''}-${getWindowStartStr(win)}-${getWindowEndStr(win)}`
+    const existing = map.get(key)
+    if (!existing || (win.strikeStatus === 1 && existing.strikeStatus !== 1)) {
+      map.set(key, win)
+    }
+  })
+  return Array.from(map.values())
+}
+
+type LinkPhase = 'normal' | 'striking' | 'severed'
+
+const LINK_COLORS: Record<LinkPhase, string> = {
+  normal: '#52c41a',
+  striking: '#ff4d4f',
+  severed: '#94a3b8',
+}
+
+/** 根据当前推演时刻解析星地链路的打击阶段 */
+const resolveTransitLinkPhase = (visibleWins: any[], currentTs: number): { phase: LinkPhase; delayMin: number } => {
+  let phase: LinkPhase = 'normal'
+  let delayMin = 0
+
+  for (const win of visibleWins) {
+    const startTs = parseToTimestamp(getWindowStartStr(win))
+    const endTs = parseToTimestamp(getWindowEndStr(win))
+    const struck = win.strikeStatus === 1
+    const delay = Number(win.delayMin) || 0
+
+    if (!struck) continue
+
+    if (currentTs >= startTs && currentTs <= endTs) {
+      return { phase: 'striking', delayMin: Math.max(delayMin, delay) }
+    }
+    if (currentTs > endTs) {
+      phase = 'severed'
+      delayMin = Math.max(delayMin, delay)
+    }
+  }
+  return { phase, delayMin }
+}
+
+/** 解析地面站-数据中心链路阶段（融合打击前后通断） */
+const resolveGroundLinkPhase = (
+  rel: { from: string; to: string },
+  postRelSet: Set<string>,
+  receiveWins: any[],
+  currentTs: number
+): { phase: LinkPhase; delayMin: number } => {
+  const visibleWins = getVisibleTransitWindows(receiveWins)
+  const transitPhase = resolveTransitLinkPhase(visibleWins, currentTs)
+  if (transitPhase.phase === 'striking') return transitPhase
+
+  const inPost = postRelSet.has(`${rel.from}::${rel.to}`)
+  if (!inPost) {
+    const delayMin = Math.max(0, ...visibleWins.filter((w) => w.strikeStatus === 1).map((w) => Number(w.delayMin) || 0))
+    return { phase: 'severed', delayMin }
+  }
+  return transitPhase
+}
+
+const buildEdgeVisual = (
+  phase: LinkPhase,
+  delayMin = 0,
+  extraStyle: Record<string, unknown> = {}
+): { style: Record<string, unknown>; label: string; labelCfg?: Record<string, unknown> } => {
+  const style: Record<string, unknown> = {
+    stroke: LINK_COLORS[phase],
+    lineWidth: phase === 'striking' ? 2.5 : 2,
+    lineDash: phase === 'severed' ? [6, 4] : undefined,
+    ...extraStyle,
+  }
+  const label = phase === 'severed' && delayMin > 0 ? `+${delayMin}m` : ''
+  const labelCfg = label
+    ? { autoRotate: true, refY: -6, style: { fill: '#94a3b8', fontSize: 10, fontWeight: 600 } }
+    : undefined
+  return { style, label, labelCfg }
+}
+
+const countLinkPhase = (counts: { normal: number; striking: number; severed: number }, phase: LinkPhase) => {
+  if (phase === 'striking') counts.striking++
+  else if (phase === 'severed') counts.severed++
+  else counts.normal++
+}
+
+const getSatLabelInRange = (sat: { norad: number; name: string; satType: string; status: number }): string => {
+  const wins = allWindowsList.value.filter(
+    (w) => w.satNorad === sat.norad && !w.isRelayWindow && isWindowInVisibleRange(w.startTime, w.endTime)
+  )
+  const typeText = formatSatType(sat.satType)
+  const winPayload = wins.map((w) => ({
+    strikeStatus: w.strikeStatus,
+    peakWindow: w.startTime,
+    endWindow: w.endTime,
+    delayMin: w.delayMin,
+  }))
+  const { phase, delayMin } = resolveTransitLinkPhase(winPayload, currentTs())
+  if (phase === 'striking') return `${sat.name}\n[${typeText}/正在打击]`
+  if (phase === 'severed') {
+    return delayMin > 0 ? `${sat.name}\n[受扰 +${delayMin}m]` : `${sat.name}\n[${typeText}/打击后]`
+  }
+  if (wins.length > 0) return `${sat.name}\n[${typeText}/过境]`
+  return `${sat.name}\n[${typeText}]`
+}
+
+const getReceiveLabelInRange = (rec: { receiveId: string; receiveName: string; status: number }): string => {
+  const wins = allWindowsList.value.filter(
+    (w) => w.receiveId === rec.receiveId && !w.isRelayWindow && isWindowInVisibleRange(w.startTime, w.endTime)
+  )
+  const winPayload = wins.map((w) => ({
+    strikeStatus: w.strikeStatus,
+    peakWindow: w.startTime,
+    endWindow: w.endTime,
+    delayMin: w.delayMin,
+  }))
+  const { phase, delayMin } = resolveTransitLinkPhase(winPayload, currentTs())
+  if (phase === 'striking') return `${rec.receiveName}\n[正在打击]`
+  if (phase === 'severed') {
+    return delayMin > 0 ? `${rec.receiveName}\n[受扰 +${delayMin}m]` : `${rec.receiveName}\n[打击后]`
+  }
+  if (wins.length > 0) return `${rec.receiveName}\n[接收中]`
+  if (rec.status === 1) return `${rec.receiveName}\n[受损]`
+  return rec.receiveName
+}
+
+const getStationLabelInRange = (st: { stationId: string; stationName: string; status: number }): string => {
+  if (st.status === 1) return `${st.stationName}\n[受损]`
+  return st.stationName
+}
+
+/**
+ * 判断星间中继链路在可见时间范围内是否有可见窗口
+ */
+const relayHasVisibleWindow = (rel: { visibilityWindows?: { beginWindow: string; endWindow: string }[] }): boolean => {
+  const windows = rel.visibilityWindows || []
+  return windows.some((win) => isWindowInVisibleRange(win.beginWindow, win.endWindow))
+}
+
+const currentTimeText = computed(() => formatTimeStr(currentTimestamp.value))
+
+const formatDelayMinutes = (minutes: number): string => {
+  if (!minutes || minutes <= 0) return '0 分钟'
+  const rounded = Number.isInteger(minutes) ? minutes : Number(minutes.toFixed(1))
+  return `${rounded} 分钟`
+}
+
+const countPlanWindows = (plan: { windows?: { beginWindow?: string; endWindow?: string }[] }): number => {
+  return plan.windows?.length ? plan.windows.length : 1
+}
+
+const matchAttackPlanToNorad = (
+  plan: { target?: string; targetType?: string },
+  norad: number,
+  name: string,
+  relayList: Set<number>
+): 'sat' | 'relay' | null => {
+  const target = plan.target || ''
+  const targetType = plan.targetType || ''
+  if (targetType.includes('中继') || relayList.has(norad)) {
+    if (target.includes(String(norad)) || target === name || target.includes(name)) return 'relay'
+  }
+  if (target.includes(String(norad)) || target === name || target.includes(name)) {
+    return relayList.has(norad) || targetType.includes('中继') ? 'relay' : 'sat'
+  }
+  return null
+}
+
+/** 计算最早全链路完成时刻（卫星→地面站→数据中心） */
+const computeEarliestFullChainFinishTs = (usePostStrike: boolean): number | null => {
+  const data = matrixData.value as any
+  if (!data) return null
+
+  const groundRels = usePostStrike ? data.stationRelationList?.relations || [] : data.initRelationList?.relations || []
+  if (!groundRels.length) return null
+
+  const activeReceiveIds = new Set(groundRels.map((r: { from: string }) => r.from))
+  let earliest: number | null = null
+
+  const processWindow = (win: any, satBlocked: boolean) => {
+    if (satBlocked) return
+    if (usePostStrike && win.strikeStatus === 1) return
+    const receiveId = win.receiveId
+    if (!receiveId || !activeReceiveIds.has(receiveId)) return
+    const endTs = parseToTimestamp(getWindowEndStr(win) || getWindowStartStr(win))
+    if (!endTs) return
+    if (earliest === null || endTs < earliest) earliest = endTs
+  }
+
+  if (usePostStrike) {
+    ; (data.satelliteMatrixList || []).forEach((sat: any) => {
+      const blocked = sat.satelliteStatus === 1
+        ; (sat.stationWindows || []).forEach((win: any) => processWindow(win, blocked))
+    })
+  } else {
+    ; (data.initMatrixList || []).forEach((sat: any) => {
+      ; (sat.initWindows || []).forEach((win: any) => processWindow(win, false))
+    })
+  }
+
+  return earliest
+}
+
+const timelineSummary = computed(() => {
+  const data = matrixData.value as any
+  const empty = {
+    satStrikeCount: 0,
+    relayStrikeCount: 0,
+    groundStrikeCount: 0,
+    totalDelayText: '0 分钟',
+    preStrikeEarliestText: '彻底阻断',
+    postStrikeEarliestText: '彻底阻断',
+    postStrikeBlocked: true,
+  }
+  if (!data) return empty
+
+  const relayList = new Set<number>(data.relayRelation?.relayList || [])
+  let satStrikeCount = 0
+  let relayStrikeCount = 0
+  let groundStrikeCount = 0
+  let totalDelayMin = 0
+
+  const hasWindowStrikes = allWindowsList.value.some((w) => w.strikeStatus === 1)
+
+  if (hasWindowStrikes) {
+    allWindowsList.value.forEach((win) => {
+      if (win.strikeStatus !== 1) return
+      if (win.isRelayWindow) relayStrikeCount++
+      else groundStrikeCount++
+      totalDelayMin += Number(win.delayMin) || 0
+    })
+      ; (data.satelliteMatrixList || []).forEach((sat: { norad: number; satelliteStatus?: number }) => {
+        if (sat.satelliteStatus !== 1 || relayList.has(sat.norad)) return
+        satStrikeCount++
+      })
+  } else {
+    ; (data.attackPlanList || []).forEach((plan: { target?: string; targetType?: string; windows?: any[] }) => {
+      const count = countPlanWindows(plan)
+      const tt = plan.targetType || ''
+      if (tt.includes('中继')) relayStrikeCount += count
+      else if (tt.includes('接收') || tt.includes('地面')) groundStrikeCount += count
+      else satStrikeCount += count
+    })
+      ; (data.satelliteMatrixList || []).forEach((sat: { norad: number; satelliteStatus?: number; delayMin?: number }) => {
+        if (sat.satelliteStatus !== 1) return
+        if (relayList.has(sat.norad)) relayStrikeCount++
+        else satStrikeCount++
+        totalDelayMin += Number(sat.delayMin) || 0
+      })
+  }
+
+  const preTs = computeEarliestFullChainFinishTs(false)
+  const postTs = computeEarliestFullChainFinishTs(true)
+
+  return {
+    satStrikeCount,
+    relayStrikeCount,
+    groundStrikeCount,
+    totalDelayText: formatDelayMinutes(totalDelayMin),
+    preStrikeEarliestText: preTs ? formatTimeStr(preTs) : '彻底阻断',
+    postStrikeEarliestText: postTs ? formatTimeStr(postTs) : '彻底阻断',
+    postStrikeBlocked: !postTs,
+  }
+})
 
 /**
  * [功能]
@@ -797,8 +1403,8 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
   const satMap = new Map<number, string>()
   const defaultTargetName = store.battle?.name || '战场目标区域'
 
-  ;(data.initMatrixList || []).forEach((s: any) => satMap.set(s.norad, s.name))
-  ;(data.satelliteMatrixList || []).forEach((s: any) => satMap.set(s.norad, s.name))
+    ; (data.initMatrixList || []).forEach((s: any) => satMap.set(s.norad, s.name))
+    ; (data.satelliteMatrixList || []).forEach((s: any) => satMap.set(s.norad, s.name))
 
   // 1. 从 satelliteMatrixList 提取 (包含打击状态 strikeStatus)
   const satMatrixList = data.satelliteMatrixList || []
@@ -966,6 +1572,67 @@ const displayedWindowsList = computed<WindowItemWrapper[]>(() => {
 })
 
 /**
+ * 单节点打击统计：仅统计该节点作为「被打击方」的次数与延时。
+ * 地面站与底部时间轴卡片（displayedWindowsList 中 strikeStatus===1）保持一致；
+ * 卫星/中继仅统计本体被打击，不把链路上对地面站的干扰计入卫星。
+ */
+const selectedNodeStrikeDetail = computed(() => {
+  const node = selectedNodeInfo.value
+  const data = matrixData.value as any
+  if (!node || !data) return null
+  if (node.type === 'station') return null
+
+  if (node.type === 'receive') {
+    const struckWins = displayedWindowsList.value.filter((w) => w.strikeStatus === 1 && !w.isRelayWindow)
+    const totalDelayMin = struckWins.reduce((sum, w) => sum + (Number(w.delayMin) || 0), 0)
+    return {
+      name: node.name,
+      typeLabel: '地面站',
+      strikeCount: struckWins.length,
+      delayText: formatDelayMinutes(totalDelayMin),
+    }
+  }
+
+  if (node.type === 'sat' || node.type === 'relay') {
+    const norad = node.norad!
+    const relayList = new Set<number>(data.relayRelation?.relayList || [])
+    let strikeCount = 0
+    let totalDelayMin = 0
+
+    const postSat = (data.satelliteMatrixList || []).find((s: any) => s.norad === norad)
+    if (postSat?.satelliteStatus === 1) {
+      strikeCount = 1
+      totalDelayMin = Number(postSat.delayMin) || 0
+    } else {
+      ; (data.attackPlanList || []).forEach((plan: { target?: string; targetType?: string; windows?: any[] }) => {
+        const tt = plan.targetType || ''
+        if (tt.includes('接收') || tt.includes('地面')) return
+        const matched = matchAttackPlanToNorad(plan, norad, node.name, relayList)
+        const expectType = node.type === 'relay' ? 'relay' : 'sat'
+        if (matched === expectType) strikeCount += countPlanWindows(plan)
+      })
+    }
+
+    if (node.type === 'relay') {
+      const relayStruck = allWindowsList.value.filter(
+        (w) => w.isRelayWindow && w.strikeStatus === 1 && (w.relayNorad === norad || w.satNorad === norad)
+      )
+      strikeCount += relayStruck.length
+      totalDelayMin += relayStruck.reduce((s, w) => s + (Number(w.delayMin) || 0), 0)
+    }
+
+    return {
+      name: node.name,
+      typeLabel: node.type === 'relay' ? '中继卫星' : '卫星',
+      strikeCount,
+      delayText: formatDelayMinutes(totalDelayMin),
+    }
+  }
+
+  return null
+})
+
+/**
  * [功能说明]
  * 重置拓扑节点选中状态
  */
@@ -998,8 +1665,10 @@ const timeRangeText = computed(() => {
  * 初始化时间轴当前时间为最小值
  */
 const initTimelineBounds = () => {
+  if (allWindowsList.value.length === 0) return
   currentTimestamp.value = minTimestamp.value
-  currentTimeProgress.value = 0
+  updateTimeProgressFromTimestamp()
+  stopTimelinePlayback()
 }
 
 /**
@@ -1014,12 +1683,7 @@ const isWindowActiveAtCurrentTime = (win: WindowItemWrapper) => {
  */
 const selectWindowItem = (win: WindowItemWrapper) => {
   selectedWindowId.value = win.id
-  currentTimestamp.value = win.startTimestamp
-  const totalSpan = maxTimestamp.value - minTimestamp.value
-  if (totalSpan > 0) {
-    currentTimeProgress.value = ((win.startTimestamp - minTimestamp.value) / totalSpan) * 100
-  }
-
+  setCurrentTimestamp(win.startTimestamp)
   if (!graph) return
 
   // 高亮对应的 Satellite 节点、Ground Station 节点及 Edge
@@ -1105,7 +1769,9 @@ const satNodeCount = ref(0)
 const receiveNodeCount = ref(0)
 const stationNodeCount = ref(0)
 const normalLinkCount = ref(0)
-const struckLinkCount = ref(0)
+const strikingLinkCount = ref(0)
+const severedLinkCount = ref(0)
+const currentTs = () => currentTimestamp.value
 
 /**
  * 构建 3 层 AntV G6 图数据 (Layer 1 卫星 -> Layer 2 地面站 -> Layer 3 数据中心)
@@ -1120,13 +1786,12 @@ const buildG6GraphData = () => {
     const edges: any[] = []
     const satMap = new Map<number, { norad: number; name: string; satType: string; status: number }>()
 
-    ;(data.initMatrixList || []).forEach((s: any) => {
-      satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType || '通讯卫星', status: 0 })
-    })
-    ;(data.satelliteMatrixList || []).forEach((s: any) => {
-      const satStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : s.satelliteStatus || 0
-      satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType || '通讯卫星', status: satStatus })
-    })
+      ; (data.initMatrixList || []).forEach((s: any) => {
+        satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType || '通讯卫星', status: 0 })
+      })
+      ; (data.satelliteMatrixList || []).forEach((s: any) => {
+        satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType || '通讯卫星', status: s.satelliteStatus || 0 })
+      })
 
     const satList = Array.from(satMap.values())
     satNodeCount.value = satList.length
@@ -1149,7 +1814,7 @@ const buildG6GraphData = () => {
 
       nodes.push({
         id,
-        label: `${sat.name}\n[${formatSatType(sat.satType)}]`,
+        label: getSatLabelInRange(sat),
         layer: 1,
         x,
         y: 90,
@@ -1276,38 +1941,46 @@ const buildG6GraphData = () => {
     })
 
     // 3. 构建通讯链路连线 (通讯卫星 -> 战场目标区域)
-    let normCount = 0
-    let struckCount = 0
+    let linkCounts = { normal: 0, striking: 0, severed: 0 }
 
     satList.forEach((sat) => {
       const satId = `sat-${sat.norad}`
-      const isStruck = sat.status === 1
-      if (isStruck) {
-        struckCount++
-      } else {
-        normCount++
-      }
+      if (!satHasVisibleWindow({ initWindows: getSatTransitWindowsMerged(data, sat.norad) })) return
+
+      const visibleWins = getVisibleTransitWindows(getSatTransitWindowsMerged(data, sat.norad))
+      if (visibleWins.length === 0) return
+
+      let { phase, delayMin } = resolveTransitLinkPhase(visibleWins, currentTs())
+      if (phase === 'normal' && sat.status === 1) phase = 'severed'
+
+      const edgeVisual = buildEdgeVisual(phase, delayMin, {
+        endArrow: { path: G6.Arrow.triangle(6, 8, 0), fill: LINK_COLORS[phase] },
+      })
+      countLinkPhase(linkCounts, phase)
 
       edges.push({
         source: satId,
         target: targetNodeId,
         type: 'struck-cubic',
-        style: {
-          stroke: isStruck ? '#ff4d4f' : '#00e1ff',
-          lineWidth: 2,
-          lineDash: isStruck ? [6, 4] : undefined,
-          endArrow: {
-            path: G6.Arrow.triangle(6, 8, 0),
-            fill: isStruck ? '#ff4d4f' : '#00e1ff',
-          },
-        },
+        label: edgeVisual.label,
+        labelCfg: edgeVisual.labelCfg,
+        style: edgeVisual.style,
       })
     })
 
-    normalLinkCount.value = normCount
-    struckLinkCount.value = struckCount
+    normalLinkCount.value = linkCounts.normal
+    strikingLinkCount.value = linkCounts.striking
+    severedLinkCount.value = linkCounts.severed
 
-    return { nodes, edges }
+    const activeNodeIds = new Set<string>()
+    edges.forEach((edge) => {
+      activeNodeIds.add(String(edge.source))
+      activeNodeIds.add(String(edge.target))
+    })
+    const filteredNodes = nodes.filter((node) => activeNodeIds.has(String(node.id)))
+    satNodeCount.value = filteredNodes.filter((node) => String(node.id).startsWith('sat-')).length
+
+    return { nodes: filteredNodes, edges }
   }
 
   // ==================== 侦察卫星模式三层拓扑构建 ====================
@@ -1318,21 +1991,17 @@ const buildG6GraphData = () => {
   // 1. 提取普通卫星 (Layer 1) 与 中继卫星 (Layer 2)
   // [变量用途] 保存节点 NORAD 到卫星详细信息及打击状态的映射
   const satMap = new Map<number, { norad: number; name: string; satType: string; status: number }>()
-  ;(data.initMatrixList || []).forEach((s) => {
-    satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: 0 })
-  })
+    ; (data.initMatrixList || []).forEach((s) => {
+      satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: 0 })
+    })
 
-  // 判断是否有卫星/中继卫星被打击
-  ;(data.satelliteMatrixList || []).forEach((s) => {
-    // [处理规则]
-    // 当处于打击前拓扑 (PRE_STRIKE) 视图模式时，卫星状态强制置为 0 (未打击/正常)；
-    // 当处于打击后拓扑 (POST_STRIKE) 或全景对比 (COMBINED) 视图模式时，读取后端返回的 satelliteStatus 确定毁伤打压状态 (0-正常, 1-受打击/毁伤)
-    const satStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : s.satelliteStatus || 0
-    satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: satStatus })
-  })
+    // 判断是否有卫星/中继卫星被打击
+    ; (data.satelliteMatrixList || []).forEach((s) => {
+      satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: s.satelliteStatus || 0 })
+    })
   // [逻辑说明] 提取星间中继拓扑关系中的中继卫星节点
   if (data.relayRelation) {
-    ;(data.relayRelation.relayList || []).forEach((norad) => {
+    ; (data.relayRelation.relayList || []).forEach((norad) => {
       if (!satMap.has(norad)) {
         satMap.set(norad, { norad, name: `TDRS-${norad}`, satType: '通信/数据中继', status: 0 })
       }
@@ -1354,14 +2023,11 @@ const buildG6GraphData = () => {
 
   // 2. Layer 3: 地面接收站 (Ground Stations)
   const receiveMap = new Map<string, { receiveId: string; receiveName: string; status: number }>()
-  const relLists =
-    currentViewMode.value === 'PRE_STRIKE'
-      ? [data.initRelationList].filter(Boolean)
-      : [data.stationRelationList, data.initRelationList].filter(Boolean)
+  const relLists = [data.stationRelationList, data.initRelationList].filter(Boolean)
 
   relLists.forEach((rl) => {
-    ;(rl.receiveObjList || []).forEach((rec) => {
-      const recStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : rec.receiveStatus || 0
+    ; (rl.receiveObjList || []).forEach((rec) => {
+      const recStatus = rec.receiveStatus || 0
       if (!receiveMap.has(rec.receiveId)) {
         receiveMap.set(rec.receiveId, {
           receiveId: rec.receiveId,
@@ -1382,8 +2048,8 @@ const buildG6GraphData = () => {
   // 3. Layer 3: 中心云数据中心 (Data Centers)
   const stationMap = new Map<string, { stationId: string; stationName: string; status: number }>()
   relLists.forEach((rl) => {
-    ;(rl.stationObjList || []).forEach((st) => {
-      const stStatus = currentViewMode.value === 'PRE_STRIKE' ? 0 : st.stationStatus || 0
+    ; (rl.stationObjList || []).forEach((st) => {
+      const stStatus = st.stationStatus || 0
       if (!stationMap.has(st.stationId)) {
         stationMap.set(st.stationId, {
           stationId: st.stationId,
@@ -1419,7 +2085,7 @@ const buildG6GraphData = () => {
 
     nodes.push({
       id,
-      label: `${sat.name}\n[${formatSatType(sat.satType)}]`,
+      label: getSatLabelInRange(sat),
       layer: 1,
       x,
       y: 80,
@@ -1490,7 +2156,7 @@ const buildG6GraphData = () => {
 
     nodes.push({
       id,
-      label: `${sat.name}\n[${formatSatType(sat.satType)}]`,
+      label: getSatLabelInRange(sat),
       layer: 2,
       x,
       y: 230,
@@ -1560,7 +2226,7 @@ const buildG6GraphData = () => {
 
     nodes.push({
       id: rec.receiveId,
-      label: rec.receiveName,
+      label: getReceiveLabelInRange(rec),
       layer: 3,
       x,
       y: 380,
@@ -1630,7 +2296,7 @@ const buildG6GraphData = () => {
 
     nodes.push({
       id: st.stationId,
-      label: st.stationName,
+      label: getStationLabelInRange(st),
       layer: 3,
       x,
       y: 490,
@@ -1691,65 +2357,57 @@ const buildG6GraphData = () => {
 
   // ==================== 构建边 Edges (Layer 1->2 & Layer 2->3) ====================
   const edgeSet = new Set<string>()
-  let normalCount = 0
-  let struckCount = 0
+  const linkCounts = { normal: 0, striking: 0, severed: 0 }
 
-  // 1. Layer 1 -> Layer 2 边 (卫星 -> 地面站)
-  if (currentViewMode.value === 'PRE_STRIKE') {
-    // 打击前: 取 initMatrixList
-    ;(data.initMatrixList || []).forEach((sat) => {
-      const satId = `sat-${sat.norad}`
-      ;(sat.initWindows || []).forEach((win) => {
-        const edgeId = `edge-${satId}-${win.receiveId}`
-        if (!edgeSet.has(edgeId) && nodeSet.has(satId) && nodeSet.has(win.receiveId)) {
-          edgeSet.add(edgeId)
-          normalCount++
-          edges.push({
-            id: edgeId,
-            source: satId,
-            target: win.receiveId,
-            sourceAnchor: 1, // 源节点下边中心
-            targetAnchor: 0, // 目标节点上边中心
-            type: 'struck-cubic',
-            isStruck: false,
-            style: {
-              stroke: '#00e1ff',
-              lineWidth: 2,
-            },
-          })
-        }
+  // 保存全部节点坐标，避免时间刷新时布局抖动
+  saveNodePositionsToCache(nodes)
+
+  // 1. Layer 1 -> Layer 2 边 (卫星 -> 地面站)，融合打击前/打击后窗口
+  satList.forEach((sat) => {
+    const satId = `sat-${sat.norad}`
+    if (!nodeSet.has(satId)) return
+    const windows = getSatTransitWindowsMerged(data, sat.norad)
+    const receiveWindowsMap = new Map<string, any[]>()
+
+    windows.forEach((win: any) => {
+      const recId = win.receiveId
+      if (!recId || !nodeSet.has(recId)) return
+      if (!receiveWindowsMap.has(recId)) receiveWindowsMap.set(recId, [])
+      receiveWindowsMap.get(recId)!.push(win)
+    })
+
+    receiveWindowsMap.forEach((recWins, recId) => {
+      const visibleWins = getVisibleTransitWindows(recWins)
+      if (visibleWins.length === 0) return
+
+      const edgeId = `edge-${satId}-${recId}`
+      if (edgeSet.has(edgeId)) return
+      edgeSet.add(edgeId)
+
+      const { phase, delayMin } = resolveTransitLinkPhase(visibleWins, currentTs())
+      const edgeVisual = buildEdgeVisual(phase, delayMin)
+      countLinkPhase(linkCounts, phase)
+
+      edges.push({
+        id: edgeId,
+        source: satId,
+        target: recId,
+        sourceAnchor: 1,
+        targetAnchor: 0,
+        type: 'struck-cubic',
+        label: edgeVisual.label,
+        labelCfg: edgeVisual.labelCfg,
+        style: edgeVisual.style,
       })
     })
-  } else {
-    // 全景对比 / 打击后: 取 satelliteMatrixList
-    ;(data.satelliteMatrixList || []).forEach((sat) => {
-      const satId = `sat-${sat.norad}`
-      ;(sat.stationWindows || []).forEach((win) => {
-        const edgeId = `edge-${satId}-${win.receiveId}`
-        if (!edgeSet.has(edgeId) && nodeSet.has(satId) && nodeSet.has(win.receiveId)) {
-          edgeSet.add(edgeId)
-          const isStruck = win.strikeStatus === 1 || sat.satelliteStatus === 1
-          if (isStruck) struckCount++
-          else normalCount++
+  })
 
-          edges.push({
-            id: edgeId,
-            source: satId,
-            target: win.receiveId,
-            sourceAnchor: 1, // 源节点下边中心
-            targetAnchor: 0, // 目标节点上边中心
-            type: 'struck-cubic',
-            isStruck,
-            style: {
-              stroke: isStruck ? '#ff4d4f' : '#00e1ff',
-              lineWidth: isStruck ? 2.2 : 2,
-              lineDash: isStruck ? [6, 4] : undefined,
-            },
-          })
-        }
-      })
-    })
-  }
+  const activeReceiveIds = new Set<string>()
+  edges.forEach((edge) => {
+    if (String(edge.source).startsWith('sat-')) {
+      activeReceiveIds.add(String(edge.target))
+    }
+  })
 
   // 2. Layer 2 -> Layer 3 边 (地面站 -> 数据中心)
   const initRels = data.initRelationList?.relations || []
@@ -1757,28 +2415,32 @@ const buildG6GraphData = () => {
   const postRelSet = new Set(postRels.map((r) => `${r.from}::${r.to}`))
 
   initRels.forEach((rel) => {
+    if (!activeReceiveIds.has(rel.from)) return
     const edgeId = `edge-${rel.from}-${rel.to}`
     if (!edgeSet.has(edgeId) && nodeSet.has(rel.from) && nodeSet.has(rel.to)) {
       edgeSet.add(edgeId)
 
-      // 判断该链路在打击后是否丢失中断
-      const isSevered = currentViewMode.value !== 'PRE_STRIKE' && !postRelSet.has(`${rel.from}::${rel.to}`)
-      if (isSevered) struckCount++
-      else normalCount++
+      const allReceiveWins: any[] = []
+      satList.forEach((sat) => {
+        getSatTransitWindowsMerged(data, sat.norad)
+          .filter((w) => w.receiveId === rel.from)
+          .forEach((w) => allReceiveWins.push(w))
+      })
+
+      const { phase, delayMin } = resolveGroundLinkPhase(rel, postRelSet as Set<string>, allReceiveWins, currentTs())
+      const edgeVisual = buildEdgeVisual(phase, delayMin)
+      countLinkPhase(linkCounts, phase)
 
       edges.push({
         id: edgeId,
         source: rel.from,
         target: rel.to,
-        sourceAnchor: 1, // 源节点下边中心
-        targetAnchor: 0, // 目标节点上边中心
+        sourceAnchor: 1,
+        targetAnchor: 0,
         type: 'struck-cubic',
-        isStruck: isSevered,
-        style: {
-          stroke: isSevered ? '#ff4d4f' : '#3b82f6',
-          lineWidth: isSevered ? 2.2 : 2,
-          lineDash: isSevered ? [6, 4] : undefined,
-        },
+        label: edgeVisual.label,
+        labelCfg: edgeVisual.labelCfg,
+        style: edgeVisual.style,
       })
     }
   })
@@ -1787,34 +2449,46 @@ const buildG6GraphData = () => {
   const relayRels = data.relayRelation?.relations || []
   relayRels.forEach((rel) => {
     const sourceSatId = `sat-${rel.from}`
+    const fromHasGroundEdge = edges.some((edge) => edge.source === sourceSatId && !String(edge.id).startsWith('edge-relay'))
+    if (!relayHasVisibleWindow(rel) && !fromHasGroundEdge) return
     const targetSatId = `sat-${rel.to}`
     const edgeId = `edge-relay-${rel.from}-${rel.to}`
 
     if (!edgeSet.has(edgeId) && nodeSet.has(sourceSatId) && nodeSet.has(targetSatId)) {
       edgeSet.add(edgeId)
-      normalCount++
+      const edgeVisual = buildEdgeVisual('normal', 0, { lineDash: [4, 4] })
+      countLinkPhase(linkCounts, 'normal')
 
       edges.push({
         id: edgeId,
         source: sourceSatId,
         target: targetSatId,
-        sourceAnchor: 1, // 源节点下边中心 (Layer 1)
-        targetAnchor: 0, // 目标节点上边中心 (Layer 2)
+        sourceAnchor: 1,
+        targetAnchor: 0,
         type: 'struck-cubic',
-        isStruck: false,
-        style: {
-          stroke: '#a855f7',
-          lineWidth: 2,
-          lineDash: [4, 4],
-        },
+        label: edgeVisual.label,
+        labelCfg: edgeVisual.labelCfg,
+        style: { ...edgeVisual.style, stroke: '#a855f7' },
       })
     }
   })
 
-  normalLinkCount.value = normalCount
-  struckLinkCount.value = struckCount
+  normalLinkCount.value = linkCounts.normal
+  strikingLinkCount.value = linkCounts.striking
+  severedLinkCount.value = linkCounts.severed
 
-  return { nodes, edges }
+  const activeNodeIds = new Set<string>()
+  edges.forEach((edge) => {
+    activeNodeIds.add(String(edge.source))
+    activeNodeIds.add(String(edge.target))
+  })
+
+  const filteredNodes = nodes.filter((node) => activeNodeIds.has(String(node.id)))
+  receiveNodeCount.value = filteredNodes.filter((node) => receiveList.some((rec) => rec.receiveId === node.id)).length
+  stationNodeCount.value = filteredNodes.filter((node) => stationList.some((st) => st.stationId === node.id)).length
+  satNodeCount.value = filteredNodes.filter((node) => String(node.id).startsWith('sat-')).length
+
+  return { nodes: filteredNodes, edges }
 }
 
 /**
@@ -1826,8 +2500,10 @@ const buildG6GraphData = () => {
  * - 若 graph 尚未创建或已销毁，则新建 G6.Graph 实例并 render。
  * - 若 graph 已存在，则调用 changeSize 动态调整画布尺寸，重新装载数据 (changeData) 并自适应全屏 (fitView)。
  */
-const initOrUpdateGraph = () => {
+const initOrUpdateGraph = (fitView = true) => {
   if (!g6Container.value) return
+
+  ensureCurrentTimestampValid()
 
   // 准确获取 DOM 容器宽高度 (clientWidth / clientHeight)
   const width = g6Container.value.clientWidth
@@ -1840,6 +2516,9 @@ const initOrUpdateGraph = () => {
   registerCustomG6Edge()
 
   const data = buildG6GraphData()
+  applyCachedNodePositions(data.nodes)
+  saveNodePositionsToCache(data.nodes)
+  graphTopologyKey = getGraphTopologyKey()
 
   if (!graph || graph.get('destroyed')) {
     graph = new G6.Graph({
@@ -1856,6 +2535,15 @@ const initOrUpdateGraph = () => {
       },
       defaultEdge: {
         type: 'struck-cubic',
+        labelCfg: {
+          autoRotate: true,
+          refY: -6,
+          style: {
+            fill: '#94a3b8',
+            fontSize: 10,
+            fontWeight: 600,
+          },
+        },
       },
       nodeStateStyles: {
         active: {
@@ -1919,7 +2607,9 @@ const initOrUpdateGraph = () => {
     // 拓扑图已有实例：重新计算画布大小并替换渲染数据
     graph.changeSize(width, height)
     graph.changeData(data)
-    graph.fitView([20, 40, 20, 40])
+    if (fitView) {
+      graph.fitView([20, 40, 20, 40])
+    }
     updateGraphHighlightState()
   }
 }
@@ -2076,6 +2766,7 @@ onActivated(() => {
 })
 
 onUnmounted(() => {
+  stopTimelinePlayback()
   window.removeEventListener('resize', handleResize)
   if (resizeTimer) {
     window.clearTimeout(resizeTimer)
@@ -2129,6 +2820,22 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 15px;
+}
+
+.series-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .label-text {
+    font-size: 12px;
+    color: #94a3b8;
+    white-space: nowrap;
+  }
+
+  .series-select {
+    width: 150px;
+  }
 }
 
 .intensity-group,
@@ -2238,7 +2945,16 @@ onUnmounted(() => {
   }
 
   .dot-normal-link {
-    background: #38bdf8;
+    background: #52c41a;
+  }
+
+  .dot-striking-link {
+    background: #ff4d4f;
+    box-shadow: 0 0 6px #ff4d4f;
+  }
+
+  .dot-severed-link {
+    background: #94a3b8;
   }
 
   .dot-struck-link {
@@ -2332,9 +3048,212 @@ onUnmounted(() => {
   }
 }
 
+.topo-right-panel {
+  width: 272px;
+  min-width: 272px;
+  height: 100%;
+  background: rgba(8, 14, 28, 0.96);
+  border-left: 1px solid rgba(0, 225, 255, 0.22);
+  padding: 12px 10px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  .panel-block {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+
+  .panel-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #40f2ff;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(0, 225, 255, 0.2);
+    letter-spacing: 0.5px;
+  }
+
+  .panel-title-sub {
+    font-size: 14px;
+    color: #7dd3fc;
+    border-bottom-color: rgba(0, 225, 255, 0.12);
+    padding-bottom: 4px;
+    margin-top: 2px;
+  }
+
+  .summary-strike-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .summary-mini-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 4px;
+    border-radius: 6px;
+    background: rgba(0, 225, 255, 0.06);
+    border: 1px solid rgba(0, 225, 255, 0.14);
+
+    .mini-label {
+      font-size: 11px;
+      color: #94a3b8;
+      text-align: center;
+      line-height: 1.3;
+      white-space: nowrap;
+    }
+
+    .mini-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #e2efff;
+      line-height: 1.2;
+
+      em {
+        font-style: normal;
+        font-size: 12px;
+        font-weight: 500;
+        color: #94a3b8;
+        margin-left: 1px;
+      }
+    }
+  }
+
+  .panel-stat-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+
+    .stat-label {
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+
+    .stat-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #e2efff;
+      line-height: 1.35;
+      word-break: break-all;
+    }
+
+    &.compact-row .stat-value-sm {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+  }
+
+  .highlight-row {
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(255, 140, 0, 0.06);
+    border: 1px solid rgba(255, 140, 0, 0.15);
+
+    .stat-value {
+      font-size: 17px;
+    }
+  }
+
+  .panel-divider {
+    height: 1px;
+    background: rgba(0, 225, 255, 0.15);
+    margin: 2px 0;
+    flex-shrink: 0;
+  }
+
+  .panel-divider-strong {
+    background: rgba(0, 225, 255, 0.28);
+    margin: 6px 0 2px;
+  }
+
+  .glow-text-green {
+    color: #52c41a;
+  }
+
+  .glow-text-muted {
+    color: #94a3b8;
+  }
+
+  .node-strike-panel {
+    padding-top: 2px;
+  }
+
+  .node-strike-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(0, 225, 255, 0.05);
+    border: 1px solid rgba(0, 225, 255, 0.12);
+
+    .node-type-badge {
+      display: inline-block;
+      align-self: flex-start;
+      font-size: 11px;
+      color: #40f2ff;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(0, 225, 255, 0.12);
+      border: 1px solid rgba(0, 225, 255, 0.2);
+    }
+
+    .node-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #e2efff;
+      line-height: 1.35;
+      word-break: break-all;
+    }
+  }
+
+  .node-strike-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+
+    .node-stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 8px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+
+      .stat-label {
+        font-size: 11px;
+        color: #94a3b8;
+      }
+
+      .stat-value {
+        font-size: 15px;
+        font-weight: 700;
+        color: #e2efff;
+      }
+    }
+  }
+
+  .clear-node-btn {
+    align-self: flex-start;
+    font-size: 12px;
+    padding: 0;
+    margin-top: -2px;
+  }
+}
+
 /* 底部时间轴样式 */
 .cema-timeline-footer {
-  height: 165px;
+  height: 210px;
   background: rgba(9, 16, 30, 0.95);
   border-top: 1px solid rgba(0, 225, 255, 0.2);
   display: flex;
@@ -2343,16 +3262,64 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+.timeline-slider-row {
+  padding: 0 4px;
+
+  :deep(.el-slider__runway) {
+    background: rgba(0, 225, 255, 0.12);
+  }
+
+  :deep(.el-slider__bar) {
+    background: linear-gradient(90deg, rgba(0, 225, 255, 0.45), rgba(0, 225, 255, 0.85));
+  }
+
+  :deep(.el-slider__button) {
+    border-color: #00e1ff;
+    background: #00e1ff;
+    box-shadow: 0 0 8px rgba(0, 225, 255, 0.6);
+  }
+}
+
 .timeline-ctrl-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 
   .ctrl-left {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ctrl-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .timeline-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .option-label {
+      font-size: 11px;
+      color: #94a3b8;
+      white-space: nowrap;
+    }
+
+    .option-select {
+      width: 92px;
+    }
+  }
+
+  .play-btn {
+    min-width: 64px;
   }
 
   .timeline-title {

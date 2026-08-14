@@ -12,17 +12,10 @@
     <div class="filter-section">
       <!-- 卫星类型选择按钮组 (占满一行) -->
       <div class="type-button-bar">
-        <button
-          v-for="item in typeOptions"
-          :key="item"
-          class="type-btn"
-          :class="{
-            active: selectedType === item,
-            disabled: isTypeDisabled(item),
-          }"
-          :disabled="isTypeDisabled(item)"
-          @click="selectType(item)"
-        >
+        <button v-for="item in typeOptions" :key="item" class="type-btn" :class="{
+          active: selectedType === item,
+          disabled: isTypeDisabled(item),
+        }" :disabled="isTypeDisabled(item)" @click="selectType(item)">
           {{ item }}
         </button>
       </div>
@@ -34,13 +27,8 @@
           <span class="series-count">{{ seriesOptions.length }} 个</span>
         </div>
         <div class="series-list">
-          <div
-            v-for="series in seriesOptions"
-            :key="series"
-            class="series-item"
-            :class="{ active: selectedSeries === series }"
-            @click="selectSeries(series)"
-          >
+          <div v-for="series in seriesOptions" :key="series" class="series-item"
+            :class="{ active: selectedSeries === series }" @click="selectSeries(series)">
             <span class="series-icon">🏷️</span>
             <span class="series-name">{{ series }}</span>
             <span class="series-status">{{ selectedSeries === series ? '✓ 已筛选' : '点击筛选' }}</span>
@@ -58,16 +46,10 @@
       </div>
 
       <div class="asset-scroll-list">
-        <div
-          v-for="sat in satList"
-          :key="sat.norad"
-          class="asset-card"
-          :class="{
-            'card-active': selectedNorad === sat.norad,
-            'card-relay': sat.isRelay,
-          }"
-          @click="handleSelectSatellite(sat.norad)"
-        >
+        <div v-for="sat in satList" :key="sat.norad" class="asset-card" :class="{
+          'card-active': selectedNorad === sat.norad,
+          'card-relay': sat.isRelay,
+        }" @click="handleSelectSatellite(sat.norad)">
           <div class="card-top">
             <span class="sat-name">
               {{ sat.isRelay ? '📡' : '🛰️' }} <strong>{{ sat.name }}</strong>
@@ -87,31 +69,6 @@
       </div>
     </div>
 
-    <!-- 3. 敌方地基网络设施清单 (Ground Layer) -->
-    <div class="panel-section">
-      <div class="section-title">
-        <span class="title-icon">🏢</span>
-        <span>敌方地基接收站与数据中心</span>
-        <span class="count-tag">{{ groundNodes.length }} 个</span>
-      </div>
-
-      <div class="ground-nodes-grid">
-        <div
-          v-for="node in groundNodes"
-          :key="`${node.type}-${node.id}`"
-          class="ground-node-pill"
-          :class="{
-            'node-center': node.type === 'STATION',
-            active: selectedInfrastructureNode?.id === node.id && selectedInfrastructureNode?.type === node.type,
-          }"
-          @click="handleSelectGroundNode(node)"
-        >
-          <span class="node-icon">{{ node.type === 'STATION' ? '💻' : '📡' }}</span>
-          <span class="node-name" :title="node.name">{{ node.name }}</span>
-          <span class="node-type-label">{{ node.type === 'STATION' ? '数据中心' : '接收站' }}</span>
-        </div>
-      </div>
-    </div>
   </aside>
 </template>
 
@@ -132,8 +89,6 @@
 import { ref, computed, watch } from 'vue'
 import { getSatelliteTypeSerials, type MatrixResult, type SatelliteMatrix, type InitMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
-import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
-
 const props = defineProps<{
   /** 算法矩阵响应式数据 */
   matrixData: MatrixResult | null
@@ -360,72 +315,9 @@ const satList = computed(() => {
   return Array.from(map.values())
 })
 
-const selectedInfrastructureNode = computed(() => store.selectedInfrastructureNode)
 
-/**
- * 解析经纬度字符串 (例如 "68.350,133.500") 为 [latitude, longitude]
- */
-const parseLatLon = (latLonStr?: string): [number, number] => {
-  if (!latLonStr) return [0, 0]
-  const parts = latLonStr.split(',').map((val) => parseFloat(val.trim()))
-  if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-    return [parts[0], parts[1]]
-  }
-  return [0, 0]
-}
 
-// 选择/取消选择敌方地面接收站或数据中心
-const handleSelectGroundNode = (node: InfrastructureLocation) => {
-  if (selectedInfrastructureNode.value?.id === node.id && selectedInfrastructureNode.value?.type === node.type) {
-    store.setSelectedInfrastructureNode(null)
-  } else {
-    store.setSelectedInfrastructureNode(node)
-  }
-}
 
-// 提取敌方地面设施列表 (接收站 + 数据中心)
-const groundNodes = computed<InfrastructureLocation[]>(() => {
-  const matrixData = props.matrixData
-  if (!matrixData) return []
-  const nodes: InfrastructureLocation[] = []
-
-  let relationData = matrixData.stationRelationList
-  if (!relationData?.receiveObjList?.length) {
-    relationData = matrixData.initRelationList
-  }
-
-  if (relationData?.receiveObjList) {
-    relationData.receiveObjList.forEach((rec) => {
-      const [lat, lon] = parseLatLon(rec.receiveLatLon)
-      nodes.push({
-        id: rec.receiveId,
-        name: rec.receiveName,
-        type: 'RECEIVE',
-        latitude: lat,
-        longitude: lon,
-        altitude: 0,
-        status: rec.receiveStatus ?? 0,
-      })
-    })
-  }
-
-  if (relationData?.stationObjList) {
-    relationData.stationObjList.forEach((st) => {
-      const [lat, lon] = parseLatLon(st.stationLatLon)
-      nodes.push({
-        id: st.stationId,
-        name: st.stationName,
-        type: 'STATION',
-        latitude: lat,
-        longitude: lon,
-        altitude: 0,
-        status: st.stationStatus ?? 0,
-      })
-    })
-  }
-
-  return nodes
-})
 </script>
 
 <style lang="scss" scoped>
@@ -444,16 +336,8 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
     system-ui,
     -apple-system,
     sans-serif;
-  overflow-y: auto;
+  overflow: hidden;
   gap: 12px;
-
-  &::-webkit-scrollbar {
-    width: 4px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 225, 255, 0.25);
-    border-radius: 4px;
-  }
 }
 
 .panel-header {
@@ -462,6 +346,7 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
   justify-content: space-between;
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(0, 225, 255, 0.15);
+  flex-shrink: 0;
 
   .header-title-box {
     display: flex;
@@ -495,6 +380,11 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 8px;
 
+  &.section-space {
+    flex: 1;
+    min-height: 0;
+  }
+
   .section-title {
     display: flex;
     align-items: center;
@@ -518,6 +408,7 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex-shrink: 0;
 
   .type-button-bar {
     display: flex;
@@ -620,6 +511,7 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
       &::-webkit-scrollbar {
         width: 3px;
       }
+
       &::-webkit-scrollbar-thumb {
         background: rgba(0, 225, 255, 0.3);
         border-radius: 3px;
@@ -698,13 +590,22 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
   }
 }
 
-// [业务目的] 敌方天基过境与中继卫星列表样式定义
-// [实现原因] 移除 max-height 与 overflow-y 局部滚动条限制，避免出现嵌套滚动条，统一由外层 .c2-panel 进行整体滚动
-// [关键规则] 不设高度上限，内容按 Flex 垂直排列自然展开
 .asset-scroll-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 225, 255, 0.25);
+    border-radius: 4px;
+  }
 }
 
 .asset-card {
@@ -779,74 +680,6 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
       margin-left: auto;
       color: #38bdf8;
       font-weight: 600;
-    }
-  }
-}
-
-.ground-nodes-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-}
-
-.ground-node-pill {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: rgba(18, 32, 54, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: rgba(56, 189, 248, 0.4);
-    background: rgba(30, 58, 95, 0.8);
-  }
-
-  &.active {
-    border-color: #38bdf8;
-    background: rgba(14, 165, 233, 0.25);
-    box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
-    .node-name {
-      color: #38bdf8;
-      font-weight: bold;
-    }
-  }
-
-  .node-icon {
-    font-size: 12px;
-  }
-
-  .node-name {
-    font-size: 12px;
-    color: #e2efff;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 80px;
-  }
-
-  .node-type-label {
-    margin-left: auto;
-    font-size: 10px;
-    color: #64748b;
-  }
-
-  &.node-center {
-    border-color: rgba(168, 85, 247, 0.3);
-    .node-type-label {
-      color: #c084fc;
-    }
-
-    &.active {
-      border-color: #a855f7;
-      background: rgba(168, 85, 247, 0.25);
-      box-shadow: 0 0 10px rgba(168, 85, 247, 0.35);
-      .node-name {
-        color: #e9d5ff;
-      }
     }
   }
 }

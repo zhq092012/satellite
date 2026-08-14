@@ -38,139 +38,28 @@
         </div>
       </div>
 
-      <!-- 2. 当前选中卫星的数据传输链路与窗口分析 -->
-      <div class="panel-section selected-sat-analysis">
+
+
+
+      <!-- 3. 敌方地基网络设施清单 (Ground Layer) -->
+      <div class="panel-section">
         <div class="section-title">
-          <span class="title-icon">🔗</span>
-          <span>目标卫星数据传输链路与窗口</span>
-          <span class="active-badge" v-if="selectedSatelliteNorad"> NORAD: #{{ selectedSatelliteNorad }} </span>
+          <span class="title-icon">🏢</span>
+          <span>敌方地基接收站与数据中心</span>
+          <span class="count-tag">{{ groundNodes.length }} 个</span>
         </div>
 
-        <!-- A. 未点击/未选择任何卫星时的静态提示 -->
-        <div v-if="!selectedSatelliteNorad" class="empty-sat-box">
-          <span class="empty-icon">🛰️</span>
-          <p class="empty-text">当前处于全网静态展示模式</p>
-          <small class="empty-sub"
-            >点击左侧列表或地图上的敌方卫星，系统将自动加载其专属传输矩阵，并推进时间轴至过境窗口</small
-          >
-        </div>
-
-        <!-- B. 已选中某颗敌方卫星时的传输分析 -->
-        <div v-else class="sat-analysis-box">
-          <!-- 卫星核心标示 -->
-          <div class="sat-header-row">
-            <div class="sat-title-group">
-              <span class="sat-name-large">{{ currentSatName }}</span>
-              <span class="sat-type-tag">{{ currentSatType }}</span>
-            </div>
-          </div>
-
-          <!-- 传输路径 Flow Diagram -->
-          <div class="link-flow-card">
-            <div class="flow-step">
-              <span class="step-icon">🛰️</span>
-              <span class="step-text">{{ currentSatName }}</span>
-              <span class="step-sub">天基感知</span>
-            </div>
-            <span class="flow-arrow">➔</span>
-            <div class="flow-step">
-              <span class="step-icon">{{ hasRelayNode ? '📡' : '🏢' }}</span>
-              <span class="step-text">{{ targetRelayOrStation }}</span>
-              <span class="step-sub">{{ hasRelayNode ? '中继/接收站' : '接收站' }}</span>
-            </div>
-            <span class="flow-arrow">➔</span>
-            <div class="flow-step">
-              <span class="step-icon">💻</span>
-              <span class="step-text">{{ targetDataCenter }}</span>
-              <span class="step-sub">数据中心</span>
-            </div>
-          </div>
-
-          <!-- 过境传输时间窗口 -->
-          <div class="window-detail-card" v-if="latestTransmissionWindow">
-            <div class="card-subtitle">
-              <span>⏱️ 下一个有效传输窗口 (自动连通推演)</span>
-            </div>
-            <div class="window-time-box">
-              <div class="time-row">
-                <span class="time-label">窗口开始:</span>
-                <span class="time-val digital-font glow-cyan">{{ latestTransmissionWindow.startTime }}</span>
-              </div>
-              <div class="time-row">
-                <span class="time-label">窗口结束:</span>
-                <span class="time-val digital-font">{{ latestTransmissionWindow.endTime }}</span>
-              </div>
-              <div class="time-row">
-                <span class="time-label">持续时长:</span>
-                <span class="time-val digital-font glow-amber">{{ windowDurationText }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 传输效能与延迟指标 -->
-          <div class="metrics-grid">
-            <div class="metric-item">
-              <span class="m-label">过境频次 (gjNum):</span>
-              <span class="m-val digital-font glow-cyan">{{ passFrequency }} 次/24h</span>
-            </div>
-            <div class="metric-item">
-              <span class="m-label">估算传输延时:</span>
-              <span class="m-val digital-font glow-green">{{ estimatedLatency }}</span>
-            </div>
-            <div class="metric-item">
-              <span class="m-label">通信余量:</span>
-              <span class="m-val digital-font glow-cyan">+18.5 dB</span>
-            </div>
-            <div class="metric-item">
-              <span class="m-label">最短用时:</span>
-              <span class="m-val digital-font glow-amber">{{ minTimeText }}</span>
-            </div>
+        <div class="ground-nodes-grid">
+          <div v-for="node in groundNodes" :key="`${node.type}-${node.id}`" class="ground-node-pill" :class="{
+            'node-center': node.type === 'STATION',
+            active: selectedInfrastructureNode?.id === node.id && selectedInfrastructureNode?.type === node.type,
+          }" @click="handleSelectGroundNode(node)">
+            <span class="node-icon">{{ node.type === 'STATION' ? '💻' : '📡' }}</span>
+            <span class="node-name" :title="node.name">{{ node.name }}</span>
+            <span class="node-type-label">{{ node.type === 'STATION' ? '数据中心' : '接收站' }}</span>
           </div>
         </div>
       </div>
-
-      <!-- 3. 选中 3D 节点/资产详情 (Node & Asset Detail) -->
-      <transition name="el-zoom-in-top">
-        <div v-if="selectedNode" class="panel-section selected-node-section">
-          <div class="section-title title-highlight">
-            <div class="title-left">
-              <span class="title-icon">{{ selectedNode.type === 'RECEIVE' ? '📡' : '💻' }}</span>
-              <span>{{ selectedNode.type === 'RECEIVE' ? '地面接收站详情' : '数据中心详情' }}</span>
-            </div>
-            <button class="close-node-btn" @click="clearSelectedNode" title="关闭详情">✕</button>
-          </div>
-
-          <div class="selected-node-card">
-            <div class="node-main-header">
-              <span class="node-name-text">{{ selectedNode.name }}</span>
-              <span class="node-id-tag">ID: {{ selectedNode.id }}</span>
-            </div>
-
-            <div class="node-grid">
-              <div class="grid-item">
-                <span class="item-label">节点类别:</span>
-                <span class="item-val glow-cyan">{{
-                  selectedNode.type === 'RECEIVE' ? '地基相控阵接收站' : '中心云数据处理中心'
-                }}</span>
-              </div>
-              <div class="grid-item">
-                <span class="item-label">地理坐标:</span>
-                <span class="item-val digital-font"
-                  >{{ selectedNode.latitude.toFixed(2) }}°N, {{ selectedNode.longitude.toFixed(2) }}°E</span
-                >
-              </div>
-              <div class="grid-item">
-                <span class="item-label">部署海拔:</span>
-                <span class="item-val digital-font">{{ selectedNode.altitude }} m</span>
-              </div>
-              <div class="grid-item">
-                <span class="item-label">解扩通信余量:</span>
-                <span class="item-val digital-font glow-green">+18.5 dB (良好)</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </transition>
     </el-scrollbar>
   </aside>
 </template>
@@ -186,9 +75,10 @@
  * - 不包含任何攻击/毁伤/打压战果内容
  */
 import { computed } from 'vue'
+import { type MatrixResult, } from '@/api/electronic'
+import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge';
 import { useLayoutStore } from '@/store/modules/layout'
-import { type MatrixResult, type SatelliteMatrix, type InitMatrix, type BattleWindow } from '@/api/electronic'
-
+const store = useLayoutStore()
 const props = defineProps<{
   /** 算法矩阵数据 */
   matrixData: MatrixResult | null
@@ -200,18 +90,12 @@ const emit = defineEmits<{
   (e: 'clear-satellite-selection'): void
 }>()
 
-const store = useLayoutStore()
 
 /**
  * 算法矩阵数据
  */
 const activeMatrix = computed<MatrixResult | null>(() => props.matrixData)
 
-// 选中的地面节点
-const selectedNode = computed(() => store.selectedInfrastructureNode)
-const clearSelectedNode = () => {
-  store.setSelectedInfrastructureNode(null)
-}
 
 // 全网资产统计
 const transitSatCount = computed(() => {
@@ -249,117 +133,71 @@ const dataCenterCount = computed(() => {
   return relationData?.stationObjList?.length || 0
 })
 
-// 当前选中卫星信息
-const currentSatItem = computed(() => {
-  if (!props.selectedSatelliteNorad) return null
-  const norad = props.selectedSatelliteNorad
-  const data = activeMatrix.value
-  if (!data) return null
-  const matchInit = (data.initMatrixList || []).find((item: InitMatrix) => item.norad === norad)
-  if (matchInit) return matchInit
-
-  const matchSat = (data.satelliteMatrixList || []).find((item: SatelliteMatrix) => item.norad === norad)
-  if (matchSat) return matchSat
-
-  const matchBattle = (data.battleMatrixList || []).find((item) => item.norad === norad)
-  if (matchBattle) return matchBattle
-
-  return null
-})
-
-const currentSatName = computed(() => {
-  return currentSatItem.value?.name || (props.selectedSatelliteNorad ? `SAT-#${props.selectedSatelliteNorad}` : '')
-})
-
-const currentSatType = computed(() => {
-  return (currentSatItem.value as any)?.satType || '过境观测卫星'
-})
-
-// 解析传输路径 (中继/接收站 & 数据中心)
-const hasRelayNode = computed(() => {
-  const data = activeMatrix.value
-  if (!data) return false
-  return (data.relayRelation?.relayList?.length || 0) > 0
-})
-/**
- * 计算目标中继卫星或者接收站的名称
- */
-const targetRelayOrStation = computed(() => {
-  if (!activeMatrix.value) return
-  const relationData = activeMatrix.value.stationRelationList || activeMatrix.value.initRelationList
-  const rec = relationData?.receiveObjList?.[0]
-  if (hasRelayNode.value) {
-    const relayNodeId = activeMatrix.value.relayRelation?.relayList?.[0]
-    return relayNodeId
-  }
-  return rec ? rec.receiveName : ''
-})
+const selectedInfrastructureNode = computed(() => store.selectedInfrastructureNode)
 
 /**
- * 计算数据中心的名称
+ * 解析经纬度字符串 (例如 "68.350,133.500") 为 [latitude, longitude]
  */
-const targetDataCenter = computed(() => {
-  if (!activeMatrix.value) return
-  const relationData = activeMatrix.value.stationRelationList || activeMatrix.value.initRelationList
-  const st = relationData?.stationObjList?.[0]
-  return st ? st.stationName : ''
-})
+const parseLatLon = (latLonStr?: string): [number, number] => {
+  if (!latLonStr) return [0, 0]
+  const parts = latLonStr.split(',').map((val) => parseFloat(val.trim()))
+  if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+    return [parts[0], parts[1]]
+  }
+  return [0, 0]
+}
 
-// 最新/最早的过境传输窗口
-const latestTransmissionWindow = computed<BattleWindow | null>(() => {
-  if (!props.selectedSatelliteNorad) return null
-  const data = activeMatrix.value
-  if (!data) return null
-  // 查 battleMatrixList
-  const battleMatch = (data.battleMatrixList || []).find((b) => b.norad === props.selectedSatelliteNorad)
-  if (battleMatch?.windows?.length) {
-    return battleMatch.windows[0]
+// 选择/取消选择敌方地面接收站或数据中心
+const handleSelectGroundNode = (node: InfrastructureLocation) => {
+  if (selectedInfrastructureNode.value?.id === node.id && selectedInfrastructureNode.value?.type === node.type) {
+    store.setSelectedInfrastructureNode(null)
+  } else {
+    store.setSelectedInfrastructureNode(node)
+  }
+}
+
+// 提取敌方地面设施列表 (接收站 + 数据中心)
+const groundNodes = computed<InfrastructureLocation[]>(() => {
+  const matrixData = props.matrixData
+  if (!matrixData) return []
+  const nodes: InfrastructureLocation[] = []
+
+  let relationData = matrixData.stationRelationList
+  if (!relationData?.receiveObjList?.length) {
+    relationData = matrixData.initRelationList
   }
 
-  // 查 initMatrixList
-  // [业务目的] 当战场过境矩阵匹配不到时，从初始过境时间窗口列表中读取该卫星的时间窗口
-  // [实现原因] InitMatrix 接口类型定义的过境窗口数组字段为 initWindows，单项时间窗口为 InitWindow (包含 peakWindow 和 endWindow 字段)
-  // [关键规则] 使用 initMatch.initWindows[0].peakWindow 作为 startTime，endWindow 作为 endTime
-  const initMatch = (data.initMatrixList || []).find((i) => i.norad === props.selectedSatelliteNorad)
-  if (initMatch?.initWindows?.length) {
-    return {
-      startTime: initMatch.initWindows[0].peakWindow,
-      endTime: initMatch.initWindows[0].endWindow,
-    }
+  if (relationData?.receiveObjList) {
+    relationData.receiveObjList.forEach((rec) => {
+      const [lat, lon] = parseLatLon(rec.receiveLatLon)
+      nodes.push({
+        id: rec.receiveId,
+        name: rec.receiveName,
+        type: 'RECEIVE',
+        latitude: lat,
+        longitude: lon,
+        altitude: 0,
+        status: rec.receiveStatus ?? 0,
+      })
+    })
   }
-  return null
-})
 
-// 计算窗口持续时长
-const windowDurationText = computed(() => {
-  const win = latestTransmissionWindow.value
-  if (!win?.startTime || !win?.endTime) return '--'
-  try {
-    const start = new Date(win.startTime.replace(/-/g, '/')).getTime()
-    const end = new Date(win.endTime.replace(/-/g, '/')).getTime()
-    const diffSec = Math.max(0, Math.floor((end - start) / 1000))
-    const min = Math.floor(diffSec / 60)
-    const sec = diffSec % 60
-    return `${min} 分 ${sec} 秒`
-  } catch (e) {
-    return '--'
+  if (relationData?.stationObjList) {
+    relationData.stationObjList.forEach((st) => {
+      const [lat, lon] = parseLatLon(st.stationLatLon)
+      nodes.push({
+        id: st.stationId,
+        name: st.stationName,
+        type: 'STATION',
+        latitude: lat,
+        longitude: lon,
+        altitude: 0,
+        status: st.stationStatus ?? 0,
+      })
+    })
   }
-})
 
-// 过境频次 (gjNum)
-const passFrequency = computed(() => {
-  const item = currentSatItem.value as any
-  return item?.gjNum || item?.windows?.length || 4
-})
-
-// 延迟估算
-const estimatedLatency = computed(() => {
-  return hasRelayNode.value ? '18.2 ms (含高轨中继)' : '8.6 ms (直连地面站)'
-})
-
-// 最短用时
-const minTimeText = computed(() => {
-  return windowDurationText.value !== '--' ? windowDurationText.value : '18 分钟 30 秒'
+  return nodes
 })
 </script>
 
@@ -473,12 +311,15 @@ const minTimeText = computed(() => {
     .glow-cyan {
       color: #38bdf8;
     }
+
     .glow-amber {
       color: #fbbf24;
     }
+
     .glow-blue {
       color: #60a5fa;
     }
+
     .glow-purple {
       color: #c084fc;
     }
@@ -499,12 +340,14 @@ const minTimeText = computed(() => {
   .empty-icon {
     font-size: 24px;
   }
+
   .empty-text {
     font-size: 13px;
     font-weight: 600;
     color: #e2efff;
     margin: 0;
   }
+
   .empty-sub {
     font-size: 11px;
     color: #94a3b8;
@@ -578,6 +421,7 @@ const minTimeText = computed(() => {
     .step-icon {
       font-size: 16px;
     }
+
     .step-text {
       font-size: 11px;
       font-weight: 600;
@@ -587,6 +431,7 @@ const minTimeText = computed(() => {
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+
     .step-sub {
       font-size: 9px;
       color: #64748b;
@@ -625,9 +470,11 @@ const minTimeText = computed(() => {
       .time-label {
         color: #94a3b8;
       }
+
       .glow-cyan {
         color: #38bdf8;
       }
+
       .glow-amber {
         color: #fbbf24;
       }
@@ -651,16 +498,20 @@ const minTimeText = computed(() => {
       font-size: 10px;
       color: #64748b;
     }
+
     .m-val {
       font-size: 12px;
       margin-top: 2px;
     }
+
     .glow-cyan {
       color: #38bdf8;
     }
+
     .glow-green {
       color: #4ade80;
     }
+
     .glow-amber {
       color: #fbbf24;
     }
@@ -705,12 +556,15 @@ const minTimeText = computed(() => {
       .item-label {
         color: #64748b;
       }
+
       .item-val {
         color: #e2efff;
       }
+
       .glow-cyan {
         color: #38bdf8;
       }
+
       .glow-green {
         color: #4ade80;
       }
@@ -727,8 +581,80 @@ const minTimeText = computed(() => {
     color: #94a3b8;
     cursor: pointer;
     font-size: 12px;
+
     &:hover {
       color: #ffffff;
+    }
+  }
+}
+
+.ground-nodes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.ground-node-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(18, 32, 54, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: rgba(56, 189, 248, 0.4);
+    background: rgba(30, 58, 95, 0.8);
+  }
+
+  &.active {
+    border-color: #38bdf8;
+    background: rgba(14, 165, 233, 0.25);
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+
+    .node-name {
+      color: #38bdf8;
+      font-weight: bold;
+    }
+  }
+
+  .node-icon {
+    font-size: 12px;
+  }
+
+  .node-name {
+    font-size: 12px;
+    color: #e2efff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 80px;
+  }
+
+  .node-type-label {
+    margin-left: auto;
+    font-size: 10px;
+    color: #64748b;
+  }
+
+  &.node-center {
+    border-color: rgba(168, 85, 247, 0.3);
+
+    .node-type-label {
+      color: #c084fc;
+    }
+
+    &.active {
+      border-color: #a855f7;
+      background: rgba(168, 85, 247, 0.25);
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.35);
+
+      .node-name {
+        color: #e9d5ff;
+      }
     }
   }
 }
