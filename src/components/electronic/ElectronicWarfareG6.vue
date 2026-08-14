@@ -59,15 +59,15 @@
         </div>
         <div class="stat-badge">
           <span class="stat-dot dot-normal-link"></span>
-          <span>打击前/正常: <strong>{{ normalLinkCount }}</strong> 条</span>
+          <span>正常: <strong>{{ normalLinkCount }}</strong> 条</span>
         </div>
         <div class="stat-badge alert-stat">
           <span class="stat-dot dot-striking-link"></span>
-          <span>正在打击: <strong>{{ strikingLinkCount }}</strong> 条</span>
+          <span>正在干扰: <strong>{{ strikingLinkCount }}</strong> 条</span>
         </div>
         <div class="stat-badge">
           <span class="stat-dot dot-severed-link"></span>
-          <span>打击后中断: <strong>{{ severedLinkCount }}</strong> 条</span>
+          <span>已干扰: <strong>{{ severedLinkCount }}</strong> 条</span>
         </div>
       </div>
 
@@ -762,7 +762,7 @@ const scrollToActiveCard = (force = false) => {
  *
  * [处理规则]
  * - 绘制 Layer 1 -> Layer 2 -> Layer 3 的平滑三层连接曲线。
- * - 当链路处于打击/毁伤状态 (isStruck === true) 时，通过红色虚线 (stroke: '#ff4d4f', lineDash: [6, 4]) 表达打压状态。
+ * - 链路仅使用三种视觉：绿色实线（未受干扰）、红色实线（正在干扰）、灰色虚线（已经干扰）。
  */
 const registerCustomG6Edge = () => {
   try {
@@ -778,7 +778,7 @@ const registerCustomG6Edge = () => {
             ['C', startPoint.x, startPoint.y + hgap, endPoint.x, endPoint.y - hgap, endPoint.x, endPoint.y],
           ]
 
-          const stroke = cfg.style?.stroke || '#00e1ff'
+          const stroke = cfg.style?.stroke || LINK_COLORS.normal
           const lineDash = cfg.style?.lineDash
 
           const shape = group.addShape('path', {
@@ -999,6 +999,25 @@ const resolveTransitLinkPhase = (visibleWins: any[], currentTs: number): { phase
       delayMin = Math.max(delayMin, delay)
     }
   }
+  return { phase, delayMin }
+}
+
+/** 解析星间中继链路阶段，规则与星地链路一致：绿实线 / 红实线 / 灰虚线 */
+const resolveRelayLinkPhase = (
+  rel: { from: string | number; to: string | number; visibilityWindows?: any[] },
+  satMap: Map<number, { status: number }>,
+  currentTs: number
+): { phase: LinkPhase; delayMin: number } => {
+  const fromSat = satMap.get(Number(rel.from))
+  const toSat = satMap.get(Number(rel.to))
+  const linkStruck = fromSat?.status === 1 || toSat?.status === 1
+  const visibleWins = getVisibleTransitWindows(rel.visibilityWindows || []).map((win) => ({
+    ...win,
+    strikeStatus: linkStruck ? 1 : Number(win.strikeStatus) || 0,
+    delayMin: Number(win.delayMin) || 0,
+  }))
+  let { phase, delayMin } = resolveTransitLinkPhase(visibleWins, currentTs)
+  if (phase === 'normal' && linkStruck) phase = 'severed'
   return { phase, delayMin }
 }
 
@@ -1700,12 +1719,7 @@ const selectWindowItem = (win: WindowItemWrapper) => {
   })
 
   graph.getEdges().forEach((edge: any) => {
-    const edgeId = edge.get('id')
-    if (edgeId.includes(satId) && edgeId.includes(recId)) {
-      graph.setItemState(edge, 'highlight', true)
-    } else {
-      graph.setItemState(edge, 'highlight', false)
-    }
+    graph.setItemState(edge, 'highlight', false)
   })
 
   // 强制滚动居中当前点击选中的窗口卡片
@@ -1718,35 +1732,27 @@ const selectWindowItem = (win: WindowItemWrapper) => {
 const highlightActiveElements = () => {
   if (!graph) return
   const activeWins = allWindowsList.value.filter((w) => isWindowActiveAtCurrentTime(w))
-  const activeEdgeKeys = new Set<string>()
   const activeNodeIds = new Set<string>()
 
   activeWins.forEach((w) => {
     const satId = `sat-${w.satNorad}`
     activeNodeIds.add(satId)
     activeNodeIds.add(w.receiveId)
-    activeEdgeKeys.add(`${satId}::${w.receiveId}`)
   })
 
-  // [逻辑说明] 当关联卫星处于活跃过境状态时，同步保持星间中继拓扑链路与中继卫星的高亮与连接活跃
+  // 当前过境卫星对应的中继卫星节点同步保持活跃，但链路颜色仍只由绿/红/灰三种状态决定
   const relayRels = matrixData.value?.relayRelation?.relations || []
   relayRels.forEach((rel) => {
     const fromId = `sat-${rel.from}`
     const toId = `sat-${rel.to}`
     if (activeNodeIds.has(fromId)) {
       activeNodeIds.add(toId)
-      activeEdgeKeys.add(`${fromId}::${toId}`)
     }
   })
 
   graph.getEdges().forEach((edge: any) => {
-    const model = edge.getModel()
-    const key = `${model.source}::${model.target}`
-    if (activeEdgeKeys.has(key)) {
-      graph.setItemState(edge, 'active', true)
-    } else {
-      graph.setItemState(edge, 'active', false)
-    }
+    graph.setItemState(edge, 'active', false)
+    graph.setItemState(edge, 'highlight', false)
   })
 
   graph.getNodes().forEach((node: any) => {
@@ -1865,6 +1871,8 @@ const buildG6GraphData = () => {
             fill: bgFill,
             stroke: strokeColor,
             lineWidth: 3,
+            shadowColor: strokeColor,
+            shadowBlur: 20,
           },
           inactive: {
             fill: bgFill,
@@ -1931,6 +1939,8 @@ const buildG6GraphData = () => {
           fill: '#0f2742',
           stroke: '#1890ff',
           lineWidth: 3,
+          shadowColor: '#1890ff',
+          shadowBlur: 20,
         },
         inactive: {
           fill: '#0f2742',
@@ -2134,6 +2144,8 @@ const buildG6GraphData = () => {
           fill: bgFill,
           stroke: strokeColor,
           lineWidth: 3,
+          shadowColor: strokeColor,
+          shadowBlur: 20,
         },
         inactive: {
           fill: bgFill,
@@ -2205,6 +2217,8 @@ const buildG6GraphData = () => {
           fill: bgFill,
           stroke: strokeColor,
           lineWidth: 3,
+          shadowColor: strokeColor,
+          shadowBlur: 20,
         },
         inactive: {
           fill: bgFill,
@@ -2275,6 +2289,8 @@ const buildG6GraphData = () => {
           fill: bgFill,
           stroke: strokeColor,
           lineWidth: 3,
+          shadowColor: strokeColor,
+          shadowBlur: 20,
         },
         inactive: {
           fill: bgFill,
@@ -2345,6 +2361,8 @@ const buildG6GraphData = () => {
           fill: bgFill,
           stroke: strokeColor,
           lineWidth: 3,
+          shadowColor: strokeColor,
+          shadowBlur: 20,
         },
         inactive: {
           fill: bgFill,
@@ -2456,8 +2474,9 @@ const buildG6GraphData = () => {
 
     if (!edgeSet.has(edgeId) && nodeSet.has(sourceSatId) && nodeSet.has(targetSatId)) {
       edgeSet.add(edgeId)
-      const edgeVisual = buildEdgeVisual('normal', 0, { lineDash: [4, 4] })
-      countLinkPhase(linkCounts, 'normal')
+      const { phase, delayMin } = resolveRelayLinkPhase(rel, satMap, currentTs())
+      const edgeVisual = buildEdgeVisual(phase, delayMin)
+      countLinkPhase(linkCounts, phase)
 
       edges.push({
         id: edgeId,
@@ -2468,7 +2487,7 @@ const buildG6GraphData = () => {
         type: 'struck-cubic',
         label: edgeVisual.label,
         labelCfg: edgeVisual.labelCfg,
-        style: { ...edgeVisual.style, stroke: '#a855f7' },
+        style: edgeVisual.style,
       })
     }
   })
@@ -2528,7 +2547,7 @@ const initOrUpdateGraph = (fitView = true) => {
       fitView: true,
       fitViewPadding: [20, 40, 20, 40],
       modes: {
-        default: ['activate-relations'],
+        default: [],
       },
       defaultNode: {
         type: 'rect',
@@ -2559,6 +2578,7 @@ const initOrUpdateGraph = (fitView = true) => {
         },
         selected: {
           lineWidth: 3,
+          shadowBlur: 20,
         },
         inactive: {
           opacity: 0.75,
@@ -2566,17 +2586,13 @@ const initOrUpdateGraph = (fitView = true) => {
       },
       edgeStateStyles: {
         active: {
-          lineWidth: 3.5,
-          shadowColor: '#00e1ff',
-          shadowBlur: 10,
+          lineWidth: 2.5,
         },
         highlight: {
-          lineWidth: 3.5,
-          shadowColor: '#00e1ff',
-          shadowBlur: 12,
+          lineWidth: 2.5,
         },
         inactive: {
-          opacity: 0.35,
+          opacity: 0.45,
         },
       },
     })
@@ -2668,7 +2684,7 @@ const parseAndSelectNode = (model: any) => {
 
 /**
  * [功能说明]
- * 更新 G6 图节点的选中与关联高亮样式
+ * 更新 G6 图节点的选中样式：仅高亮当前节点，不联动高亮相连链路
  */
 const updateGraphHighlightState = () => {
   if (!graph || graph.get('destroyed')) return
@@ -2680,45 +2696,25 @@ const updateGraphHighlightState = () => {
 
   const selId = selectedNodeInfo.value.id
 
-  // 查找与当前选中节点相连的所有边和节点 ID 集合
-  const connectedNodeIds = new Set<string>([selId])
-  const connectedEdgeIds = new Set<string>()
-
-  graph.getEdges().forEach((edge: any) => {
-    const model = edge.getModel()
-    if (model.source === selId || model.target === selId) {
-      connectedEdgeIds.add(edge.get('id'))
-      connectedNodeIds.add(model.source)
-      connectedNodeIds.add(model.target)
-    }
-  })
-
   graph.getNodes().forEach((node: any) => {
     const id = node.get('id')
     if (id === selId) {
       graph.setItemState(node, 'selected', true)
       graph.setItemState(node, 'inactive', false)
       graph.setItemState(node, 'highlight', false)
-    } else if (connectedNodeIds.has(id)) {
-      graph.setItemState(node, 'selected', false)
-      graph.setItemState(node, 'highlight', true)
-      graph.setItemState(node, 'inactive', false)
+      graph.setItemState(node, 'active', false)
     } else {
       graph.setItemState(node, 'selected', false)
       graph.setItemState(node, 'highlight', false)
       graph.setItemState(node, 'inactive', true)
+      graph.setItemState(node, 'active', false)
     }
   })
 
   graph.getEdges().forEach((edge: any) => {
-    const edgeId = edge.get('id')
-    if (connectedEdgeIds.has(edgeId)) {
-      graph.setItemState(edge, 'highlight', true)
-      graph.setItemState(edge, 'inactive', false)
-    } else {
-      graph.setItemState(edge, 'highlight', false)
-      graph.setItemState(edge, 'inactive', true)
-    }
+    graph.setItemState(edge, 'highlight', false)
+    graph.setItemState(edge, 'inactive', false)
+    graph.setItemState(edge, 'active', false)
   })
 }
 

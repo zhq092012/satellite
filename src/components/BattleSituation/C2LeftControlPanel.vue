@@ -146,13 +146,11 @@
               </div>
               <div class="param-item">
                 <span class="param-label">国别</span>
-                <span class="param-value">{{ threatInfo.satelliteBaseModelResp.countryIndicator === 1 ? '敌方卫星' : '我方卫星'
-                }}</span>
+                <span class="param-value">{{ threatInfo.satelliteBaseModelResp.countryIndicator }}</span>
               </div>
               <div class="param-item">
                 <span class="param-label">用户属性</span>
-                <span class="param-value">{{ formatUsageIndicator(threatInfo.satelliteBaseModelResp.usageIndicator)
-                }}</span>
+                <span class="param-value">{{ threatInfo.satelliteBaseModelResp.usageIndicator }}</span>
               </div>
             </div>
           </div>
