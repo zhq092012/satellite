@@ -18,7 +18,7 @@ import { getAllWeapons, getSatelliteDetail, getSatelliteTLEData, getTLEDataByTas
 import { createWeaponIconDataUri, getWeaponIconScale } from '@/utils/tools/svgIcons'
 import * as satellitejs from 'satellite.js'
 import { useLayoutStore } from '@/store/modules/layout'
-import { formatTimeLineAndAnimation, markBattleArea } from '@/utils/tools/functionTool'
+import { markBattleArea } from '@/utils/tools/functionTool'
 import { CallbackProperty } from 'cesium'
 import type { SatelliteData, Weapon } from '@/types/dashboard'
 
@@ -34,15 +34,8 @@ const creditEl = ref<HTMLElement | null>(null)
 
 /**
  * 组件 Props 定义
- *
- * [字段说明]
- * - showTimeLine: 是否显示时间轴控件
- * - showAnimation: 是否显示动画控件
- * - matrixData: 算法矩阵数据（包含地面站、中继卫星、过境窗口与打压状态）
  */
 const props = defineProps<{
-  showTimeLine: boolean
-  showAnimation: boolean
   /** 算法矩阵数据（包含地面站、中继卫星、过境窗口与打压状态） */
   matrixData?: MatrixResult | null
   /** 当前选中的敌方卫星 NORAD */
@@ -177,8 +170,8 @@ const initViewer = async () => {
         homeButton: false, // 关闭回到默认视角按钮
         sceneModePicker: false, // 关闭视图模式切换器
         navigationHelpButton: false, // 关闭帮助按钮
-        animation: props.showAnimation, // 关闭默认动画控件
-        timeline: props.showTimeLine, // 关闭默认时间轴控件（我们使用自定义时间轴）
+        animation: false,
+        timeline: false,
         creditContainer: creditEl.value || undefined, // 使用组件内的 credit 容器，避免多个实例使用相同 id
         fullscreenButton: false, // 关闭全屏按钮
         baseLayerPicker: false, // 关闭底图选择器
@@ -204,31 +197,7 @@ const initViewer = async () => {
       // 设置每帧最大渲染时间，避免单帧过长导致界面卡顿（根据实际情况调整，单位：秒）
       viewer.scene.maximumRenderTimeChange = 0.1
 
-      // 设置时间系统
-      if (props.showTimeLine) {
-        if (store.activedTask) {
-          const beginTime = new Date(store.activedTask.beginDate)
-          const endTime = new Date(store.activedTask.endDate)
-
-          const isoUTCStartTime = beginTime.toISOString() // 已经减 8 h 转成 UTC 字符串
-          const startTime = Cesium.JulianDate.fromIso8601(isoUTCStartTime)
-          const isoUTCStopTime = endTime.toISOString() // 已经减 8 h 转成 UTC 字符串
-          const stopTime = Cesium.JulianDate.fromIso8601(isoUTCStopTime)
-
-          // 设置时间轴的显示范围
-          viewer.timeline.zoomTo(startTime, stopTime)
-          viewer.clock.startTime = startTime.clone()
-          viewer.clock.stopTime = stopTime.clone()
-          viewer.clock.currentTime = startTime.clone()
-
-          viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP
-          viewer.clock.multiplier = playbackSpeed.value
-          //  确保动画默认启用
-          viewer.clock.shouldAnimate = true
-          //  动画控件格式
-          formatTimeLineAndAnimation(viewer)
-        }
-      }
+      initTaskClock()
 
       // 绑定自定义的相机监听（用于显示相机位置/角度等）
       // listenCameraLocaion(viewer)
@@ -725,6 +694,57 @@ const satelliteRenderBusy = ref(false)
 let satelliteRenderToken = 0
 // 时间轴回放速度（倍速），默认 1.0 倍
 const playbackSpeed = ref(1.0)
+
+/**
+ * 根据当前任务初始化 Cesium 时钟范围（不启用默认 UI 时间轴）
+ */
+const initTaskClock = () => {
+  if (!viewer || viewer.isDestroyed() || !store.activedTask) return
+  const beginTime = new Date(store.activedTask.beginDate.replace(/-/g, '/'))
+  const endTime = new Date(store.activedTask.endDate.replace(/-/g, '/'))
+  if (Number.isNaN(beginTime.getTime()) || Number.isNaN(endTime.getTime())) return
+
+  const startTime = Cesium.JulianDate.fromDate(beginTime)
+  const stopTime = Cesium.JulianDate.fromDate(endTime)
+  viewer.clock.startTime = startTime.clone()
+  viewer.clock.stopTime = stopTime.clone()
+  viewer.clock.currentTime = startTime.clone()
+  viewer.clock.clockRange = Cesium.ClockRange.CLAMPED
+  viewer.clock.multiplier = playbackSpeed.value
+  viewer.clock.shouldAnimate = false
+  viewer.scene.requestRender()
+}
+
+/**
+ * 设置 Cesium 时钟到指定时刻（毫秒时间戳）
+ */
+const setClockTime = (ms: number) => {
+  if (!viewer || viewer.isDestroyed()) return
+  const date = new Date(ms)
+  if (Number.isNaN(date.getTime())) return
+  viewer.clock.currentTime = Cesium.JulianDate.fromDate(date)
+  viewer.scene.requestRender()
+}
+
+/**
+ * 控制 Cesium 时钟播放/暂停
+ */
+const setClockPlaying = (playing: boolean, multiplier = 1) => {
+  if (!viewer || viewer.isDestroyed()) return
+  playbackSpeed.value = multiplier
+  viewer.clock.multiplier = multiplier
+  viewer.clock.shouldAnimate = playing
+  viewer.scene.requestRender()
+}
+
+watch(
+  () => [store.activedTask?.id, store.activedTask?.beginDate, store.activedTask?.endDate],
+  () => {
+    if (viewer && !viewer.isDestroyed()) {
+      initTaskClock()
+    }
+  }
+)
 
 let cameraMoveEndListener: Cesium.Event.RemoveCallback | null = null
 
@@ -1302,16 +1322,11 @@ onBeforeUnmount(() => {
  * 暂停时钟推演动画 (用于未选择单颗卫星时静态展示)
  */
 const pauseClockAnimation = () => {
-  if (viewer && !viewer.isDestroyed()) {
-    viewer.clock.shouldAnimate = false
-  }
+  setClockPlaying(false)
 }
 
 /**
- * [功能]
- * 推进 Cesium 时钟至指定时间点并开启推演动画
- *
- * @param timeStr 时间格式字符串或 ISO 8601 字符串
+ * 推进 Cesium 时钟至指定时间点
  */
 const jumpToTimeAndPlay = (timeStr?: string) => {
   if (!viewer || viewer.isDestroyed()) return
@@ -1319,16 +1334,13 @@ const jumpToTimeAndPlay = (timeStr?: string) => {
     try {
       const date = new Date(timeStr.replace(/-/g, '/'))
       if (!isNaN(date.getTime())) {
-        const targetJulianDate = Cesium.JulianDate.fromDate(date)
-        viewer.clock.currentTime = targetJulianDate
+        setClockTime(date.getTime())
       }
     } catch (err) {
       console.warn('时间跳转解析失败:', timeStr, err)
     }
   }
-  viewer.clock.shouldAnimate = true
-
-  viewer.scene.requestRender()
+  setClockPlaying(true, playbackSpeed.value)
 }
 
 defineExpose({
@@ -1339,6 +1351,9 @@ defineExpose({
   highlightSatellite,
   pauseClockAnimation,
   jumpToTimeAndPlay,
+  initTaskClock,
+  setClockTime,
+  setClockPlaying,
 })
 </script>
 <style lang="scss" scoped>

@@ -17,10 +17,16 @@
           <div class="battle-grid__earth">
             <CesiumViewer
               ref="cesiumViewerRef"
-              :showTimeLine="true"
-              :showAnimation="true"
               :matrix-data="matrixData"
               :selected-norad="selectedNorad"
+            />
+            <BattleMissionTimeline
+              v-if="taskTimeRange"
+              :task-start="taskTimeRange.start"
+              :task-end="taskTimeRange.end"
+              :matrix-data="matrixData"
+              :selected-norad="selectedNorad"
+              @time-change="handleTimelineTimeChange"
             />
           </div>
         </div>
@@ -43,6 +49,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
+import BattleMissionTimeline from '@/components/BattleSituation/BattleMissionTimeline.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
@@ -61,6 +68,17 @@ const selectedNorad = ref<number | null>(null)
 
 /** [计算属性说明] 全局共享的侦察/打击算法矩阵结果 */
 const matrixData = computed<MatrixResult | null>(() => store.matrixData)
+
+/** 当前任务时间范围 */
+const taskTimeRange = computed(() => {
+  const task = store.activedTask
+  if (!task?.beginDate || !task?.endDate) return null
+  return { start: task.beginDate, end: task.endDate }
+})
+
+const handleTimelineTimeChange = (ms: number) => {
+  cesiumViewerRef.value?.setClockTime(ms)
+}
 
 /**
  * [函数说明]
@@ -107,7 +125,7 @@ const handleSelectSatellite = (norad: number | null) => {
   selectedNorad.value = norad
   const taskId = store.activedTask?.id
 
-  // 1. 未选择卫星/取消选择 (相机定位战场，暂停推演动画)
+  // 1. 未选择卫星/取消选择 (相机定位战场)
   if (!norad || !taskId) {
     if (cesiumViewerRef.value) {
       cesiumViewerRef.value.pauseClockAnimation()

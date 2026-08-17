@@ -35,7 +35,7 @@ interface ChainCandidate {
   nodes: ChainNode[]
 }
 
-const parseTimeToMs = (timeStr: string): number => {
+export const parseTimeToMs = (timeStr: string): number => {
   if (!timeStr) return 0
   const normalized = timeStr.replace(/-/g, '/')
   const ts = new Date(normalized).getTime()
