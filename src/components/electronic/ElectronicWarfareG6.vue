@@ -41,11 +41,8 @@
     <div class="cema-workspace">
       <div class="topo-main-body">
         <div class="topo-side topo-side--left">
-          <C2LeftControlPanel
-            :matrix-data="matrixData"
-            :selected-norad="selectedNorad"
-            @select-satellite="handleSelectSatellite"
-          />
+          <C2LeftControlPanel :matrix-data="matrixData" :selected-norad="selectedNorad"
+            @select-satellite="handleSelectSatellite" />
         </div>
 
         <div class="topo-center-column">
@@ -83,17 +80,11 @@
           <div class="topo-graph-stack">
             <div class="graph-stage">
               <div class="graph-layer-labels">
-                <div
-                  v-for="item in layerLabelItems"
-                  :key="item.key"
-                  class="graph-layer-label"
-                  :class="item.className"
-                  :style="{ top: item.top }"
-                >
+                <div v-for="item in layerLabelItems" :key="item.key" class="graph-layer-label" :class="item.className"
+                  :style="{ top: item.top }">
                   <span class="layer-icon">{{ item.icon }}</span>
                   <div class="layer-text">
                     <span class="layer-title">{{ item.title }}</span>
-                    <span class="layer-sub">{{ item.sub }}</span>
                   </div>
                 </div>
               </div>
@@ -103,21 +94,6 @@
             <div class="graph-time-toolbar">
               <span class="toolbar-label">当前时刻</span>
               <span class="time-value">{{ currentTimeText }}</span>
-              <span class="toolbar-divider"></span>
-              <span class="toolbar-label">可见时间窗口</span>
-              <el-select
-                v-model="timeWindowHours"
-                size="small"
-                class="time-window-select"
-                @change="handleTimeWindowChange"
-              >
-                <el-option
-                  v-for="opt in timeWindowOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
               <span class="service-duration-badge pre-strike-badge" v-if="currentSatCategory === 'COMM'">
                 <span class="badge-label">打击前服务时长:</span>
                 <strong class="glow-text-cyan badge-val">{{ formattedPreServiceDuration }}</strong>
@@ -129,24 +105,16 @@
             </div>
 
             <div class="mission-timeline-wrap">
-              <BattleMissionTimeline
-                v-if="taskTimeRange"
-                :task-start="taskTimeRange.start"
-                :task-end="taskTimeRange.end"
-                :matrix-data="matrixData"
-                :selected-norad="selectedNorad"
-                @time-change="handleTimelineTimeChange"
-              />
+              <BattleMissionTimeline v-if="taskTimeRange" :task-start="taskTimeRange.start"
+                :task-end="taskTimeRange.end" :matrix-data="matrixData" :selected-norad="selectedNorad"
+                @time-change="handleTimelineTimeChange" />
             </div>
           </div>
         </div>
 
         <div class="topo-side topo-side--right">
-          <C2RightAnalysisPanel
-            :matrix-data="matrixData"
-            :selected-satellite-norad="selectedNorad"
-            @clear-satellite-selection="handleSelectSatellite(null)"
-          />
+          <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad"
+            @clear-satellite-selection="handleSelectSatellite(null)" />
         </div>
       </div>
     </div>
@@ -176,17 +144,40 @@ const taskTimeRange = computed(() => {
   return { start: task.beginDate, end: task.endDate }
 })
 
+// G6 画布容器 DOM ref
+const g6Container = ref<HTMLDivElement | null>(null)
+
+const graphStageHeight = ref(480)
+
+const RECON_LAYER_Y_RATIOS = [0.14, 0.33, 0.54, 0.75] as const
+const COMM_LAYER_Y_RATIOS = [0.2, 0.72] as const
+
+const syncGraphStageHeight = () => {
+  const height = g6Container.value?.clientHeight ?? 0
+  if (height > 0) graphStageHeight.value = height
+}
+
+const getLayerYRatio = (layer: number): number => {
+  const ratios = currentSatCategory.value === 'COMM' ? COMM_LAYER_Y_RATIOS : RECON_LAYER_Y_RATIOS
+  return ratios[layer - 1] ?? 0.5
+}
+
+const getLayerY = (layer: number): number => getLayerYRatio(layer) * graphStageHeight.value
+
+const formatLayerTop = (layer: number): string => `${getLayerY(layer)}px`
+
 const layerLabelItems = computed(() => {
   if (currentSatCategory.value === 'COMM') {
     return [
-      { key: 'comm-1', icon: '🛰️', title: '第一层：通讯卫星', sub: 'Communication Satellites', top: '16%', className: 'layer-1-item' },
-      { key: 'comm-2', icon: '🎯', title: `第二层：${store.battle?.name || '战场目标区域'}`, sub: 'Target Battle Area', top: '64%', className: 'layer-2-item' },
+      { key: 'comm-1', icon: '🛰️', title: '通讯卫星', top: formatLayerTop(1), className: 'layer-1-item' },
+      { key: 'comm-2', icon: '🎯', title: `第二层：${store.battle?.name || '战场目标区域'}`, top: formatLayerTop(2), className: 'layer-2-item' },
     ]
   }
   return [
-    { key: 'recon-1', icon: '🛰️', title: '第一层：普通卫星', sub: 'Ordinary Satellites', top: '14%', className: 'layer-1-item' },
-    { key: 'recon-2', icon: '🛰️', title: '第二层：中继卫星', sub: 'Relay Satellites', top: '42%', className: 'layer-2-item' },
-    { key: 'recon-3', icon: '📡', title: '第三层：接收站/数据中心', sub: 'Ground & Data Layer', top: '74%', className: 'layer-3-item' },
+    { key: 'recon-1', icon: '🛰️', title: '侦察卫星', top: formatLayerTop(1), className: 'layer-1-item' },
+    { key: 'recon-2', icon: '🛰️', title: '中继卫星', top: formatLayerTop(2), className: 'layer-2-item' },
+    { key: 'recon-3', icon: '📡', title: '地面接收站', top: formatLayerTop(3), className: 'layer-3-item' },
+    { key: 'recon-4', icon: '🏢', title: '数据中心', top: formatLayerTop(4), className: 'layer-4-item' },
   ]
 })
 
@@ -330,10 +321,6 @@ const currentSatCategory = computed<FuncType>(() => {
 const loading = ref(false)
 
 // [变量用途]
-// G6 图形 Canvas 容器 DOM ref
-const g6Container = ref<HTMLDivElement | null>(null)
-
-// [变量用途]
 // AntV G6 Graph 实例引用
 let graph: any = null
 
@@ -382,17 +369,6 @@ interface WindowItemWrapper {
 // [变量用途]
 // 选中的时间窗口 ID
 const currentTimestamp = ref<number>(0)
-const timeWindowHours = ref(1)
-
-const timeWindowOptions = [
-  { label: '30分钟', value: 0.5 },
-  { label: '1小时', value: 1 },
-  { label: '2小时', value: 2 },
-  { label: '4小时', value: 4 },
-  { label: '8小时', value: 8 },
-]
-
-const timeWindowMs = computed(() => timeWindowHours.value * 3600 * 1000)
 
 const ensureCurrentTimestampValid = () => {
   const min = minTimestamp.value
@@ -402,28 +378,35 @@ const ensureCurrentTimestampValid = () => {
   }
 }
 
-const nodeLayoutCache = new Map<string, { x: number; y: number }>()
+const nodeLayoutCache = new Map<string, number>()
 let graphTopologyKey = ''
 
 const getGraphTopologyKey = () =>
-  `${store.selectedSatSeries}|${currentIntensity.value}|${matrixData.value?.series ?? ''}|${g6Container.value?.clientWidth ?? 0}`
+  `${store.selectedSatSeries}|${currentIntensity.value}|${matrixData.value?.series ?? ''}|${g6Container.value?.clientWidth ?? 0}|${g6Container.value?.clientHeight ?? 0}`
 
 const applyCachedNodePositions = (nodes: any[]) => {
   nodes.forEach((node) => {
-    const cached = nodeLayoutCache.get(String(node.id))
-    if (cached) {
-      node.x = cached.x
-      node.y = cached.y
-    }
+    const cachedX = nodeLayoutCache.get(String(node.id))
+    if (cachedX !== undefined) node.x = cachedX
+    if (node.layer) node.y = getLayerY(node.layer)
   })
 }
 
 const saveNodePositionsToCache = (nodes: any[]) => {
-  nodes.forEach((node) => nodeLayoutCache.set(String(node.id), { x: node.x, y: node.y }))
+  nodes.forEach((node) => nodeLayoutCache.set(String(node.id), node.x))
 }
 
-const refreshGraphForTime = (fitView = false) => {
+const resetGraphViewport = () => {
+  if (!graph || graph.get('destroyed')) return
+  const group = graph.getGroup()
+  if (group && typeof group.resetMatrix === 'function') {
+    group.resetMatrix()
+  }
+}
+
+const refreshGraphForTime = () => {
   if (!g6Container.value) return
+  syncGraphStageHeight()
   ensureCurrentTimestampValid()
   const width = g6Container.value.clientWidth
   const height = g6Container.value.clientHeight
@@ -438,17 +421,18 @@ const refreshGraphForTime = (fitView = false) => {
   if (!graph || graph.get('destroyed')) {
     graphTopologyKey = topoKey
     saveNodePositionsToCache(graphData.nodes)
-    initOrUpdateGraph(true)
+    initOrUpdateGraph()
     return
   }
 
   graph.changeSize(width, height)
+  resetGraphViewport()
 
   if (structureChanged) {
     graphTopologyKey = topoKey
     saveNodePositionsToCache(graphData.nodes)
     graph.changeData(graphData)
-    if (fitView) graph.fitView([20, 40, 20, 40])
+    resetGraphViewport()
     updateGraphHighlightState()
     return
   }
@@ -461,7 +445,7 @@ const refreshGraphForTime = (fitView = false) => {
     const model = nodeModelMap.get(id)
     if (model) {
       graph.showItem(node)
-      graph.updateItem(node, { label: model.label, style: model.style })
+      graph.updateItem(node, { x: model.x, y: model.y, style: model.style })
     } else {
       graph.hideItem(node)
     }
@@ -493,12 +477,7 @@ const setCurrentTimestamp = (ts: number, refreshGraph = true) => {
   const clamped = Math.min(Math.max(ts, minTimestamp.value), maxTimestamp.value)
   currentTimestamp.value = clamped
   if (!refreshGraph) return
-  refreshGraphForTime(false)
-  highlightActiveElements()
-}
-
-const handleTimeWindowChange = () => {
-  refreshGraphForTime(false)
+  refreshGraphForTime()
   highlightActiveElements()
 }
 
@@ -569,6 +548,129 @@ const formatSatType = (typeStr?: string): string => {
   return uniqueParts.join('/')
 }
 
+type TopoNodeKind = 'sat' | 'relay' | 'receive' | 'station' | 'target'
+
+const TOPO_NODE_SHAPE: Record<TopoNodeKind, string> = {
+  sat: 'circle',
+  relay: 'diamond',
+  receive: 'triangle',
+  station: 'rect',
+  target: 'rect',
+}
+
+const TOPO_NODE_SIZE: Record<TopoNodeKind, number | [number, number]> = {
+  sat: 16,
+  relay: [18, 18],
+  receive: 12,
+  station: 18,
+  target: 22,
+}
+
+const getTopoNodeColors = (kind: TopoNodeKind, struck: boolean) => {
+  if (struck) {
+    return { fill: '#2d1215', stroke: '#ff4d4f', shadow: 'rgba(255, 77, 79, 0.45)' }
+  }
+  switch (kind) {
+    case 'sat':
+      return { fill: '#092638', stroke: '#00e1ff', shadow: 'rgba(0, 225, 255, 0.35)' }
+    case 'relay':
+      return { fill: '#1e112a', stroke: '#a855f7', shadow: 'rgba(168, 85, 247, 0.4)' }
+    case 'receive':
+      return { fill: '#0a2e2b', stroke: '#00f2fe', shadow: 'rgba(0, 242, 254, 0.35)' }
+    case 'station':
+      return { fill: '#10244c', stroke: '#3b82f6', shadow: 'rgba(59, 130, 246, 0.35)' }
+    case 'target':
+      return { fill: '#0f2742', stroke: '#1890ff', shadow: 'rgba(24, 144, 255, 0.4)' }
+  }
+}
+
+const buildTopoNode = (opts: {
+  id: string
+  name: string
+  kind: TopoNodeKind
+  x: number
+  layer: number
+  struck?: boolean
+}) => {
+  const struck = !!opts.struck
+  const colors = getTopoNodeColors(opts.kind, struck)
+  const style = {
+    fill: colors.fill,
+    stroke: colors.stroke,
+    lineWidth: struck ? 2.5 : 2,
+    shadowColor: colors.shadow,
+    shadowBlur: 12,
+  }
+  const stateStyle = {
+    fill: colors.fill,
+    stroke: colors.stroke,
+    lineWidth: 3,
+    shadowColor: colors.stroke,
+    shadowBlur: 18,
+  }
+  return {
+    id: opts.id,
+    label: '',
+    nodeName: opts.name,
+    layer: opts.layer,
+    x: opts.x,
+    y: getLayerY(opts.layer),
+    type: TOPO_NODE_SHAPE[opts.kind],
+    size: TOPO_NODE_SIZE[opts.kind],
+    anchorPoints: [
+      [0.5, 0],
+      [0.5, 1],
+    ],
+    style,
+    labelCfg: { style: { opacity: 0 } },
+    stateStyles: {
+      active: stateStyle,
+      highlight: { ...stateStyle, shadowBlur: 22 },
+      hover: { ...stateStyle, lineWidth: 2.5 },
+      selected: { ...stateStyle, shadowBlur: 24 },
+      inactive: { ...style, opacity: 0.55 },
+    },
+  }
+}
+
+let topoTooltipEl: HTMLDivElement | null = null
+
+const setupGraphTooltip = (g: any) => {
+  if (!g6Container.value) return
+  if (!topoTooltipEl) {
+    topoTooltipEl = document.createElement('div')
+    topoTooltipEl.className = 'g6-node-tooltip'
+    g6Container.value.appendChild(topoTooltipEl)
+  }
+
+  const hideTooltip = () => {
+    if (topoTooltipEl) topoTooltipEl.style.display = 'none'
+  }
+
+  const showTooltip = (name: string, clientX: number, clientY: number) => {
+    if (!topoTooltipEl || !g6Container.value) return
+    const rect = g6Container.value.getBoundingClientRect()
+    topoTooltipEl.textContent = name
+    topoTooltipEl.style.display = 'block'
+    topoTooltipEl.style.left = `${clientX - rect.left + 12}px`
+    topoTooltipEl.style.top = `${clientY - rect.top + 12}px`
+  }
+
+  g.off('node:mouseenter')
+  g.off('node:mousemove')
+  g.off('node:mouseleave')
+  g.on('node:mouseenter', (evt: any) => {
+    const name = String(evt.item?.getModel()?.nodeName || '')
+    if (name) showTooltip(name, evt.clientX, evt.clientY)
+  })
+  g.on('node:mousemove', (evt: any) => {
+    const name = String(evt.item?.getModel()?.nodeName || '')
+    if (name) showTooltip(name, evt.clientX, evt.clientY)
+  })
+  g.on('node:mouseleave', hideTooltip)
+  g.on('canvas:mouseleave', hideTooltip)
+}
+
 /**
  * [功能说明]
  * 调用后端 API 获取算法矩阵数据并更新 store (按 store 中的 selectedSatSeries 检索)
@@ -600,7 +702,7 @@ const fetchMatrixData = async (force = false) => {
       nodeLayoutCache.clear()
       initTimelineBounds()
       ensureCurrentTimestampValid()
-      refreshGraphForTime(true)
+      refreshGraphForTime()
     })
   }
 }
@@ -621,7 +723,7 @@ watch(
         nodeLayoutCache.clear()
         initTimelineBounds()
         ensureCurrentTimestampValid()
-        refreshGraphForTime(true)
+        refreshGraphForTime()
       })
     } else {
       void fetchMatrixData()
@@ -687,33 +789,10 @@ const formatTimeStr = (ts: number): string => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-/**
- * 判断过境时间窗口是否与当前时刻 ± 时间窗口存在交集
- */
-const isWindowInVisibleRange = (startStr: string, endStr: string): boolean => {
-  if (!startStr || !endStr) return false
-  const startTs = parseToTimestamp(startStr)
-  const endTs = parseToTimestamp(endStr)
-  const rangeStart = currentTimestamp.value - timeWindowMs.value
-  const rangeEnd = currentTimestamp.value + timeWindowMs.value
-  return startTs <= rangeEnd && endTs >= rangeStart
-}
-
-/**
- * 判断卫星在可见时间范围内是否有过境窗口（融合打击前/打击后窗口）
- */
-const satHasVisibleWindow = (sat: { initWindows?: any[]; stationWindows?: any[] } | null | undefined): boolean => {
-  if (!sat) return false
-  const windows = [...(sat.stationWindows || []), ...(sat.initWindows || [])]
-  return windows.some((win: any) => isWindowInVisibleRange(getWindowStartStr(win), getWindowEndStr(win)))
-}
-
 const getWindowStartStr = (win: any): string => win.peakWindow || win.startWindow || win.beginWindow || ''
 const getWindowEndStr = (win: any): string => win.endWindow || ''
 
-const getVisibleTransitWindows = (windows: any[]): any[] => {
-  return (windows || []).filter((win) => isWindowInVisibleRange(getWindowStartStr(win), getWindowEndStr(win)))
-}
+const getVisibleTransitWindows = (windows: any[]): any[] => windows || []
 
 /** 融合打击前 initWindows 与打击后 stationWindows */
 const getSatTransitWindowsMerged = (data: any, norad: number): any[] => {
@@ -823,59 +902,6 @@ const countLinkPhase = (counts: { normal: number; striking: number; severed: num
   if (phase === 'striking') counts.striking++
   else if (phase === 'severed') counts.severed++
   else counts.normal++
-}
-
-const getSatLabelInRange = (sat: { norad: number; name: string; satType: string; status: number }): string => {
-  const wins = allWindowsList.value.filter(
-    (w) => w.satNorad === sat.norad && !w.isRelayWindow && isWindowInVisibleRange(w.startTime, w.endTime)
-  )
-  const typeText = formatSatType(sat.satType)
-  const winPayload = wins.map((w) => ({
-    strikeStatus: w.strikeStatus,
-    peakWindow: w.startTime,
-    endWindow: w.endTime,
-    delayMin: w.delayMin,
-  }))
-  const { phase, delayMin } = resolveTransitLinkPhase(winPayload, currentTs())
-  if (phase === 'striking') return `${sat.name}\n[${typeText}/正在打击]`
-  if (phase === 'severed') {
-    return delayMin > 0 ? `${sat.name}\n[受扰 +${delayMin}m]` : `${sat.name}\n[${typeText}/打击后]`
-  }
-  if (wins.length > 0) return `${sat.name}\n[${typeText}/过境]`
-  return `${sat.name}\n[${typeText}]`
-}
-
-const getReceiveLabelInRange = (rec: { receiveId: string; receiveName: string; status: number }): string => {
-  const wins = allWindowsList.value.filter(
-    (w) => w.receiveId === rec.receiveId && !w.isRelayWindow && isWindowInVisibleRange(w.startTime, w.endTime)
-  )
-  const winPayload = wins.map((w) => ({
-    strikeStatus: w.strikeStatus,
-    peakWindow: w.startTime,
-    endWindow: w.endTime,
-    delayMin: w.delayMin,
-  }))
-  const { phase, delayMin } = resolveTransitLinkPhase(winPayload, currentTs())
-  if (phase === 'striking') return `${rec.receiveName}\n[正在打击]`
-  if (phase === 'severed') {
-    return delayMin > 0 ? `${rec.receiveName}\n[受扰 +${delayMin}m]` : `${rec.receiveName}\n[打击后]`
-  }
-  if (wins.length > 0) return `${rec.receiveName}\n[接收中]`
-  if (rec.status === 1) return `${rec.receiveName}\n[受损]`
-  return rec.receiveName
-}
-
-const getStationLabelInRange = (st: { stationId: string; stationName: string; status: number }): string => {
-  if (st.status === 1) return `${st.stationName}\n[受损]`
-  return st.stationName
-}
-
-/**
- * 判断星间中继链路在可见时间范围内是否有可见窗口
- */
-const relayHasVisibleWindow = (rel: { visibilityWindows?: { beginWindow: string; endWindow: string }[] }): boolean => {
-  const windows = rel.visibilityWindows || []
-  return windows.some((win) => isWindowInVisibleRange(win.beginWindow, win.endWindow))
 }
 
 const currentTimeText = computed(() => formatTimeStr(currentTimestamp.value))
@@ -1245,6 +1271,7 @@ const currentTs = () => currentTimestamp.value
  */
 const buildG6GraphData = () => {
   if (!matrixData.value) return { nodes: [], edges: [] }
+  syncGraphStageHeight()
   const data: any = matrixData.value
 
   // ==================== 通讯卫星模式两层拓扑构建 ====================
@@ -1270,154 +1297,38 @@ const buildG6GraphData = () => {
     const startX = 140
     const availableW = Math.max(containerW - startX - 30, 400)
 
-    // 1. 排布第一层 通讯卫星 (y = 90)
+    // 1. 排布第一层 通讯卫星
     satList.forEach((sat, i) => {
       const id = `sat-${sat.norad}`
       const x = startX + (availableW / (satList.length + 1)) * (i + 1)
-      const isStruck = sat.status === 1
-      const bgFill = isStruck ? '#2d1215' : '#092638'
-      const strokeColor = isStruck ? '#ff4d4f' : '#00e1ff'
-      const textColor = isStruck ? '#ff7875' : '#e6f7ff'
-
-      nodes.push({
-        id,
-        label: getSatLabelInRange(sat),
-        layer: 1,
-        x,
-        y: 90,
-        type: 'rect',
-        size: [140, 44],
-        anchorPoints: [
-          [0.5, 0],
-          [0.5, 1],
-        ],
-        style: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 2,
-          radius: 6,
-          shadowColor: isStruck ? 'rgba(255, 77, 79, 0.4)' : 'rgba(0, 225, 255, 0.3)',
-          shadowBlur: 10,
-        },
-        labelCfg: {
-          style: {
-            fill: textColor,
-            fontSize: 12,
-            fontWeight: 600,
-          },
-        },
-        stateStyles: {
-          active: {
-            fill: bgFill,
-            stroke: strokeColor,
-            lineWidth: 3,
-            shadowColor: strokeColor,
-            shadowBlur: 16,
-          },
-          highlight: {
-            fill: bgFill,
-            stroke: strokeColor,
-            lineWidth: 3,
-            shadowColor: strokeColor,
-            shadowBlur: 20,
-          },
-          hover: {
-            fill: bgFill,
-            stroke: strokeColor,
-            lineWidth: 2.5,
-            shadowColor: strokeColor,
-            shadowBlur: 14,
-          },
-          selected: {
-            fill: bgFill,
-            stroke: strokeColor,
-            lineWidth: 3,
-            shadowColor: strokeColor,
-            shadowBlur: 20,
-          },
-          inactive: {
-            fill: bgFill,
-            stroke: strokeColor,
-            opacity: 0.6,
-          },
-        },
-      })
+      nodes.push(
+        buildTopoNode({
+          id,
+          name: sat.name,
+          kind: 'sat',
+          x,
+          layer: 1,
+          struck: sat.status === 1,
+        })
+      )
     })
 
-    // 2. 排布第二层 战场目标区域节点 (y = 350, 居中)
     const targetNodeId = 'target-area'
     const targetName = store.battle?.name || '战场目标区域'
-    nodes.push({
-      id: targetNodeId,
-      label: `🎯 ${targetName}\n[通信目标区域]`,
-      layer: 2,
-      x: containerW / 2,
-      y: 350,
-      type: 'rect',
-      size: [220, 50],
-      anchorPoints: [
-        [0.5, 0],
-        [0.5, 1],
-      ],
-      style: {
-        fill: '#0f2742',
-        stroke: '#1890ff',
-        lineWidth: 2,
-        radius: 8,
-        shadowColor: 'rgba(24, 144, 255, 0.4)',
-        shadowBlur: 12,
-      },
-      labelCfg: {
-        style: {
-          fill: '#e6f7ff',
-          fontSize: 14,
-          fontWeight: 700,
-        },
-      },
-      stateStyles: {
-        active: {
-          fill: '#0f2742',
-          stroke: '#1890ff',
-          lineWidth: 3,
-          shadowColor: '#1890ff',
-          shadowBlur: 18,
-        },
-        highlight: {
-          fill: '#0f2742',
-          stroke: '#1890ff',
-          lineWidth: 3,
-          shadowColor: '#1890ff',
-          shadowBlur: 22,
-        },
-        hover: {
-          fill: '#0f2742',
-          stroke: '#40a9ff',
-          lineWidth: 2.5,
-          shadowColor: '#40a9ff',
-          shadowBlur: 16,
-        },
-        selected: {
-          fill: '#0f2742',
-          stroke: '#1890ff',
-          lineWidth: 3,
-          shadowColor: '#1890ff',
-          shadowBlur: 20,
-        },
-        inactive: {
-          fill: '#0f2742',
-          stroke: '#1890ff',
-          opacity: 0.6,
-        },
-      },
-    })
+    nodes.push(
+      buildTopoNode({
+        id: targetNodeId,
+        name: targetName,
+        kind: 'target',
+        x: containerW / 2,
+        layer: 2,
+      })
+    )
 
-    // 3. 构建通讯链路连线 (通讯卫星 -> 战场目标区域)
     let linkCounts = { normal: 0, striking: 0, severed: 0 }
 
     satList.forEach((sat) => {
       const satId = `sat-${sat.norad}`
-      if (!satHasVisibleWindow({ initWindows: getSatTransitWindowsMerged(data, sat.norad) })) return
-
       const visibleWins = getVisibleTransitWindows(getSatTransitWindowsMerged(data, sat.norad))
       if (visibleWins.length === 0) return
 
@@ -1442,16 +1353,9 @@ const buildG6GraphData = () => {
     normalLinkCount.value = linkCounts.normal
     strikingLinkCount.value = linkCounts.striking
     severedLinkCount.value = linkCounts.severed
+    satNodeCount.value = satList.length
 
-    const activeNodeIds = new Set<string>()
-    edges.forEach((edge) => {
-      activeNodeIds.add(String(edge.source))
-      activeNodeIds.add(String(edge.target))
-    })
-    const filteredNodes = nodes.filter((node) => activeNodeIds.has(String(node.id)))
-    satNodeCount.value = filteredNodes.filter((node) => String(node.id).startsWith('sat-')).length
-
-    return { nodes: filteredNodes, edges }
+    return { nodes, edges }
   }
 
   // ==================== 侦察卫星模式三层拓扑构建 ====================
@@ -1538,300 +1442,72 @@ const buildG6GraphData = () => {
   const stationList = Array.from(stationMap.values())
   stationNodeCount.value = stationList.length
 
-  // 计算 3 层节点的坐标布局 (Layer 1 普通卫星: y=80, Layer 2 中继卫星: y=230, Layer 3 接收站: y=380, Layer 3 数据中心: y=490)
+  // 四层布局：按容器高度比例分配 Y 坐标
   const containerW = g6Container.value ? g6Container.value.clientWidth : 0
   if (containerW <= 0) return { nodes: [], edges: [] }
   const startX = 140
   const availableW = Math.max(containerW - startX - 30, 400)
 
-  // 排布 Layer 1 普通卫星 (y = 80)
   normalSatList.forEach((sat, i) => {
     const id = `sat-${sat.norad}`
     nodeSet.add(id)
     const x = startX + (availableW / (normalSatList.length + 1)) * (i + 1)
-    const isStruck = sat.status === 1
-    const bgFill = isStruck ? '#2d1215' : '#092638'
-    const strokeColor = isStruck ? '#ff4d4f' : '#00e1ff'
-    const textColor = isStruck ? '#ff7875' : '#e6f7ff'
-
-    nodes.push({
-      id,
-      label: getSatLabelInRange(sat),
-      layer: 1,
-      x,
-      y: 80,
-      type: 'rect',
-      size: [130, 42],
-      anchorPoints: [
-        [0.5, 0], // 0: 上边中心
-        [0.5, 1], // 1: 下边中心
-      ],
-      style: {
-        fill: bgFill,
-        stroke: strokeColor,
-        lineWidth: 2,
-        radius: 6,
-        shadowColor: isStruck ? 'rgba(255, 77, 79, 0.4)' : 'rgba(0, 225, 255, 0.3)',
-        shadowBlur: 10,
-      },
-      labelCfg: {
-        style: {
-          fill: textColor,
-          fontSize: 12,
-          fontWeight: 600,
-        },
-      },
-      stateStyles: {
-        active: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 3,
-          shadowColor: strokeColor,
-          shadowBlur: 16,
-        },
-        highlight: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 3,
-          shadowColor: strokeColor,
-          shadowBlur: 20,
-        },
-        hover: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 2.5,
-        },
-        selected: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 3,
-          shadowColor: strokeColor,
-          shadowBlur: 20,
-        },
-        inactive: {
-          fill: bgFill,
-          stroke: strokeColor,
-          opacity: 0.6,
-        },
-      },
-    })
+    nodes.push(
+      buildTopoNode({
+        id,
+        name: sat.name,
+        kind: 'sat',
+        x,
+        layer: 1,
+        struck: sat.status === 1,
+      })
+    )
   })
 
-  // 排布 Layer 2 中继卫星 (y = 230)
   relaySatList.forEach((sat, i) => {
     const id = `sat-${sat.norad}`
     nodeSet.add(id)
     const x = startX + (availableW / (relaySatList.length + 1)) * (i + 1)
-    const isStruck = sat.status === 1
-    const bgFill = isStruck ? '#2d1215' : '#1e112a'
-    const strokeColor = isStruck ? '#ff4d4f' : '#a855f7'
-    const textColor = isStruck ? '#ff7875' : '#e9d5ff'
-
-    nodes.push({
-      id,
-      label: getSatLabelInRange(sat),
-      layer: 2,
-      x,
-      y: 230,
-      type: 'rect',
-      size: [135, 42],
-      anchorPoints: [
-        [0.5, 0], // 0: 上边中心
-        [0.5, 1], // 1: 下边中心
-      ],
-      style: {
-        fill: bgFill,
-        stroke: strokeColor,
-        lineWidth: 2,
-        radius: 6,
-        shadowColor: isStruck ? 'rgba(255, 77, 79, 0.4)' : 'rgba(168, 85, 247, 0.4)',
-        shadowBlur: 10,
-      },
-      labelCfg: {
-        style: {
-          fill: textColor,
-          fontSize: 12,
-          fontWeight: 600,
-        },
-      },
-      stateStyles: {
-        active: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 3,
-          shadowColor: strokeColor,
-          shadowBlur: 16,
-        },
-        highlight: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 3,
-          shadowColor: strokeColor,
-          shadowBlur: 20,
-        },
-        hover: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 2.5,
-        },
-        selected: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 3,
-          shadowColor: strokeColor,
-          shadowBlur: 20,
-        },
-        inactive: {
-          fill: bgFill,
-          stroke: strokeColor,
-          opacity: 0.6,
-        },
-      },
-    })
+    nodes.push(
+      buildTopoNode({
+        id,
+        name: sat.name,
+        kind: 'relay',
+        x,
+        layer: 2,
+        struck: sat.status === 1,
+      })
+    )
   })
 
-  // 排布 Layer 3 地面站 (y = 380)
   receiveList.forEach((rec, i) => {
     nodeSet.add(rec.receiveId)
     const x = startX + (availableW / (receiveList.length + 1)) * (i + 1)
-    const isStruck = rec.status === 1
-    const bgFill = isStruck ? '#2d1215' : '#0a2e2b'
-    const strokeColor = isStruck ? '#ff4d4f' : '#00f2fe'
-    const textColor = isStruck ? '#ff7875' : '#e6f7ff'
-
-    nodes.push({
-      id: rec.receiveId,
-      label: getReceiveLabelInRange(rec),
-      layer: 3,
-      x,
-      y: 380,
-      type: 'rect',
-      size: [120, 38],
-      anchorPoints: [
-        [0.5, 0], // 0: 上边中心
-        [0.5, 1], // 1: 下边中心
-      ],
-      style: {
-        fill: bgFill,
-        stroke: strokeColor,
-        lineWidth: isStruck ? 2.2 : 1.8,
-        radius: 6,
-        shadowColor: isStruck ? 'rgba(255, 77, 79, 0.4)' : undefined,
-        shadowBlur: 10,
-      },
-      labelCfg: {
-        style: {
-          fill: textColor,
-          fontSize: 11,
-          fontWeight: 500,
-        },
-      },
-      stateStyles: {
-        active: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 3,
-          shadowColor: strokeColor,
-          shadowBlur: 16,
-        },
-        highlight: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 3,
-          shadowColor: strokeColor,
-          shadowBlur: 20,
-        },
-        hover: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 2.5,
-        },
-        selected: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 3,
-          shadowColor: strokeColor,
-          shadowBlur: 20,
-        },
-        inactive: {
-          fill: bgFill,
-          stroke: strokeColor,
-          opacity: 0.6,
-        },
-      },
-    })
+    nodes.push(
+      buildTopoNode({
+        id: rec.receiveId,
+        name: rec.receiveName,
+        kind: 'receive',
+        x,
+        layer: 3,
+        struck: rec.status === 1,
+      })
+    )
   })
 
-  // 排布 Layer 3 数据中心 (y = 490)
   stationList.forEach((st, i) => {
     nodeSet.add(st.stationId)
     const x = startX + (availableW / (stationList.length + 1)) * (i + 1)
-    const isStruck = st.status === 1
-    const bgFill = isStruck ? '#2d1215' : '#10244c'
-    const strokeColor = isStruck ? '#ff4d4f' : '#3b82f6'
-    const textColor = isStruck ? '#ff7875' : '#93c5fd'
-
-    nodes.push({
-      id: st.stationId,
-      label: getStationLabelInRange(st),
-      layer: 3,
-      x,
-      y: 490,
-      type: 'rect',
-      size: [170, 44],
-      anchorPoints: [
-        [0.5, 0], // 0: 上边中心
-        [0.5, 1], // 1: 下边中心
-      ],
-      style: {
-        fill: bgFill,
-        stroke: strokeColor,
-        lineWidth: isStruck ? 2.2 : 2,
-        radius: 8,
-        shadowColor: isStruck ? 'rgba(255, 77, 79, 0.4)' : 'rgba(59, 130, 246, 0.3)',
-        shadowBlur: 10,
-      },
-      labelCfg: {
-        style: {
-          fill: textColor,
-          fontSize: 12,
-          fontWeight: 600,
-        },
-      },
-      stateStyles: {
-        active: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 3,
-          shadowColor: strokeColor,
-          shadowBlur: 16,
-        },
-        highlight: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 3,
-          shadowColor: strokeColor,
-          shadowBlur: 20,
-        },
-        hover: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 2.5,
-        },
-        selected: {
-          fill: bgFill,
-          stroke: strokeColor,
-          lineWidth: 3,
-          shadowColor: strokeColor,
-          shadowBlur: 20,
-        },
-        inactive: {
-          fill: bgFill,
-          stroke: strokeColor,
-          opacity: 0.6,
-        },
-      },
-    })
+    nodes.push(
+      buildTopoNode({
+        id: st.stationId,
+        name: st.stationName,
+        kind: 'station',
+        x,
+        layer: 4,
+        struck: st.status === 1,
+      })
+    )
   })
 
   // ==================== 构建边 Edges (Layer 1->2 & Layer 2->3) ====================
@@ -1881,20 +1557,12 @@ const buildG6GraphData = () => {
     })
   })
 
-  const activeReceiveIds = new Set<string>()
-  edges.forEach((edge) => {
-    if (String(edge.source).startsWith('sat-')) {
-      activeReceiveIds.add(String(edge.target))
-    }
-  })
-
-  // 2. Layer 2 -> Layer 3 边 (地面站 -> 数据中心)
+  // 2. 地面站 -> 数据中心
   const initRels = data.initRelationList?.relations || []
   const postRels = data.stationRelationList?.relations || []
   const postRelSet = new Set(postRels.map((r) => `${r.from}::${r.to}`))
 
   initRels.forEach((rel) => {
-    if (!activeReceiveIds.has(rel.from)) return
     const edgeId = `edge-${rel.from}-${rel.to}`
     if (!edgeSet.has(edgeId) && nodeSet.has(rel.from) && nodeSet.has(rel.to)) {
       edgeSet.add(edgeId)
@@ -1928,8 +1596,6 @@ const buildG6GraphData = () => {
   const relayRels = data.relayRelation?.relations || []
   relayRels.forEach((rel) => {
     const sourceSatId = `sat-${rel.from}`
-    const fromHasGroundEdge = edges.some((edge) => edge.source === sourceSatId && !String(edge.id).startsWith('edge-relay'))
-    if (!relayHasVisibleWindow(rel) && !fromHasGroundEdge) return
     const targetSatId = `sat-${rel.to}`
     const edgeId = `edge-relay-${rel.from}-${rel.to}`
 
@@ -1956,19 +1622,9 @@ const buildG6GraphData = () => {
   normalLinkCount.value = linkCounts.normal
   strikingLinkCount.value = linkCounts.striking
   severedLinkCount.value = linkCounts.severed
+  satNodeCount.value = nodes.filter((node) => String(node.id).startsWith('sat-')).length
 
-  const activeNodeIds = new Set<string>()
-  edges.forEach((edge) => {
-    activeNodeIds.add(String(edge.source))
-    activeNodeIds.add(String(edge.target))
-  })
-
-  const filteredNodes = nodes.filter((node) => activeNodeIds.has(String(node.id)))
-  receiveNodeCount.value = filteredNodes.filter((node) => receiveList.some((rec) => rec.receiveId === node.id)).length
-  stationNodeCount.value = filteredNodes.filter((node) => stationList.some((st) => st.stationId === node.id)).length
-  satNodeCount.value = filteredNodes.filter((node) => String(node.id).startsWith('sat-')).length
-
-  return { nodes: filteredNodes, edges }
+  return { nodes, edges }
 }
 
 /**
@@ -1978,11 +1634,12 @@ const buildG6GraphData = () => {
  * [处理规则]
  * - 当视图切回可见状态时，在 nextTick 后准确获取 DOM 容器宽高度 (clientWidth / clientHeight)。
  * - 若 graph 尚未创建或已销毁，则新建 G6.Graph 实例并 render。
- * - 若 graph 已存在，则调用 changeSize 动态调整画布尺寸，重新装载数据 (changeData) 并自适应全屏 (fitView)。
+ * - 若 graph 已存在，则调用 changeSize 动态调整画布尺寸并重新装载数据 (changeData)。
  */
-const initOrUpdateGraph = (fitView = true) => {
+const initOrUpdateGraph = () => {
   if (!g6Container.value) return
 
+  syncGraphStageHeight()
   ensureCurrentTimestampValid()
 
   // 准确获取 DOM 容器宽高度 (clientWidth / clientHeight)
@@ -2005,13 +1662,12 @@ const initOrUpdateGraph = (fitView = true) => {
       container: g6Container.value,
       width,
       height,
-      fitView: true,
-      fitViewPadding: [20, 40, 20, 40],
+      fitView: false,
       modes: {
         default: [],
       },
       defaultNode: {
-        type: 'rect',
+        type: 'circle',
       },
       defaultEdge: {
         type: 'struck-cubic',
@@ -2059,6 +1715,8 @@ const initOrUpdateGraph = (fitView = true) => {
     })
     graph.data(data)
     graph.render()
+    resetGraphViewport()
+    setupGraphTooltip(graph)
 
     graph.on('node:click', (evt: any) => {
       const nodeItem = evt.item
@@ -2092,9 +1750,7 @@ const initOrUpdateGraph = (fitView = true) => {
     // 拓扑图已有实例：重新计算画布大小并替换渲染数据
     graph.changeSize(width, height)
     graph.changeData(data)
-    if (fitView) {
-      graph.fitView([20, 40, 20, 40])
-    }
+    resetGraphViewport()
     updateGraphHighlightState()
   }
 }
@@ -2113,7 +1769,7 @@ const parseAndSelectNode = (model: any) => {
     const satObj =
       (data?.satelliteMatrixList || []).find((s) => s.norad === norad) ||
       (data?.initMatrixList || []).find((s) => s.norad === norad)
-    const name = satObj?.name || (model.label ? model.label.split('\n')[0] : `Sat-${norad}`)
+    const name = satObj?.name || model.nodeName || (model.label ? String(model.label).split('\n')[0] : `Sat-${norad}`)
 
     selectedNodeInfo.value = {
       id,
@@ -2133,7 +1789,7 @@ const parseAndSelectNode = (model: any) => {
         (data?.initRelationList?.stationObjList || []).find((st) => st.stationId === id)
       selectedNodeInfo.value = {
         id,
-        name: stObj?.stationName || model.label || id,
+        name: stObj?.stationName || model.nodeName || model.label || id,
         type: 'station',
         stationId: id,
       }
@@ -2143,7 +1799,7 @@ const parseAndSelectNode = (model: any) => {
         (data?.initRelationList?.receiveObjList || []).find((r) => r.receiveId === id)
       selectedNodeInfo.value = {
         id,
-        name: recObj?.receiveName || model.label || id,
+        name: recObj?.receiveName || model.nodeName || model.label || id,
         type: 'receive',
         receiveId: id,
       }
@@ -2542,6 +2198,14 @@ onUnmounted(() => {
   }
 
   &.layer-3-item {
+    border-color: rgba(0, 242, 254, 0.3);
+
+    .layer-title {
+      color: #00f2fe;
+    }
+  }
+
+  &.layer-4-item {
     border-color: rgba(59, 130, 246, 0.3);
 
     .layer-title {
@@ -2643,6 +2307,23 @@ onUnmounted(() => {
   :deep(canvas) {
     display: block;
   }
-}
 
+  :deep(.g6-node-tooltip) {
+    position: absolute;
+    z-index: 20;
+    display: none;
+    pointer-events: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #e2efff;
+    background: rgba(8, 14, 28, 0.95);
+    border: 1px solid rgba(0, 225, 255, 0.35);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    white-space: nowrap;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
 </style>

@@ -10,36 +10,9 @@
     </div>
 
     <!-- 全面板纵向滚动容器 -->
-    <el-scrollbar class="panel-body-scroll">
-      <!-- 1. 敌方全网传输资产与拓扑概览 -->
-      <div class="panel-section">
-        <div class="section-title">
-          <span class="title-icon">🌐</span>
-          <span>敌方全网传输资产统计</span>
-        </div>
-
-        <div class="stats-grid">
-          <div class="stat-card">
-            <span class="stat-label">过境卫星</span>
-            <strong class="stat-val glow-cyan">{{ transitSatCount }} 颗</strong>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">中继节点</span>
-            <strong class="stat-val glow-amber">{{ relaySatCount }} 颗</strong>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">地面接收站</span>
-            <strong class="stat-val glow-blue">{{ receiveStationCount }} 个</strong>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">数据中心</span>
-            <strong class="stat-val glow-purple">{{ dataCenterCount }} 个</strong>
-          </div>
-        </div>
-      </div>
-
-      <!-- 2. 选中卫星全链路分析 -->
-      <div class="panel-section" v-if="selectedSatelliteNorad">
+    <el-scrollbar ref="panelScrollRef" class="panel-body-scroll">
+      <!-- 1. 选中卫星全链路分析（点击后置顶展示） -->
+      <div class="panel-section panel-section--sat-analysis" v-if="selectedSatelliteNorad">
         <div class="section-title title-highlight">
           <span>
             <span class="title-icon">🛰️</span>
@@ -134,6 +107,33 @@
         </div>
       </div>
 
+      <!-- 2. 敌方全网传输资产与拓扑概览 -->
+      <div class="panel-section">
+        <div class="section-title">
+          <span class="title-icon">🌐</span>
+          <span>敌方全网传输资产统计</span>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">过境卫星</span>
+            <strong class="stat-val glow-cyan">{{ transitSatCount }} 颗</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">中继节点</span>
+            <strong class="stat-val glow-amber">{{ relaySatCount }} 颗</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">地面接收站</span>
+            <strong class="stat-val glow-blue">{{ receiveStationCount }} 个</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">数据中心</span>
+            <strong class="stat-val glow-purple">{{ dataCenterCount }} 个</strong>
+          </div>
+        </div>
+      </div>
+
       <!-- 3. 敌方地基网络设施清单 (Ground Layer) -->
       <div class="panel-section">
         <div class="section-title">
@@ -167,7 +167,7 @@
  * - 展现过境时间窗口、传输延时、最短用时、资产统计与资产详情
  * - 不包含任何攻击/毁伤/打压战果内容
  */
-import { computed } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { type MatrixResult } from '@/api/electronic'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import { useLayoutStore } from '@/store/modules/layout'
@@ -190,6 +190,18 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'clear-satellite-selection'): void
 }>()
+
+const panelScrollRef = ref<{ setScrollTop: (value: number) => void } | null>(null)
+
+watch(
+  () => props.selectedSatelliteNorad,
+  (norad) => {
+    if (!norad) return
+    nextTick(() => {
+      panelScrollRef.value?.setScrollTop(0)
+    })
+  }
+)
 
 
 /**
