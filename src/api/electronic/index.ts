@@ -231,6 +231,27 @@ export interface ThreatSatelliteItem {
   threatScore: number
 }
 
+/**
+ * 卫星首次通信时间列表
+ */
+export interface TimeEffectsItem {
+  /**
+   * 卫星Id
+   */
+  norad: number
+  /**
+   * 系列名称
+   */
+  name: string
+  /**
+   * 卫星类型
+   */
+  satType: string
+  /**
+   * 开始传输时间
+   */
+  transTime: string
+}
 // ==================== 根数据结构 ====================
 
 /**
@@ -272,6 +293,8 @@ export interface MatrixResult {
   series: string
   /** 威胁卫星列表 */
   threatSats: ThreatSatelliteItem[]
+  /** 卫星时延列表 */
+  timeEffects: TimeEffectsItem[]
 }
 
 /**

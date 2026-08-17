@@ -6,7 +6,7 @@
         <span class="header-icon">📊</span>
         <span class="header-title glow-text-cyan">敌方数据传输与链路效能</span>
       </div>
-      <span class="panel-badge badge-blue">正常传输分析</span>
+      <span class="panel-badge badge-blue">{{ selectedSatInfo ? selectedSatInfo.name : '正常传输分析' }}</span>
     </div>
 
     <!-- 全面板纵向滚动容器 -->
@@ -38,8 +38,101 @@
         </div>
       </div>
 
+      <!-- 2. 选中卫星全链路分析 -->
+      <div class="panel-section" v-if="selectedSatelliteNorad">
+        <div class="section-title title-highlight">
+          <span>
+            <span class="title-icon">🛰️</span>
+            <span>选中卫星链路分析</span>
+          </span>
+          <button class="close-node-btn" @click="emit('clear-satellite-selection')">清除</button>
+        </div>
 
+        <div v-if="selectedSatInfo" class="sat-analysis-box">
+          <div class="sat-header-row">
+            <div class="sat-title-group">
+              <span class="sat-name-large">{{ selectedSatInfo.name }}</span>
+              <span class="sat-type-tag">{{ selectedSatInfo.satType }}</span>
+            </div>
+            <span class="norad-tag">NORAD {{ selectedSatelliteNorad }}</span>
+          </div>
 
+          <!-- 打击前最早全链路 -->
+          <div class="chain-block">
+            <div class="chain-block-title">打击前最早全链路通信</div>
+            <template v-if="!preStrikeChain.blocked">
+              <div class="link-flow-card">
+                <template v-for="(node, idx) in preStrikeChain.nodes" :key="node.layer + node.id">
+                  <div class="flow-step">
+                    <span class="step-icon">{{ node.icon }}</span>
+                    <span class="step-text" :title="node.name">{{ node.name }}</span>
+                    <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
+                  </div>
+                  <span v-if="idx < preStrikeChain.nodes.length - 1" class="flow-arrow">→</span>
+                </template>
+              </div>
+              <div class="finish-time-row">
+                <span class="finish-label">完成时间</span>
+                <strong class="finish-val glow-green">{{ preStrikeChain.finishTime }}</strong>
+              </div>
+            </template>
+            <div v-else class="chain-blocked-tip">{{ preStrikeChain.blockedReason || '无可完成链路' }}</div>
+          </div>
+
+          <!-- 打击后最早全链路 -->
+          <div class="chain-block">
+            <div class="chain-block-title">打击后最早全链路通信</div>
+            <template v-if="!postStrikeChain.blocked">
+              <div class="link-flow-card post-strike">
+                <template v-for="(node, idx) in postStrikeChain.nodes" :key="node.layer + node.id">
+                  <div class="flow-step">
+                    <span class="step-icon">{{ node.icon }}</span>
+                    <span class="step-text" :title="node.name">{{ node.name }}</span>
+                    <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
+                  </div>
+                  <span v-if="idx < postStrikeChain.nodes.length - 1" class="flow-arrow">→</span>
+                </template>
+              </div>
+              <div class="finish-time-row">
+                <span class="finish-label">完成时间</span>
+                <strong class="finish-val glow-cyan">{{ postStrikeChain.finishTime }}</strong>
+              </div>
+            </template>
+            <div v-else class="chain-blocked-tip danger">
+              {{ postStrikeChain.blockedReason }}
+              <span v-if="postStrikeChain.finishTime" class="blocked-time">{{ postStrikeChain.finishTime }}</span>
+            </div>
+          </div>
+
+          <!-- 干扰武器列表 -->
+          <div class="chain-block">
+            <div class="chain-block-title">
+              干扰武器列表
+              <span class="weapon-count-tag">{{ jamWeaponList.length }} 条</span>
+            </div>
+            <div v-if="jamWeaponList.length" class="weapon-jam-list">
+              <div v-for="(item, idx) in jamWeaponList" :key="idx" class="weapon-jam-item">
+                <div class="weapon-jam-header">
+                  <span class="weapon-name">🎯 {{ item.weaponName }}</span>
+                  <span v-if="item.weaponType" class="weapon-type-tag">{{ item.weaponType }}</span>
+                </div>
+                <div class="weapon-jam-target">
+                  <span class="jam-arrow">→</span>
+                  <span class="jam-target">{{ targetTypeIcon(item.targetType) }} {{ item.targetName }}</span>
+                  <span class="jam-target-type">[{{ item.targetType }}]</span>
+                </div>
+                <div class="weapon-jam-time">{{ item.timeRange }}</div>
+              </div>
+            </div>
+            <div v-else class="chain-blocked-tip muted">暂无与该卫星相关的干扰武器记录</div>
+          </div>
+        </div>
+
+        <div v-else class="empty-sat-box">
+          <span class="empty-icon">🛰️</span>
+          <p class="empty-text">当前系列下未找到该卫星数据</p>
+        </div>
+      </div>
 
       <!-- 3. 敌方地基网络设施清单 (Ground Layer) -->
       <div class="panel-section">
@@ -75,9 +168,17 @@
  * - 不包含任何攻击/毁伤/打压战果内容
  */
 import { computed } from 'vue'
-import { type MatrixResult, } from '@/api/electronic'
-import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge';
+import { type MatrixResult } from '@/api/electronic'
+import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import { useLayoutStore } from '@/store/modules/layout'
+import {
+  analyzeSatelliteFullChain,
+  collectSatelliteJamWeapons,
+  getSatelliteDisplayInfo,
+  type ChainNode,
+  type JamWeaponRecord,
+} from '@/utils/satelliteFullChainAnalysis'
+
 const store = useLayoutStore()
 const props = defineProps<{
   /** 算法矩阵数据 */
@@ -96,6 +197,49 @@ const emit = defineEmits<{
  */
 const activeMatrix = computed<MatrixResult | null>(() => props.matrixData)
 
+const selectedSatInfo = computed(() => {
+  if (!props.selectedSatelliteNorad) return null
+  return getSatelliteDisplayInfo(activeMatrix.value, props.selectedSatelliteNorad)
+})
+
+const preStrikeChain = computed(() => {
+  if (!props.selectedSatelliteNorad) {
+    return analyzeSatelliteFullChain(null, 0, false)
+  }
+  return analyzeSatelliteFullChain(activeMatrix.value, props.selectedSatelliteNorad, false)
+})
+
+const postStrikeChain = computed(() => {
+  if (!props.selectedSatelliteNorad) {
+    return analyzeSatelliteFullChain(null, 0, true)
+  }
+  return analyzeSatelliteFullChain(activeMatrix.value, props.selectedSatelliteNorad, true)
+})
+
+const jamWeaponList = computed<JamWeaponRecord[]>(() => {
+  if (!props.selectedSatelliteNorad) return []
+  return collectSatelliteJamWeapons(activeMatrix.value, props.selectedSatelliteNorad)
+})
+
+const chainLayerLabel = (layer: ChainNode['layer']): string => {
+  const map: Record<ChainNode['layer'], string> = {
+    SAT: '卫星',
+    RELAY: '中继',
+    RECEIVE: '地面站',
+    STATION: '数据中心',
+  }
+  return map[layer]
+}
+
+const targetTypeIcon = (type: JamWeaponRecord['targetType']): string => {
+  const map: Record<JamWeaponRecord['targetType'], string> = {
+    卫星: '🛰️',
+    中继卫星: '📡',
+    接收站: '📡',
+    数据中心: '💻',
+  }
+  return map[type]
+}
 
 // 全网资产统计
 const transitSatCount = computed(() => {
@@ -405,11 +549,18 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
 .link-flow-card {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 4px;
   padding: 10px;
   background: rgba(18, 32, 54, 0.8);
   border: 1px solid rgba(0, 225, 255, 0.2);
   border-radius: 6px;
+
+  &.post-strike {
+    border-color: rgba(249, 115, 22, 0.35);
+    background: rgba(30, 25, 20, 0.5);
+  }
 
   .flow-step {
     display: flex;
@@ -656,6 +807,167 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
         color: #e9d5ff;
       }
     }
+  }
+}
+
+.norad-tag {
+  font-size: 10px;
+  color: #64748b;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.chain-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgba(12, 22, 38, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+
+  .chain-block-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #7dd3fc;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .weapon-count-tag {
+    margin-left: auto;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+  }
+}
+
+.finish-time-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: rgba(18, 32, 54, 0.6);
+
+  .finish-label {
+    font-size: 11px;
+    color: #94a3b8;
+  }
+
+  .finish-val {
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .glow-green {
+    color: #4ade80;
+  }
+
+  .glow-cyan {
+    color: #38bdf8;
+  }
+}
+
+.chain-blocked-tip {
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #94a3b8;
+  background: rgba(18, 32, 54, 0.5);
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+  line-height: 1.5;
+
+  &.danger {
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.08);
+  }
+
+  &.muted {
+    color: #64748b;
+  }
+
+  .blocked-time {
+    display: block;
+    margin-top: 4px;
+    font-weight: 700;
+    color: #f87171;
+  }
+}
+
+.weapon-jam-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(239, 68, 68, 0.35);
+    border-radius: 3px;
+  }
+}
+
+.weapon-jam-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(18, 32, 54, 0.7);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  .weapon-jam-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .weapon-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #fecaca;
+    }
+
+    .weapon-type-tag {
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(239, 68, 68, 0.15);
+      color: #fca5a5;
+    }
+  }
+
+  .weapon-jam-target {
+    font-size: 11px;
+    color: #e2efff;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+
+    .jam-arrow {
+      color: #64748b;
+    }
+
+    .jam-target-type {
+      color: #94a3b8;
+      font-size: 10px;
+    }
+  }
+
+  .weapon-jam-time {
+    font-size: 10px;
+    color: #94a3b8;
+    font-family: Consolas, monospace;
   }
 }
 </style>

@@ -4,13 +4,8 @@
     <header class="top-nav-bar">
       <!-- 中间：四个功能切换按钮 -->
       <div class="menu-tabs">
-        <button
-          v-for="tab in menuTabs"
-          :key="tab.key"
-          class="menu-btn"
-          :class="{ active: activeTab === tab.key }"
-          @click="switchTab(tab.key)"
-        >
+        <button v-for="tab in menuTabs" :key="tab.key" class="menu-btn" :class="{ active: activeTab === tab.key }"
+          @click="switchTab(tab.key)">
           <span class="btn-icon">{{ tab.icon }}</span>
           <span class="btn-label">{{ tab.name }}</span>
         </button>
@@ -41,28 +36,17 @@
     </main>
 
     <!-- 战场与任务选择模态弹窗 -->
-    <el-dialog
-      v-model="selectorDialogVisible"
-      title="🎯 选择战场与任务"
-      width="540px"
-      append-to-body
-      class="task-selector-dialog"
-    >
+    <el-dialog v-model="selectorDialogVisible" title="🎯 选择战场与任务" width="540px" append-to-body
+      class="task-selector-dialog">
       <div class="dialog-body" v-loading="loadingData">
         <div class="form-tip">请选择当前分析所基于的战场及关联任务：</div>
 
         <!-- 级联选择器 -->
         <el-form label-width="90px">
           <el-form-item label="选择任务">
-            <el-cascader
-              v-model="selectedCascadeValue"
-              :options="battleTaskOptions"
+            <el-cascader v-model="selectedCascadeValue" :options="battleTaskOptions"
               :props="{ expandTrigger: 'hover', value: 'id', label: 'name', children: 'children' }"
-              placeholder="请选择 战场 / 任务"
-              style="width: 100%"
-              filterable
-              @change="handleCascaderChange"
-            />
+              placeholder="请选择 战场 / 任务" style="width: 100%" filterable @change="handleCascaderChange" />
           </el-form-item>
         </el-form>
 
@@ -73,13 +57,8 @@
             <div v-for="battle in battleListWithTasks" :key="battle.id" class="battle-group">
               <div class="battle-group-name">⚔️ {{ battle.name }}</div>
               <div class="task-chips">
-                <div
-                  v-for="task in battle.tasks"
-                  :key="task.id"
-                  class="task-chip"
-                  :class="{ active: store.activedTask?.id === task.id }"
-                  @click="selectBattleAndTask(battle, task)"
-                >
+                <div v-for="task in battle.tasks" :key="task.id" class="task-chip"
+                  :class="{ active: store.activedTask?.id === task.id }" @click="selectBattleAndTask(battle, task)">
                   📋 {{ task.name }}
                 </div>
                 <div v-if="!battle.tasks || battle.tasks.length === 0" class="no-task">暂无所属任务</div>
@@ -129,10 +108,10 @@ const activeTab = ref<string>('GIS态势分析')
 
 /** [变量说明] 顶层四个切换菜单按钮配置 */
 const menuTabs: MenuTabItem[] = [
-  { key: 'GIS态势分析', name: 'GIS态势分析', icon: '🌐', component: BattleSituation },
-  { key: 'G6图谱态势分析', name: 'G6图谱态势分析', icon: '🕸️', component: ElectronicWarfareG6 },
-  { key: '甘特图态势分析', name: '甘特图态势分析', icon: '📊', component: SatelliteGantt },
-  { key: '武器打击窗口分析', name: '武器打击窗口分析', icon: '🎯', component: WeaponAttackList },
+  { key: '整体态势分析', name: '整体态势分析', icon: '🌐', component: BattleSituation },
+  { key: '态势拓扑分析', name: '态势拓扑分析', icon: '🕸️', component: ElectronicWarfareG6 },
+  { key: '甘特图分析', name: '甘特图分析', icon: '📊', component: SatelliteGantt },
+  { key: '打击窗口分析', name: '打击窗口分析', icon: '🎯', component: WeaponAttackList },
 ]
 
 /** [计算属性说明] 动态组件引用 */
@@ -474,7 +453,8 @@ onMounted(async () => {
     .tree-title {
       font-size: 14px;
       font-weight: bold;
-      color: #ffffff; /* 快捷选择列表字样改为白色 */
+      color: #ffffff;
+      /* 快捷选择列表字样改为白色 */
       margin-bottom: 12px;
     }
 

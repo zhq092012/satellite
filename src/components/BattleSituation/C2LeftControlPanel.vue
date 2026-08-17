@@ -39,19 +39,37 @@
 
     <!-- 2. 敌方天基空间节点资产清单 (Space Layer) -->
     <div class="panel-section section-space">
-      <div class="section-title">
-        <span class="title-icon">🌌</span>
-        <span>敌方天基过境与中继卫星</span>
-        <span class="count-tag">{{ satList.length }} 颗</span>
+      <div class="section-header-block">
+        <div class="section-title">
+          <span class="title-icon">🌌</span>
+          <span>敌方天基过境与中继卫星</span>
+          <span class="count-tag">{{ satList.length }} 颗</span>
+        </div>
+        <div class="sort-toggle-bar">
+          <button
+            class="sort-btn"
+            :class="{ active: sortMode === 'threat' }"
+            @click="sortMode = 'threat'"
+          >
+            按威胁度
+          </button>
+          <button
+            class="sort-btn"
+            :class="{ active: sortMode === 'transTime' }"
+            @click="sortMode = 'transTime'"
+          >
+            按首次通信时间
+          </button>
+        </div>
       </div>
 
       <div class="asset-scroll-list">
         <div v-for="(sat, index) in satList" :key="sat.norad" class="asset-card" :class="{
           'card-active': selectedNorad === sat.norad,
           'card-relay': sat.isRelay,
-          'card-threat-rank-1': index === 0 && sat.threatScore != null,
-          'card-threat-rank-2': index === 1 && sat.threatScore != null,
-          'card-threat-rank-3': index === 2 && sat.threatScore != null,
+          'card-threat-rank-1': index === 0 && isTopRankEligible(sat),
+          'card-threat-rank-2': index === 1 && isTopRankEligible(sat),
+          'card-threat-rank-3': index === 2 && isTopRankEligible(sat),
         }" @click="handleSelectSatellite(sat.norad)">
           <div class="card-top">
             <span class="sat-name">
@@ -66,6 +84,7 @@
             <div class="card-details">
               <span class="detail-tag">NORAD: {{ sat.norad }}</span>
               <span class="detail-tag tag-type">{{ sat.satType || '天基节点' }}</span>
+              <span class="detail-tag tag-trans-time">首次通信: {{ formatTransTime(sat.transTime) }}</span>
               <span class="detail-tag tag-role" v-if="sat.isRelay">中继节点</span>
               <span class="click-hint" v-if="selectedNorad === sat.norad">✓ 已选择分析</span>
             </div>
@@ -387,7 +406,12 @@ interface SatListItem {
   satType: string
   isRelay: boolean
   threatScore: number | null
+  transTime: string | null
 }
+
+type SatSortMode = 'threat' | 'transTime'
+
+const sortMode = ref<SatSortMode>('threat')
 
 const threatDialogVisible = ref(false)
 const threatLoading = ref(false)
@@ -397,6 +421,14 @@ const threatDialogSat = ref<{ norad: number; name: string } | null>(null)
 const formatThreatScore = (score: number): string => {
   if (Number.isInteger(score)) return String(score)
   return Number(score.toFixed(2)).toString()
+}
+
+const formatTransTime = (timeStr: string | null): string => {
+  if (!timeStr) return '--'
+  const d = new Date(timeStr)
+  if (Number.isNaN(d.getTime())) return timeStr
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 const formatUsageIndicator = (val?: number | null): string => {
@@ -453,18 +485,34 @@ const normalizeThreatScore = (score: number | null): number => {
   return score <= 1 ? score * 100 : score
 }
 
+const parseTransTimeTs = (timeStr: string | null): number => {
+  if (!timeStr) return Infinity
+  const ts = new Date(timeStr).getTime()
+  return Number.isNaN(ts) ? Infinity : ts
+}
+
+const isTopRankEligible = (sat: SatListItem): boolean => {
+  if (sortMode.value === 'threat') return sat.threatScore != null
+  return sat.transTime != null
+}
+
 /**
  * [计算属性说明]
- * 提取当前矩阵中的敌方天基过境与中继卫星列表，按威胁度从高到低排序。
+ * 提取当前矩阵中的敌方天基过境与中继卫星列表，支持按威胁度或首次通信时间排序。
  */
 const satList = computed<SatListItem[]>(() => {
   const matrixData = props.matrixData
   if (!matrixData) return []
 
   const threatMap = new Map<number, number>()
-    ; (matrixData.threatSats || []).forEach((item) => {
-      threatMap.set(item.norad, item.threatScore)
-    })
+  ;(matrixData.threatSats || []).forEach((item) => {
+    threatMap.set(item.norad, item.threatScore)
+  })
+
+  const transTimeMap = new Map<number, string>()
+  ;(matrixData.timeEffects || []).forEach((item) => {
+    transTimeMap.set(item.norad, item.transTime)
+  })
 
   const map = new Map<number, SatListItem>()
 
@@ -480,6 +528,7 @@ const satList = computed<SatListItem[]>(() => {
       satType: s.satType,
       isRelay,
       threatScore: threatMap.get(s.norad) ?? null,
+      transTime: transTimeMap.get(s.norad) ?? null,
     })
   })
   satMatrixList.forEach((s: SatelliteMatrix) => {
@@ -490,12 +539,17 @@ const satList = computed<SatListItem[]>(() => {
       satType: s.satType,
       isRelay,
       threatScore: threatMap.get(s.norad) ?? null,
+      transTime: transTimeMap.get(s.norad) ?? null,
     })
   })
 
-  return Array.from(map.values()).sort(
-    (a, b) => normalizeThreatScore(b.threatScore) - normalizeThreatScore(a.threatScore)
-  )
+  const list = Array.from(map.values())
+
+  if (sortMode.value === 'transTime') {
+    return list.sort((a, b) => parseTransTimeTs(a.transTime) - parseTransTimeTs(b.transTime))
+  }
+
+  return list.sort((a, b) => normalizeThreatScore(b.threatScore) - normalizeThreatScore(a.threatScore))
 })
 
 
@@ -568,6 +622,13 @@ const satList = computed<SatListItem[]>(() => {
     min-height: 0;
   }
 
+  .section-header-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
   .section-title {
     display: flex;
     align-items: center;
@@ -583,6 +644,41 @@ const satList = computed<SatListItem[]>(() => {
       border-radius: 10px;
       background: rgba(64, 242, 255, 0.15);
       color: #7dd3fc;
+    }
+  }
+
+  .sort-toggle-bar {
+    display: flex;
+    gap: 6px;
+
+    .sort-btn {
+      flex: 1;
+      height: 26px;
+      padding: 0 8px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #9ec5ed;
+      background: rgba(18, 32, 54, 0.85);
+      border: 1px solid rgba(0, 225, 255, 0.25);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      outline: none;
+      white-space: nowrap;
+
+      &:hover {
+        color: #ffffff;
+        border-color: rgba(0, 225, 255, 0.6);
+        background: rgba(24, 48, 80, 0.9);
+      }
+
+      &.active {
+        color: #ffffff;
+        font-weight: 600;
+        background: linear-gradient(135deg, rgba(0, 180, 216, 0.4) 0%, rgba(0, 225, 255, 0.25) 100%);
+        border-color: #00e1ff;
+        box-shadow: 0 0 8px rgba(0, 225, 255, 0.3);
+      }
     }
   }
 }
@@ -899,6 +995,10 @@ const satList = computed<SatListItem[]>(() => {
 
       &.tag-type {
         color: #7dd3fc;
+      }
+
+      &.tag-trans-time {
+        color: #86efac;
       }
 
       &.tag-role {
