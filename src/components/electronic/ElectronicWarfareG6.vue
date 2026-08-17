@@ -39,239 +39,114 @@
 
     <!-- 中间主视图与拓扑画布区域 -->
     <div class="cema-workspace">
-      <!-- 状态与统计看板小条 -->
-      <div class="topo-summary-bar">
-        <div class="stat-badge">
-          <span class="stat-dot dot-sat"></span>
-          <span>卫星节点: <strong>{{ satNodeCount }}</strong> 颗</span>
-        </div>
-        <div class="stat-badge" v-if="currentSatCategory === 'RECON'">
-          <span class="stat-dot dot-rec"></span>
-          <span>地面站节点: <strong>{{ receiveNodeCount }}</strong> 个</span>
-        </div>
-        <div class="stat-badge" v-if="currentSatCategory === 'RECON'">
-          <span class="stat-dot dot-station"></span>
-          <span>数据中心: <strong>{{ stationNodeCount }}</strong> 个</span>
-        </div>
-        <div class="stat-badge" v-else>
-          <span class="stat-dot dot-rec"></span>
-          <span>通信目标: <strong>{{ store.battle?.name || '战场目标区域' }}</strong></span>
-        </div>
-        <div class="stat-badge">
-          <span class="stat-dot dot-normal-link"></span>
-          <span>正常: <strong>{{ normalLinkCount }}</strong> 条</span>
-        </div>
-        <div class="stat-badge alert-stat">
-          <span class="stat-dot dot-striking-link"></span>
-          <span>正在干扰: <strong>{{ strikingLinkCount }}</strong> 条</span>
-        </div>
-        <div class="stat-badge">
-          <span class="stat-dot dot-severed-link"></span>
-          <span>已干扰: <strong>{{ severedLinkCount }}</strong> 条</span>
-        </div>
-      </div>
-
-      <!-- 左右分栏主体区域 -->
       <div class="topo-main-body">
-        <!-- 左侧：图层标注独立一栏 -->
-        <div class="layer-sidebar">
-          <template v-if="currentSatCategory === 'RECON'">
-            <div class="layer-sidebar-item layer-1-item">
-              <span class="layer-icon">🛰️</span>
-              <div class="layer-text">
-                <span class="layer-title">第一层：普通卫星</span>
-                <span class="layer-sub">Ordinary Satellites</span>
-              </div>
-            </div>
-
-            <div class="layer-sidebar-item layer-2-item">
-              <span class="layer-icon">🛰️</span>
-              <div class="layer-text">
-                <span class="layer-title">第二层：中继卫星</span>
-                <span class="layer-sub">Relay Satellites</span>
-              </div>
-            </div>
-
-            <div class="layer-sidebar-item layer-3-item">
-              <span class="layer-icon">📡</span>
-              <div class="layer-text">
-                <span class="layer-title">第三层：接收站/数据中心</span>
-                <span class="layer-sub">Ground & Data Layer</span>
-              </div>
-            </div>
-          </template>
-          <template v-else>
-            <div class="layer-sidebar-item layer-1-item">
-              <span class="layer-icon">🛰️</span>
-              <div class="layer-text">
-                <span class="layer-title">第一层：通讯卫星</span>
-                <span class="layer-sub">Communication Satellites</span>
-              </div>
-            </div>
-
-            <div class="layer-sidebar-item layer-2-item">
-              <span class="layer-icon">🎯</span>
-              <div class="layer-text">
-                <span class="layer-title">第二层：{{ store.battle?.name || '战场目标区域' }}</span>
-                <span class="layer-sub">Target Battle Area</span>
-              </div>
-            </div>
-          </template>
+        <div class="topo-side topo-side--left">
+          <C2LeftControlPanel
+            :matrix-data="matrixData"
+            :selected-norad="selectedNorad"
+            @select-satellite="handleSelectSatellite"
+          />
         </div>
 
-        <!-- 中间：G6 画布容器 -->
-        <div ref="g6Container" class="g6-chart-container" v-loading="loading"></div>
-
-        <!-- 右侧：推演汇总结算（始终显示）+ 节点打击详情（选中时追加） -->
-        <div class="topo-right-panel">
-          <div v-if="selectedNodeStrikeDetail" class="panel-block node-strike-panel">
-            <div class="panel-divider panel-divider-strong"></div>
-            <div class="panel-title panel-title-sub">节点打击详情</div>
-            <div class="node-strike-header">
-              <span class="node-type-badge">{{ selectedNodeStrikeDetail.typeLabel }}</span>
-              <strong class="node-name">{{ selectedNodeStrikeDetail.name }}</strong>
+        <div class="topo-center-column">
+          <div class="topo-summary-bar">
+            <div class="stat-badge">
+              <span class="stat-dot dot-sat"></span>
+              <span>卫星节点: <strong>{{ satNodeCount }}</strong> 颗</span>
             </div>
-            <div class="node-strike-stats">
-              <div class="node-stat-item">
-                <span class="stat-label">打击次数</span>
-                <strong class="stat-value">{{ selectedNodeStrikeDetail.strikeCount }} 次</strong>
-              </div>
-              <div class="node-stat-item">
-                <span class="stat-label">造成延时</span>
-                <strong class="stat-value glow-text-orange">{{ selectedNodeStrikeDetail.delayText }}</strong>
-              </div>
+            <div class="stat-badge" v-if="currentSatCategory === 'RECON'">
+              <span class="stat-dot dot-rec"></span>
+              <span>地面站节点: <strong>{{ receiveNodeCount }}</strong> 个</span>
             </div>
-            <el-button type="primary" link size="small" class="clear-node-btn" @click="clearSelectedNode">
-              清除选择
-            </el-button>
-          </div>
-          <div class="panel-block timeline-summary-panel">
-            <div class="panel-title">推演汇总结算</div>
-
-            <div class="summary-strike-grid">
-              <div class="summary-mini-card">
-                <span class="mini-label">打击卫星</span>
-                <strong class="mini-value">{{ timelineSummary.satStrikeCount }}<em>次</em></strong>
-              </div>
-              <div class="summary-mini-card">
-                <span class="mini-label">打击中继</span>
-                <strong class="mini-value">{{ timelineSummary.relayStrikeCount }}<em>次</em></strong>
-              </div>
-              <div class="summary-mini-card">
-                <span class="mini-label">打击地面站</span>
-                <strong class="mini-value">{{ timelineSummary.groundStrikeCount }}<em>次</em></strong>
-              </div>
+            <div class="stat-badge" v-if="currentSatCategory === 'RECON'">
+              <span class="stat-dot dot-station"></span>
+              <span>数据中心: <strong>{{ stationNodeCount }}</strong> 个</span>
             </div>
-
-            <div class="panel-stat-row highlight-row">
-              <span class="stat-label">总共造成延时</span>
-              <strong class="stat-value glow-text-orange">{{ timelineSummary.totalDelayText }}</strong>
+            <div class="stat-badge" v-else>
+              <span class="stat-dot dot-rec"></span>
+              <span>通信目标: <strong>{{ store.battle?.name || '战场目标区域' }}</strong></span>
             </div>
-
-            <div class="panel-divider"></div>
-
-            <div class="panel-stat-row compact-row">
-              <span class="stat-label">未打击时理论最早全链路完成</span>
-              <strong class="stat-value glow-text-green stat-value-sm">{{ timelineSummary.preStrikeEarliestText
-              }}</strong>
+            <div class="stat-badge">
+              <span class="stat-dot dot-normal-link"></span>
+              <span>正常: <strong>{{ normalLinkCount }}</strong> 条</span>
             </div>
-            <div class="panel-stat-row compact-row">
-              <span class="stat-label">打击后最早全链路完成</span>
-              <strong class="stat-value stat-value-sm"
-                :class="timelineSummary.postStrikeBlocked ? 'glow-text-muted' : 'glow-text-cyan'">
-                {{ timelineSummary.postStrikeEarliestText }}
-              </strong>
+            <div class="stat-badge alert-stat">
+              <span class="stat-dot dot-striking-link"></span>
+              <span>正在干扰: <strong>{{ strikingLinkCount }}</strong> 条</span>
+            </div>
+            <div class="stat-badge">
+              <span class="stat-dot dot-severed-link"></span>
+              <span>已干扰: <strong>{{ severedLinkCount }}</strong> 条</span>
             </div>
           </div>
 
-
-        </div>
-      </div>
-    </div>
-
-    <!-- 底部时间轴控制与过境窗口面板 -->
-    <div class="cema-timeline-footer">
-      <div class="timeline-ctrl-bar">
-        <div class="ctrl-left">
-          <span class="timeline-title"> <i class="el-icon-timer"></i> 打击/过境时间轴 </span>
-          <span class="time-range-text"> [{{ timeRangeText.start }} ~ {{ timeRangeText.end }}] </span>
-          <span class="current-time-display">
-            当前时刻: <span class="time-value">{{ currentTimeText }}</span>
-          </span>
-          <!-- AI: 通讯卫星矩阵下在底部工具栏展示打击前/打击后服务时长指标 (字段为 serviceDuration) -->
-          <span class="service-duration-badge pre-strike-badge" v-if="currentSatCategory === 'COMM'">
-            <span class="badge-label">打击前服务时长:</span>
-            <strong class="glow-text-cyan badge-val">{{ formattedPreServiceDuration }}</strong>
-          </span>
-          <span class="service-duration-badge post-strike-badge" v-if="currentSatCategory === 'COMM'">
-            <span class="badge-label">打击后服务时长:</span>
-            <strong class="glow-text-orange badge-val">{{ formattedPostServiceDuration }}</strong>
-          </span>
-        </div>
-
-        <div class="ctrl-right">
-          <el-button class="play-btn" size="small" :type="isTimelinePlaying ? 'warning' : 'primary'"
-            @click="toggleTimelinePlayback">
-            {{ isTimelinePlaying ? '暂停' : '播放' }}
-          </el-button>
-          <div class="timeline-option">
-            <span class="option-label">播放速度</span>
-            <el-select v-model="playbackSpeed" size="small" class="option-select" @change="handlePlaybackSpeedChange">
-              <el-option v-for="opt in playbackSpeedOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-            </el-select>
-          </div>
-          <div class="timeline-option">
-            <span class="option-label">时间窗口</span>
-            <el-select v-model="timeWindowHours" size="small" class="option-select" @change="handleTimeWindowChange">
-              <el-option v-for="opt in timeWindowOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-            </el-select>
-          </div>
-        </div>
-      </div>
-
-      <div class="timeline-slider-row">
-        <el-slider v-model="currentTimeProgress" :min="0" :max="100" :step="0.1" :show-tooltip="false"
-          @input="handleTimelineSliderInput" />
-      </div>
-
-      <!-- 排序过境/打击窗口列表条 (即使无关联窗口也常驻保留底部横向滚动轴) -->
-      <div ref="windowsScrollRef" class="windows-cards-scroll">
-        <div v-if="displayedWindowsList.length === 0" class="empty-window-card">
-          <span>暂无相关节点的过境/打击时间窗口数据</span>
-        </div>
-        <div v-else v-for="(win, idx) in displayedWindowsList" :key="win.id || idx"
-          :ref="(el) => setCardRef(el, win.id)" class="window-card" :class="{
-            'card-struck': win.strikeStatus === 1,
-            'card-relay': win.isRelayWindow,
-            'card-active': isWindowActiveAtCurrentTime(win),
-            'card-selected': selectedWindowId === win.id,
-          }" @click="selectWindowItem(win)">
-          <div class="card-header">
-            <span class="win-time">{{ win.startTimeShort }} ~ {{ win.endTimeShort }}</span>
-            <span class="win-status-badge"
-              :class="win.isRelayWindow ? 'badge-relay' : win.strikeStatus === 1 ? 'badge-danger' : 'badge-success'">
-              {{ win.isRelayWindow ? '中继可见' : win.strikeStatus === 1 ? '受毁伤打压' : '正常过境' }}
-            </span>
-          </div>
-
-          <div class="card-body">
-            <div class="win-link-info">
-              <span class="sat-name" :title="win.satName">🛰️ {{ win.satName }}</span>
-              <span class="arrow-icon">➔</span>
-              <span class="rec-name" :title="win.receiveName">{{ win.isRelayWindow ? '🛰️' : '📡' }} {{ win.receiveName
-              }}</span>
+          <div class="topo-graph-stack">
+            <div class="graph-stage">
+              <div class="graph-layer-labels">
+                <div
+                  v-for="item in layerLabelItems"
+                  :key="item.key"
+                  class="graph-layer-label"
+                  :class="item.className"
+                  :style="{ top: item.top }"
+                >
+                  <span class="layer-icon">{{ item.icon }}</span>
+                  <div class="layer-text">
+                    <span class="layer-title">{{ item.title }}</span>
+                    <span class="layer-sub">{{ item.sub }}</span>
+                  </div>
+                </div>
+              </div>
+              <div ref="g6Container" class="g6-chart-container" v-loading="loading"></div>
             </div>
 
-            <div class="win-meta-info" v-if="win.strikeStatus === 1">
-              <span class="delay-tag" v-if="win.delayMin">延时: +{{ win.delayMin }}m</span>
-              <span class="weapon-tag" v-if="win.weapons && win.weapons.length > 0" :title="win.weapons[0].name">
-                🎯 {{ win.weapons[0].name }} ({{ win.weapons[0].type }})
+            <div class="graph-time-toolbar">
+              <span class="toolbar-label">当前时刻</span>
+              <span class="time-value">{{ currentTimeText }}</span>
+              <span class="toolbar-divider"></span>
+              <span class="toolbar-label">可见时间窗口</span>
+              <el-select
+                v-model="timeWindowHours"
+                size="small"
+                class="time-window-select"
+                @change="handleTimeWindowChange"
+              >
+                <el-option
+                  v-for="opt in timeWindowOptions"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+              <span class="service-duration-badge pre-strike-badge" v-if="currentSatCategory === 'COMM'">
+                <span class="badge-label">打击前服务时长:</span>
+                <strong class="glow-text-cyan badge-val">{{ formattedPreServiceDuration }}</strong>
+              </span>
+              <span class="service-duration-badge post-strike-badge" v-if="currentSatCategory === 'COMM'">
+                <span class="badge-label">打击后服务时长:</span>
+                <strong class="glow-text-orange badge-val">{{ formattedPostServiceDuration }}</strong>
               </span>
             </div>
-            <div class="win-meta-info" v-else-if="win.isRelayWindow">
-              <span class="relay-tag">星间中继过境窗口</span>
+
+            <div class="mission-timeline-wrap">
+              <BattleMissionTimeline
+                v-if="taskTimeRange"
+                :task-start="taskTimeRange.start"
+                :task-end="taskTimeRange.end"
+                :matrix-data="matrixData"
+                :selected-norad="selectedNorad"
+                @time-change="handleTimelineTimeChange"
+              />
             </div>
           </div>
+        </div>
+
+        <div class="topo-side topo-side--right">
+          <C2RightAnalysisPanel
+            :matrix-data="matrixData"
+            :selected-satellite-norad="selectedNorad"
+            @clear-satellite-selection="handleSelectSatellite(null)"
+          />
         </div>
       </div>
     </div>
@@ -284,11 +159,60 @@ import G6 from '@antv/g6'
 import { useLayoutStore } from '@/store/modules/layout'
 import { getSatelliteTypeSerials, type MatrixResult, type Weapon } from '@/api/electronic'
 import type { FuncType } from '@/types/electronic'
+import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
+import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
+import BattleMissionTimeline from '@/components/BattleSituation/BattleMissionTimeline.vue'
 
 defineOptions({
   name: 'ElectronicWarfareG6',
 })
 const store = useLayoutStore()
+
+const selectedNorad = ref<number | null>(null)
+
+const taskTimeRange = computed(() => {
+  const task = store.activedTask
+  if (!task?.beginDate || !task?.endDate) return null
+  return { start: task.beginDate, end: task.endDate }
+})
+
+const layerLabelItems = computed(() => {
+  if (currentSatCategory.value === 'COMM') {
+    return [
+      { key: 'comm-1', icon: '🛰️', title: '第一层：通讯卫星', sub: 'Communication Satellites', top: '16%', className: 'layer-1-item' },
+      { key: 'comm-2', icon: '🎯', title: `第二层：${store.battle?.name || '战场目标区域'}`, sub: 'Target Battle Area', top: '64%', className: 'layer-2-item' },
+    ]
+  }
+  return [
+    { key: 'recon-1', icon: '🛰️', title: '第一层：普通卫星', sub: 'Ordinary Satellites', top: '14%', className: 'layer-1-item' },
+    { key: 'recon-2', icon: '🛰️', title: '第二层：中继卫星', sub: 'Relay Satellites', top: '42%', className: 'layer-2-item' },
+    { key: 'recon-3', icon: '📡', title: '第三层：接收站/数据中心', sub: 'Ground & Data Layer', top: '74%', className: 'layer-3-item' },
+  ]
+})
+
+const handleSelectSatellite = (norad: number | null) => {
+  selectedNorad.value = norad
+  if (norad) {
+    const data = matrixData.value
+    const satObj =
+      (data?.satelliteMatrixList || []).find((s) => s.norad === norad) ||
+      (data?.initMatrixList || []).find((s) => s.norad === norad)
+    const isRelay = (data?.relayRelation?.relayList || []).includes(norad)
+    selectedNodeInfo.value = {
+      id: `sat-${norad}`,
+      name: satObj?.name || `Sat-${norad}`,
+      type: isRelay ? 'relay' : 'sat',
+      norad,
+    }
+  } else {
+    selectedNodeInfo.value = null
+  }
+  updateGraphHighlightState()
+}
+
+const handleTimelineTimeChange = (ms: number) => {
+  setCurrentTimestamp(ms)
+}
 
 // 卫星类型与系列映射
 const typeSerialsMap = ref<Record<string, string[]>>({})
@@ -328,9 +252,8 @@ const fetchTypeSerials = async (taskId?: number) => {
 const handleSeriesChange = (series: string) => {
   if (!series) return
   store.setSelectedSatSeries(series)
+  selectedNorad.value = null
   selectedNodeInfo.value = null
-  selectedWindowId.value = null
-  stopTimelinePlayback()
   void fetchMatrixData(true)
 }
 
@@ -458,28 +381,8 @@ interface WindowItemWrapper {
 
 // [变量用途]
 // 选中的时间窗口 ID
-const selectedWindowId = ref<string | null>(null)
-
-// [变量用途]
-// 当前时间轴推演时刻的 Unix 毫秒时间戳
 const currentTimestamp = ref<number>(0)
-
-// [变量用途]
-// 时间轴进度条 0 - 100 百分比
-const currentTimeProgress = ref<number>(0)
-
-// 时间轴播放与时间窗口配置
-const isTimelinePlaying = ref(false)
-const playbackSpeed = ref(1)
 const timeWindowHours = ref(1)
-
-const playbackSpeedOptions = [
-  { label: '0.5x', value: 0.5 },
-  { label: '1x', value: 1 },
-  { label: '2x', value: 2 },
-  { label: '5x', value: 5 },
-  { label: '10x', value: 10 },
-]
 
 const timeWindowOptions = [
   { label: '30分钟', value: 0.5 },
@@ -491,29 +394,14 @@ const timeWindowOptions = [
 
 const timeWindowMs = computed(() => timeWindowHours.value * 3600 * 1000)
 
-let playbackFrameId: number | null = null
-let lastPlaybackTick = 0
-
-const updateTimeProgressFromTimestamp = () => {
-  const totalSpan = maxTimestamp.value - minTimestamp.value
-  if (totalSpan > 0) {
-    currentTimeProgress.value = ((currentTimestamp.value - minTimestamp.value) / totalSpan) * 100
-  } else {
-    currentTimeProgress.value = 0
-  }
-}
-
 const ensureCurrentTimestampValid = () => {
   const min = minTimestamp.value
   const max = maxTimestamp.value
   if (!currentTimestamp.value || currentTimestamp.value < min || currentTimestamp.value > max) {
     currentTimestamp.value = min
-    updateTimeProgressFromTimestamp()
   }
 }
 
-let lastGraphRefreshAt = 0
-const GRAPH_TIME_REFRESH_MS = 400
 const nodeLayoutCache = new Map<string, { x: number; y: number }>()
 let graphTopologyKey = ''
 
@@ -602,158 +490,16 @@ const refreshGraphForTime = (fitView = false) => {
 }
 
 const setCurrentTimestamp = (ts: number, refreshGraph = true) => {
-  ensureCurrentTimestampValid()
   const clamped = Math.min(Math.max(ts, minTimestamp.value), maxTimestamp.value)
   currentTimestamp.value = clamped
-  updateTimeProgressFromTimestamp()
   if (!refreshGraph) return
-
-  const now = performance.now()
-  if (!isTimelinePlaying.value || now - lastGraphRefreshAt >= GRAPH_TIME_REFRESH_MS) {
-    lastGraphRefreshAt = now
-    refreshGraphForTime(false)
-    if (!isTimelinePlaying.value) scrollToActiveCard()
-  }
-}
-
-const flushGraphTimeRefresh = () => {
-  lastGraphRefreshAt = 0
-  ensureCurrentTimestampValid()
   refreshGraphForTime(false)
-  scrollToActiveCard()
-}
-
-const handleTimelineSliderInput = (val: number) => {
-  const totalSpan = maxTimestamp.value - minTimestamp.value
-  if (totalSpan <= 0) return
-  ensureCurrentTimestampValid()
-  currentTimestamp.value = Math.min(
-    Math.max(minTimestamp.value + (val / 100) * totalSpan, minTimestamp.value),
-    maxTimestamp.value
-  )
-  updateTimeProgressFromTimestamp()
-  lastGraphRefreshAt = performance.now()
-  refreshGraphForTime(false)
-  scrollToActiveCard()
-}
-
-const stopTimelinePlayback = () => {
-  const wasPlaying = isTimelinePlaying.value
-  isTimelinePlaying.value = false
-  if (playbackFrameId !== null) {
-    cancelAnimationFrame(playbackFrameId)
-    playbackFrameId = null
-  }
-  if (wasPlaying) {
-    flushGraphTimeRefresh()
-  }
-}
-
-const toggleTimelinePlayback = () => {
-  if (isTimelinePlaying.value) {
-    stopTimelinePlayback()
-    return
-  }
-  if (currentTimestamp.value >= maxTimestamp.value) {
-    setCurrentTimestamp(minTimestamp.value, false)
-  }
-  isTimelinePlaying.value = true
-  lastPlaybackTick = performance.now()
-  const tick = (now: number) => {
-    if (!isTimelinePlaying.value) return
-    const delta = now - lastPlaybackTick
-    lastPlaybackTick = now
-    const totalSpan = maxTimestamp.value - minTimestamp.value
-    if (totalSpan <= 0) {
-      stopTimelinePlayback()
-      return
-    }
-    const advanceMs = (delta / 1000) * playbackSpeed.value * (totalSpan / 60)
-    const nextTs = currentTimestamp.value + advanceMs
-    if (nextTs >= maxTimestamp.value) {
-      setCurrentTimestamp(maxTimestamp.value)
-      stopTimelinePlayback()
-      return
-    }
-    setCurrentTimestamp(nextTs)
-    playbackFrameId = requestAnimationFrame(tick)
-  }
-  playbackFrameId = requestAnimationFrame(tick)
-}
-
-const handlePlaybackSpeedChange = () => {
-  if (isTimelinePlaying.value) {
-    stopTimelinePlayback()
-    toggleTimelinePlayback()
-  }
+  highlightActiveElements()
 }
 
 const handleTimeWindowChange = () => {
-  flushGraphTimeRefresh()
-}
-
-// [变量用途]
-// 时间轴下方过境/打击窗口列表条 DOM ref
-const windowsScrollRef = ref<HTMLDivElement | null>(null)
-
-// [变量用途]
-// 存储每个过境窗口卡片的 DOM ref 映射
-const cardRefs = ref<Map<string, HTMLElement>>(new Map())
-
-// [变量用途]
-// 记录上一次已自动滚动的窗口卡片 ID，防止重复触发滚动动画抖动
-let lastAutoScrolledId: string | null = null
-
-/**
- * [功能说明]
- * 动态记录过境窗口卡片的 DOM 引用。
- *
- * @param el DOM 节点
- * @param id 窗口卡片 ID
- */
-const setCardRef = (el: any, id: string) => {
-  if (el) {
-    cardRefs.value.set(id, el as HTMLElement)
-  }
-}
-
-/**
- * [功能说明]
- * 时间轴推进或高亮变动时，同步向右平滑滚动窗口卡片列表，保持当前正在打击/过境的窗口卡片在屏幕可视区域内居中显示。
- *
- * [修改约束]
- * - 当活跃卡片未改变时不做重复 scrollIntoView 避免界面频繁动画抖动。
- * - 支持用户手动点击卡片或跳转时通过 force 参数强制滚动定位。
- *
- * @param force 是否强制执行滚动
- */
-const scrollToActiveCard = (force = false) => {
-  if (!windowsScrollRef.value || allWindowsList.value.length === 0) return
-
-  // 1. 优先获取当前时间戳处于活跃 (正在打击/过境) 状态的窗口卡片
-  let targetWin = allWindowsList.value.find((w) => isWindowActiveAtCurrentTime(w))
-
-  // 2. 若当前没有活跃窗口，则获取与当前推演时刻时间间隔最近的窗口卡片
-  if (!targetWin) {
-    targetWin = allWindowsList.value.reduce((prev, curr) => {
-      return Math.abs(curr.startTimestamp - currentTimestamp.value) <
-        Math.abs(prev.startTimestamp - currentTimestamp.value)
-        ? curr
-        : prev
-    })
-  }
-
-  if (targetWin && (force || lastAutoScrolledId !== targetWin.id)) {
-    lastAutoScrolledId = targetWin.id
-    const cardEl = cardRefs.value.get(targetWin.id)
-    if (cardEl) {
-      cardEl.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-        inline: 'center',
-      })
-    }
-  }
+  refreshGraphForTime(false)
+  highlightActiveElements()
 }
 
 /**
@@ -842,6 +588,8 @@ const fetchMatrixData = async (force = false) => {
 
     if (data) {
       matrixData.value = data
+      selectedNorad.value = null
+      selectedNodeInfo.value = null
     }
   } catch (err: any) {
     console.warn('调用后端算法矩阵接口提示:', err)
@@ -866,6 +614,8 @@ watch(
   ([newStoreMatrix]) => {
     if (newStoreMatrix) {
       matrixData.value = newStoreMatrix
+      selectedNorad.value = null
+      selectedNodeInfo.value = null
       nextTick(() => {
         graphTopologyKey = ''
         nodeLayoutCache.clear()
@@ -878,6 +628,17 @@ watch(
     }
   },
   { immediate: true }
+)
+
+watch(
+  () => store.selectedSatSeries,
+  (series, prev) => {
+    if (series && series !== prev) {
+      selectedNorad.value = null
+      selectedNodeInfo.value = null
+      void fetchMatrixData(true)
+    }
+  }
 )
 
 /**
@@ -1124,124 +885,6 @@ const formatDelayMinutes = (minutes: number): string => {
   const rounded = Number.isInteger(minutes) ? minutes : Number(minutes.toFixed(1))
   return `${rounded} 分钟`
 }
-
-const countPlanWindows = (plan: { windows?: { beginWindow?: string; endWindow?: string }[] }): number => {
-  return plan.windows?.length ? plan.windows.length : 1
-}
-
-const matchAttackPlanToNorad = (
-  plan: { target?: string; targetType?: string },
-  norad: number,
-  name: string,
-  relayList: Set<number>
-): 'sat' | 'relay' | null => {
-  const target = plan.target || ''
-  const targetType = plan.targetType || ''
-  if (targetType.includes('中继') || relayList.has(norad)) {
-    if (target.includes(String(norad)) || target === name || target.includes(name)) return 'relay'
-  }
-  if (target.includes(String(norad)) || target === name || target.includes(name)) {
-    return relayList.has(norad) || targetType.includes('中继') ? 'relay' : 'sat'
-  }
-  return null
-}
-
-/** 计算最早全链路完成时刻（卫星→地面站→数据中心） */
-const computeEarliestFullChainFinishTs = (usePostStrike: boolean): number | null => {
-  const data = matrixData.value as any
-  if (!data) return null
-
-  const groundRels = usePostStrike ? data.stationRelationList?.relations || [] : data.initRelationList?.relations || []
-  if (!groundRels.length) return null
-
-  const activeReceiveIds = new Set(groundRels.map((r: { from: string }) => r.from))
-  let earliest: number | null = null
-
-  const processWindow = (win: any, satBlocked: boolean) => {
-    if (satBlocked) return
-    if (usePostStrike && win.strikeStatus === 1) return
-    const receiveId = win.receiveId
-    if (!receiveId || !activeReceiveIds.has(receiveId)) return
-    const endTs = parseToTimestamp(getWindowEndStr(win) || getWindowStartStr(win))
-    if (!endTs) return
-    if (earliest === null || endTs < earliest) earliest = endTs
-  }
-
-  if (usePostStrike) {
-    ; (data.satelliteMatrixList || []).forEach((sat: any) => {
-      const blocked = sat.satelliteStatus === 1
-        ; (sat.stationWindows || []).forEach((win: any) => processWindow(win, blocked))
-    })
-  } else {
-    ; (data.initMatrixList || []).forEach((sat: any) => {
-      ; (sat.initWindows || []).forEach((win: any) => processWindow(win, false))
-    })
-  }
-
-  return earliest
-}
-
-const timelineSummary = computed(() => {
-  const data = matrixData.value as any
-  const empty = {
-    satStrikeCount: 0,
-    relayStrikeCount: 0,
-    groundStrikeCount: 0,
-    totalDelayText: '0 分钟',
-    preStrikeEarliestText: '彻底阻断',
-    postStrikeEarliestText: '彻底阻断',
-    postStrikeBlocked: true,
-  }
-  if (!data) return empty
-
-  const relayList = new Set<number>(data.relayRelation?.relayList || [])
-  let satStrikeCount = 0
-  let relayStrikeCount = 0
-  let groundStrikeCount = 0
-  let totalDelayMin = 0
-
-  const hasWindowStrikes = allWindowsList.value.some((w) => w.strikeStatus === 1)
-
-  if (hasWindowStrikes) {
-    allWindowsList.value.forEach((win) => {
-      if (win.strikeStatus !== 1) return
-      if (win.isRelayWindow) relayStrikeCount++
-      else groundStrikeCount++
-      totalDelayMin += Number(win.delayMin) || 0
-    })
-      ; (data.satelliteMatrixList || []).forEach((sat: { norad: number; satelliteStatus?: number }) => {
-        if (sat.satelliteStatus !== 1 || relayList.has(sat.norad)) return
-        satStrikeCount++
-      })
-  } else {
-    ; (data.attackPlanList || []).forEach((plan: { target?: string; targetType?: string; windows?: any[] }) => {
-      const count = countPlanWindows(plan)
-      const tt = plan.targetType || ''
-      if (tt.includes('中继')) relayStrikeCount += count
-      else if (tt.includes('接收') || tt.includes('地面')) groundStrikeCount += count
-      else satStrikeCount += count
-    })
-      ; (data.satelliteMatrixList || []).forEach((sat: { norad: number; satelliteStatus?: number; delayMin?: number }) => {
-        if (sat.satelliteStatus !== 1) return
-        if (relayList.has(sat.norad)) relayStrikeCount++
-        else satStrikeCount++
-        totalDelayMin += Number(sat.delayMin) || 0
-      })
-  }
-
-  const preTs = computeEarliestFullChainFinishTs(false)
-  const postTs = computeEarliestFullChainFinishTs(true)
-
-  return {
-    satStrikeCount,
-    relayStrikeCount,
-    groundStrikeCount,
-    totalDelayText: formatDelayMinutes(totalDelayMin),
-    preStrikeEarliestText: preTs ? formatTimeStr(preTs) : '彻底阻断',
-    postStrikeEarliestText: postTs ? formatTimeStr(postTs) : '彻底阻断',
-    postStrikeBlocked: !postTs,
-  }
-})
 
 /**
  * [功能]
@@ -1528,207 +1171,28 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
   return list
 })
 
-/**
- * [功能说明]
- * 根据当前选中的节点 (普通卫星 / 中继卫星 / 地面接收站 / 中心云数据中心) 联动过滤展示的时间窗口列表。
- *
- * [处理规则]
- * - 结果严格保持按时间从早到晚 (startTimestamp 升序) 排列。
- * - 当无任何节点被选中时，默认列出全量按时间升序排列的时间窗口。
- */
-const displayedWindowsList = computed<WindowItemWrapper[]>(() => {
-  const all = allWindowsList.value
-  if (!selectedNodeInfo.value) {
-    return all
-  }
-
-  const node = selectedNodeInfo.value
-  let filtered: WindowItemWrapper[] = []
-
-  if (node.type === 'sat') {
-    // 1. 普通卫星: 筛选 satNorad 匹配或星间中继 relayNorad 匹配的时间窗口
-    filtered = all.filter((w) => w.satNorad === node.norad || w.relayNorad === node.norad)
-  } else if (node.type === 'relay') {
-    // 2. 中继卫星: 筛选中继卫星自身及所有由其提供转发服务的依赖卫星时间窗口
-    const relayRels = matrixData.value?.relayRelation?.relations || []
-    const relatedNorads = new Set<number>()
-    if (node.norad) relatedNorads.add(node.norad)
-
-    relayRels.forEach((rel) => {
-      if (Number(rel.to) === node.norad) {
-        relatedNorads.add(Number(rel.from))
-      } else if (Number(rel.from) === node.norad) {
-        relatedNorads.add(Number(rel.to))
-      }
-    })
-
-    filtered = all.filter(
-      (w) => w.relayNorad === node.norad || w.satNorad === node.norad || relatedNorads.has(w.satNorad)
-    )
-  } else if (node.type === 'receive') {
-    // 3. 地面接收站: 筛选 receiveId 匹配的时间窗口
-    filtered = all.filter((w) => w.receiveId === node.receiveId)
-  } else if (node.type === 'station') {
-    // 4. 中心云数据中心: 筛选相连的所有地面接收站对应的时间窗口
-    const initRels = matrixData.value?.initRelationList?.relations || []
-    const stationRels = matrixData.value?.stationRelationList?.relations || []
-    const allRels = [...initRels, ...stationRels]
-
-    const connectedReceiveIds = new Set<string>()
-    allRels.forEach((rel) => {
-      if (rel.to === node.stationId) {
-        connectedReceiveIds.add(rel.from)
-      }
-    })
-
-    filtered = all.filter((w) => connectedReceiveIds.has(w.receiveId))
-  } else {
-    filtered = all
-  }
-
-  // 按过境开始时间从早到晚进行升序排序
-  return filtered.sort((a, b) => a.startTimestamp - b.startTimestamp)
-})
-
-/**
- * 单节点打击统计：仅统计该节点作为「被打击方」的次数与延时。
- * 地面站与底部时间轴卡片（displayedWindowsList 中 strikeStatus===1）保持一致；
- * 卫星/中继仅统计本体被打击，不把链路上对地面站的干扰计入卫星。
- */
-const selectedNodeStrikeDetail = computed(() => {
-  const node = selectedNodeInfo.value
-  const data = matrixData.value as any
-  if (!node || !data) return null
-  if (node.type === 'station') return null
-
-  if (node.type === 'receive') {
-    const struckWins = displayedWindowsList.value.filter((w) => w.strikeStatus === 1 && !w.isRelayWindow)
-    const totalDelayMin = struckWins.reduce((sum, w) => sum + (Number(w.delayMin) || 0), 0)
-    return {
-      name: node.name,
-      typeLabel: '地面站',
-      strikeCount: struckWins.length,
-      delayText: formatDelayMinutes(totalDelayMin),
-    }
-  }
-
-  if (node.type === 'sat' || node.type === 'relay') {
-    const norad = node.norad!
-    const relayList = new Set<number>(data.relayRelation?.relayList || [])
-    let strikeCount = 0
-    let totalDelayMin = 0
-
-    const postSat = (data.satelliteMatrixList || []).find((s: any) => s.norad === norad)
-    if (postSat?.satelliteStatus === 1) {
-      strikeCount = 1
-      totalDelayMin = Number(postSat.delayMin) || 0
-    } else {
-      ; (data.attackPlanList || []).forEach((plan: { target?: string; targetType?: string; windows?: any[] }) => {
-        const tt = plan.targetType || ''
-        if (tt.includes('接收') || tt.includes('地面')) return
-        const matched = matchAttackPlanToNorad(plan, norad, node.name, relayList)
-        const expectType = node.type === 'relay' ? 'relay' : 'sat'
-        if (matched === expectType) strikeCount += countPlanWindows(plan)
-      })
-    }
-
-    if (node.type === 'relay') {
-      const relayStruck = allWindowsList.value.filter(
-        (w) => w.isRelayWindow && w.strikeStatus === 1 && (w.relayNorad === norad || w.satNorad === norad)
-      )
-      strikeCount += relayStruck.length
-      totalDelayMin += relayStruck.reduce((s, w) => s + (Number(w.delayMin) || 0), 0)
-    }
-
-    return {
-      name: node.name,
-      typeLabel: node.type === 'relay' ? '中继卫星' : '卫星',
-      strikeCount,
-      delayText: formatDelayMinutes(totalDelayMin),
-    }
-  }
-
-  return null
-})
-
-/**
- * [功能说明]
- * 重置拓扑节点选中状态
- */
-const clearSelectedNode = () => {
-  selectedNodeInfo.value = null
-  updateGraphHighlightState()
-}
-
-/**
- * 时间轴边界 (起始时间戳与结束时间戳)
- */
 const minTimestamp = computed(() => {
+  const task = store.activedTask
+  if (task?.beginDate) return parseToTimestamp(task.beginDate)
   if (allWindowsList.value.length === 0) return Date.now()
   return Math.min(...allWindowsList.value.map((w) => w.startTimestamp))
 })
 
 const maxTimestamp = computed(() => {
+  const task = store.activedTask
+  if (task?.endDate) return parseToTimestamp(task.endDate)
   if (allWindowsList.value.length === 0) return Date.now() + 3600 * 1000
   return Math.max(...allWindowsList.value.map((w) => w.endTimestamp))
 })
 
-const timeRangeText = computed(() => {
-  return {
-    start: formatTimeStr(minTimestamp.value),
-    end: formatTimeStr(maxTimestamp.value),
-  }
-})
-
-/**
- * 初始化时间轴当前时间为最小值
- */
 const initTimelineBounds = () => {
-  if (allWindowsList.value.length === 0) return
   currentTimestamp.value = minTimestamp.value
-  updateTimeProgressFromTimestamp()
-  stopTimelinePlayback()
 }
 
-/**
- * 判断窗口在当前推演时刻是否处于活跃过境状态
- */
 const isWindowActiveAtCurrentTime = (win: WindowItemWrapper) => {
   return currentTimestamp.value >= win.startTimestamp && currentTimestamp.value <= win.endTimestamp
 }
 
-/**
- * 点击单个时间轴窗口卡片，高亮 G6 画布中对应的节点与边
- */
-const selectWindowItem = (win: WindowItemWrapper) => {
-  selectedWindowId.value = win.id
-  setCurrentTimestamp(win.startTimestamp)
-  if (!graph) return
-
-  // 高亮对应的 Satellite 节点、Ground Station 节点及 Edge
-  const satId = `sat-${win.satNorad}`
-  const recId = win.receiveId
-
-  graph.getNodes().forEach((node: any) => {
-    const id = node.get('id')
-    if (id === satId || id === recId) {
-      graph.setItemState(node, 'highlight', true)
-    } else {
-      graph.setItemState(node, 'highlight', false)
-    }
-  })
-
-  graph.getEdges().forEach((edge: any) => {
-    graph.setItemState(edge, 'highlight', false)
-  })
-
-  // 强制滚动居中当前点击选中的窗口卡片
-  scrollToActiveCard(true)
-}
-
-/**
- * 根据当前推演时刻高亮活跃通信与毁伤链路
- */
 const highlightActiveElements = () => {
   if (!graph) return
   const activeWins = allWindowsList.value.filter((w) => isWindowActiveAtCurrentTime(w))
@@ -1763,9 +1227,6 @@ const highlightActiveElements = () => {
       graph.setItemState(node, 'active', false)
     }
   })
-
-  // 时间轴推进时自动向右平滑滚动卡片列表条
-  scrollToActiveCard()
 }
 
 // ==================== G6 拓扑构建与布局算法 ====================
@@ -1806,7 +1267,7 @@ const buildG6GraphData = () => {
 
     const containerW = g6Container.value ? g6Container.value.clientWidth : 0
     if (containerW <= 0) return { nodes: [], edges: [] }
-    const startX = 30
+    const startX = 140
     const availableW = Math.max(containerW - startX - 30, 400)
 
     // 1. 排布第一层 通讯卫星 (y = 90)
@@ -2080,7 +1541,7 @@ const buildG6GraphData = () => {
   // 计算 3 层节点的坐标布局 (Layer 1 普通卫星: y=80, Layer 2 中继卫星: y=230, Layer 3 接收站: y=380, Layer 3 数据中心: y=490)
   const containerW = g6Container.value ? g6Container.value.clientWidth : 0
   if (containerW <= 0) return { nodes: [], edges: [] }
-  const startX = 30
+  const startX = 140
   const availableW = Math.max(containerW - startX - 30, 400)
 
   // 排布 Layer 1 普通卫星 (y = 80)
@@ -2599,13 +2060,23 @@ const initOrUpdateGraph = (fitView = true) => {
     graph.data(data)
     graph.render()
 
-    // 绑定拓扑图节点点击事件：选中节点并筛选联动时间轴时间窗口列表
     graph.on('node:click', (evt: any) => {
       const nodeItem = evt.item
       if (!nodeItem) return
       const model = nodeItem.getModel()
       const nodeId = String(model.id)
 
+      if (nodeId.startsWith('sat-')) {
+        const norad = Number(nodeId.replace('sat-', ''))
+        if (selectedNorad.value === norad) {
+          handleSelectSatellite(null)
+        } else {
+          handleSelectSatellite(norad)
+        }
+        return
+      }
+
+      selectedNorad.value = null
       if (selectedNodeInfo.value?.id === nodeId) {
         selectedNodeInfo.value = null
       } else {
@@ -2614,10 +2085,8 @@ const initOrUpdateGraph = (fitView = true) => {
       updateGraphHighlightState()
     })
 
-    // 点击空白画布区重置选中节点
     graph.on('canvas:click', () => {
-      selectedNodeInfo.value = null
-      updateGraphHighlightState()
+      handleSelectSatellite(null)
     })
   } else {
     // 拓扑图已有实例：重新计算画布大小并替换渲染数据
@@ -2762,7 +2231,6 @@ onActivated(() => {
 })
 
 onUnmounted(() => {
-  stopTimelinePlayback()
   window.removeEventListener('resize', handleResize)
   if (resizeTimer) {
     window.clearTimeout(resizeTimer)
@@ -2969,365 +2437,148 @@ onUnmounted(() => {
   display: flex;
   position: relative;
   overflow: hidden;
+  min-height: 0;
 }
 
-.layer-sidebar {
-  width: 175px;
-  min-width: 175px;
-  background: rgba(8, 14, 28, 0.95);
-  border-right: 1px solid rgba(0, 225, 255, 0.18);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  padding: 15px 12px;
-  z-index: 20;
+.topo-side {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 
-  .layer-sidebar-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    background: rgba(13, 24, 46, 0.85);
-    border: 1px solid rgba(0, 225, 255, 0.25);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  &--left {
+    width: 460px;
+    min-width: 460px;
+    border-right: 1px solid rgba(0, 225, 255, 0.18);
+  }
 
-    .layer-icon {
-      font-size: 20px;
-    }
+  &--right {
+    width: 480px;
+    min-width: 480px;
+    border-left: 1px solid rgba(0, 225, 255, 0.18);
+  }
 
-    .layer-text {
-      display: flex;
-      flex-direction: column;
-
-      .layer-title {
-        font-size: 13px;
-        font-weight: 700;
-        color: #00e1ff;
-      }
-
-      .layer-sub {
-        font-size: 10px;
-        color: #64748b;
-      }
-    }
-
-    &.layer-2-item {
-      border-color: rgba(0, 242, 254, 0.3);
-
-      .layer-title {
-        color: #00f2fe;
-      }
-    }
-
-    &.layer-3-item {
-      border-color: rgba(59, 130, 246, 0.3);
-
-      .layer-title {
-        color: #60a5fa;
-      }
-    }
+  :deep(.c2-panel) {
+    height: 100%;
   }
 }
 
-.g6-chart-container {
+.topo-center-column {
   flex: 1;
-  width: 100%;
-  height: 100%;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.topo-graph-stack {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.graph-stage {
+  flex: 1;
   min-height: 0;
   position: relative;
   overflow: hidden;
-
-  :deep(canvas) {
-    display: block;
-  }
 }
 
-.topo-right-panel {
-  width: 272px;
-  min-width: 272px;
-  height: 100%;
-  background: rgba(8, 14, 28, 0.96);
-  border-left: 1px solid rgba(0, 225, 255, 0.22);
-  padding: 12px 10px;
-  box-sizing: border-box;
-  overflow-y: auto;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-
-  .panel-block {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    flex-shrink: 0;
-  }
-
-  .panel-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: #40f2ff;
-    padding-bottom: 6px;
-    border-bottom: 1px solid rgba(0, 225, 255, 0.2);
-    letter-spacing: 0.5px;
-  }
-
-  .panel-title-sub {
-    font-size: 14px;
-    color: #7dd3fc;
-    border-bottom-color: rgba(0, 225, 255, 0.12);
-    padding-bottom: 4px;
-    margin-top: 2px;
-  }
-
-  .summary-strike-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-  }
-
-  .summary-mini-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: 8px 4px;
-    border-radius: 6px;
-    background: rgba(0, 225, 255, 0.06);
-    border: 1px solid rgba(0, 225, 255, 0.14);
-
-    .mini-label {
-      font-size: 11px;
-      color: #94a3b8;
-      text-align: center;
-      line-height: 1.3;
-      white-space: nowrap;
-    }
-
-    .mini-value {
-      font-size: 18px;
-      font-weight: 700;
-      color: #e2efff;
-      line-height: 1.2;
-
-      em {
-        font-style: normal;
-        font-size: 12px;
-        font-weight: 500;
-        color: #94a3b8;
-        margin-left: 1px;
-      }
-    }
-  }
-
-  .panel-stat-row {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-
-    .stat-label {
-      font-size: 12px;
-      color: #94a3b8;
-      line-height: 1.4;
-    }
-
-    .stat-value {
-      font-size: 16px;
-      font-weight: 700;
-      color: #e2efff;
-      line-height: 1.35;
-      word-break: break-all;
-    }
-
-    &.compact-row .stat-value-sm {
-      font-size: 13px;
-      font-weight: 600;
-      line-height: 1.45;
-    }
-  }
-
-  .highlight-row {
-    padding: 8px 10px;
-    border-radius: 6px;
-    background: rgba(255, 140, 0, 0.06);
-    border: 1px solid rgba(255, 140, 0, 0.15);
-
-    .stat-value {
-      font-size: 17px;
-    }
-  }
-
-  .panel-divider {
-    height: 1px;
-    background: rgba(0, 225, 255, 0.15);
-    margin: 2px 0;
-    flex-shrink: 0;
-  }
-
-  .panel-divider-strong {
-    background: rgba(0, 225, 255, 0.28);
-    margin: 6px 0 2px;
-  }
-
-  .glow-text-green {
-    color: #52c41a;
-  }
-
-  .glow-text-muted {
-    color: #94a3b8;
-  }
-
-  .node-strike-panel {
-    padding-top: 2px;
-  }
-
-  .node-strike-header {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 8px 10px;
-    border-radius: 6px;
-    background: rgba(0, 225, 255, 0.05);
-    border: 1px solid rgba(0, 225, 255, 0.12);
-
-    .node-type-badge {
-      display: inline-block;
-      align-self: flex-start;
-      font-size: 11px;
-      color: #40f2ff;
-      padding: 2px 8px;
-      border-radius: 10px;
-      background: rgba(0, 225, 255, 0.12);
-      border: 1px solid rgba(0, 225, 255, 0.2);
-    }
-
-    .node-name {
-      font-size: 15px;
-      font-weight: 700;
-      color: #e2efff;
-      line-height: 1.35;
-      word-break: break-all;
-    }
-  }
-
-  .node-strike-stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-
-    .node-stat-item {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      padding: 8px;
-      border-radius: 6px;
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(148, 163, 184, 0.15);
-
-      .stat-label {
-        font-size: 11px;
-        color: #94a3b8;
-      }
-
-      .stat-value {
-        font-size: 15px;
-        font-weight: 700;
-        color: #e2efff;
-      }
-    }
-  }
-
-  .clear-node-btn {
-    align-self: flex-start;
-    font-size: 12px;
-    padding: 0;
-    margin-top: -2px;
-  }
+.graph-layer-labels {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 132px;
+  z-index: 5;
+  pointer-events: none;
 }
 
-/* 底部时间轴样式 */
-.cema-timeline-footer {
-  height: 210px;
-  background: rgba(9, 16, 30, 0.95);
-  border-top: 1px solid rgba(0, 225, 255, 0.2);
-  display: flex;
-  flex-direction: column;
-  padding: 10px 16px;
-  gap: 8px;
-}
-
-.timeline-slider-row {
-  padding: 0 4px;
-
-  :deep(.el-slider__runway) {
-    background: rgba(0, 225, 255, 0.12);
-  }
-
-  :deep(.el-slider__bar) {
-    background: linear-gradient(90deg, rgba(0, 225, 255, 0.45), rgba(0, 225, 255, 0.85));
-  }
-
-  :deep(.el-slider__button) {
-    border-color: #00e1ff;
-    background: #00e1ff;
-    box-shadow: 0 0 8px rgba(0, 225, 255, 0.6);
-  }
-}
-
-.timeline-ctrl-bar {
+.graph-layer-label {
+  position: absolute;
+  left: 6px;
+  right: 4px;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(13, 24, 46, 0.88);
+  border: 1px solid rgba(0, 225, 255, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 
-  .ctrl-left {
+  .layer-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .layer-text {
     display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
-    flex: 1;
+    flex-direction: column;
     min-width: 0;
   }
 
-  .ctrl-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-  }
-
-  .timeline-option {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-
-    .option-label {
-      font-size: 11px;
-      color: #94a3b8;
-      white-space: nowrap;
-    }
-
-    .option-select {
-      width: 92px;
-    }
-  }
-
-  .play-btn {
-    min-width: 64px;
-  }
-
-  .timeline-title {
-    font-size: 13px;
+  .layer-title {
+    font-size: 11px;
     font-weight: 700;
     color: #00e1ff;
-    margin-right: 8px;
+    line-height: 1.3;
   }
 
-  .time-range-text {
-    font-size: 11px;
+  .layer-sub {
+    font-size: 9px;
     color: #64748b;
+    line-height: 1.2;
+  }
+
+  &.layer-2-item {
+    border-color: rgba(0, 242, 254, 0.3);
+
+    .layer-title {
+      color: #00f2fe;
+    }
+  }
+
+  &.layer-3-item {
+    border-color: rgba(59, 130, 246, 0.3);
+
+    .layer-title {
+      color: #60a5fa;
+    }
+  }
+}
+
+.graph-time-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px 12px;
+  border-top: 1px solid rgba(0, 225, 255, 0.12);
+  background: rgba(9, 16, 30, 0.85);
+  font-size: 12px;
+
+  .toolbar-label {
+    color: #94a3b8;
+  }
+
+  .time-value {
+    color: #00e1ff;
+    font-weight: 600;
+    font-family: Consolas, monospace;
+  }
+
+  .toolbar-divider {
+    width: 1px;
+    height: 14px;
+    background: rgba(148, 163, 184, 0.35);
+  }
+
+  .time-window-select {
+    width: 100px;
   }
 
   .service-duration-badge {
@@ -3353,7 +2604,6 @@ onUnmounted(() => {
 
       .badge-val {
         color: #00e1ff;
-        text-shadow: 0 0 6px rgba(0, 225, 255, 0.4);
       }
     }
 
@@ -3363,207 +2613,36 @@ onUnmounted(() => {
 
       .badge-val {
         color: #ff7875;
-        text-shadow: 0 0 6px rgba(255, 120, 117, 0.4);
       }
     }
   }
+}
 
-  .current-time-display {
-    font-size: 12px;
-    color: #94a3b8;
+.mission-timeline-wrap {
+  flex-shrink: 0;
+  position: relative;
+  padding: 0 8px 8px;
 
-    .time-value {
-      color: #00e1ff;
-      font-weight: 700;
-      font-size: 13px;
-    }
+  :deep(.battle-mission-timeline) {
+    position: relative;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
   }
 }
 
-.windows-cards-scroll {
-  display: flex;
-  gap: 12px;
-  // AI: 使用 overflow-x: scroll，即便无数据或数据较少时也始终保留底部滚动轴轨迹
-  overflow-x: scroll;
-  padding-bottom: 8px;
-  flex: 1;
-  align-items: stretch;
-
-  &::-webkit-scrollbar {
-    height: 8px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 225, 255, 0.4);
-    border-radius: 4px;
-
-    &:hover {
-      background: rgba(0, 225, 255, 0.7);
-    }
-  }
-
-  &::-webkit-scrollbar-track {
-    background: rgba(0, 225, 255, 0.08);
-    border-radius: 4px;
-  }
-}
-
-.empty-window-card {
+.g6-chart-container {
   width: 100%;
-  min-width: 320px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.5);
-  border: 1px dashed rgba(0, 225, 255, 0.25);
-  border-radius: 6px;
-  color: #94a3b8;
-  font-size: 13px;
-  padding: 12px;
-}
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
 
-.window-card {
-  min-width: 260px;
-  max-width: 280px;
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(0, 225, 255, 0.18);
-  border-radius: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  transition: all 0.2s ease;
-
-  &.card-active {
-    border-color: #00e1ff;
-    background: rgba(0, 225, 255, 0.14);
-    box-shadow: 0 0 10px rgba(0, 225, 255, 0.25);
-  }
-
-  &.card-selected {
-    border-color: #ff4d4f;
-    box-shadow: 0 0 12px rgba(255, 77, 79, 0.45);
-  }
-
-  &.card-struck {
-    border-color: rgba(255, 77, 79, 0.45);
-  }
-
-  &.card-relay {
-    border-color: rgba(168, 85, 247, 0.45);
-    background: rgba(168, 85, 247, 0.08);
-
-    &.card-active {
-      border-color: #a855f7;
-      background: rgba(168, 85, 247, 0.2);
-      box-shadow: 0 0 10px rgba(168, 85, 247, 0.35);
-    }
-  }
-
-  .card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 4px;
-
-    .win-time {
-      font-size: 11px;
-      color: #94a3b8;
-      font-family: inherit;
-    }
-
-    .win-status-badge {
-      font-size: 10px;
-      padding: 1px 6px;
-      border-radius: 3px;
-
-      &.badge-success {
-        background: rgba(16, 185, 129, 0.2);
-        color: #34d399;
-      }
-
-      &.badge-danger {
-        background: rgba(239, 68, 68, 0.2);
-        color: #f87171;
-      }
-
-      &.badge-relay {
-        background: rgba(168, 85, 247, 0.2);
-        color: #c084fc;
-      }
-    }
-  }
-
-  .win-link-info {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11.5px;
-    margin: 3px 0;
-
-    .sat-name {
-      color: #38bdf8;
-      font-weight: 600;
-      max-width: 110px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .arrow-icon {
-      color: #64748b;
-    }
-
-    .rec-name {
-      color: #34d399;
-      max-width: 110px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  }
-
-  .win-meta-info {
-    margin-top: 6px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 10.5px;
-    flex-wrap: wrap;
-
-    .delay-tag {
-      color: #fbbf24;
-      background: rgba(251, 191, 36, 0.15);
-      border: 1px solid rgba(251, 191, 36, 0.3);
-      padding: 2px 6px;
-      border-radius: 3px;
-      white-space: nowrap;
-      font-weight: 500;
-    }
-
-    .relay-tag {
-      color: #c084fc;
-      background: rgba(168, 85, 247, 0.15);
-      border: 1px solid rgba(168, 85, 247, 0.3);
-      padding: 2px 6px;
-      border-radius: 3px;
-      white-space: nowrap;
-      font-weight: 500;
-    }
-
-    .weapon-tag {
-      color: #f87171;
-      background: rgba(248, 113, 113, 0.15);
-      border: 1px solid rgba(248, 113, 113, 0.3);
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-weight: 500;
-      max-width: 150px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+  :deep(canvas) {
+    display: block;
   }
 }
+
 </style>
