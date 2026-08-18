@@ -55,13 +55,21 @@
       <div class="header-right">
         <!-- 放大与缩小刻度控制 -->
         <div class="zoom-controls">
+          <span class="time-span-display">{{ currentTickSpanLabel }}</span>
           <span class="zoom-label">时间刻度:</span>
           <el-button-group>
-            <el-button size="small" type="primary" :disabled="timeScaleFactor <= 0.5" @click="changeScale(0.75)">
+            <el-button
+              size="small"
+              type="primary"
+              :disabled="tickStepIndex >= TICK_STEP_OPTIONS.length - 1"
+              @click="zoomOut"
+            >
               缩小 -
             </el-button>
-            <el-button size="small" type="primary" @click="resetScale"> 100% </el-button>
-            <el-button size="small" type="primary" :disabled="timeScaleFactor >= 3.0" @click="changeScale(1.25)">
+            <el-button size="small" type="primary" @click="resetScale">
+              {{ currentTickSpanShort }}
+            </el-button>
+            <el-button size="small" type="primary" :disabled="tickStepIndex <= 0" @click="zoomIn">
               放大 +
             </el-button>
           </el-button-group>
@@ -121,7 +129,7 @@
 
         <!-- 卫星与接收站层次索引树/列表 -->
         <div class="sat-tree-list">
-          <div class="tree-header">卫星与接收站节点 ({{ filteredSatellites.length }})</div>
+          <div class="tree-header">卫星节点 ({{ filteredSatellites.length }})</div>
           <div
             v-for="sat in filteredSatellites"
             :key="sat.norad"
@@ -178,80 +186,122 @@
         </div>
       </div>
 
-      <!-- 2. 中间栏 (Center Workspace): 可上下左右二维滚动的甘特图 Canvas 区域 -->
-      <div class="gantt-workspace-center" ref="scrollContainerRef">
-        <div class="gantt-chart-inner" :style="{ width: ganttCanvasWidth + 'px' }">
-          <!-- 甘特图顶部时间轴 Header -->
-          <div class="gantt-timeline-header">
-            <div class="left-row-label-header">
-              <span>卫星 / 干扰排道</span>
-            </div>
-            <div class="timeline-ticks-container">
-              <div
-                v-for="tick in timelineTicks"
-                :key="tick.timeStr"
-                class="time-tick-item"
-                :style="{ left: tick.leftPx + 'px' }"
-              >
-                <span class="tick-line"></span>
-                <span class="tick-text">{{ tick.label }}</span>
+      <!-- 2. 中间栏：甘特图 + 底部播放时间轴 -->
+      <div class="gantt-center-column">
+        <div class="gantt-workspace-center" ref="scrollContainerRef">
+          <div class="gantt-chart-inner" :style="{ width: ganttCanvasWidth + 180 + 'px' }">
+            <div class="gantt-timeline-header">
+              <div class="left-row-label-header">
+                <span>卫星 / 干扰排道</span>
               </div>
-            </div>
-          </div>
-
-          <!-- 甘特图行 (Rows) 区域 -->
-          <div class="gantt-rows-container">
-            <div
-              v-for="satRow in processedGanttRows"
-              :key="satRow.norad"
-              class="gantt-sat-row-group"
-              :class="{ 'row-sat-struck': satRow.satelliteStatus === 1 }"
-            >
-              <!-- 卫星行左侧固定 Label 块 -->
-              <div class="row-label-col">
-                <div class="sat-main-label">
-                  <span class="icon-sat">🛰️</span>
-                  <span class="sat-title">{{ satRow.name }}</span>
-                </div>
-                <div class="sat-meta-sub">
-                  <span>NORAD: {{ satRow.norad }}</span>
-                  <span class="lane-count-tag" v-if="satRow.maxLanes > 1">分道: {{ satRow.maxLanes }}层</span>
-                </div>
-              </div>
-
-              <!-- 卫星行右侧 Timeline 轨道 (支持 Chrome Timer 式排道展示) -->
-              <div class="row-timeline-track" :style="{ height: satRow.maxLanes * 32 + 12 + 'px' }">
-                <!-- 时间刻度网格线条 -->
+              <div class="timeline-ticks-container">
                 <div
                   v-for="tick in timelineTicks"
-                  :key="'grid-' + tick.timeStr"
-                  class="track-grid-line"
+                  :key="tick.timeStr"
+                  class="time-tick-item"
+                  :class="{ 'is-current-tick': tick.isCurrent }"
                   :style="{ left: tick.leftPx + 'px' }"
-                ></div>
+                >
+                  <span class="tick-line"></span>
+                  <span class="tick-text">{{ tick.label }}</span>
+                </div>
+                <div class="gantt-playhead-line" :style="{ left: playheadLeftPx + 'px' }"></div>
+              </div>
+            </div>
 
-                <!-- 具体的干扰/过境甘特块 (Gantt Bar Items) -->
+            <div class="gantt-rows-container">
+              <div
+                v-for="ganttRow in processedGanttRows"
+                :key="ganttRow.rowKey"
+                class="gantt-sat-row-group"
+                :class="{
+                  'row-sat-struck': ganttRow.satelliteStatus === 1,
+                  'is-row-selected': selectedSatNorad === ganttRow.norad,
+                }"
+                :ref="(el) => setGanttRowRef(ganttRow.norad, el as Element | null)"
+              >
+                <div class="row-label-col">
+                  <div class="sat-main-label">
+                    <span class="icon-sat">🛰️</span>
+                    <span class="sat-title">{{ ganttRow.name }}</span>
+                  </div>
+                  <div class="sat-meta-sub">
+                    <span>NORAD: {{ ganttRow.norad }}</span>
+                    <span class="lane-count-tag" v-if="ganttRow.maxLanes > 1">窗口: {{ ganttRow.maxLanes }}个</span>
+                  </div>
+                </div>
+
                 <div
-                  v-for="bar in satRow.bars"
-                  :key="bar.id"
-                  class="gantt-bar-item"
-                  :class="[bar.colorStatusClass, { 'is-bar-active': selectedBarId === bar.id }]"
-                  :style="{
-                    left: bar.leftPx + 'px',
-                    width: bar.widthPx + 'px',
-                    top: bar.laneIndex * 32 + 6 + 'px',
-                  }"
-                  @click.stop="handleSelectBar(bar)"
+                  class="row-timeline-track"
+                  :style="{ height: ganttRow.trackHeight + 'px' }"
                 >
                   <div
-                    class="bar-content"
-                    :title="`${bar.receiveName} (${bar.peakWindowShort} ~ ${bar.endWindowShort})`"
+                    v-for="tick in timelineTicks"
+                    :key="'grid-' + ganttRow.rowKey + tick.timeStr"
+                    class="track-grid-line"
+                    :class="{ 'is-current-grid': tick.isCurrent }"
+                    :style="{ left: tick.leftPx + 'px' }"
+                  ></div>
+                  <div class="gantt-playhead-line" :style="{ left: playheadLeftPx + 'px' }"></div>
+
+                  <div
+                    v-for="bar in ganttRow.bars"
+                    :key="bar.id"
+                    class="gantt-bar-item"
+                    :class="[
+                      bar.colorStatusClass,
+                      {
+                        'is-bar-active': selectedBarId === bar.id,
+                        'is-bar-at-playhead': isBarAtPlayhead(bar),
+                      },
+                    ]"
+                    :style="{
+                      left: bar.leftPx + 'px',
+                      width: bar.widthPx + 'px',
+                      top: bar.topPx + 'px',
+                      height: bar.barHeight + 'px',
+                    }"
+                    @click.stop="handleSelectBar(bar)"
                   >
-                    <!-- 绿色表示未被干扰，紫色表示被干扰 -->
-                    <span class="bar-icon-only"> 📡 </span>
+                    <div class="bar-content" :title="bar.barTooltip">
+                      <span v-for="(line, lineIdx) in bar.barLabelLines" :key="lineIdx" class="bar-label-line">{{
+                        line
+                      }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div class="gantt-playback-footer" v-if="taskTimeBounds">
+          <div class="playback-controls">
+            <el-button size="small" type="primary" @click="jumpToTaskStart">起点</el-button>
+            <el-button size="small" type="primary" @click="togglePlayback">
+              {{ isPlaying ? '暂停' : '播放' }}
+            </el-button>
+            <el-button size="small" type="primary" @click="jumpToTaskEnd">终点</el-button>
+            <span class="playback-divider"></span>
+            <span class="playback-label">速度</span>
+            <el-select v-model="gridsPerSecond" size="small" class="speed-select" @change="onSpeedChange">
+              <el-option v-for="opt in GRIDS_PER_SECOND_OPTIONS" :key="opt" :label="`${opt} 格/秒`" :value="opt" />
+            </el-select>
+            <span class="playback-time">{{ currentPlayTimeText }}</span>
+          </div>
+          <div class="playback-track" ref="playbackTrackRef" @click="handlePlaybackTrackClick">
+            <div class="playback-track-bg"></div>
+            <div
+              v-for="tick in timelineTicks"
+              :key="'pb-' + tick.timeStr"
+              class="playback-tick"
+              :style="{ left: tick.percent + '%' }"
+            ></div>
+            <div class="playback-cursor" :style="{ left: playheadPercent + '%' }"></div>
+          </div>
+          <div class="playback-scale">
+            <span>{{ formatPlayTime(taskTimeBounds.minTs) }}</span>
+            <span>{{ formatPlayTime(taskTimeBounds.maxTs) }}</span>
           </div>
         </div>
       </div>
@@ -278,116 +328,62 @@
             <line x1="12" x2="12" y1="22" y2="18" />
           </svg>
           <span class="panel-title">干扰与武器明细</span>
+          <span v-if="barsAtPlayhead.length > 0" class="panel-subtitle">{{ barsAtPlayhead.length }} 条链路</span>
         </div>
 
-        <div class="panel-content-body" v-if="selectedBar">
-          <!-- 干扰状态卡片 Banner -->
-          <div class="status-banner-card" :class="selectedBar.colorStatusClass">
-            <div class="banner-title">
-              <span class="banner-icon">
-                <template v-if="selectedBar.satStatus === 1 && selectedBar.strikeStatus === 1">💥⚡</template>
-                <template v-else-if="selectedBar.satStatus === 1">🛰️💥</template>
-                <template v-else-if="selectedBar.strikeStatus === 1">📡🎯</template>
-                <template v-else>🟢</template>
-              </span>
-              <span class="banner-status-text">
-                <template v-if="selectedBar.satStatus === 1 && selectedBar.strikeStatus === 1"
-                  >双重毁伤状态 (卫星与接收站均被击毁)</template
-                >
-                <template v-else-if="selectedBar.satStatus === 1">卫星受打压/毁伤 </template>
-                <template v-else-if="selectedBar.strikeStatus === 1">接收站受打压/毁伤 </template>
-                <template v-else>正常过境窗口 (未受干扰)</template>
-              </span>
-            </div>
+        <div class="panel-content-body" v-if="barsAtPlayhead.length > 0">
+          <div class="playhead-summary-header">
+            <span class="playhead-time-label">当前时刻</span>
+            <span class="playhead-time-val">{{ currentPlayTimeText }}</span>
           </div>
 
-          <!-- 基本信息 Section -->
-          <div class="info-section">
-            <div class="section-title">🛰️ 卫星与接收站信息</div>
-            <div class="info-grid">
-              <!-- 目标卫星 (突出显示) -->
-              <div class="info-row vertical-stack">
-                <span class="label">目标卫星:</span>
-                <div class="highlight-box sat-highlight-box">
-                  <span class="highlight-name">🛰️ {{ selectedBar.satName }}</span>
-                  <span class="highlight-sub">NORAD: {{ selectedBar.satNorad }}</span>
-                </div>
-              </div>
-              <div class="info-row">
-                <span class="label">卫星状态:</span>
-                <span class="val" :class="selectedBar.satStatus === 1 ? 'danger-text' : 'success-text'">
-                  {{ selectedBar.satStatus === 1 ? '已被干扰' : '正常可用' }}
+          <div
+            v-for="bar in barsAtPlayhead"
+            :key="bar.id"
+            class="playhead-link-block"
+            :class="[bar.colorStatusClass, { 'is-click-selected': selectedBarId === bar.id }]"
+            @click="handleSelectBar(bar)"
+          >
+            <div class="compact-link-header" :class="bar.colorStatusClass">
+              <span class="compact-status-tag">{{ bar.statusLabel }}</span>
+              <span class="compact-link-line" :title="`${bar.satName} → ${bar.receiveName}`">
+                🛰️ {{ bar.satName }} → 📡 {{ bar.receiveName }}
+              </span>
+            </div>
+
+            <div class="compact-detail-grid">
+              <div class="compact-row">
+                <span class="compact-key">卫星</span>
+                <span class="compact-val" :title="`NORAD: ${bar.satNorad}`">{{ bar.satName }}</span>
+                <span class="compact-tag" :class="bar.satStatus === 1 ? 'is-danger' : 'is-success'">
+                  {{ bar.satStatus === 1 ? '被干扰' : '正常' }}
                 </span>
               </div>
-
-              <!-- 关联接收站 (突出显示) -->
-              <div class="info-row vertical-stack">
-                <span class="label">关联接收站:</span>
-                <div class="highlight-box rec-highlight-box">
-                  <span class="highlight-name">📡 {{ selectedBar.receiveName }}</span>
-                  <span class="highlight-sub">ID: {{ selectedBar.receiveId }}</span>
-                </div>
-              </div>
-              <div class="info-row">
-                <span class="label">接收站状态:</span>
-                <span class="val" :class="selectedBar.strikeStatus === 1 ? 'danger-text' : 'success-text'">
-                  {{ selectedBar.strikeStatus === 1 ? '已被干扰' : '正常可用' }}
+              <div class="compact-row">
+                <span class="compact-key">地面站</span>
+                <span class="compact-val" :title="bar.receiveId">{{ bar.receiveName }}</span>
+                <span class="compact-tag" :class="bar.strikeStatus === 1 ? 'is-danger' : 'is-success'">
+                  {{ bar.strikeStatus === 1 ? '被干扰' : '正常' }}
                 </span>
               </div>
+              <div class="compact-row compact-time-row">
+                <span class="compact-key">过境</span>
+                <span class="compact-val compact-time" :title="`${bar.peakWindow} ~ ${bar.endWindow}`">
+                  {{ bar.peakWindowShort }} ~ {{ bar.endWindowShort }}
+                </span>
+              </div>
+              <div class="compact-row" v-if="bar.delayMin">
+                <span class="compact-key">延时</span>
+                <span class="compact-val is-warning">+{{ bar.delayMin }} 分钟</span>
+              </div>
             </div>
-          </div>
 
-          <!-- 时间窗口 Section (整块高亮包覆 Label + 数值) -->
-          <div class="info-section">
-            <div class="section-title">⏱️ 打击时间窗口</div>
-            <div class="info-grid">
-              <!-- 开始时间 peakWindow (整块高亮包覆) -->
-              <div class="info-row vertical-stack">
-                <div class="highlight-box time-highlight-card">
-                  <span class="highlight-label">开始过境时间:</span>
-                  <span class="highlight-time-val">{{ selectedBar.peakWindow }}</span>
-                </div>
-              </div>
-              <!-- 结束时间 endWindow (整块高亮包覆) -->
-              <div class="info-row vertical-stack">
-                <div class="highlight-box time-highlight-card">
-                  <span class="highlight-label">结束过境时间:</span>
-                  <span class="highlight-time-val">{{ selectedBar.endWindow }}</span>
-                </div>
-              </div>
-              <div class="info-row" v-if="selectedBar.delayMin">
-                <span class="label">窗口干扰延时:</span>
-                <span class="val warning-text">+{{ selectedBar.delayMin }} 分钟</span>
+            <div class="compact-weapons" v-if="bar.weapons && bar.weapons.length > 0">
+              <div v-for="w in bar.weapons" :key="w.id" class="compact-weapon-row">
+                <span class="weapon-name">🎯 {{ w.name }}</span>
+                <span class="weapon-meta">{{ w.country }} · {{ w.type }} · {{ w.range }}km</span>
               </div>
             </div>
-          </div>
-
-          <!-- 武器参数与干扰系统配置 Section -->
-          <div class="info-section">
-            <div class="section-title">🎯 执行干扰的武器系统配置</div>
-            <div v-if="selectedBar.weapons && selectedBar.weapons.length > 0" class="weapons-list">
-              <div v-for="w in selectedBar.weapons" :key="w.id" class="weapon-detail-card">
-                <div class="w-card-header">
-                  <span class="w-name">🎯 {{ w.name }}</span>
-                  <span class="w-country">{{ w.country }}</span>
-                </div>
-                <div class="w-card-body">
-                  <div class="w-prop">
-                    <span class="p-lbl">武器类型:</span>
-                    <span class="p-val">{{ w.type }}</span>
-                  </div>
-                  <div class="w-prop">
-                    <span class="p-lbl">武器射程:</span>
-                    <span class="p-val warning-text">{{ w.range }} km</span>
-                  </div>
-                  <div class="w-prop" v-if="w.latitude && w.longitude">
-                    <span class="p-lbl">部署经纬度:</span>
-                    <span class="p-val">({{ w.latitude.toFixed(2) }}, {{ w.longitude.toFixed(2) }})</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-else class="empty-weapon-tip">暂无配置干扰武器（该时间段为正常过境窗口或未指派武器）。</div>
           </div>
         </div>
 
@@ -411,7 +407,9 @@
             <path d="M14 4.1 12 6" />
             <path d="m6 12-1.9 2" />
           </svg>
-          <div class="tip-text">请在中间甘特图中点击任意干扰/过境时间块，查看卫星与干扰武器详细参数。</div>
+          <div class="tip-text">
+            当前时刻 <strong>{{ currentPlayTimeText }}</strong> 无过境链路。拖动底部时间轴或播放，使时刻标线穿过甘特条块即可查看链路详情。
+          </div>
         </div>
       </div>
     </div>
@@ -419,7 +417,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import type { MatrixResult, SatelliteMatrix, Weapon, CommucationMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
 const store = useLayoutStore()
@@ -459,9 +457,54 @@ const selectedSatNorad = ref<number | null>(null)
 // 当前选中的甘特条 Item ID
 const selectedBarId = ref<string | null>(null)
 
-// [变量用途]
-// 时间刻度缩放倍率 (0.5x ~ 3.0x)
-const timeScaleFactor = ref<number>(1.0)
+const scrollContainerRef = ref<HTMLDivElement | null>(null)
+const playbackTrackRef = ref<HTMLDivElement | null>(null)
+const ganttRowRefs = new Map<number, HTMLElement>()
+
+const setGanttRowRef = (norad: number, el: Element | null) => {
+  if (el) ganttRowRefs.set(norad, el as HTMLElement)
+  else ganttRowRefs.delete(norad)
+}
+
+const scrollToSatRow = (norad: number) => {
+  nextTick(() => {
+    const rowEl = ganttRowRefs.get(norad)
+    rowEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  })
+}
+
+// 时间刻度步长档位（默认 10 分钟/格）
+const TICK_STEP_OPTIONS = [15, 30, 60, 300, 600] as const
+const DEFAULT_TICK_STEP_INDEX = 4
+const PIXELS_PER_TICK = 80
+const BAR_LINE_HEIGHT = 13
+const BAR_PADDING_Y = 10
+const BAR_PADDING_X = 16
+const LANE_GAP = 4
+const LANE_BAR_GAP_PX = 4
+const LANE_TOP_OFFSET = 6
+const TRACK_PADDING = 12
+
+const estimateWrappedLines = (text: string, widthPx: number): number => {
+  const available = Math.max(widthPx - BAR_PADDING_X, 48)
+  const charsPerLine = Math.max(5, Math.floor(available / 8.5))
+  return Math.max(1, Math.ceil(text.length / charsPerLine))
+}
+
+const computeBarHeight = (labelLines: string[], widthPx: number): number => {
+  const firstLineWraps = estimateWrappedLines(labelLines[0] || '', widthPx)
+  const otherLines = Math.max(0, labelLines.length - 1)
+  const visualLines = firstLineWraps + otherLines
+  const gapTotal = Math.max(0, visualLines - 1) * 2
+  return Math.max(50, visualLines * BAR_LINE_HEIGHT + BAR_PADDING_Y + gapTotal)
+}
+const GRIDS_PER_SECOND_OPTIONS = [0.5, 1, 2, 5] as const
+
+const tickStepIndex = ref<number>(DEFAULT_TICK_STEP_INDEX)
+const gridsPerSecond = ref<number>(1)
+const currentPlayTs = ref<number>(0)
+const isPlaying = ref(false)
+let playTimer: ReturnType<typeof setInterval> | null = null
 
 // [类型用途]
 // 甘特图 Bar 元素计算后的封装结构
@@ -500,15 +543,24 @@ interface ProcessedGanttBar {
   colorStatusClass: 'status-normal' | 'status-sat-struck' | 'status-rec-struck' | 'status-both-struck'
   /** 多层排道索引号 (0, 1, 2...) */
   laneIndex: number
+  /** 甘特 Bar 顶部 Px 偏移 */
+  topPx: number
+  /** 甘特 Bar 高度 Px */
+  barHeight: number
   /** 甘特 Bar 左侧 Px 偏移 */
   leftPx: number
   /** 甘特 Bar 宽度 Px */
   widthPx: number
+  /** 条块展示文字（多行） */
+  barLabelLines: string[]
+  /** tooltip 全文 */
+  barTooltip: string
+  /** 干扰状态简写 */
+  statusLabel: string
 }
 
-// [类型用途]
-// 卫星甘特图行渲染对象
-interface ProcessedSatRow {
+interface ProcessedGanttRow {
+  rowKey: string
   norad: number
   name: string
   satType: string
@@ -516,6 +568,7 @@ interface ProcessedSatRow {
   weapons: Weapon[]
   bars: ProcessedGanttBar[]
   maxLanes: number
+  trackHeight: number
 }
 
 /**
@@ -590,6 +643,19 @@ const filteredSatellites = computed<SatelliteMatrix[]>(() => {
       sat.stationWindows?.some((win) => win.weapons?.some((w) => w.name.toLowerCase().includes(kw)))
     return matchSatName || matchRec || matchWeapon
   })
+})
+
+/**
+ * [功能说明]
+ * 任务时间边界（严格使用 beginDate ~ endDate）
+ */
+const taskTimeBounds = computed<{ minTs: number; maxTs: number } | null>(() => {
+  const task = store.activedTask
+  if (!task?.beginDate || !task?.endDate) return null
+  const minTs = parseToTimestamp(task.beginDate)
+  const maxTs = parseToTimestamp(task.endDate)
+  if (minTs >= maxTs) return null
+  return { minTs, maxTs }
 })
 
 /**
@@ -696,34 +762,14 @@ const parseToTimestamp = (timeStr: string): number => {
 
 /**
  * [功能说明]
- * 计算所有时间窗口的全局起始与结束时间边界。
+ * 甘特图时间边界（严格限定任务 beginDate ~ endDate）
  */
 const timeBounds = computed<{ minTs: number; maxTs: number }>(() => {
-  let minTs = Infinity
-  let maxTs = -Infinity
+  const bounds = taskTimeBounds.value
+  if (bounds) return bounds
 
-  filteredSatellites.value.forEach((sat: any) => {
-    const rawWindows = sat.stationWindows || sat.initWindows || []
-    rawWindows.forEach((win: any) => {
-      const startStr = win.peakWindow || win.startWindow || win.beginWindow || ''
-      const endStr = win.endWindow || ''
-      const start = parseToTimestamp(startStr)
-      const end = parseToTimestamp(endStr)
-      if (start < minTs) minTs = start
-      if (end > maxTs) maxTs = end
-    })
-  })
-
-  if (minTs === Infinity || maxTs === -Infinity || minTs >= maxTs) {
-    const now = Math.floor(Date.now() / 1000)
-    minTs = now
-    maxTs = now + 86400
-  }
-
-  // 前补充10分钟 后补充2小时
-  minTs -= 10 * 60
-  maxTs += 2 * 3600
-  return { minTs, maxTs }
+  const now = Math.floor(Date.now() / 1000)
+  return { minTs: now, maxTs: now + 86400 }
 })
 
 /**
@@ -732,35 +778,253 @@ const timeBounds = computed<{ minTs: number; maxTs: number }>(() => {
  */
 const ganttCanvasWidth = computed<number>(() => {
   const durationSec = timeBounds.value.maxTs - timeBounds.value.minTs
-  // 基准: 每小时 300px * timeScaleFactor 最少4小时
-  const hours = Math.max(durationSec / 3600, 4)
-  return Math.max(Math.floor(hours * 300 * timeScaleFactor.value), 1200)
+  const tickCount = Math.max(Math.ceil(durationSec / tickStepSec.value), 1)
+  return Math.max(tickCount * PIXELS_PER_TICK, 1200)
 })
+
+/**
+ * [功能说明]
+ * 当前时间轴刻度步长（秒）。
+ */
+const tickStepSec = computed<number>(() => TICK_STEP_OPTIONS[tickStepIndex.value] ?? 60)
+
+const formatTickStepLabel = (sec: number): string => {
+  if (sec < 60) return `${sec} 秒/格`
+  return `${sec / 60} 分钟/格`
+}
+
+/**
+ * [功能说明]
+ * 当前时间轴刻度跨度文案（放大/缩小时展示）。
+ */
+const currentTickSpanLabel = computed<string>(() => `刻度跨度: ${formatTickStepLabel(tickStepSec.value)}`)
+
+const currentTickSpanShort = computed<string>(() => formatTickStepLabel(tickStepSec.value))
+
+const formatTimelineTickLabel = (ts: number, stepSec: number): string => {
+  const date = new Date(ts * 1000)
+  const h = String(date.getHours()).padStart(2, '0')
+  const m = String(date.getMinutes()).padStart(2, '0')
+  const s = String(date.getSeconds()).padStart(2, '0')
+  if (stepSec < 60) return `${h}:${m}:${s}`
+  return `${h}:${m}`
+}
+
+const getInterferenceStatusLabel = (satStatus: number, strikeStatus: number): string => {
+  if (satStatus === 1 && strikeStatus === 1) return '双扰'
+  if (satStatus === 1) return '星扰'
+  if (strikeStatus === 1) return '站扰'
+  return '正常'
+}
+
+const buildBarLabelLines = (
+  satName: string,
+  recName: string,
+  statusLabel: string,
+  peakWindowShort: string,
+  endWindowShort: string,
+  delayMin?: number
+): string[] => {
+  const lines = [
+    `${satName} → ${recName}`,
+    statusLabel,
+    `${peakWindowShort} ~ ${endWindowShort}`,
+  ]
+  if (delayMin !== undefined && delayMin !== null && Number(delayMin) > 0) {
+    lines.push(`延时 +${delayMin}分钟`)
+  }
+  return lines
+}
+
+const tsToLeftPx = (ts: number): number => {
+  const { minTs, maxTs } = timeBounds.value
+  const totalSec = maxTs - minTs
+  if (totalSec <= 0) return 0
+  return Math.floor(((ts - minTs) / totalSec) * ganttCanvasWidth.value)
+}
+
+const tsToPercent = (ts: number): number => {
+  const { minTs, maxTs } = timeBounds.value
+  const totalSec = maxTs - minTs
+  if (totalSec <= 0) return 0
+  return Math.min(Math.max(((ts - minTs) / totalSec) * 100, 0), 100)
+}
+
+const playheadLeftPx = computed(() => tsToLeftPx(currentPlayTs.value))
+const playheadPercent = computed(() => tsToPercent(currentPlayTs.value))
+
+const formatPlayTime = (ts: number): string => {
+  const date = new Date(ts * 1000)
+  const y = date.getFullYear()
+  const mo = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const h = String(date.getHours()).padStart(2, '0')
+  const m = String(date.getMinutes()).padStart(2, '0')
+  const s = String(date.getSeconds()).padStart(2, '0')
+  return `${y}-${mo}-${d} ${h}:${m}:${s}`
+}
+
+const currentPlayTimeText = computed(() => formatPlayTime(currentPlayTs.value))
+
+const snapToGrid = (ts: number): number => {
+  const { minTs, maxTs } = timeBounds.value
+  const step = tickStepSec.value
+  const snapped = minTs + Math.round((ts - minTs) / step) * step
+  return Math.min(Math.max(snapped, minTs), maxTs)
+}
+
+const buildBarsForWindows = (
+  windows: Array<{
+    win: any
+    sat: any
+    start: number
+    end: number
+    idx: number
+    startStr: string
+    endStr: string
+  }>,
+  options: {
+    defaultTargetName: string
+    minTs: number
+    totalSec: number
+    canvasWidth: number
+  }
+): { bars: ProcessedGanttBar[]; maxLanes: number; trackHeight: number } => {
+  const bars: ProcessedGanttBar[] = []
+  const laneRightPx: number[] = []
+
+  windows.forEach(({ win, sat, start, end, idx, startStr, endStr }) => {
+    const startRatio = (start - options.minTs) / options.totalSec
+    const endRatio = (end - options.minTs) / options.totalSec
+    const leftPx = Math.floor(startRatio * options.canvasWidth)
+    const rawWidthPx = Math.floor((endRatio - startRatio) * options.canvasWidth)
+    const widthPx = Math.max(rawWidthPx, 72)
+
+    const satStatus = sat?.satelliteStatus || 0
+    const strikeStatusVal =
+      typeof win.strikeStatus === 'number' ? win.strikeStatus : satStatus === 1 ? 1 : 0
+    let colorStatusClass: ProcessedGanttBar['colorStatusClass'] = 'status-normal'
+    if (satStatus === 1 && strikeStatusVal === 1) {
+      colorStatusClass = 'status-both-struck'
+    } else if (satStatus === 1) {
+      colorStatusClass = 'status-sat-struck'
+    } else if (strikeStatusVal === 1) {
+      colorStatusClass = 'status-rec-struck'
+    }
+
+    const peakWindowShort = startStr.length >= 16 ? startStr.substring(11, 19) : startStr
+    const endWindowShort = endStr.length >= 16 ? endStr.substring(11, 19) : endStr
+    const recName = win.receiveName || options.defaultTargetName
+    const recId = win.receiveId || 'target-area'
+    const satName = sat?.name || `Sat-${sat?.norad || ''}`
+    const satNorad = sat?.norad || 0
+    const statusLabel = getInterferenceStatusLabel(satStatus, strikeStatusVal)
+    const barLabelLines = buildBarLabelLines(
+      satName,
+      recName,
+      statusLabel,
+      peakWindowShort,
+      endWindowShort,
+      win.delayMin
+    )
+    const barTooltip = barLabelLines.join('\n')
+    const barHeight = computeBarHeight(barLabelLines, widthPx)
+    const rightPx = leftPx + widthPx
+
+    // 时间未重叠也可能因最小条宽在像素上重叠，需同时按像素右边界排道
+    let laneIndex = laneRightPx.findIndex((laneRight) => laneRight + LANE_BAR_GAP_PX <= leftPx)
+    if (laneIndex === -1) {
+      laneIndex = laneRightPx.length
+      laneRightPx.push(rightPx)
+    } else {
+      laneRightPx[laneIndex] = rightPx
+    }
+
+    const weaponMap = new Map<string, Weapon>()
+    ;(sat?.weapons || []).forEach((w: Weapon) => weaponMap.set(w.id, w))
+    ;(win.weapons || []).forEach((w: Weapon) => weaponMap.set(w.id, w))
+
+    bars.push({
+      id: `bar-sat-${satNorad}-${recId}-${idx}`,
+      satNorad,
+      satName,
+      satStatus,
+      receiveId: recId,
+      receiveName: recName,
+      strikeStatus: strikeStatusVal,
+      peakWindow: startStr,
+      endWindow: endStr,
+      peakWindowShort,
+      endWindowShort,
+      startTimestamp: start,
+      endTimestamp: end,
+      delayMin: win.delayMin,
+      weapons: Array.from(weaponMap.values()),
+      colorStatusClass,
+      laneIndex,
+      topPx: 0,
+      barHeight,
+      leftPx,
+      widthPx,
+      barLabelLines,
+      barTooltip,
+      statusLabel,
+    })
+  })
+
+  const maxLanes = Math.max(laneRightPx.length, 1)
+  const laneMaxHeights = new Array<number>(maxLanes).fill(0)
+  bars.forEach((bar) => {
+    laneMaxHeights[bar.laneIndex] = Math.max(laneMaxHeights[bar.laneIndex], bar.barHeight)
+  })
+
+  const laneTops: number[] = []
+  let trackBottom = LANE_TOP_OFFSET
+  for (let i = 0; i < maxLanes; i++) {
+    laneTops[i] = trackBottom
+    trackBottom += laneMaxHeights[i] + LANE_GAP
+  }
+
+  bars.forEach((bar) => {
+    bar.topPx = laneTops[bar.laneIndex]
+  })
+
+  const trackHeight =
+    bars.length === 0
+      ? LANE_TOP_OFFSET + computeBarHeight(['占位', '占位'], 120) + TRACK_PADDING
+      : trackBottom + TRACK_PADDING - LANE_GAP
+
+  return { bars, maxLanes, trackHeight }
+}
 
 /**
  * [功能说明]
  * 计算生成顶部时间轴刻度列表。
  */
-const timelineTicks = computed<{ label: string; timeStr: string; leftPx: number }[]>(() => {
+const timelineTicks = computed<
+  { label: string; timeStr: string; leftPx: number; percent: number; isCurrent: boolean }[]
+>(() => {
   const { minTs, maxTs } = timeBounds.value
   const totalSec = maxTs - minTs
   if (totalSec <= 0) return []
 
-  const ticks: { label: string; timeStr: string; leftPx: number }[] = []
-  // 每 1 小时产生一个 Tick 刻度
-  const stepSec = 3600
-  const startHourTs = Math.ceil(minTs / stepSec) * stepSec
+  const ticks: { label: string; timeStr: string; leftPx: number; percent: number; isCurrent: boolean }[] =
+    []
+  const stepSec = tickStepSec.value
+  const startTs = Math.ceil(minTs / stepSec) * stepSec
+  const currentSnapped = snapToGrid(currentPlayTs.value)
 
-  for (let ts = startHourTs; ts <= maxTs; ts += stepSec) {
-    const date = new Date(ts * 1000)
-    const hoursStr = String(date.getHours()).padStart(2, '0') + ':00'
-    const ratio = (ts - minTs) / totalSec
-    const leftPx = ratio * ganttCanvasWidth.value
+  for (let ts = startTs; ts <= maxTs; ts += stepSec) {
+    const label = formatTimelineTickLabel(ts, stepSec)
+    const leftPx = tsToLeftPx(ts)
+    const percent = tsToPercent(ts)
 
     ticks.push({
-      label: hoursStr,
-      timeStr: date.toISOString(),
+      label,
+      timeStr: new Date(ts * 1000).toISOString(),
       leftPx,
+      percent,
+      isCurrent: ts === currentSnapped,
     })
   }
 
@@ -770,136 +1034,66 @@ const timelineTicks = computed<{ label: string; timeStr: string; leftPx: number 
 /**
  * [功能说明]
  * 核心多层排道 (Multi-tier Lane) 算法：
- * 计算并格式化每一颗卫星及其所属窗口甘特条 (ProcessedSatRow 与 ProcessedGanttBar)。
- * 解决同一卫星/接收站有多个过境时间窗口时的纵向错开排道展示，防止甘特块重叠。
+ * 计算卫星行与地面站行及其甘特条。
  */
-const processedGanttRows = computed<ProcessedSatRow[]>(() => {
+const processedGanttRows = computed<ProcessedGanttRow[]>(() => {
   const { minTs, maxTs } = timeBounds.value
   const totalSec = maxTs - minTs
   const canvasWidth = ganttCanvasWidth.value
-
   const defaultTargetName = store.battle?.name || '战场目标区域'
 
   return filteredSatellites.value.map((sat: any) => {
     const rawWindows = sat.stationWindows || sat.initWindows || []
-
-    // 1. 按照开始时间戳升序排序
     const sortedWindows = rawWindows
       .map((win: any, idx: number) => {
         const startStr = win.peakWindow || win.startWindow || win.beginWindow || ''
         const endStr = win.endWindow || ''
         const start = parseToTimestamp(startStr)
         const end = parseToTimestamp(endStr)
-        return { win, start, end, idx, startStr, endStr }
+        return { win, sat, start, end, idx, startStr, endStr }
       })
       .sort((a: any, b: any) => a.start - b.start)
 
-    // 2. 多层排道 Lane 分配算法 (类似 Chrome Network Timing / Timer Timeline，防止任何视觉与物理碰撞)
-    const laneEndTimes: number[] = [] // 记录每个 lane 当前最后一个块的结束时间戳
-    const laneRightPx: number[] = [] // 记录每个 lane 当前最后一个块的最右侧物理像素位置
-    const bars: ProcessedGanttBar[] = []
-
-    sortedWindows.forEach(({ win, start, end, idx, startStr, endStr }: any) => {
-      // 计算位置像素
-      const startRatio = (start - minTs) / totalSec
-      const endRatio = (end - minTs) / totalSec
-      const leftPx = Math.floor(startRatio * canvasWidth)
-
-      // 时间跨度像素 (最小 22px，无文字仅图标)
-      const rawWidthPx = Math.floor((endRatio - startRatio) * canvasWidth)
-      const widthPx = Math.max(rawWidthPx, 22)
-      const rightPx = leftPx + widthPx
-
-      let assignedLane = -1
-
-      // 寻找可容纳该窗口的现有 lane (需同时满足时间戳不重叠且物理像素留有空隙 4px)
-      for (let l = 0; l < laneRightPx.length; l++) {
-        if (laneEndTimes[l] <= start && laneRightPx[l] + 4 <= leftPx) {
-          assignedLane = l
-          laneEndTimes[l] = end
-          laneRightPx[l] = rightPx
-          break
-        }
-      }
-
-      // 若在已有 lane 发生视觉或时间遮挡，开辟新 lane 纵向分道
-      if (assignedLane === -1) {
-        assignedLane = laneRightPx.length
-        laneEndTimes.push(end)
-        laneRightPx.push(rightPx)
-      }
-
-      // 合并武器列表 (去重)
-      const weaponMap = new Map<string, Weapon>()
-      ;(sat.weapons || []).forEach((w: Weapon) => weaponMap.set(w.id, w))
-      ;(win.weapons || []).forEach((w: Weapon) => weaponMap.set(w.id, w))
-      const combinedWeapons = Array.from(weaponMap.values())
-
-      // 4色击毁状态判定名
-      const strikeStatusVal =
-        typeof win.strikeStatus === 'number' ? win.strikeStatus : sat.satelliteStatus === 1 ? 1 : 0
-      let colorStatusClass: 'status-normal' | 'status-sat-struck' | 'status-rec-struck' | 'status-both-struck' =
-        'status-normal'
-      if (sat.satelliteStatus === 1 && strikeStatusVal === 1) {
-        colorStatusClass = 'status-both-struck'
-      } else if (sat.satelliteStatus === 1) {
-        colorStatusClass = 'status-sat-struck'
-      } else if (strikeStatusVal === 1) {
-        colorStatusClass = 'status-rec-struck'
-      }
-
-      const peakWindowShort = startStr.length >= 16 ? startStr.substring(11, 16) : startStr
-      const endWindowShort = endStr.length >= 16 ? endStr.substring(11, 16) : endStr
-      const recName = win.receiveName || defaultTargetName
-      const recId = win.receiveId || 'target-area'
-
-      bars.push({
-        id: `bar-${sat.norad}-${recId}-${idx}`,
-        satNorad: sat.norad,
-        satName: sat.name,
-        satStatus: sat.satelliteStatus || 0,
-        receiveId: recId,
-        receiveName: recName,
-        strikeStatus: strikeStatusVal,
-        peakWindow: startStr,
-        endWindow: endStr,
-        peakWindowShort,
-        endWindowShort,
-        startTimestamp: start,
-        endTimestamp: end,
-        delayMin: win.delayMin,
-        weapons: combinedWeapons,
-        colorStatusClass,
-        laneIndex: assignedLane,
-        leftPx,
-        widthPx,
-      })
+    const { bars, maxLanes, trackHeight } = buildBarsForWindows(sortedWindows, {
+      defaultTargetName,
+      minTs,
+      totalSec,
+      canvasWidth,
     })
 
     return {
+      rowKey: `sat-${sat.norad}`,
       norad: sat.norad,
       name: sat.name,
       satType: sat.satType,
-      satelliteStatus: sat.satelliteStatus,
+      satelliteStatus: sat.satelliteStatus || 0,
       weapons: sat.weapons || [],
       bars,
-      maxLanes: Math.max(laneEndTimes.length, 1),
+      maxLanes,
+      trackHeight,
     }
   })
 })
 
 /**
- * [功能说明]
- * 当前选中的甘特块对象引用。
+ * 当前时刻标线穿过的所有过境链路
  */
-const selectedBar = computed<ProcessedGanttBar | null>(() => {
-  if (!selectedBarId.value) return null
+const barsAtPlayhead = computed<ProcessedGanttBar[]>(() => {
+  const ts = currentPlayTs.value
+  const result: ProcessedGanttBar[] = []
   for (const row of processedGanttRows.value) {
-    const found = row.bars.find((b) => b.id === selectedBarId.value)
-    if (found) return found
+    for (const bar of row.bars) {
+      if (ts >= bar.startTimestamp && ts <= bar.endTimestamp) {
+        result.push(bar)
+      }
+    }
   }
-  return null
+  return result
 })
+
+const playheadBarIdSet = computed(() => new Set(barsAtPlayhead.value.map((bar) => bar.id)))
+
+const isBarAtPlayhead = (bar: ProcessedGanttBar) => playheadBarIdSet.value.has(bar.id)
 
 /**
  * 点击甘特块选择事件 handlers
@@ -909,32 +1103,104 @@ const handleSelectBar = (bar: ProcessedGanttBar) => {
   selectedSatNorad.value = bar.satNorad
 }
 
-/**
- * 选中卫星行时高亮
- */
 const selectSatelliteRow = (sat: SatelliteMatrix) => {
   selectedSatNorad.value = sat.norad
-  const row = processedGanttRows.value.find((r) => r.norad === sat.norad)
-  if (row && row.bars.length > 0) {
-    selectedBarId.value = row.bars[0].id
+  selectedBarId.value = null
+  scrollToSatRow(sat.norad)
+}
+
+const stopPlayback = () => {
+  isPlaying.value = false
+  if (playTimer) {
+    clearInterval(playTimer)
+    playTimer = null
   }
 }
 
+const startPlayback = () => {
+  stopPlayback()
+  isPlaying.value = true
+  const intervalMs = Math.max(200, 1000 / gridsPerSecond.value)
+  playTimer = setInterval(() => {
+    let next = currentPlayTs.value + tickStepSec.value
+    if (next >= timeBounds.value.maxTs) {
+      next = timeBounds.value.maxTs
+      currentPlayTs.value = snapToGrid(next)
+      stopPlayback()
+      return
+    }
+    currentPlayTs.value = snapToGrid(next)
+  }, intervalMs)
+}
+
+const togglePlayback = () => {
+  if (isPlaying.value) {
+    stopPlayback()
+    return
+  }
+  if (currentPlayTs.value >= timeBounds.value.maxTs) {
+    currentPlayTs.value = timeBounds.value.minTs
+  }
+  startPlayback()
+}
+
+const jumpToTaskStart = () => {
+  stopPlayback()
+  currentPlayTs.value = timeBounds.value.minTs
+}
+
+const jumpToTaskEnd = () => {
+  stopPlayback()
+  currentPlayTs.value = timeBounds.value.maxTs
+}
+
+const onSpeedChange = () => {
+  if (isPlaying.value) startPlayback()
+}
+
+const handlePlaybackTrackClick = (evt: MouseEvent) => {
+  const track = playbackTrackRef.value
+  if (!track) return
+  const rect = track.getBoundingClientRect()
+  const ratio = Math.min(Math.max((evt.clientX - rect.left) / rect.width, 0), 1)
+  const { minTs, maxTs } = timeBounds.value
+  const ts = minTs + ratio * (maxTs - minTs)
+  currentPlayTs.value = snapToGrid(ts)
+}
+
+const zoomIn = () => {
+  if (tickStepIndex.value > 0) tickStepIndex.value -= 1
+}
+
 /**
- * 调整刻度倍率
+ * 缩小：切换到更粗的时间刻度
  */
-const changeScale = (delta: number) => {
-  timeScaleFactor.value = Math.min(Math.max(timeScaleFactor.value * delta, 0.5), 3.0)
+const zoomOut = () => {
+  if (tickStepIndex.value < TICK_STEP_OPTIONS.length - 1) tickStepIndex.value += 1
 }
 
 const resetScale = () => {
-  timeScaleFactor.value = 1.0
+  tickStepIndex.value = DEFAULT_TICK_STEP_INDEX
 }
 
 // 监听生命周期与Props变动
 onMounted(() => {
   loadMatrixData()
+  if (taskTimeBounds.value) {
+    currentPlayTs.value = taskTimeBounds.value.minTs
+  }
 })
+
+onBeforeUnmount(() => {
+  stopPlayback()
+})
+
+watch(
+  () => timeBounds.value.minTs,
+  (minTs) => {
+    if (minTs) currentPlayTs.value = minTs
+  }
+)
 
 watch(
   () => props.matrixData,
@@ -944,6 +1210,17 @@ watch(
     }
   }
 )
+
+watch(playheadLeftPx, (left) => {
+  const container = scrollContainerRef.value
+  if (!container) return
+  const target = 180 + left
+  const viewLeft = container.scrollLeft
+  const viewRight = viewLeft + container.clientWidth
+  if (target < viewLeft + 100 || target > viewRight - 100) {
+    container.scrollLeft = Math.max(target - container.clientWidth * 0.4, 0)
+  }
+})
 </script>
 
 <style scoped lang="scss">
@@ -1030,6 +1307,12 @@ watch(
         .zoom-label {
           color: #94a3b8;
         }
+
+        .time-span-display {
+          min-width: 120px;
+          color: #38bdf8;
+          font-weight: 600;
+        }
       }
     }
   }
@@ -1040,6 +1323,108 @@ watch(
     flex: 1;
     overflow: hidden;
     position: relative;
+
+    .gantt-center-column {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .gantt-playback-footer {
+      flex-shrink: 0;
+      padding: 10px 14px 12px;
+      background: #0f172a;
+      border-top: 1px solid #1e293b;
+
+      .playback-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
+        font-size: 12px;
+
+        .playback-divider {
+          width: 1px;
+          height: 16px;
+          background: #334155;
+        }
+
+        .playback-label {
+          color: #94a3b8;
+        }
+
+        .speed-select {
+          width: 100px;
+        }
+
+        .playback-time {
+          margin-left: auto;
+          color: #38bdf8;
+          font-family: Consolas, monospace;
+          font-weight: 600;
+        }
+      }
+
+      .playback-track {
+        position: relative;
+        height: 28px;
+        border-radius: 4px;
+        cursor: pointer;
+        overflow: hidden;
+
+        .playback-track-bg {
+          position: absolute;
+          inset: 0;
+          background: rgba(30, 41, 59, 0.8);
+          border: 1px solid #334155;
+          border-radius: 4px;
+        }
+
+        .playback-tick {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 1px;
+          background: rgba(148, 163, 184, 0.25);
+          transform: translateX(-50%);
+        }
+
+        .playback-cursor {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 2px;
+          background: #00e1ff;
+          box-shadow: 0 0 8px rgba(0, 225, 255, 0.8);
+          transform: translateX(-50%);
+          z-index: 2;
+        }
+      }
+
+      .playback-scale {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 4px;
+        font-size: 10px;
+        color: #64748b;
+        font-family: Consolas, monospace;
+      }
+    }
+
+    .gantt-playhead-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #00e1ff;
+      box-shadow: 0 0 10px rgba(0, 225, 255, 0.75);
+      transform: translateX(-50%);
+      z-index: 6;
+      pointer-events: none;
+    }
 
     /* 2.1 左侧栏 Sidebar */
     .gantt-sidebar-left {
@@ -1117,6 +1502,7 @@ watch(
         display: flex;
         flex-direction: column;
         gap: 8px;
+        min-height: 0;
 
         .tree-header {
           font-size: 12px;
@@ -1206,7 +1592,8 @@ watch(
     /* 2.2 中间栏 Center Workspace (甘特图上下左右滚动区) */
     .gantt-workspace-center {
       flex: 1;
-      overflow: auto; /* 支持上下左右二维滚动 */
+      min-height: 0;
+      overflow: auto;
       background-color: #080d1a;
       position: relative;
 
@@ -1267,6 +1654,11 @@ watch(
                 color: #94a3b8;
                 font-family: inherit;
               }
+
+              &.is-current-tick .tick-line {
+                background-color: #00e1ff;
+                box-shadow: 0 0 6px rgba(0, 225, 255, 0.6);
+              }
             }
           }
         }
@@ -1281,6 +1673,27 @@ watch(
             border-bottom: 1px solid #1e293b;
             background-color: #0b1120;
             position: relative;
+
+            &.row-sat-struck {
+              box-shadow: inset 3px 0 0 #ef4444;
+            }
+
+            &.is-row-selected {
+              background-color: rgba(56, 189, 248, 0.1);
+              box-shadow: inset 3px 0 0 #38bdf8;
+
+              .row-label-col {
+                background-color: rgba(56, 189, 248, 0.14);
+              }
+
+              .sat-title {
+                color: #7dd3fc;
+              }
+            }
+
+            &.row-sat-struck.is-row-selected {
+              box-shadow: inset 3px 0 0 #38bdf8;
+            }
 
             &:nth-child(even) {
               background-color: #0d1527;
@@ -1338,18 +1751,24 @@ watch(
                 width: 1px;
                 background-color: rgba(51, 65, 85, 0.25);
                 pointer-events: none;
+
+                &.is-current-grid {
+                  width: 2px;
+                  background-color: rgba(0, 225, 255, 0.45);
+                  box-shadow: 0 0 6px rgba(0, 225, 255, 0.35);
+                }
               }
 
               /* 具体的甘特块 Gantt Bar */
               .gantt-bar-item {
                 position: absolute;
-                height: 25px;
                 border-radius: 4px;
-                padding: 0 6px;
+                padding: 0;
                 cursor: pointer;
                 box-sizing: border-box;
                 display: flex;
-                align-items: center;
+                align-items: stretch;
+                overflow: hidden;
                 transition:
                   transform 0.15s ease,
                   box-shadow 0.15s ease;
@@ -1365,6 +1784,19 @@ watch(
                   outline: 2px solid #ffffff;
                   box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
                   z-index: 5;
+                }
+
+                &.is-bar-at-playhead {
+                  outline: 2px solid rgba(0, 225, 255, 0.9);
+                  box-shadow: 0 0 12px rgba(0, 225, 255, 0.55);
+                  z-index: 6;
+                }
+
+                &.is-bar-active.is-bar-at-playhead {
+                  outline: 2px solid #ffffff;
+                  box-shadow:
+                    0 0 10px rgba(255, 255, 255, 0.8),
+                    0 0 14px rgba(0, 225, 255, 0.45);
                 }
 
                 /* 4色干扰状态样式定义 */
@@ -1395,19 +1827,25 @@ watch(
 
                 .bar-content {
                   display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  font-size: 11px;
+                  flex-direction: column;
+                  align-items: flex-start;
+                  justify-content: flex-start;
+                  gap: 2px;
+                  font-size: 10px;
                   width: 100%;
                   height: 100%;
+                  padding: 5px 8px;
+                  box-sizing: border-box;
+                  overflow: hidden;
 
-                  .bar-icon-only {
-                    font-size: 12px;
-                    line-height: 1;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    user-select: none;
+                  .bar-label-line {
+                    font-size: 9px;
+                    font-weight: 600;
+                    line-height: 1.35;
+                    white-space: normal;
+                    word-break: break-all;
+                    width: 100%;
+                    text-align: left;
                   }
                 }
               }
@@ -1417,263 +1855,227 @@ watch(
       }
     }
 
-    /* 2.3 右侧栏 Right Detail Panel (选中的干扰武器与交战分析明细) */
+    /* 2.3 右侧栏 Right Detail Panel */
     .gantt-sidebar-right {
-      width: 320px;
-      min-width: 300px;
+      width: 300px;
+      min-width: 280px;
       background-color: #0f172a;
       border-left: 1px solid #1e293b;
       display: flex;
       flex-direction: column;
-      padding: 12px;
+      padding: 8px;
       overflow-y: auto;
 
       .panel-header {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         color: #38bdf8;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 700;
-        padding-bottom: 10px;
+        padding-bottom: 6px;
         border-bottom: 1px solid #1e293b;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
+
+        .panel-subtitle {
+          margin-left: auto;
+          font-size: 10px;
+          font-weight: 600;
+          color: #7dd3fc;
+          background: rgba(56, 189, 248, 0.12);
+          border: 1px solid rgba(56, 189, 248, 0.25);
+          border-radius: 999px;
+          padding: 1px 6px;
+        }
       }
 
       .panel-content-body {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 8px;
 
-        .status-banner-card {
-          padding: 10px;
-          border-radius: 6px;
-          font-size: 12px;
+        .playhead-summary-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 4px 8px;
+          border-radius: 4px;
+          background: rgba(0, 225, 255, 0.08);
+          border: 1px solid rgba(0, 225, 255, 0.2);
 
-          .banner-title {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-weight: 600;
+          .playhead-time-label {
+            font-size: 10px;
+            color: #94a3b8;
           }
 
-          &.status-normal {
-            background-color: rgba(16, 185, 129, 0.15);
-            border: 1px solid #10b981;
-            color: #34d399;
-          }
-          &.status-sat-struck {
-            background-color: rgba(239, 68, 68, 0.15);
-            border: 1px solid #ef4444;
-            color: #f87171;
-          }
-          &.status-rec-struck {
-            background-color: rgba(245, 158, 11, 0.15);
-            border: 1px solid #f59e0b;
-            color: #fbbf24;
-          }
-          &.status-both-struck {
-            background-color: rgba(147, 51, 234, 0.2);
-            border: 1px solid #9333ea;
-            color: #c084fc;
+          .playhead-time-val {
+            font-size: 11px;
+            font-weight: 700;
+            color: #67e8f9;
+            font-family: monospace;
           }
         }
 
-        .info-section {
-          background-color: #162032;
-          border: 1px solid #233148;
+        .playhead-link-block {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          padding: 6px;
           border-radius: 6px;
-          padding: 10px;
+          border: 1px solid #233148;
+          background: rgba(12, 20, 36, 0.9);
+          cursor: pointer;
+          transition:
+            border-color 0.15s ease,
+            box-shadow 0.15s ease;
 
-          .section-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: #94a3b8;
-            margin-bottom: 8px;
+          &:hover {
+            border-color: rgba(56, 189, 248, 0.35);
           }
 
-          .info-grid {
+          &.is-click-selected {
+            border-color: rgba(255, 255, 255, 0.45);
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+          }
+
+          .compact-link-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+
+            &.status-normal {
+              background: rgba(16, 185, 129, 0.12);
+              border-color: rgba(16, 185, 129, 0.35);
+            }
+            &.status-sat-struck {
+              background: rgba(239, 68, 68, 0.12);
+              border-color: rgba(239, 68, 68, 0.35);
+            }
+            &.status-rec-struck {
+              background: rgba(245, 158, 11, 0.12);
+              border-color: rgba(245, 158, 11, 0.35);
+            }
+            &.status-both-struck {
+              background: rgba(147, 51, 234, 0.14);
+              border-color: rgba(147, 51, 234, 0.35);
+            }
+
+            .compact-status-tag {
+              flex-shrink: 0;
+              font-size: 10px;
+              font-weight: 700;
+              line-height: 1.2;
+              padding: 1px 5px;
+              border-radius: 3px;
+              background: rgba(0, 0, 0, 0.25);
+              color: #e2e8f0;
+            }
+
+            .compact-link-line {
+              font-size: 11px;
+              font-weight: 600;
+              line-height: 1.3;
+              color: #e2e8f0;
+              word-break: break-all;
+            }
+          }
+
+          .compact-detail-grid {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            font-size: 12px;
+            gap: 2px;
+            padding: 2px 0;
 
-            .info-row {
-              display: flex;
-              justify-content: space-between;
+            .compact-row {
+              display: grid;
+              grid-template-columns: 42px 1fr auto;
+              align-items: center;
+              gap: 4px;
+              min-height: 18px;
+              font-size: 10px;
 
-              &.align-center {
-                align-items: center;
+              &.compact-time-row {
+                grid-template-columns: 42px 1fr;
               }
 
-              &.vertical-stack {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 4px;
-                margin-bottom: 4px;
-              }
-
-              .label {
+              .compact-key {
                 color: #64748b;
+                white-space: nowrap;
               }
 
-              .val {
+              .compact-val {
                 color: #cbd5e1;
-                font-weight: 500;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
 
-                &.highlight-cyan {
-                  color: #38bdf8;
-                }
-                &.danger-text {
-                  color: #f87171;
-                }
-                &.success-text {
-                  color: #34d399;
-                }
-                &.warning-text {
+                &.compact-time {
                   color: #fbbf24;
+                  font-family: monospace;
+                  font-weight: 600;
                 }
-                &.time-font {
-                  font-family: inherit;
+
+                &.is-warning {
+                  color: #fbbf24;
+                  font-weight: 600;
                 }
               }
 
-              /* 突出显示时间的专门发光数码框 */
-              .highlight-time-box {
-                background: rgba(15, 23, 42, 0.95);
-                border: 1px solid #f59e0b;
-                box-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
-                color: #fbbf24 !important;
-                font-family: inherit;
-                font-size: 12px;
-                font-weight: 700;
-                padding: 4px 8px;
-                border-radius: 4px;
-                letter-spacing: 0.5px;
-              }
+              .compact-tag {
+                font-size: 9px;
+                font-weight: 600;
+                padding: 0 4px;
+                border-radius: 2px;
+                white-space: nowrap;
 
-              /* 目标卫星与关联接收站的突出高亮 Badge 卡片 */
-              .highlight-box {
-                width: 100%;
-                padding: 8px 10px;
-                border-radius: 6px;
-                display: flex;
-                flex-direction: column;
-                gap: 3px;
-                box-sizing: border-box;
-                transition: all 0.2s ease;
-
-                .highlight-name {
-                  font-size: 13px;
-                  font-weight: 700;
-                  letter-spacing: 0.3px;
+                &.is-success {
+                  color: #34d399;
+                  background: rgba(16, 185, 129, 0.15);
                 }
 
-                .highlight-sub {
-                  font-size: 11px;
-                  opacity: 0.85;
-                  font-family: inherit;
-                  word-break: break-all;
-                }
-
-                &.sat-highlight-box {
-                  background: linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(14, 165, 233, 0.08) 100%);
-                  border: 1px dashed #38bdf8;
-                  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
-                  color: #7dd3fc;
-
-                  .highlight-name {
-                    color: #38bdf8;
-                    text-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
-                  }
-                }
-
-                &.rec-highlight-box {
-                  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(147, 51, 234, 0.08) 100%);
-                  border: 1px dashed #a855f7;
-                  box-shadow: 0 0 12px rgba(168, 85, 247, 0.3);
-                  color: #e9d5ff;
-
-                  .highlight-name {
-                    color: #c084fc;
-                    text-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
-                  }
-                }
-
-                /* 时间窗口整块包覆高亮 Card */
-                &.time-highlight-card {
-                  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.08) 100%);
-                  border: 1px dashed #f59e0b;
-                  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
-                  color: #fef08a;
-
-                  .highlight-label {
-                    font-size: 11px;
-                    color: #fcd34d;
-                    opacity: 0.9;
-                  }
-
-                  .highlight-time-val {
-                    font-size: 13px;
-                    font-weight: 700;
-                    color: #fbbf24;
-                    font-family: inherit;
-                    letter-spacing: 0.5px;
-                    text-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
-                    margin-top: 2px;
-                  }
+                &.is-danger {
+                  color: #f87171;
+                  background: rgba(239, 68, 68, 0.15);
                 }
               }
             }
           }
 
-          .weapons-list {
+          .compact-weapons {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 2px;
+            margin-top: 2px;
+            padding-top: 4px;
+            border-top: 1px dashed rgba(51, 65, 85, 0.8);
 
-            .weapon-detail-card {
-              background-color: #1e2942;
-              border: 1px solid #334155;
-              border-radius: 4px;
-              padding: 8px;
+            .compact-weapon-row {
+              display: flex;
+              flex-direction: column;
+              gap: 1px;
+              font-size: 10px;
+              line-height: 1.25;
 
-              .w-card-header {
-                display: flex;
-                justify-content: space-between;
-                font-size: 12px;
+              .weapon-name {
+                color: #e2e8f0;
                 font-weight: 600;
-                color: #f8fafc;
-                margin-bottom: 4px;
-
-                .w-country {
-                  font-size: 10px;
-                  color: #38bdf8;
-                  background-color: rgba(56, 189, 248, 0.1);
-                  padding: 1px 4px;
-                  border-radius: 3px;
-                }
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
               }
 
-              .w-card-body {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-                font-size: 11px;
+              .weapon-meta {
                 color: #94a3b8;
-
-                .w-prop {
-                  display: flex;
-                  justify-content: space-between;
-                }
+                font-size: 9px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
               }
             }
-          }
-
-          .empty-weapon-tip {
-            font-size: 11px;
-            color: #64748b;
-            font-style: italic;
           }
         }
       }
@@ -1683,15 +2085,15 @@ watch(
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        margin-top: 60px;
+        margin-top: 40px;
         color: #475569;
-        gap: 12px;
+        gap: 8px;
         text-align: center;
-        padding: 20px;
+        padding: 12px;
 
         .tip-text {
-          font-size: 12px;
-          line-height: 1.5;
+          font-size: 11px;
+          line-height: 1.4;
         }
       }
     }
