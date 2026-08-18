@@ -46,18 +46,10 @@
           <span class="count-tag">{{ satList.length }} 颗</span>
         </div>
         <div class="sort-toggle-bar">
-          <button
-            class="sort-btn"
-            :class="{ active: sortMode === 'threat' }"
-            @click="sortMode = 'threat'"
-          >
+          <button class="sort-btn" :class="{ active: sortMode === 'threat' }" @click="sortMode = 'threat'">
             按威胁度
           </button>
-          <button
-            class="sort-btn"
-            :class="{ active: sortMode === 'transTime' }"
-            @click="sortMode = 'transTime'"
-          >
+          <button class="sort-btn" :class="{ active: sortMode === 'transTime' }" @click="sortMode = 'transTime'">
             按链路时长
           </button>
         </div>
@@ -212,6 +204,7 @@ import {
   type SatelliteThreatInfo,
 } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
+/** 组件接收的矩阵数据及当前选中卫星信息。 */
 const props = defineProps<{
   /** 算法矩阵响应式数据 */
   matrixData: MatrixResult | null
@@ -219,6 +212,7 @@ const props = defineProps<{
   selectedNorad?: number | null
 }>()
 
+/** 组件向父级触发的卫星选择事件。 */
 const emit = defineEmits<{
   /**
    * [事件说明]
@@ -228,20 +222,24 @@ const emit = defineEmits<{
   (e: 'select-satellite', norad: number | null): void
 }>()
 
+/** 布局 Store，用于读取当前任务及持久化卫星筛选状态。 */
 const store = useLayoutStore()
 
-//存储从接口 getSatelliteTypeSerials 获取的卫星类型与对应系列字典数据
+/** 从接口获取的卫星类型与对应系列映射。 */
 const typeSerialsMap = ref<Record<string, string[]>>({})
 
-// 当前选中的卫星类型筛选值，优先从 Store 持久化状态中恢复
+/** 当前选中的卫星类型筛选值，优先从 Store 持久化状态中恢复。 */
 const selectedType = ref<string>(store.selectedSatType || '')
 
-
-// 当前选中的卫星系列筛选值，优先从 Store 持久化状态中恢复
+/** 当前选中的卫星系列筛选值，优先从 Store 持久化状态中恢复。 */
 const selectedSeries = ref<string>(store.selectedSatSeries || '')
 
 
-// 可供选择的卫星类型下拉选项列表
+/**
+ * 获取可供选择的卫星类型列表。
+ *
+ * @returns 卫星类型名称列表
+ */
 const typeOptions = computed<string[]>(() => {
   return Object.keys(typeSerialsMap.value)
 })
@@ -252,6 +250,7 @@ const typeOptions = computed<string[]>(() => {
  */
 const seriesOptions = computed<string[]>(() => {
   if (!selectedType.value) {
+    /** 合并后的全部卫星系列名称。 */
     const allSeries = Object.values(typeSerialsMap.value).flat()
     return Array.from(new Set(allSeries))
   }
@@ -281,7 +280,9 @@ const selectType = (type: string) => {
   selectedType.value = type
   store.setSelectedSatType(selectedType.value)
 
+  /** 当前类型下可用的卫星系列列表。 */
   const availSeries = typeSerialsMap.value[type] || []
+  /** 类型切换后默认选中的卫星系列。 */
   const newSeries = availSeries.length > 0 ? availSeries[0] : ''
   selectedSeries.value = newSeries
   store.setSelectedSatSeries(newSeries)
@@ -295,8 +296,10 @@ watch(
   typeOptions,
   (options) => {
     if (!options || options.length === 0) return
+    /** 当前需要保留或恢复的卫星类型。 */
     let currentType = selectedType.value || store.selectedSatType || ''
     if (!currentType || isTypeDisabled(currentType) || !options.includes(currentType)) {
+      /** 第一个未被禁用的卫星类型。 */
       const validOption = options.find((opt) => !isTypeDisabled(opt))
       if (validOption) {
         selectType(validOption)
@@ -316,6 +319,7 @@ watch(
   seriesOptions,
   (sOptions) => {
     if (!sOptions || sOptions.length === 0) return
+    /** 当前需要保留或恢复的卫星系列。 */
     let currentSeries = selectedSeries.value || store.selectedSatSeries || ''
     if (!currentSeries || !sOptions.includes(currentSeries)) {
       currentSeries = sOptions[0]
@@ -369,6 +373,7 @@ const fetchTypeSerials = async (taskId?: number) => {
     return
   }
   try {
+    /** 卫星类型与系列映射接口响应。 */
     const res = await getSatelliteTypeSerials(taskId)
     if (res.code === 200 && res.data) {
       typeSerialsMap.value = res.data
@@ -407,65 +412,109 @@ const handleSelectSatellite = (norad: number) => {
 }
 
 interface SatTimeEffectInfo {
+  /** 链路开始时间。 */
   beginTime: string
+  /** 链路结束时间。 */
   endTime: string
+  /** 链路持续时长，单位为分钟。 */
   duration: number
+  /** 链路对应的接收站名称。 */
   receiveName: string
 }
 
+/** 展示在卫星资产列表中的卫星信息。 */
 interface SatListItem {
+  /** 卫星 NORAD 编号。 */
   norad: number
+  /** 卫星名称。 */
   name: string
+  /** 卫星类型。 */
   satType: string
+  /** 是否为中继卫星。 */
   isRelay: boolean
+  /** 威胁度分数，未计算时为空。 */
   threatScore: number | null
+  /** 过境链路信息，暂无链路时为空。 */
   timeEffect: SatTimeEffectInfo | null
 }
 
+/** 卫星资产列表的排序模式。 */
 type SatSortMode = 'threat' | 'transTime'
 
+/** 当前卫星资产列表的排序模式。 */
 const sortMode = ref<SatSortMode>('threat')
 
+/** 威胁度详情弹窗是否可见。 */
 const threatDialogVisible = ref(false)
+/** 威胁度详情是否正在加载。 */
 const threatLoading = ref(false)
+/** 当前加载完成的威胁度详情。 */
 const threatInfo = ref<SatelliteThreatInfo | null>(null)
+/** 当前查看详情的卫星基本信息。 */
 const threatDialogSat = ref<{ norad: number; name: string } | null>(null)
 
+/**
+ * 格式化威胁度分数，整数不显示小数部分，其余最多保留两位小数。
+ *
+ * @param score 威胁度分数
+ * @returns 格式化后的威胁度文本
+ */
 const formatThreatScore = (score: number): string => {
   if (Number.isInteger(score)) return String(score)
   return Number(score.toFixed(2)).toString()
 }
 
+/**
+ * 将过境时间字符串格式化为本地日期时间文本。
+ *
+ * @param timeStr 过境时间字符串
+ * @returns 格式化后的时间文本，缺失或无法解析时返回原值或占位符
+ */
 const formatTransTime = (timeStr: string | null | undefined): string => {
   if (!timeStr) return '--'
+  /** 解析后的日期对象。 */
   const d = new Date(timeStr)
   if (Number.isNaN(d.getTime())) return timeStr
+  /** 将数字补齐为两位字符串。 */
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
+/**
+ * 将链路时长格式化为分钟文本。
+ *
+ * @param duration 链路时长，单位为分钟
+ * @returns 格式化后的时长文本
+ */
 const formatDuration = (duration: number | null | undefined): string => {
   if (duration == null || Number.isNaN(duration)) return '--'
+  /** 按展示精度处理后的链路时长。 */
   const rounded = Number.isInteger(duration) ? duration : Number(duration.toFixed(1))
   return `${rounded} 分钟`
 }
 
-const formatUsageIndicator = (val?: number | null): string => {
-  if (val == null) return '--'
-  if (val === 1) return '军用'
-  if (val === 0.6) return '商用'
-  if (val === 0.3) return '民用'
-  return String(val)
-}
-
+/**
+ * 根据威胁度分数返回对应的样式类名。
+ * 分数在 0 到 1 之间时按比例转换为百分制。
+ *
+ * @param score 威胁度分数
+ * @returns 威胁等级样式类名
+ */
 const getThreatLevelClass = (score: number): string => {
+  /** 转换为百分制后的威胁度分数。 */
   const normalized = score <= 1 ? score * 100 : score
   if (normalized >= 70) return 'threat-high'
   if (normalized >= 40) return 'threat-medium'
   return 'threat-low'
 }
 
+/**
+ * 打开卫星威胁度详情弹窗并加载后端计算信息。
+ *
+ * @param sat 待查看详情的卫星
+ */
 const openThreatDetail = async (sat: SatListItem) => {
+  /** 当前任务 ID，用于请求卫星威胁度详情。 */
   const taskId = store.activedTask?.id
   if (!taskId) {
     ElMessage.warning('请先选择任务')
@@ -478,6 +527,7 @@ const openThreatDetail = async (sat: SatListItem) => {
   threatInfo.value = null
 
   try {
+    /** 卫星威胁度详情接口响应。 */
     const res = await getSatelliteThreatInfo({
       norad: sat.norad,
       series: selectedType.value || '侦察',
@@ -493,58 +543,82 @@ const openThreatDetail = async (sat: SatListItem) => {
     threatLoading.value = false
   }
 }
-
+/**
+ * [函数说明]
+ * 处理威胁度详情弹窗关闭事件，清空相关状态
+ */
 const handleThreatDialogClosed = () => {
   threatInfo.value = null
   threatDialogSat.value = null
 }
-
+/**
+ * 归一化威胁度分数，将 0-1 的分数转换为百分制
+ * @param score 威胁度分数
+ * @returns 归一化后的威胁度分数
+ */
 const normalizeThreatScore = (score: number | null): number => {
   if (score == null) return -Infinity
   return score <= 1 ? score * 100 : score
 }
-
+/**
+ * 解析过境时间字符串为时间戳
+ * @param timeStr 过境时间字符串
+ * @returns 时间戳，解析失败返回 Infinity
+ */
 const parseTransTimeTs = (timeStr: string | null | undefined): number => {
   if (!timeStr) return Infinity
   const ts = new Date(timeStr).getTime()
   return Number.isNaN(ts) ? Infinity : ts
 }
-
+/**
+ * 判断卫星是否有资格进入排行榜
+ * @param sat 卫星信息
+ * @returns 是否有资格
+ */
 const isTopRankEligible = (sat: SatListItem): boolean => {
   if (sortMode.value === 'threat') return sat.threatScore != null
   return sat.timeEffect != null
 }
 
 /**
- * [计算属性说明]
  * 提取当前矩阵中的敌方天基过境与中继卫星列表，支持按威胁度或链路时长排序。
  */
 const satList = computed<SatListItem[]>(() => {
+  /** 当前算法矩阵响应数据。 */
   const matrixData = props.matrixData
   if (!matrixData) return []
-
+  // 构建 NORAD -> 威胁度映射
+  /** 按 NORAD 编号索引的威胁度映射。 */
   const threatMap = new Map<number, number>()
-  ;(matrixData.threatSats || []).forEach((item) => {
-    threatMap.set(item.norad, item.threatScore)
-  })
-
-  const timeEffectMap = new Map<number, SatTimeEffectInfo>()
-  ;(matrixData.timeEffects || []).forEach((item) => {
-    timeEffectMap.set(item.norad, {
-      beginTime: item.beginTime,
-      endTime: item.endTime,
-      duration: item.duration,
-      receiveName: item.receiveName,
+    ; (matrixData.threatSats || []).forEach((item) => {
+      threatMap.set(item.norad, item.threatScore)
     })
-  })
+  // 构建 NORAD -> 过境链路时长映射
+  /** 按 NORAD 编号索引的过境链路映射。 */
+  const timeEffectMap = new Map<number, SatTimeEffectInfo>()
+    ; (matrixData.timeEffects || []).forEach((item) => {
+      timeEffectMap.set(item.norad, {
+        beginTime: item.beginTime,
+        endTime: item.endTime,
+        duration: item.duration,
+        receiveName: item.receiveName,
+      })
+    })
 
+  // 使用 Map 来去重并合并 initMatrixList 与 satelliteMatrixList
+  /** 按 NORAD 编号去重并合并后的卫星信息映射。 */
   const map = new Map<number, SatListItem>()
 
+  /** 初始算法矩阵中的卫星列表。 */
   const initList = matrixData.initMatrixList?.length ? matrixData.initMatrixList : []
+  /** 卫星矩阵中的卫星列表。 */
   const satMatrixList = matrixData.satelliteMatrixList?.length ? matrixData.satelliteMatrixList : []
+  /** 中继卫星 NORAD 编号列表。 */
   const relayList = matrixData.relayRelation?.relayList?.length ? matrixData.relayRelation.relayList : []
 
+  // 遍历 initMatrixList 和 satelliteMatrixList，合并卫星信息
   initList.forEach((s: InitMatrix) => {
+    /** 根据卫星类型或中继关系判断是否为中继卫星。 */
     const isRelay = (s.satType || '').includes('中继') || relayList.includes(s.norad)
     map.set(s.norad, {
       norad: s.norad,
@@ -556,6 +630,7 @@ const satList = computed<SatListItem[]>(() => {
     })
   })
   satMatrixList.forEach((s: SatelliteMatrix) => {
+    /** 根据卫星类型或中继关系判断是否为中继卫星。 */
     const isRelay = (s.satType || '').includes('中继') || relayList.includes(s.norad)
     map.set(s.norad, {
       norad: s.norad,
@@ -567,10 +642,13 @@ const satList = computed<SatListItem[]>(() => {
     })
   })
 
+  /** 去重合并后的卫星资产列表。 */
   const list = Array.from(map.values())
 
+  // 根据当前排序模式进行排序
   if (sortMode.value === 'transTime') {
     return list.sort((a, b) => {
+      /** 两颗卫星的链路持续时长。 */
       const durationA = a.timeEffect?.duration ?? Infinity
       const durationB = b.timeEffect?.duration ?? Infinity
       if (durationA !== durationB) return durationA - durationB

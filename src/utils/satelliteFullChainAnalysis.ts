@@ -407,7 +407,13 @@ export const resolveChainForTimelineMarker = (
     (!!postChain.finishTimestamp && atMs >= postChain.finishTimestamp)
   return analyzeSatelliteChainAtTime(matrix, norad, atMs, usePostStrike)
 }
-
+/**
+ * 分析卫星的全链路
+ * @param matrix 算法矩阵数据
+ * @param norad 卫星 NORAD 号
+ * @param usePostStrike 是否使用打击后数据
+ * @returns 卫星的全链路分析结果
+ */
 export const analyzeSatelliteFullChain = (
   matrix: MatrixResult | null,
   norad: number,
@@ -597,7 +603,12 @@ export const collectSatelliteJamWeapons = (
 
   return records
 }
-
+/**
+ * 获取选中卫星的显示信息 (名称、类型、NORAD)
+ * @param matrix 算法矩阵数据
+ * @param norad 卫星 NORAD 号
+ * @returns 卫星的显示信息，包括名称和类型，如果未找到则返回 null
+ */
 export const getSatelliteDisplayInfo = (
   matrix: MatrixResult | null,
   norad: number
