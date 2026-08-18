@@ -32,6 +32,8 @@ export interface JamWeaponRecord {
 
 interface ChainCandidate {
   finishTs: number
+  groundStartTs: number
+  groundEndTs: number
   nodes: ChainNode[]
 }
 
@@ -139,8 +141,9 @@ const enumerateChainCandidates = (
 
     const groundStart = getWindowStartStr(win)
     const groundEnd = getWindowEndStr(win)
+    const groundStartTs = parseTimeToMs(groundStart)
     const groundEndTs = parseTimeToMs(groundEnd || groundStart)
-    if (!groundEndTs) return
+    if (!groundStartTs || !groundEndTs) return
 
     const receiveName = win.receiveName || receiveObj?.receiveName || receiveId
 
@@ -152,6 +155,8 @@ const enumerateChainCandidates = (
       // 直连路径：卫星 → 地面站 → 数据中心
       candidates.push({
         finishTs: groundEndTs,
+        groundStartTs,
+        groundEndTs,
         nodes: [
           ...baseNodes,
           { layer: 'RECEIVE', id: receiveId, name: receiveName, icon: '📡' },
@@ -168,6 +173,8 @@ const enumerateChainCandidates = (
           const finishTs = Math.max(relayEndTs, groundEndTs)
           candidates.push({
             finishTs,
+            groundStartTs,
+            groundEndTs,
             nodes: [
               ...baseNodes,
               { layer: 'RELAY', id: String(relayNorad), name: relayName, icon: '📡' },
@@ -186,6 +193,219 @@ const enumerateChainCandidates = (
 const pickEarliestChain = (candidates: ChainCandidate[]): ChainCandidate | null => {
   if (!candidates.length) return null
   return candidates.reduce((best, cur) => (cur.finishTs < best.finishTs ? cur : best))
+}
+
+/** 将全链路节点序列映射为 G6 边 ID 集合 */
+export const chainToEdgeIds = (chain: FullChainResult): Set<string> => {
+  const ids = new Set<string>()
+  const nodes = chain.nodes
+  if (nodes.length < 2) return ids
+
+  const satNode = nodes.find((n) => n.layer === 'SAT')
+  const satNorad = satNode?.id
+
+  for (let i = 0; i < nodes.length - 1; i++) {
+    const from = nodes[i]
+    const to = nodes[i + 1]
+    if (from.layer === 'SAT' && to.layer === 'RELAY') {
+      ids.add(`edge-relay-${from.id}-${to.id}`)
+    } else if (from.layer === 'SAT' && to.layer === 'RECEIVE') {
+      ids.add(`edge-sat-${from.id}-${to.id}`)
+    } else if (from.layer === 'RELAY' && to.layer === 'RECEIVE' && satNorad) {
+      ids.add(`edge-relay-${satNorad}-${from.id}`)
+      ids.add(`edge-sat-${satNorad}-${to.id}`)
+    } else if (from.layer === 'RECEIVE' && to.layer === 'STATION') {
+      ids.add(`edge-${from.id}-${to.id}`)
+    }
+  }
+  return ids
+}
+
+/** 获取某颗卫星相关的全部拓扑边 ID */
+export const getSatelliteRelatedEdgeIds = (matrix: MatrixResult, norad: number): Set<string> => {
+  const ids = new Set<string>()
+  const satId = `sat-${norad}`
+
+  const windows = [
+    ...(matrix.initMatrixList?.find((s) => s.norad === norad)?.initWindows || []),
+    ...(matrix.satelliteMatrixList?.find((s) => s.norad === norad)?.stationWindows || []),
+  ]
+  const receiveIds = new Set(windows.map((w) => w.receiveId).filter(Boolean) as string[])
+
+  receiveIds.forEach((recId) => {
+    ids.add(`edge-${satId}-${recId}`)
+    ids.add(`edge-sat-${norad}-${recId}`)
+  })
+
+  const relayRel = matrix.relayRelation?.relations?.find((r) => Number(r.from) === norad)
+  if (relayRel) {
+    ids.add(`edge-relay-${relayRel.from}-${relayRel.to}`)
+  }
+
+  const relationLists = [matrix.initRelationList, matrix.stationRelationList].filter(Boolean)
+  relationLists.forEach((relData) => {
+    ;(relData?.relations || []).forEach((rel) => {
+      if (receiveIds.has(rel.from)) {
+        ids.add(`edge-${rel.from}-${rel.to}`)
+      }
+    })
+  })
+
+  const targetId = 'target-area'
+  if (windows.length > 0) {
+    ids.add(`edge-${satId}-${targetId}`)
+  }
+
+  return ids
+}
+
+const isRelaySatellite = (matrix: MatrixResult, norad: number, satType?: string): boolean => {
+  if ((satType || '').includes('中继')) return true
+  return (matrix.relayRelation?.relayList || []).includes(norad)
+}
+
+/** 普通侦察卫星 NORAD 列表（不含中继） */
+export const listNormalSatelliteNorads = (matrix: MatrixResult): number[] => {
+  const norads = new Set<number>()
+  ;(matrix.initMatrixList || []).forEach((s) => {
+    if (!isRelaySatellite(matrix, s.norad, s.satType)) norads.add(s.norad)
+  })
+  ;(matrix.satelliteMatrixList || []).forEach((s) => {
+    if (!isRelaySatellite(matrix, s.norad, s.satType)) norads.add(s.norad)
+  })
+  return Array.from(norads)
+}
+
+/** 全部卫星打击后最早可用链路边 ID 并集 */
+export const collectPostStrikePrimaryEdgeIds = (matrix: MatrixResult): Set<string> => {
+  const ids = new Set<string>()
+  listNormalSatelliteNorads(matrix).forEach((norad) => {
+    const chain = analyzeSatelliteFullChain(matrix, norad, true)
+    if (!chain.blocked) {
+      chainToEdgeIds(chain).forEach((id) => ids.add(id))
+    }
+  })
+  return ids
+}
+
+/** 指定时刻被干扰的链路边 ID（用于时间轴打击点标红） */
+export const collectJamStrikeEdgeIdsAtTime = (
+  matrix: MatrixResult,
+  norad: number,
+  atMs: number
+): Set<string> => {
+  const ids = new Set<string>()
+  const satId = `sat-${norad}`
+  const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
+  const receiveIds = new Set<string>()
+
+  ;(postSat?.stationWindows || []).forEach((win) => {
+    if (win.strikeStatus !== 1) return
+    const start = parseTimeToMs(getWindowStartStr(win as Record<string, string>))
+    const end = parseTimeToMs(win.endWindow || '')
+    if (!start || atMs < start || atMs > (end || start)) return
+    const recId = win.receiveId
+    if (!recId) return
+    receiveIds.add(recId)
+    ids.add(`edge-${satId}-${recId}`)
+    ids.add(`edge-sat-${norad}-${recId}`)
+  })
+
+  const relationLists = [matrix.initRelationList, matrix.stationRelationList].filter(Boolean)
+  relationLists.forEach((relData) => {
+    ;(relData?.relations || []).forEach((rel) => {
+      if (receiveIds.has(rel.from)) {
+        ids.add(`edge-${rel.from}-${rel.to}`)
+      }
+    })
+  })
+
+  const relayRel = matrix.relayRelation?.relations?.find((r) => Number(r.from) === norad)
+  if (relayRel) {
+    ids.add(`edge-relay-${relayRel.from}-${relayRel.to}`)
+  }
+
+  return ids
+}
+
+const isChainActiveAtMs = (candidate: ChainCandidate, atMs: number): boolean => {
+  if (!atMs) return false
+  if (atMs >= candidate.groundStartTs && atMs <= candidate.groundEndTs) return true
+  return Math.abs(candidate.finishTs - atMs) <= 1000
+}
+
+/** 解析指定时刻的活跃全链路 */
+export const analyzeSatelliteChainAtTime = (
+  matrix: MatrixResult | null,
+  norad: number,
+  atMs: number,
+  usePostStrike: boolean
+): FullChainResult => {
+  const empty: FullChainResult = {
+    finishTime: null,
+    finishTimestamp: null,
+    nodes: [],
+    blocked: true,
+    blockedReason: '该时刻无活跃链路',
+  }
+  if (!matrix || !norad || !atMs) return empty
+
+  const candidates = enumerateChainCandidates(matrix, norad, usePostStrike).filter((c) =>
+    isChainActiveAtMs(c, atMs)
+  )
+  const best = pickEarliestChain(candidates)
+  if (!best) return empty
+
+  return {
+    finishTime: formatTimestampMs(best.finishTs),
+    finishTimestamp: best.finishTs,
+    nodes: best.nodes,
+    blocked: false,
+  }
+}
+
+export type TimelineChainMarkerType =
+  | 'task_start'
+  | 'first_transmit'
+  | 'jam'
+  | 'post_chain_finish'
+  | 'all_blocked'
+  | 'task_end'
+
+/** 根据时间轴关键点类型解析应展示的链路 */
+export const resolveChainForTimelineMarker = (
+  matrix: MatrixResult | null,
+  norad: number,
+  markerType: TimelineChainMarkerType,
+  atMs: number
+): FullChainResult => {
+  if (!matrix || !norad) {
+    return {
+      finishTime: null,
+      finishTimestamp: null,
+      nodes: [],
+      blocked: true,
+      blockedReason: '暂无矩阵数据',
+    }
+  }
+
+  if (markerType === 'post_chain_finish' || markerType === 'all_blocked') {
+    return analyzeSatelliteFullChain(matrix, norad, true)
+  }
+  if (markerType === 'first_transmit') {
+    return analyzeSatelliteChainAtTime(matrix, norad, atMs, false)
+  }
+  if (markerType === 'jam') {
+    const active = analyzeSatelliteChainAtTime(matrix, norad, atMs, true)
+    if (!active.blocked) return active
+    return analyzeSatelliteChainAtTime(matrix, norad, atMs, false)
+  }
+
+  const postChain = analyzeSatelliteFullChain(matrix, norad, true)
+  const usePostStrike =
+    markerType === 'task_end' ||
+    (!!postChain.finishTimestamp && atMs >= postChain.finishTimestamp)
+  return analyzeSatelliteChainAtTime(matrix, norad, atMs, usePostStrike)
 }
 
 export const analyzeSatelliteFullChain = (

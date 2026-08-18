@@ -30,7 +30,36 @@
             <span class="norad-tag">NORAD {{ selectedSatelliteNorad }}</span>
           </div>
 
+          <!-- 时间轴关键点链路（点击时间轴后展示） -->
+          <div class="chain-block chain-block--timeline" v-if="hasTimelinePoint">
+            <div class="chain-block-title">
+              当前时刻链路
+              <span class="timeline-point-tag">{{ timelineMarkerLabel }}</span>
+            </div>
+            <div class="timeline-point-time">{{ timelinePointTimeText }}</div>
+            <template v-if="!timelinePointChain.blocked">
+              <div class="link-flow-card post-strike">
+                <template v-for="(node, idx) in timelinePointChain.nodes" :key="'tl-' + node.layer + node.id">
+                  <div class="flow-step">
+                    <span class="step-icon">{{ node.icon }}</span>
+                    <span class="step-text" :title="node.name">{{ node.name }}</span>
+                    <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
+                  </div>
+                  <span v-if="idx < timelinePointChain.nodes.length - 1" class="flow-arrow">→</span>
+                </template>
+              </div>
+              <div class="finish-time-row" v-if="timelinePointChain.finishTime">
+                <span class="finish-label">链路完成时间</span>
+                <strong class="finish-val glow-cyan">{{ timelinePointChain.finishTime }}</strong>
+              </div>
+            </template>
+            <div v-else class="chain-blocked-tip danger">
+              {{ timelinePointChain.blockedReason || '该时刻无可用链路' }}
+            </div>
+          </div>
+
           <!-- 打击前最早全链路 -->
+          <template v-if="!hasTimelinePoint">
           <div class="chain-block">
             <div class="chain-block-title">打击前最早全链路通信</div>
             <template v-if="!preStrikeChain.blocked">
@@ -76,6 +105,7 @@
               <span v-if="postStrikeChain.finishTime" class="blocked-time">{{ postStrikeChain.finishTime }}</span>
             </div>
           </div>
+          </template>
 
           <!-- 干扰武器列表 -->
           <div class="chain-block">
@@ -175,8 +205,10 @@ import {
   analyzeSatelliteFullChain,
   collectSatelliteJamWeapons,
   getSatelliteDisplayInfo,
+  resolveChainForTimelineMarker,
   type ChainNode,
   type JamWeaponRecord,
+  type TimelineChainMarkerType,
 } from '@/utils/satelliteFullChainAnalysis'
 
 const store = useLayoutStore()
@@ -185,6 +217,12 @@ const props = defineProps<{
   matrixData: MatrixResult | null
   /** 当前选中的卫星 NORAD */
   selectedSatelliteNorad?: number | null
+  /** 时间轴关键点时刻 (ms) */
+  timelinePointMs?: number | null
+  /** 时间轴关键点类型 */
+  timelineMarkerType?: import('@/utils/satelliteFullChainAnalysis').TimelineChainMarkerType | null
+  /** 时间轴关键点标签 */
+  timelineMarkerLabel?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -226,6 +264,32 @@ const postStrikeChain = computed(() => {
     return analyzeSatelliteFullChain(null, 0, true)
   }
   return analyzeSatelliteFullChain(activeMatrix.value, props.selectedSatelliteNorad, true)
+})
+
+const hasTimelinePoint = computed(
+  () =>
+    !!props.selectedSatelliteNorad &&
+    props.timelinePointMs != null &&
+    !!props.timelineMarkerType
+)
+
+const timelinePointChain = computed(() => {
+  if (!hasTimelinePoint.value || !props.selectedSatelliteNorad || props.timelinePointMs == null) {
+    return analyzeSatelliteFullChain(null, 0, true)
+  }
+  return resolveChainForTimelineMarker(
+    activeMatrix.value,
+    props.selectedSatelliteNorad,
+    props.timelineMarkerType as TimelineChainMarkerType,
+    props.timelinePointMs
+  )
+})
+
+const timelinePointTimeText = computed(() => {
+  if (props.timelinePointMs == null) return ''
+  const d = new Date(props.timelinePointMs)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 })
 
 const jamWeaponList = computed<JamWeaponRecord[]>(() => {
@@ -855,6 +919,27 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
     border-radius: 8px;
     background: rgba(239, 68, 68, 0.15);
     color: #fca5a5;
+  }
+
+  &.chain-block--timeline {
+    border-color: rgba(56, 189, 248, 0.35);
+    background: rgba(8, 18, 36, 0.75);
+  }
+
+  .timeline-point-tag {
+    margin-left: auto;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(56, 189, 248, 0.15);
+    color: #7dd3fc;
+  }
+
+  .timeline-point-time {
+    font-size: 11px;
+    font-family: monospace;
+    color: #67e8f9;
+    margin-bottom: 6px;
   }
 }
 

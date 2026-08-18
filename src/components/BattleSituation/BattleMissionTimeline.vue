@@ -76,7 +76,7 @@
               'align-' + item.align,
             ]"
             :style="{ left: item.percent + '%', bottom: item.lane * 10 + 'px' }"
-            @click="handleMarkerClick(item.ms)"
+            @click="handleMarkerClick(item)"
           >
             <span class="tick-square"></span>
           </button>
@@ -112,6 +112,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'time-change', ms: number): void
+  (e: 'marker-click', payload: { ms: number; type: TimelineMarkerType; label: string }): void
 }>()
 
 const trackRef = ref<HTMLElement | null>(null)
@@ -292,8 +293,9 @@ const rulerTicks = computed(() => {
   return ticks
 })
 
-const handleMarkerClick = (ms: number) => {
-  emit('time-change', ms)
+const handleMarkerClick = (item: { ms: number; type: TimelineMarkerType; title: string }) => {
+  emit('time-change', item.ms)
+  emit('marker-click', { ms: item.ms, type: item.type, label: item.title })
 }
 
 const syncTaskStart = () => {

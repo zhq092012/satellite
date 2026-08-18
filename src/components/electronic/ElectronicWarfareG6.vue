@@ -77,6 +77,26 @@
             </div>
           </div>
 
+          <div class="topo-chain-banner" v-if="selectedNorad && timelineChainDisplay">
+            <div class="chain-banner-head">
+              <span class="chain-banner-title">{{ timelineChainDisplay.label }}</span>
+              <span class="chain-banner-time">{{ timelineChainDisplay.timeText }}</span>
+            </div>
+            <template v-if="!timelineChainDisplay.chain.blocked">
+              <div class="chain-banner-flow">
+                <template v-for="(node, idx) in timelineChainDisplay.chain.nodes" :key="node.layer + node.id">
+                  <div class="chain-banner-step">
+                    <span class="step-icon">{{ node.icon }}</span>
+                    <span class="step-name" :title="node.name">{{ node.name }}</span>
+                    <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
+                  </div>
+                  <span v-if="idx < timelineChainDisplay.chain.nodes.length - 1" class="chain-banner-arrow">→</span>
+                </template>
+              </div>
+            </template>
+            <div v-else class="chain-banner-blocked">{{ timelineChainDisplay.chain.blockedReason }}</div>
+          </div>
+
           <div class="topo-graph-stack">
             <div class="graph-stage">
               <div class="graph-layer-labels">
@@ -107,13 +127,16 @@
             <div class="mission-timeline-wrap">
               <BattleMissionTimeline v-if="taskTimeRange" :task-start="taskTimeRange.start"
                 :task-end="taskTimeRange.end" :matrix-data="matrixData" :selected-norad="selectedNorad"
-                @time-change="handleTimelineTimeChange" />
+                @time-change="handleTimelineTimeChange" @marker-click="handleTimelineMarkerClick" />
             </div>
           </div>
         </div>
 
         <div class="topo-side topo-side--right">
           <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad"
+            :timeline-point-ms="selectedTimelinePoint?.ms ?? null"
+            :timeline-marker-type="selectedTimelinePoint?.type ?? null"
+            :timeline-marker-label="selectedTimelinePoint?.label ?? null"
             @clear-satellite-selection="handleSelectSatellite(null)" />
         </div>
       </div>
@@ -130,6 +153,16 @@ import type { FuncType } from '@/types/electronic'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
 import BattleMissionTimeline from '@/components/BattleSituation/BattleMissionTimeline.vue'
+import {
+  analyzeSatelliteFullChain,
+  chainToEdgeIds,
+  collectJamStrikeEdgeIdsAtTime,
+  collectPostStrikePrimaryEdgeIds,
+  getSatelliteRelatedEdgeIds,
+  resolveChainForTimelineMarker,
+  type ChainNode,
+  type TimelineChainMarkerType,
+} from '@/utils/satelliteFullChainAnalysis'
 
 defineOptions({
   name: 'ElectronicWarfareG6',
@@ -137,6 +170,11 @@ defineOptions({
 const store = useLayoutStore()
 
 const selectedNorad = ref<number | null>(null)
+const selectedTimelinePoint = ref<{
+  ms: number
+  type: TimelineChainMarkerType
+  label: string
+} | null>(null)
 
 const taskTimeRange = computed(() => {
   const task = store.activedTask
@@ -183,6 +221,7 @@ const layerLabelItems = computed(() => {
 
 const handleSelectSatellite = (norad: number | null) => {
   selectedNorad.value = norad
+  selectedTimelinePoint.value = null
   if (norad) {
     const data = matrixData.value
     const satObj =
@@ -199,11 +238,47 @@ const handleSelectSatellite = (norad: number | null) => {
     selectedNodeInfo.value = null
   }
   updateGraphHighlightState()
+  refreshGraphForTime()
 }
 
 const handleTimelineTimeChange = (ms: number) => {
   setCurrentTimestamp(ms)
 }
+
+const handleTimelineMarkerClick = (payload: {
+  ms: number
+  type: TimelineChainMarkerType
+  label: string
+}) => {
+  selectedTimelinePoint.value = payload
+  setCurrentTimestamp(payload.ms)
+  refreshGraphForTime()
+}
+
+const chainLayerLabel = (layer: ChainNode['layer']): string => {
+  const map: Record<ChainNode['layer'], string> = {
+    SAT: '卫星',
+    RELAY: '中继',
+    RECEIVE: '地面站',
+    STATION: '数据中心',
+  }
+  return map[layer]
+}
+
+const timelineChainDisplay = computed(() => {
+  if (!selectedNorad.value || !selectedTimelinePoint.value || !matrixData.value) return null
+  const chain = resolveChainForTimelineMarker(
+    matrixData.value,
+    selectedNorad.value,
+    selectedTimelinePoint.value.type,
+    selectedTimelinePoint.value.ms
+  )
+  return {
+    label: selectedTimelinePoint.value.label,
+    timeText: formatTimeStr(selectedTimelinePoint.value.ms),
+    chain,
+  }
+})
 
 // 卫星类型与系列映射
 const typeSerialsMap = ref<Record<string, string[]>>({})
@@ -255,6 +330,14 @@ watch(
   },
   { immediate: true }
 )
+
+watch(selectedNorad, (norad) => {
+  if (!norad) selectedTimelinePoint.value = null
+})
+
+watch(selectedTimelinePoint, () => {
+  refreshGraphForTime()
+})
 
 watch(seriesOptions, (options) => {
   if (!options.length) return
@@ -382,7 +465,7 @@ const nodeLayoutCache = new Map<string, number>()
 let graphTopologyKey = ''
 
 const getGraphTopologyKey = () =>
-  `${store.selectedSatSeries}|${currentIntensity.value}|${matrixData.value?.series ?? ''}|${g6Container.value?.clientWidth ?? 0}|${g6Container.value?.clientHeight ?? 0}`
+  `${store.selectedSatSeries}|${currentIntensity.value}|${matrixData.value?.series ?? ''}|${selectedNorad.value ?? ''}|${g6Container.value?.clientWidth ?? 0}|${g6Container.value?.clientHeight ?? 0}`
 
 const applyCachedNodePositions = (nodes: any[]) => {
   nodes.forEach((node) => {
@@ -904,6 +987,101 @@ const countLinkPhase = (counts: { normal: number; striking: number; severed: num
   else counts.normal++
 }
 
+const isGreenTimelineMarker = (type: TimelineChainMarkerType): boolean =>
+  type === 'first_transmit' || type === 'post_chain_finish'
+
+const isRedTimelineMarker = (type: TimelineChainMarkerType): boolean => type === 'jam'
+
+const paintEdgePhase = (
+  edge: any,
+  phase: LinkPhase
+): any => {
+  const extraStyle: Record<string, unknown> = {}
+  if (edge.style?.endArrow) {
+    extraStyle.endArrow = {
+      ...(edge.style.endArrow as object),
+      fill: LINK_COLORS[phase],
+    }
+  }
+  const edgeVisual = buildEdgeVisual(phase, 0, extraStyle)
+  return {
+    ...edge,
+    label: edgeVisual.label,
+    labelCfg: edgeVisual.labelCfg,
+    style: { ...edge.style, ...edgeVisual.style },
+  }
+}
+
+/** 统一链路着色：未选中 / 选中卫星 / 时间轴关键点 */
+const applyGraphLinkPolicy = (
+  data: MatrixResult,
+  nodes: any[],
+  edges: any[]
+): { nodes: any[]; edges: any[]; linkCounts: { normal: number; striking: number; severed: number } } => {
+  const norad = selectedNorad.value
+  const timeline = selectedTimelinePoint.value
+  const linkCounts = { normal: 0, striking: 0, severed: 0 }
+
+  let visibleEdges = edges
+  let displayEdgeIds = new Set<string>()
+
+  if (timeline && norad) {
+    const chain = resolveChainForTimelineMarker(data, norad, timeline.type, timeline.ms)
+    if (chain.blocked && isRedTimelineMarker(timeline.type)) {
+      displayEdgeIds = collectJamStrikeEdgeIdsAtTime(data, norad, timeline.ms)
+    } else if (!chain.blocked) {
+      displayEdgeIds = chainToEdgeIds(chain)
+    }
+    const allowed = getSatelliteRelatedEdgeIds(data, norad)
+    visibleEdges = edges.filter(
+      (e) => displayEdgeIds.has(String(e.id)) && allowed.has(String(e.id))
+    )
+  } else if (norad) {
+    const allowed = getSatelliteRelatedEdgeIds(data, norad)
+    const postChain = analyzeSatelliteFullChain(data, norad, true)
+    displayEdgeIds = postChain.blocked ? new Set<string>() : chainToEdgeIds(postChain)
+    visibleEdges = edges.filter((e) => allowed.has(String(e.id)))
+  } else {
+    displayEdgeIds = collectPostStrikePrimaryEdgeIds(data)
+  }
+
+  const paintedEdges = visibleEdges.map((edge) => {
+    const edgeId = String(edge.id)
+    let phase: LinkPhase = 'severed'
+
+    if (timeline && norad) {
+      if (!displayEdgeIds.has(edgeId)) {
+        phase = 'severed'
+      } else if (isRedTimelineMarker(timeline.type)) {
+        phase = 'striking'
+      } else if (isGreenTimelineMarker(timeline.type)) {
+        phase = 'normal'
+      } else {
+        phase = 'normal'
+      }
+    } else {
+      phase = displayEdgeIds.has(edgeId) ? 'normal' : 'severed'
+    }
+
+    const painted = paintEdgePhase(edge, phase)
+    countLinkPhase(linkCounts, phase)
+    return painted
+  })
+
+  const visibleNodeIds = new Set<string>()
+  paintedEdges.forEach((e) => {
+    visibleNodeIds.add(e.source)
+    visibleNodeIds.add(e.target)
+  })
+
+  const filteredNodes =
+    norad || (timeline && norad)
+      ? nodes.filter((n) => visibleNodeIds.has(n.id))
+      : nodes
+
+  return { nodes: filteredNodes, edges: paintedEdges, linkCounts }
+}
+
 const currentTimeText = computed(() => formatTimeStr(currentTimestamp.value))
 
 const formatDelayMinutes = (minutes: number): string => {
@@ -1341,6 +1519,7 @@ const buildG6GraphData = () => {
       countLinkPhase(linkCounts, phase)
 
       edges.push({
+        id: `edge-${satId}-${targetNodeId}`,
         source: satId,
         target: targetNodeId,
         type: 'struck-cubic',
@@ -1350,12 +1529,13 @@ const buildG6GraphData = () => {
       })
     })
 
-    normalLinkCount.value = linkCounts.normal
-    strikingLinkCount.value = linkCounts.striking
-    severedLinkCount.value = linkCounts.severed
-    satNodeCount.value = satList.length
+    const applied = applyGraphLinkPolicy(data, nodes, edges)
+    normalLinkCount.value = applied.linkCounts.normal
+    strikingLinkCount.value = applied.linkCounts.striking
+    severedLinkCount.value = applied.linkCounts.severed
+    satNodeCount.value = applied.nodes.filter((node) => String(node.id).startsWith('sat-')).length
 
-    return { nodes, edges }
+    return { nodes: applied.nodes, edges: applied.edges }
   }
 
   // ==================== 侦察卫星模式三层拓扑构建 ====================
@@ -1619,12 +1799,13 @@ const buildG6GraphData = () => {
     }
   })
 
-  normalLinkCount.value = linkCounts.normal
-  strikingLinkCount.value = linkCounts.striking
-  severedLinkCount.value = linkCounts.severed
-  satNodeCount.value = nodes.filter((node) => String(node.id).startsWith('sat-')).length
+  const applied = applyGraphLinkPolicy(data, nodes, edges)
+  normalLinkCount.value = applied.linkCounts.normal
+  strikingLinkCount.value = applied.linkCounts.striking
+  severedLinkCount.value = applied.linkCounts.severed
+  satNodeCount.value = applied.nodes.filter((node) => String(node.id).startsWith('sat-')).length
 
-  return { nodes, edges }
+  return { nodes: applied.nodes, edges: applied.edges }
 }
 
 /**
@@ -2115,6 +2296,87 @@ onUnmounted(() => {
 
   :deep(.c2-panel) {
     height: 100%;
+  }
+}
+
+.topo-chain-banner {
+  margin: 0;
+  padding: 8px 16px 10px;
+  border-bottom: 1px solid rgba(0, 225, 255, 0.18);
+  background: linear-gradient(180deg, rgba(8, 20, 40, 0.95) 0%, rgba(6, 14, 28, 0.85) 100%);
+
+  .chain-banner-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .chain-banner-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #7dd3fc;
+  }
+
+  .chain-banner-time {
+    font-size: 11px;
+    font-family: monospace;
+    color: #67e8f9;
+  }
+
+  .chain-banner-flow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    background: rgba(10, 18, 34, 0.85);
+  }
+
+  .chain-banner-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 72px;
+    max-width: 120px;
+
+    .step-icon {
+      font-size: 14px;
+    }
+
+    .step-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: #e2e8f0;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      width: 100%;
+    }
+
+    .step-sub {
+      font-size: 9px;
+      color: #64748b;
+    }
+  }
+
+  .chain-banner-arrow {
+    color: #38bdf8;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .chain-banner-blocked {
+    font-size: 11px;
+    color: #fca5a5;
+    padding: 6px 10px;
+    border-radius: 4px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.25);
   }
 }
 
