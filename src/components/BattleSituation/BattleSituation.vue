@@ -45,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onMounted, ref, watch } from 'vue'
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
@@ -208,6 +208,22 @@ onMounted(() => {
     }
   })
   void pauseClockAnimation()
+})
+
+onActivated(() => {
+  nextTick(() => {
+    markBattleArea()
+    cesiumViewerRef.value?.refreshAfterActivate?.()
+    if (store.selectedSatSeries && store.matrixData) {
+      if (selectedNorad.value) {
+        cesiumViewerRef.value?.highlightSatellite({ norad_id: String(selectedNorad.value) })
+      } else {
+        cesiumViewerRef.value?.markBattle()
+      }
+    } else if (store.selectedSatSeries) {
+      void fetchMatrixDataBySeries(store.selectedSatSeries)
+    }
+  })
 })
 
 /**

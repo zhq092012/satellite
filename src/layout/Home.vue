@@ -30,7 +30,7 @@
 
     <!-- 下层内容展示区域 -->
     <main class="bottom-content">
-      <keep-alive>
+      <keep-alive :include="['BattleSituation', 'ElectronicWarfareG6', 'SatelliteGantt', 'WeaponAttackList']">
         <component :is="currentComponent" :key="activeTab" />
       </keep-alive>
     </main>

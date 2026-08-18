@@ -10,17 +10,17 @@
   </div>
 </template>
 <script setup lang="ts">
+import { getAllWeapons, getSatelliteDetail, getSatelliteTLEData, getTLEDataByTaskId } from '@/api/dashboard'
 import type { MatrixResult } from '@/api/electronic'
 import { useElectronicCesiumBridge, type InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
-import * as Cesium from 'cesium'
-import { getAllWeapons, getSatelliteDetail, getSatelliteTLEData, getTLEDataByTaskId } from '@/api/dashboard'
-import { createWeaponIconDataUri, getWeaponIconScale } from '@/utils/tools/svgIcons'
-import * as satellitejs from 'satellite.js'
 import { useLayoutStore } from '@/store/modules/layout'
-import { markBattleArea } from '@/utils/tools/functionTool'
-import { CallbackProperty } from 'cesium'
 import type { SatelliteData, Weapon } from '@/types/dashboard'
+import { markBattleArea } from '@/utils/tools/functionTool'
+import { createWeaponIconDataUri, getWeaponIconScale } from '@/utils/tools/svgIcons'
+import * as Cesium from 'cesium'
+import { CallbackProperty } from 'cesium'
+import * as satellitejs from 'satellite.js'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
 
 // 全局布局状态管理 store
 const store = useLayoutStore()
@@ -110,6 +110,7 @@ const syncViewerRenderLoopWithContainer = () => {
   viewer.useDefaultRenderLoop = canRender
   if (!canRender) return
   ;(viewer as any).resize?.()
+  flushPendingInfrastructureRender()
   if (!viewer.isDestroyed()) {
     viewer.scene.requestRender()
   }
@@ -670,20 +671,39 @@ const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null =
   return null
 }
 
+let pendingInfrastructureRender = false
+
+const flushPendingInfrastructureRender = () => {
+  if (!pendingInfrastructureRender || !viewer || viewer.isDestroyed()) return
+  if (!props.matrixData || !hasValidContainerSize(cesiumContainer.value || null)) return
+  pendingInfrastructureRender = false
+  renderElectronicInfrastructureNodes()
+}
+
+const scheduleInfrastructureRender = () => {
+  if (!viewer || viewer.isDestroyed()) return
+  if (!props.matrixData) {
+    pendingInfrastructureRender = false
+    clearElectronicInfrastructureNodes()
+    viewer.scene.requestRender()
+    return
+  }
+  if (!hasValidContainerSize(cesiumContainer.value || null)) {
+    pendingInfrastructureRender = true
+    return
+  }
+  pendingInfrastructureRender = false
+  renderElectronicInfrastructureNodes()
+}
+
 /**
  * [功能]
  * 监听矩阵数据变化，触发 3D 电子信息网络与连线更新
  */
 watch(
   () => props.matrixData,
-  (newData) => {
-    if (!viewer || viewer.isDestroyed()) return
-    if (newData) {
-      renderElectronicInfrastructureNodes()
-    } else {
-      clearElectronicInfrastructureNodes()
-      viewer.scene.requestRender()
-    }
+  () => {
+    scheduleInfrastructureRender()
   },
   { deep: true, immediate: true }
 )
@@ -1343,6 +1363,15 @@ const jumpToTimeAndPlay = (timeStr?: string) => {
   setClockPlaying(true, playbackSpeed.value)
 }
 
+const refreshAfterActivate = () => {
+  syncViewerRenderLoopWithContainer()
+  if (props.matrixData) {
+    pendingInfrastructureRender = false
+    renderElectronicInfrastructureNodes()
+  }
+  viewer?.scene.requestRender()
+}
+
 defineExpose({
   clearViewer,
   clearElectronicInfrastructureNodes,
@@ -1354,6 +1383,7 @@ defineExpose({
   initTaskClock,
   setClockTime,
   setClockPlaying,
+  refreshAfterActivate,
 })
 </script>
 <style lang="scss" scoped>
