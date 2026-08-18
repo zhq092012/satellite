@@ -2076,12 +2076,6 @@ const initOrUpdateGraph = () => {
       const nodeId = String(model.id)
 
       if (nodeId.startsWith('sat-')) {
-        const norad = Number(nodeId.replace('sat-', ''))
-        if (selectedNorad.value === norad) {
-          handleSelectSatellite(null)
-        } else {
-          handleSelectSatellite(norad)
-        }
         return
       }
 
@@ -2092,10 +2086,6 @@ const initOrUpdateGraph = () => {
 
       parseAndSelectNode(model)
       updateGraphHighlightState()
-    })
-
-    graph.on('canvas:click', () => {
-      handleSelectSatellite(null)
     })
   } else {
     // 拓扑图已有实例：重新计算画布大小并替换渲染数据
