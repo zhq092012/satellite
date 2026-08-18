@@ -5,18 +5,9 @@
       <div class="header-left">
         <span class="header-icon">
           <!-- Lucide Satellite Icon SVG -->
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="lucide lucide-satellite"
-          >
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            class="lucide lucide-satellite">
             <path d="M13 7 9 3 5 7l4 4" />
             <path d="m17 11 4 4-4 4-4-4" />
             <path d="m8 12 4 4" />
@@ -58,12 +49,8 @@
           <span class="time-span-display">{{ currentTickSpanLabel }}</span>
           <span class="zoom-label">时间刻度:</span>
           <el-button-group>
-            <el-button
-              size="small"
-              type="primary"
-              :disabled="tickStepIndex >= TICK_STEP_OPTIONS.length - 1"
-              @click="zoomOut"
-            >
+            <el-button size="small" type="primary" :disabled="tickStepIndex >= TICK_STEP_OPTIONS.length - 1"
+              @click="zoomOut">
               缩小 -
             </el-button>
             <el-button size="small" type="primary" @click="resetScale">
@@ -85,18 +72,9 @@
         <div class="sidebar-search-box">
           <el-input v-model="searchKeyword" placeholder="搜索卫星/接收站/武器..." size="small" clearable>
             <template #prefix>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="lucide lucide-search"
-              >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="lucide lucide-search">
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.3-4.3" />
               </svg>
@@ -130,30 +108,15 @@
         <!-- 卫星与接收站层次索引树/列表 -->
         <div class="sat-tree-list">
           <div class="tree-header">卫星节点 ({{ filteredSatellites.length }})</div>
-          <div
-            v-for="sat in filteredSatellites"
-            :key="sat.norad"
-            class="sat-tree-item"
-            :class="{
-              'is-sat-struck': sat.satelliteStatus === 1,
-              'is-selected': selectedSatNorad === sat.norad,
-            }"
-            @click="selectSatelliteRow(sat)"
-          >
+          <div v-for="sat in filteredSatellites" :key="sat.norad" class="sat-tree-item" :class="{
+            'is-sat-struck': sat.satelliteStatus === 1,
+            'is-selected': selectedSatNorad === sat.norad,
+          }" :ref="(el) => setSatTreeItemRef(sat.norad, el as Element | null)" @click="selectSatelliteRow(sat)">
             <div class="sat-item-header">
               <span class="sat-icon">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="lucide lucide-satellite"
-                >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  class="lucide lucide-satellite">
                   <path d="M13 7 9 3 5 7l4 4" />
                   <path d="m17 11 4 4-4 4-4-4" />
                   <path d="m8 12 4 4" />
@@ -170,12 +133,11 @@
 
             <!-- 关联接收站过境窗口摘要列表 -->
             <div class="sat-windows-sublist">
-              <div
-                v-for="win in sat.stationWindows"
-                :key="win.receiveId + '-' + win.peakWindow"
-                class="win-sub-item"
-                :class="{ 'is-win-struck': win.strikeStatus === 1 }"
-              >
+              <div v-for="win in sat.stationWindows" :key="win.receiveId + '-' + win.peakWindow" class="win-sub-item"
+                :class="{
+                  'is-win-struck': win.strikeStatus === 1,
+                  'is-win-selected': isStationWindowSelected(sat.norad, win),
+                }" @click.stop="selectStationWindow(sat, win)">
                 <span class="sub-rec-name">📡 {{ win.receiveName }}</span>
                 <span class="sub-win-time">{{
                   win.peakWindow.length >= 16 ? win.peakWindow.substring(11, 16) : win.peakWindow
@@ -195,13 +157,8 @@
                 <span>卫星 / 干扰排道</span>
               </div>
               <div class="timeline-ticks-container">
-                <div
-                  v-for="tick in timelineTicks"
-                  :key="tick.timeStr"
-                  class="time-tick-item"
-                  :class="{ 'is-current-tick': tick.isCurrent }"
-                  :style="{ left: tick.leftPx + 'px' }"
-                >
+                <div v-for="tick in timelineTicks" :key="tick.timeStr" class="time-tick-item"
+                  :class="{ 'is-current-tick': tick.isCurrent }" :style="{ left: tick.leftPx + 'px' }">
                   <span class="tick-line"></span>
                   <span class="tick-text">{{ tick.label }}</span>
                 </div>
@@ -210,59 +167,35 @@
             </div>
 
             <div class="gantt-rows-container">
-              <div
-                v-for="ganttRow in processedGanttRows"
-                :key="ganttRow.rowKey"
-                class="gantt-sat-row-group"
-                :class="{
-                  'row-sat-struck': ganttRow.satelliteStatus === 1,
-                  'is-row-selected': selectedSatNorad === ganttRow.norad,
-                }"
-                :ref="(el) => setGanttRowRef(ganttRow.norad, el as Element | null)"
-              >
+              <div v-for="ganttRow in processedGanttRows" :key="ganttRow.rowKey" class="gantt-sat-row-group" :class="{
+                'row-sat-struck': ganttRow.satelliteStatus === 1,
+                'is-row-selected': selectedSatNorad === ganttRow.norad,
+              }" :ref="(el) => setGanttRowRef(ganttRow.norad, el as Element | null)">
                 <div class="row-label-col">
                   <div class="sat-main-label">
                     <span class="icon-sat">🛰️</span>
                     <span class="sat-title">{{ ganttRow.name }}</span>
                   </div>
-                  <div class="sat-meta-sub">
-                    <span>NORAD: {{ ganttRow.norad }}</span>
-                    <span class="lane-count-tag" v-if="ganttRow.maxLanes > 1">窗口: {{ ganttRow.maxLanes }}个</span>
-                  </div>
                 </div>
 
-                <div
-                  class="row-timeline-track"
-                  :style="{ height: ganttRow.trackHeight + 'px' }"
-                >
-                  <div
-                    v-for="tick in timelineTicks"
-                    :key="'grid-' + ganttRow.rowKey + tick.timeStr"
-                    class="track-grid-line"
-                    :class="{ 'is-current-grid': tick.isCurrent }"
-                    :style="{ left: tick.leftPx + 'px' }"
-                  ></div>
+                <div class="row-timeline-track" :style="{ height: ganttRow.trackHeight + 'px' }">
+                  <div v-for="tick in timelineTicks" :key="'grid-' + ganttRow.rowKey + tick.timeStr"
+                    class="track-grid-line" :class="{ 'is-current-grid': tick.isCurrent }"
+                    :style="{ left: tick.leftPx + 'px' }"></div>
                   <div class="gantt-playhead-line" :style="{ left: playheadLeftPx + 'px' }"></div>
 
-                  <div
-                    v-for="bar in ganttRow.bars"
-                    :key="bar.id"
-                    class="gantt-bar-item"
-                    :class="[
-                      bar.colorStatusClass,
-                      {
-                        'is-bar-active': selectedBarId === bar.id,
-                        'is-bar-at-playhead': isBarAtPlayhead(bar),
-                      },
-                    ]"
-                    :style="{
-                      left: bar.leftPx + 'px',
-                      width: bar.widthPx + 'px',
-                      top: bar.topPx + 'px',
-                      height: bar.barHeight + 'px',
-                    }"
-                    @click.stop="handleSelectBar(bar)"
-                  >
+                  <div v-for="bar in ganttRow.bars" :key="bar.id" class="gantt-bar-item" :class="[
+                    bar.colorStatusClass,
+                    {
+                      'is-bar-active': selectedBarId === bar.id,
+                      'is-bar-at-playhead': isBarAtPlayhead(bar),
+                    },
+                  ]" :style="{
+                    left: bar.leftPx + 'px',
+                    width: bar.widthPx + 'px',
+                    top: bar.topPx + 'px',
+                    height: bar.barHeight + 'px',
+                  }" @click.stop="handleSelectBar(bar)">
                     <div class="bar-content" :title="bar.barTooltip">
                       <span v-for="(line, lineIdx) in bar.barLabelLines" :key="lineIdx" class="bar-label-line">{{
                         line
@@ -278,8 +211,24 @@
         <div class="gantt-playback-footer" v-if="taskTimeBounds">
           <div class="playback-controls">
             <el-button size="small" type="primary" @click="jumpToTaskStart">起点</el-button>
-            <el-button size="small" type="primary" @click="togglePlayback">
+            <el-button size="small" type="primary" :disabled="!canJumpPrevWindow"
+              :title="selectedSatNorad ? '跳转到上一个过境窗口' : '请先选择卫星'" @click="jumpToAdjacentWindow(-1)">
+              上一窗口
+            </el-button>
+            <el-button size="small" type="primary" :disabled="!canStepPrev" @click="jumpPlayheadByGrid(-1)">
+              上一格
+            </el-button>
+
+            <el-button size="small" type="primary" :disabled="!selectedSatNorad"
+              :title="selectedSatNorad ? '' : '请先选择卫星'" @click="togglePlayback">
               {{ isPlaying ? '暂停' : '播放' }}
+            </el-button>
+            <el-button size="small" type="primary" :disabled="!canStepNext" @click="jumpPlayheadByGrid(1)">
+              下一格
+            </el-button>
+            <el-button size="small" type="primary" :disabled="!canJumpNextWindow"
+              :title="selectedSatNorad ? '跳转到下一个过境窗口' : '请先选择卫星'" @click="jumpToAdjacentWindow(1)">
+              下一窗口
             </el-button>
             <el-button size="small" type="primary" @click="jumpToTaskEnd">终点</el-button>
             <span class="playback-divider"></span>
@@ -289,14 +238,12 @@
             </el-select>
             <span class="playback-time">{{ currentPlayTimeText }}</span>
           </div>
-          <div class="playback-track" ref="playbackTrackRef" @click="handlePlaybackTrackClick">
+          <div class="playback-track" :class="{ 'is-dragging': isDraggingPlayhead }" ref="playbackTrackRef"
+            @pointerdown="handlePlaybackPointerDown" @pointermove="handlePlaybackPointerMove"
+            @pointerup="handlePlaybackPointerUp" @pointercancel="handlePlaybackPointerUp">
             <div class="playback-track-bg"></div>
-            <div
-              v-for="tick in timelineTicks"
-              :key="'pb-' + tick.timeStr"
-              class="playback-tick"
-              :style="{ left: tick.percent + '%' }"
-            ></div>
+            <div v-for="tick in timelineTicks" :key="'pb-' + tick.timeStr" class="playback-tick"
+              :style="{ left: tick.percent + '%' }"></div>
             <div class="playback-cursor" :style="{ left: playheadPercent + '%' }"></div>
           </div>
           <div class="playback-scale">
@@ -309,18 +256,9 @@
       <!-- 3. 右侧栏 (Right Detail Panel): 选中的干扰武器与交战分析明细 -->
       <div class="gantt-sidebar-right">
         <div class="panel-header">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="lucide lucide-crosshair"
-          >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            class="lucide lucide-crosshair">
             <circle cx="12" cy="12" r="10" />
             <line x1="22" x2="18" y1="12" y2="12" />
             <line x1="6" x2="2" y1="12" y2="12" />
@@ -337,13 +275,9 @@
             <span class="playhead-time-val">{{ currentPlayTimeText }}</span>
           </div>
 
-          <div
-            v-for="bar in barsAtPlayhead"
-            :key="bar.id"
-            class="playhead-link-block"
+          <div v-for="bar in barsAtPlayhead" :key="bar.id" class="playhead-link-block"
             :class="[bar.colorStatusClass, { 'is-click-selected': selectedBarId === bar.id }]"
-            @click="handleSelectBar(bar)"
-          >
+            @click="handleSelectBar(bar)">
             <div class="compact-link-header" :class="bar.colorStatusClass">
               <span class="compact-status-tag">{{ bar.statusLabel }}</span>
               <span class="compact-link-line" :title="`${bar.satName} → ${bar.receiveName}`">
@@ -389,18 +323,9 @@
 
         <!-- 缺省提示 -->
         <div class="empty-panel-tip" v-else>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="40"
-            height="40"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="lucide lucide-mouse-pointer-click"
-          >
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+            class="lucide lucide-mouse-pointer-click">
             <path d="m9 9 5 12 1.8-5.2L21 14Z" />
             <path d="M7.2 2.2 8 5.1" />
             <path d="m5.1 8-2.9-.8" />
@@ -408,7 +333,7 @@
             <path d="m6 12-1.9 2" />
           </svg>
           <div class="tip-text">
-            当前时刻 <strong>{{ currentPlayTimeText }}</strong> 无过境链路。拖动底部时间轴或播放，使时刻标线穿过甘特条块即可查看链路详情。
+            当前时刻 <strong>{{ currentPlayTimeText }}</strong> 无过境链路。点击左侧接收站，或拖动底部时间轴使标线穿过甘特条块，即可查看链路详情。
           </div>
         </div>
       </div>
@@ -418,7 +343,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import type { MatrixResult, SatelliteMatrix, Weapon, CommucationMatrix } from '@/api/electronic'
+import type { MatrixResult, SatelliteMatrix, StationWindow, Weapon, CommucationMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
 const store = useLayoutStore()
 // [类型定义]
@@ -456,20 +381,35 @@ const selectedSatNorad = ref<number | null>(null)
 // [变量用途]
 // 当前选中的甘特条 Item ID
 const selectedBarId = ref<string | null>(null)
+const selectedStationKey = ref<string | null>(null)
 
 const scrollContainerRef = ref<HTMLDivElement | null>(null)
 const playbackTrackRef = ref<HTMLDivElement | null>(null)
+const isDraggingPlayhead = ref(false)
 const ganttRowRefs = new Map<number, HTMLElement>()
+const satTreeItemRefs = new Map<number, HTMLElement>()
 
 const setGanttRowRef = (norad: number, el: Element | null) => {
   if (el) ganttRowRefs.set(norad, el as HTMLElement)
   else ganttRowRefs.delete(norad)
 }
 
+const setSatTreeItemRef = (norad: number, el: Element | null) => {
+  if (el) satTreeItemRefs.set(norad, el as HTMLElement)
+  else satTreeItemRefs.delete(norad)
+}
+
 const scrollToSatRow = (norad: number) => {
   nextTick(() => {
     const rowEl = ganttRowRefs.get(norad)
     rowEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  })
+}
+
+const scrollToSatTreeItem = (norad: number) => {
+  nextTick(() => {
+    const itemEl = satTreeItemRefs.get(norad)
+    itemEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   })
 }
 
@@ -676,7 +616,7 @@ const totalReceiveList = computed(() => {
   const relLists = [currentData.value?.stationRelationList, currentData.value?.initRelationList].filter(Boolean)
 
   relLists.forEach((rl) => {
-    ;(rl?.receiveObjList || []).forEach((rec) => {
+    ; (rl?.receiveObjList || []).forEach((rec) => {
       if (!map.has(rec.receiveId)) {
         map.set(rec.receiveId, {
           receiveId: rec.receiveId,
@@ -694,7 +634,7 @@ const totalReceiveList = computed(() => {
   // 若关联列表无数据，从卫星过境窗口中兜底提炼
   if (map.size === 0 && currentData.value?.satelliteMatrixList) {
     currentData.value.satelliteMatrixList.forEach((sat) => {
-      ;(sat.stationWindows || []).forEach((win) => {
+      ; (sat.stationWindows || []).forEach((win) => {
         if (!map.has(win.receiveId)) {
           map.set(win.receiveId, {
             receiveId: win.receiveId,
@@ -873,6 +813,69 @@ const snapToGrid = (ts: number): number => {
   return Math.min(Math.max(snapped, minTs), maxTs)
 }
 
+/** 定位到事件发生时刻所在格的前一格起点 */
+const seekToPrevGrid = (eventTs: number) => {
+  const { minTs, maxTs } = timeBounds.value
+  const step = tickStepSec.value
+  if (step <= 0) {
+    currentPlayTs.value = Math.min(Math.max(eventTs, minTs), maxTs)
+    return
+  }
+  const prevGridTs = minTs + Math.floor((eventTs - minTs - 1) / step) * step
+  currentPlayTs.value = Math.min(Math.max(prevGridTs, minTs), maxTs)
+}
+
+const getWindowStartTs = (win: any): number | null => {
+  const startStr = win?.peakWindow || win?.startWindow || win?.beginWindow || win?.startTime || ''
+  if (!startStr) return null
+  return parseToTimestamp(startStr)
+}
+
+const getFirstStationStartTs = (sat: any): number | null => {
+  const windows = sat?.stationWindows || sat?.initWindows || []
+  let earliest: number | null = null
+  windows.forEach((win: any) => {
+    const ts = getWindowStartTs(win)
+    if (ts == null) return
+    if (earliest == null || ts < earliest) earliest = ts
+  })
+  return earliest
+}
+
+const stationWindowKey = (norad: number, win: any) =>
+  `${norad}-${win?.receiveId || ''}-${win?.peakWindow || win?.startWindow || ''}`
+
+const isStationWindowSelected = (norad: number, win: StationWindow) =>
+  selectedStationKey.value === stationWindowKey(norad, win)
+
+const findBarForWindow = (norad: number, win: any): ProcessedGanttBar | undefined => {
+  const row = processedGanttRows.value.find((item) => item.norad === norad)
+  if (!row) return undefined
+  const startStr = win?.peakWindow || win?.startWindow || win?.beginWindow || ''
+  const receiveId = win?.receiveId || 'target-area'
+  return (
+    row.bars.find((bar) => bar.receiveId === receiveId && bar.peakWindow === startStr) ||
+    row.bars.find((bar) => bar.receiveId === receiveId && bar.receiveName === win?.receiveName)
+  )
+}
+
+const seekPlayheadIntoBar = (bar: ProcessedGanttBar) => {
+  const { minTs, maxTs } = timeBounds.value
+  const step = tickStepSec.value
+  const clampedStart = Math.min(Math.max(bar.startTimestamp, minTs), maxTs)
+  const clampedEnd = Math.min(Math.max(bar.endTimestamp, minTs), maxTs)
+  if (step <= 0) {
+    currentPlayTs.value = clampedStart
+    return
+  }
+  const gridInWindow = minTs + Math.ceil((clampedStart - minTs) / step) * step
+  if (gridInWindow >= clampedStart && gridInWindow <= clampedEnd) {
+    currentPlayTs.value = Math.min(Math.max(gridInWindow, minTs), maxTs)
+    return
+  }
+  currentPlayTs.value = snapToGrid(clampedStart)
+}
+
 const buildBarsForWindows = (
   windows: Array<{
     win: any
@@ -941,8 +944,8 @@ const buildBarsForWindows = (
     }
 
     const weaponMap = new Map<string, Weapon>()
-    ;(sat?.weapons || []).forEach((w: Weapon) => weaponMap.set(w.id, w))
-    ;(win.weapons || []).forEach((w: Weapon) => weaponMap.set(w.id, w))
+      ; (sat?.weapons || []).forEach((w: Weapon) => weaponMap.set(w.id, w))
+      ; (win.weapons || []).forEach((w: Weapon) => weaponMap.set(w.id, w))
 
     bars.push({
       id: `bar-sat-${satNorad}-${recId}-${idx}`,
@@ -1101,12 +1104,63 @@ const isBarAtPlayhead = (bar: ProcessedGanttBar) => playheadBarIdSet.value.has(b
 const handleSelectBar = (bar: ProcessedGanttBar) => {
   selectedBarId.value = bar.id
   selectedSatNorad.value = bar.satNorad
+  selectedStationKey.value = stationWindowKey(bar.satNorad, {
+    receiveId: bar.receiveId,
+    peakWindow: bar.peakWindow,
+  })
+  scrollToSatRow(bar.satNorad)
+  scrollToSatTreeItem(bar.satNorad)
+  if (currentPlayTs.value < bar.startTimestamp || currentPlayTs.value > bar.endTimestamp) {
+    seekPlayheadIntoBar(bar)
+  }
 }
 
 const selectSatelliteRow = (sat: SatelliteMatrix) => {
   selectedSatNorad.value = sat.norad
   selectedBarId.value = null
+  selectedStationKey.value = null
+  stopPlayback()
   scrollToSatRow(sat.norad)
+  const firstTs = getFirstStationStartTs(sat)
+  if (firstTs != null) seekToPrevGrid(firstTs)
+}
+
+const selectStationWindow = (sat: SatelliteMatrix, win: StationWindow) => {
+  selectedSatNorad.value = sat.norad
+  selectedStationKey.value = stationWindowKey(sat.norad, win)
+  stopPlayback()
+  scrollToSatRow(sat.norad)
+
+  const bar = findBarForWindow(sat.norad, win)
+  if (bar) {
+    selectedBarId.value = bar.id
+    seekPlayheadIntoBar(bar)
+    return
+  }
+
+  selectedBarId.value = null
+  const startTs = getWindowStartTs(win)
+  if (startTs != null) currentPlayTs.value = snapToGrid(startTs)
+}
+
+const getSelectedSatWindowBounds = (): { firstStart: number; lastEnd: number } | null => {
+  if (selectedSatNorad.value == null) return null
+  const row = processedGanttRows.value.find((item) => item.norad === selectedSatNorad.value)
+  if (!row?.bars.length) return null
+  let firstStart = Number.POSITIVE_INFINITY
+  let lastEnd = Number.NEGATIVE_INFINITY
+  row.bars.forEach((bar) => {
+    firstStart = Math.min(firstStart, bar.startTimestamp)
+    lastEnd = Math.max(lastEnd, bar.endTimestamp)
+  })
+  if (!Number.isFinite(firstStart) || !Number.isFinite(lastEnd)) return null
+  return { firstStart, lastEnd }
+}
+
+const rewindToSelectedSatStart = () => {
+  const bounds = getSelectedSatWindowBounds()
+  if (!bounds) return
+  seekToPrevGrid(bounds.firstStart)
 }
 
 const stopPlayback = () => {
@@ -1118,14 +1172,25 @@ const stopPlayback = () => {
 }
 
 const startPlayback = () => {
+  if (selectedSatNorad.value == null) return
+  const windowBounds = getSelectedSatWindowBounds()
+  if (!windowBounds) return
+
   stopPlayback()
+  if (currentPlayTs.value >= windowBounds.lastEnd) {
+    rewindToSelectedSatStart()
+  }
+
   isPlaying.value = true
   const intervalMs = Math.max(200, 1000 / gridsPerSecond.value)
   playTimer = setInterval(() => {
+    const satBounds = getSelectedSatWindowBounds()
+    const stopAt = satBounds?.lastEnd ?? timeBounds.value.maxTs
     let next = currentPlayTs.value + tickStepSec.value
-    if (next >= timeBounds.value.maxTs) {
-      next = timeBounds.value.maxTs
-      currentPlayTs.value = snapToGrid(next)
+    if (next > stopAt || next >= timeBounds.value.maxTs) {
+      if (next >= timeBounds.value.maxTs) {
+        currentPlayTs.value = snapToGrid(timeBounds.value.maxTs)
+      }
       stopPlayback()
       return
     }
@@ -1138,8 +1203,10 @@ const togglePlayback = () => {
     stopPlayback()
     return
   }
-  if (currentPlayTs.value >= timeBounds.value.maxTs) {
-    currentPlayTs.value = timeBounds.value.minTs
+  if (selectedSatNorad.value == null) return
+  const satBounds = getSelectedSatWindowBounds()
+  if (satBounds && currentPlayTs.value >= satBounds.lastEnd) {
+    rewindToSelectedSatStart()
   }
   startPlayback()
 }
@@ -1154,18 +1221,118 @@ const jumpToTaskEnd = () => {
   currentPlayTs.value = timeBounds.value.maxTs
 }
 
+const getSelectedSatBarsSorted = (): ProcessedGanttBar[] => {
+  if (selectedSatNorad.value == null) return []
+  const row = processedGanttRows.value.find((item) => item.norad === selectedSatNorad.value)
+  if (!row?.bars.length) return []
+  return [...row.bars].sort((a, b) => a.startTimestamp - b.startTimestamp || a.endTimestamp - b.endTimestamp)
+}
+
+const resolveCurrentWindowIndex = (bars: ProcessedGanttBar[], ts: number): number => {
+  if (!bars.length) return -1
+  const selectedIdx = selectedBarId.value ? bars.findIndex((bar) => bar.id === selectedBarId.value) : -1
+  if (
+    selectedIdx >= 0 &&
+    ts >= bars[selectedIdx].startTimestamp &&
+    ts <= bars[selectedIdx].endTimestamp
+  ) {
+    return selectedIdx
+  }
+  return bars.findIndex((bar) => ts >= bar.startTimestamp && ts <= bar.endTimestamp)
+}
+
+const resolveAdjacentWindow = (dir: -1 | 1): ProcessedGanttBar | null => {
+  const bars = getSelectedSatBarsSorted()
+  if (!bars.length) return null
+  const ts = currentPlayTs.value
+  const currentIdx = resolveCurrentWindowIndex(bars, ts)
+
+  if (currentIdx >= 0) {
+    const targetIdx = currentIdx + dir
+    return targetIdx >= 0 && targetIdx < bars.length ? bars[targetIdx] : null
+  }
+
+  if (dir > 0) {
+    return bars.find((bar) => bar.startTimestamp > ts) || null
+  }
+
+  for (let i = bars.length - 1; i >= 0; i--) {
+    if (bars[i].endTimestamp < ts || bars[i].startTimestamp < ts) return bars[i]
+  }
+  return null
+}
+
+const canJumpPrevWindow = computed(() => resolveAdjacentWindow(-1) != null)
+const canJumpNextWindow = computed(() => resolveAdjacentWindow(1) != null)
+const canStepPrev = computed(() => currentPlayTs.value > timeBounds.value.minTs)
+const canStepNext = computed(() => currentPlayTs.value < timeBounds.value.maxTs)
+
+const jumpToAdjacentWindow = (dir: -1 | 1) => {
+  const bar = resolveAdjacentWindow(dir)
+  if (!bar) return
+  stopPlayback()
+  selectedSatNorad.value = bar.satNorad
+  selectedBarId.value = bar.id
+  selectedStationKey.value = stationWindowKey(bar.satNorad, {
+    receiveId: bar.receiveId,
+    peakWindow: bar.peakWindow,
+  })
+  scrollToSatRow(bar.satNorad)
+  scrollToSatTreeItem(bar.satNorad)
+  seekPlayheadIntoBar(bar)
+}
+
+const jumpPlayheadByGrid = (dir: -1 | 1) => {
+  stopPlayback()
+  const { minTs, maxTs } = timeBounds.value
+  const step = tickStepSec.value
+  if (step <= 0) return
+  const next =
+    dir < 0
+      ? minTs + Math.floor((currentPlayTs.value - minTs - 1) / step) * step
+      : minTs + Math.ceil((currentPlayTs.value - minTs + 1) / step) * step
+  currentPlayTs.value = Math.min(Math.max(next, minTs), maxTs)
+}
+
 const onSpeedChange = () => {
   if (isPlaying.value) startPlayback()
 }
 
-const handlePlaybackTrackClick = (evt: MouseEvent) => {
+const seekPlayheadFromClientX = (clientX: number) => {
   const track = playbackTrackRef.value
   if (!track) return
   const rect = track.getBoundingClientRect()
-  const ratio = Math.min(Math.max((evt.clientX - rect.left) / rect.width, 0), 1)
+  if (rect.width <= 0) return
+  const ratio = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1)
   const { minTs, maxTs } = timeBounds.value
   const ts = minTs + ratio * (maxTs - minTs)
-  currentPlayTs.value = snapToGrid(ts)
+  const snapped = snapToGrid(ts)
+  if (snapped !== currentPlayTs.value) currentPlayTs.value = snapped
+}
+
+const handlePlaybackPointerDown = (evt: PointerEvent) => {
+  if (evt.button !== 0) return
+  const track = playbackTrackRef.value
+  if (!track) return
+  evt.preventDefault()
+  stopPlayback()
+  isDraggingPlayhead.value = true
+  track.setPointerCapture(evt.pointerId)
+  seekPlayheadFromClientX(evt.clientX)
+}
+
+const handlePlaybackPointerMove = (evt: PointerEvent) => {
+  if (!isDraggingPlayhead.value) return
+  seekPlayheadFromClientX(evt.clientX)
+}
+
+const handlePlaybackPointerUp = (evt: PointerEvent) => {
+  if (!isDraggingPlayhead.value) return
+  isDraggingPlayhead.value = false
+  const track = playbackTrackRef.value
+  if (track?.hasPointerCapture(evt.pointerId)) {
+    track.releasePointerCapture(evt.pointerId)
+  }
 }
 
 const zoomIn = () => {
@@ -1193,6 +1360,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopPlayback()
+  isDraggingPlayhead.value = false
 })
 
 watch(
@@ -1372,8 +1540,14 @@ watch(playheadLeftPx, (left) => {
         position: relative;
         height: 28px;
         border-radius: 4px;
-        cursor: pointer;
+        cursor: grab;
         overflow: hidden;
+        touch-action: none;
+        user-select: none;
+
+        &.is-dragging {
+          cursor: grabbing;
+        }
 
         .playback-track-bg {
           position: absolute;
@@ -1390,6 +1564,7 @@ watch(playheadLeftPx, (left) => {
           width: 1px;
           background: rgba(148, 163, 184, 0.25);
           transform: translateX(-50%);
+          pointer-events: none;
         }
 
         .playback-cursor {
@@ -1401,6 +1576,7 @@ watch(playheadLeftPx, (left) => {
           box-shadow: 0 0 8px rgba(0, 225, 255, 0.8);
           transform: translateX(-50%);
           z-index: 2;
+          pointer-events: none;
         }
       }
 
@@ -1481,12 +1657,15 @@ watch(playheadLeftPx, (left) => {
               &.dot-normal {
                 background: linear-gradient(135deg, #10b981, #059669);
               }
+
               &.dot-sat-struck {
                 background: linear-gradient(135deg, #ef4444, #dc2626);
               }
+
               &.dot-rec-struck {
                 background: linear-gradient(135deg, #f59e0b, #d97706);
               }
+
               &.dot-both-struck {
                 background: linear-gradient(135deg, #9333ea, #7e22ce);
                 box-shadow: 0 0 6px rgba(147, 51, 234, 0.8);
@@ -1579,6 +1758,21 @@ watch(playheadLeftPx, (left) => {
               justify-content: space-between;
               font-size: 11px;
               color: #94a3b8;
+              padding: 3px 6px;
+              border-radius: 4px;
+              cursor: pointer;
+              border: 1px solid transparent;
+
+              &:hover {
+                color: #e2e8f0;
+                background: rgba(56, 189, 248, 0.08);
+              }
+
+              &.is-win-selected {
+                color: #e0f2fe;
+                background: rgba(56, 189, 248, 0.16);
+                border-color: rgba(56, 189, 248, 0.45);
+              }
 
               &.is-win-struck {
                 color: #fbbf24;
@@ -1683,7 +1877,7 @@ watch(playheadLeftPx, (left) => {
               box-shadow: inset 3px 0 0 #38bdf8;
 
               .row-label-col {
-                background-color: rgba(56, 189, 248, 0.14);
+                background-color: #16324a;
               }
 
               .sat-title {
@@ -1711,6 +1905,7 @@ watch(playheadLeftPx, (left) => {
               position: sticky;
               left: 0;
               z-index: 8;
+              isolation: isolate;
 
               .sat-main-label {
                 display: flex;
@@ -1721,19 +1916,6 @@ watch(playheadLeftPx, (left) => {
                   font-size: 13px;
                   font-weight: 600;
                   color: #f1f5f9;
-                }
-              }
-
-              .sat-meta-sub {
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                margin-top: 4px;
-                font-size: 10px;
-                color: #64748b;
-
-                .lane-count-tag {
-                  color: #38bdf8;
                 }
               }
             }
@@ -1781,22 +1963,18 @@ watch(playheadLeftPx, (left) => {
                 }
 
                 &.is-bar-active {
-                  outline: 2px solid #ffffff;
-                  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-                  z-index: 5;
-                }
-
-                &.is-bar-at-playhead {
-                  outline: 2px solid rgba(0, 225, 255, 0.9);
-                  box-shadow: 0 0 12px rgba(0, 225, 255, 0.55);
+                  outline: 2px solid #00e1ff;
+                  box-shadow: 0 0 12px rgba(0, 225, 255, 0.7);
                   z-index: 6;
                 }
 
+                &.is-bar-at-playhead {
+                  z-index: 4;
+                }
+
                 &.is-bar-active.is-bar-at-playhead {
-                  outline: 2px solid #ffffff;
-                  box-shadow:
-                    0 0 10px rgba(255, 255, 255, 0.8),
-                    0 0 14px rgba(0, 225, 255, 0.45);
+                  outline: 2px solid #00e1ff;
+                  box-shadow: 0 0 14px rgba(0, 225, 255, 0.8);
                 }
 
                 /* 4色干扰状态样式定义 */
@@ -1934,8 +2112,8 @@ watch(playheadLeftPx, (left) => {
           }
 
           &.is-click-selected {
-            border-color: rgba(255, 255, 255, 0.45);
-            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+            border-color: rgba(0, 225, 255, 0.85);
+            box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.45), 0 0 12px rgba(0, 225, 255, 0.25);
           }
 
           .compact-link-header {
@@ -1950,14 +2128,17 @@ watch(playheadLeftPx, (left) => {
               background: rgba(16, 185, 129, 0.12);
               border-color: rgba(16, 185, 129, 0.35);
             }
+
             &.status-sat-struck {
               background: rgba(239, 68, 68, 0.12);
               border-color: rgba(239, 68, 68, 0.35);
             }
+
             &.status-rec-struck {
               background: rgba(245, 158, 11, 0.12);
               border-color: rgba(245, 158, 11, 0.35);
             }
+
             &.status-both-struck {
               background: rgba(147, 51, 234, 0.14);
               border-color: rgba(147, 51, 234, 0.35);

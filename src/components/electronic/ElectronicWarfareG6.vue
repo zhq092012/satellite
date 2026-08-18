@@ -987,9 +987,6 @@ const countLinkPhase = (counts: { normal: number; striking: number; severed: num
   else counts.normal++
 }
 
-const isGreenTimelineMarker = (type: TimelineChainMarkerType): boolean =>
-  type === 'first_transmit' || type === 'post_chain_finish'
-
 const isRedTimelineMarker = (type: TimelineChainMarkerType): boolean => type === 'jam'
 
 const paintEdgePhase = (
@@ -1023,26 +1020,24 @@ const applyGraphLinkPolicy = (
   const linkCounts = { normal: 0, striking: 0, severed: 0 }
 
   let visibleEdges = edges
-  let displayEdgeIds = new Set<string>()
+  let highlightEdgeIds = new Set<string>()
 
   if (timeline && norad) {
     const chain = resolveChainForTimelineMarker(data, norad, timeline.type, timeline.ms)
     if (chain.blocked && isRedTimelineMarker(timeline.type)) {
-      displayEdgeIds = collectJamStrikeEdgeIdsAtTime(data, norad, timeline.ms)
+      highlightEdgeIds = collectJamStrikeEdgeIdsAtTime(data, norad, timeline.ms)
     } else if (!chain.blocked) {
-      displayEdgeIds = chainToEdgeIds(chain)
+      highlightEdgeIds = chainToEdgeIds(chain)
     }
     const allowed = getSatelliteRelatedEdgeIds(data, norad)
-    visibleEdges = edges.filter(
-      (e) => displayEdgeIds.has(String(e.id)) && allowed.has(String(e.id))
-    )
+    visibleEdges = edges.filter((e) => allowed.has(String(e.id)))
   } else if (norad) {
     const allowed = getSatelliteRelatedEdgeIds(data, norad)
     const postChain = analyzeSatelliteFullChain(data, norad, true)
-    displayEdgeIds = postChain.blocked ? new Set<string>() : chainToEdgeIds(postChain)
+    highlightEdgeIds = postChain.blocked ? new Set<string>() : chainToEdgeIds(postChain)
     visibleEdges = edges.filter((e) => allowed.has(String(e.id)))
   } else {
-    displayEdgeIds = collectPostStrikePrimaryEdgeIds(data)
+    highlightEdgeIds = collectPostStrikePrimaryEdgeIds(data)
   }
 
   const paintedEdges = visibleEdges.map((edge) => {
@@ -1050,17 +1045,13 @@ const applyGraphLinkPolicy = (
     let phase: LinkPhase = 'severed'
 
     if (timeline && norad) {
-      if (!displayEdgeIds.has(edgeId)) {
-        phase = 'severed'
-      } else if (isRedTimelineMarker(timeline.type)) {
-        phase = 'striking'
-      } else if (isGreenTimelineMarker(timeline.type)) {
-        phase = 'normal'
+      if (highlightEdgeIds.has(edgeId)) {
+        phase = isRedTimelineMarker(timeline.type) ? 'striking' : 'normal'
       } else {
-        phase = 'normal'
+        phase = 'severed'
       }
     } else {
-      phase = displayEdgeIds.has(edgeId) ? 'normal' : 'severed'
+      phase = highlightEdgeIds.has(edgeId) ? 'normal' : 'severed'
     }
 
     const painted = paintEdgePhase(edge, phase)
@@ -1074,10 +1065,7 @@ const applyGraphLinkPolicy = (
     visibleNodeIds.add(e.target)
   })
 
-  const filteredNodes =
-    norad || (timeline && norad)
-      ? nodes.filter((n) => visibleNodeIds.has(n.id))
-      : nodes
+  const filteredNodes = norad ? nodes.filter((n) => visibleNodeIds.has(n.id)) : nodes
 
   return { nodes: filteredNodes, edges: paintedEdges, linkCounts }
 }

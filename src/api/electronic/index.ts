@@ -232,7 +232,7 @@ export interface ThreatSatelliteItem {
 }
 
 /**
- * 卫星首次通信时间列表
+ * 卫星链路时长与过境窗口列表
  */
 export interface TimeEffectsItem {
   /**
@@ -250,7 +250,20 @@ export interface TimeEffectsItem {
   /**
    * 开始传输时间
    */
-  transTime: string
+
+  beginTime: string
+  /**
+   * 结束传输时间
+   */
+  endTime: string
+  /**
+   * 链路时长
+   */
+  duration: number
+  /**
+   * 接收站名称
+   */
+  receiveName: string
 }
 // ==================== 根数据结构 ====================
 

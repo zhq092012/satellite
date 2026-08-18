@@ -58,7 +58,7 @@
             :class="{ active: sortMode === 'transTime' }"
             @click="sortMode = 'transTime'"
           >
-            按首次通信时间
+            按链路时长
           </button>
         </div>
       </div>
@@ -84,8 +84,14 @@
             <div class="card-details">
               <span class="detail-tag">NORAD: {{ sat.norad }}</span>
               <span class="detail-tag tag-type">{{ sat.satType || '天基节点' }}</span>
-              <span class="detail-tag tag-trans-time">首次通信: {{ formatTransTime(sat.transTime) }}</span>
               <span class="detail-tag tag-role" v-if="sat.isRelay">中继节点</span>
+              <div class="time-effect-grid" v-if="sat.timeEffect">
+                <span class="detail-tag tag-trans-time">开始: {{ formatTransTime(sat.timeEffect.beginTime) }}</span>
+                <span class="detail-tag tag-trans-time">结束: {{ formatTransTime(sat.timeEffect.endTime) }}</span>
+                <span class="detail-tag tag-trans-time">链路时长: {{ formatDuration(sat.timeEffect.duration) }}</span>
+                <span class="detail-tag tag-trans-time">接收站: {{ sat.timeEffect.receiveName || '--' }}</span>
+              </div>
+              <span class="detail-tag tag-trans-time muted" v-else>链路时长: --</span>
               <span class="click-hint" v-if="selectedNorad === sat.norad">✓ 已选择分析</span>
             </div>
             <div class="card-side-actions" @click.stop>
@@ -400,13 +406,20 @@ const handleSelectSatellite = (norad: number) => {
   }
 }
 
+interface SatTimeEffectInfo {
+  beginTime: string
+  endTime: string
+  duration: number
+  receiveName: string
+}
+
 interface SatListItem {
   norad: number
   name: string
   satType: string
   isRelay: boolean
   threatScore: number | null
-  transTime: string | null
+  timeEffect: SatTimeEffectInfo | null
 }
 
 type SatSortMode = 'threat' | 'transTime'
@@ -423,12 +436,18 @@ const formatThreatScore = (score: number): string => {
   return Number(score.toFixed(2)).toString()
 }
 
-const formatTransTime = (timeStr: string | null): string => {
+const formatTransTime = (timeStr: string | null | undefined): string => {
   if (!timeStr) return '--'
   const d = new Date(timeStr)
   if (Number.isNaN(d.getTime())) return timeStr
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+const formatDuration = (duration: number | null | undefined): string => {
+  if (duration == null || Number.isNaN(duration)) return '--'
+  const rounded = Number.isInteger(duration) ? duration : Number(duration.toFixed(1))
+  return `${rounded} 分钟`
 }
 
 const formatUsageIndicator = (val?: number | null): string => {
@@ -485,7 +504,7 @@ const normalizeThreatScore = (score: number | null): number => {
   return score <= 1 ? score * 100 : score
 }
 
-const parseTransTimeTs = (timeStr: string | null): number => {
+const parseTransTimeTs = (timeStr: string | null | undefined): number => {
   if (!timeStr) return Infinity
   const ts = new Date(timeStr).getTime()
   return Number.isNaN(ts) ? Infinity : ts
@@ -493,12 +512,12 @@ const parseTransTimeTs = (timeStr: string | null): number => {
 
 const isTopRankEligible = (sat: SatListItem): boolean => {
   if (sortMode.value === 'threat') return sat.threatScore != null
-  return sat.transTime != null
+  return sat.timeEffect != null
 }
 
 /**
  * [计算属性说明]
- * 提取当前矩阵中的敌方天基过境与中继卫星列表，支持按威胁度或首次通信时间排序。
+ * 提取当前矩阵中的敌方天基过境与中继卫星列表，支持按威胁度或链路时长排序。
  */
 const satList = computed<SatListItem[]>(() => {
   const matrixData = props.matrixData
@@ -509,9 +528,14 @@ const satList = computed<SatListItem[]>(() => {
     threatMap.set(item.norad, item.threatScore)
   })
 
-  const transTimeMap = new Map<number, string>()
+  const timeEffectMap = new Map<number, SatTimeEffectInfo>()
   ;(matrixData.timeEffects || []).forEach((item) => {
-    transTimeMap.set(item.norad, item.transTime)
+    timeEffectMap.set(item.norad, {
+      beginTime: item.beginTime,
+      endTime: item.endTime,
+      duration: item.duration,
+      receiveName: item.receiveName,
+    })
   })
 
   const map = new Map<number, SatListItem>()
@@ -528,7 +552,7 @@ const satList = computed<SatListItem[]>(() => {
       satType: s.satType,
       isRelay,
       threatScore: threatMap.get(s.norad) ?? null,
-      transTime: transTimeMap.get(s.norad) ?? null,
+      timeEffect: timeEffectMap.get(s.norad) ?? null,
     })
   })
   satMatrixList.forEach((s: SatelliteMatrix) => {
@@ -539,14 +563,19 @@ const satList = computed<SatListItem[]>(() => {
       satType: s.satType,
       isRelay,
       threatScore: threatMap.get(s.norad) ?? null,
-      transTime: transTimeMap.get(s.norad) ?? null,
+      timeEffect: timeEffectMap.get(s.norad) ?? null,
     })
   })
 
   const list = Array.from(map.values())
 
   if (sortMode.value === 'transTime') {
-    return list.sort((a, b) => parseTransTimeTs(a.transTime) - parseTransTimeTs(b.transTime))
+    return list.sort((a, b) => {
+      const durationA = a.timeEffect?.duration ?? Infinity
+      const durationB = b.timeEffect?.duration ?? Infinity
+      if (durationA !== durationB) return durationA - durationB
+      return parseTransTimeTs(a.timeEffect?.beginTime) - parseTransTimeTs(b.timeEffect?.beginTime)
+    })
   }
 
   return list.sort((a, b) => normalizeThreatScore(b.threatScore) - normalizeThreatScore(a.threatScore))
@@ -1001,6 +1030,10 @@ const satList = computed<SatListItem[]>(() => {
         color: #86efac;
       }
 
+      &.muted {
+        color: #64748b;
+      }
+
       &.tag-role {
         color: #fcd34d;
       }
@@ -1009,6 +1042,14 @@ const satList = computed<SatListItem[]>(() => {
     .click-hint {
       color: #38bdf8;
       font-weight: 600;
+    }
+
+    .time-effect-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 6px;
+      width: 100%;
+      margin-top: 2px;
     }
   }
 

@@ -53,8 +53,8 @@ const parseJamTimeRange = (timeRange: string): { startMs: number; endMs: number 
 
 const resolveFirstTransmitMs = (matrix: MatrixResult, norad: number): number | null => {
   const timeEffect = matrix.timeEffects?.find((item) => item.norad === norad)
-  if (timeEffect?.transTime) {
-    const ts = parseTimeToMs(timeEffect.transTime)
+  if (timeEffect?.beginTime) {
+    const ts = parseTimeToMs(timeEffect.beginTime)
     if (ts) return ts
   }
 
