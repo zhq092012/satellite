@@ -1,7 +1,6 @@
 import type { MatrixResult } from '@/api/electronic'
 import {
   analyzeSatelliteFullChain,
-  collectSatelliteJamWeapons,
   parseTimeToMs,
 } from '@/utils/satelliteFullChainAnalysis'
 
@@ -42,15 +41,6 @@ const clampMs = (ms: number, min: number, max: number): number => Math.min(max, 
 const getWindowStartStr = (win: Record<string, string | undefined>): string =>
   win.peakWindow || win.startWindow || win.beginWindow || ''
 
-const parseJamTimeRange = (timeRange: string): { startMs: number; endMs: number } | null => {
-  const parts = timeRange.split('~').map((s) => s.trim())
-  if (parts.length < 2) return null
-  const startMs = parseTimeToMs(parts[0])
-  const endMs = parseTimeToMs(parts[1])
-  if (!startMs || !endMs) return null
-  return { startMs, endMs: Math.max(startMs, endMs) }
-}
-
 const resolveFirstTransmitMs = (matrix: MatrixResult, norad: number): number | null => {
   const timeEffect = matrix.timeEffects?.find((item) => item.norad === norad)
   if (timeEffect?.beginTime) {
@@ -86,20 +76,6 @@ const collectJamSegments = (matrix: MatrixResult, norad: number, taskStartMs: nu
       endMs: clampMs(end, taskStartMs, taskEndMs),
       label: win.receiveName || win.receiveId,
       weaponName: win.weapons?.[0]?.name,
-    })
-  })
-
-  collectSatelliteJamWeapons(matrix, norad).forEach((item) => {
-    const range = parseJamTimeRange(item.timeRange)
-    if (!range) return
-    const key = `${range.startMs}-${range.endMs}-${item.weaponName}`
-    if (dedupe.has(key)) return
-    dedupe.add(key)
-    segments.push({
-      startMs: clampMs(range.startMs, taskStartMs, taskEndMs),
-      endMs: clampMs(range.endMs, taskStartMs, taskEndMs),
-      label: item.targetName,
-      weaponName: item.weaponName,
     })
   })
 

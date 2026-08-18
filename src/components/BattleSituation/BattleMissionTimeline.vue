@@ -12,13 +12,8 @@
     <div class="ruler-panel" ref="trackRef">
       <!-- 标尺刻度 -->
       <div class="ruler-scale">
-        <div
-          v-for="tick in rulerTicks"
-          :key="tick.label"
-          class="ruler-tick"
-          :class="{ major: tick.major, ['align-' + tick.align]: true }"
-          :style="{ left: tick.percent + '%' }"
-        >
+        <div v-for="tick in rulerTicks" :key="tick.label" class="ruler-tick"
+          :class="{ major: tick.major, ['align-' + tick.align]: true }" :style="{ left: tick.percent + '%' }">
           <span class="tick-line"></span>
           <span v-if="tick.major" class="tick-label">{{ tick.label }}</span>
         </div>
@@ -27,33 +22,18 @@
       <!-- 色段轨道 -->
       <div class="timeline-track">
         <div class="track-base"></div>
-        <div
-          v-if="timelineModel?.firstTransmitMs"
-          class="track-segment segment-normal"
-          :style="segmentStyle(taskStartMs, timelineModel.firstTransmitMs)"
-        ></div>
-        <div
-          v-for="(seg, idx) in timelineModel?.jamSegments || []"
-          :key="'jam-' + idx"
-          class="track-segment segment-jam"
-          :style="segmentStyle(seg.startMs, seg.endMs)"
-        ></div>
-        <div
-          v-if="timelineModel?.postChainFinishMs && !timelineModel.allBlocked"
-          class="track-segment segment-post"
-          :style="segmentStyle(lastJamEndMs, timelineModel.postChainFinishMs)"
-        ></div>
+        <div v-if="timelineModel?.firstTransmitMs" class="track-segment segment-normal"
+          :style="segmentStyle(taskStartMs, timelineModel.firstTransmitMs)"></div>
+        <div v-for="(seg, idx) in timelineModel?.jamSegments || []" :key="'jam-' + idx"
+          class="track-segment segment-jam" :style="segmentStyle(seg.startMs, seg.endMs)"></div>
+        <div v-if="timelineModel?.postChainFinishMs && !timelineModel.allBlocked" class="track-segment segment-post"
+          :style="segmentStyle(lastJamEndMs, timelineModel.postChainFinishMs)"></div>
       </div>
 
       <!-- 方形节点标尺 -->
       <div class="ruler-markers">
-        <el-tooltip
-          v-for="(item, idx) in displayMarkerItems"
-          :key="item.key"
-          placement="top"
-          :show-after="120"
-          popper-class="mission-timeline-tooltip"
-        >
+        <el-tooltip v-for="(item, idx) in displayMarkerItems" :key="item.key" placement="top" :show-after="120"
+          popper-class="mission-timeline-tooltip">
           <template #content>
             <div class="tooltip-card">
               <div class="tooltip-header" :class="'type-' + item.type">
@@ -67,17 +47,11 @@
               </ul>
             </div>
           </template>
-          <button
-            type="button"
-            class="ruler-tick-btn"
-            :class="[
-              'tick-' + item.type,
-              { 'is-jam': item.type === 'jam', 'is-major': item.isMajor },
-              'align-' + item.align,
-            ]"
-            :style="{ left: item.percent + '%', bottom: item.lane * 10 + 'px' }"
-            @click="handleMarkerClick(item)"
-          >
+          <button type="button" class="ruler-tick-btn" :class="[
+            'tick-' + item.type,
+            { 'is-jam': item.type === 'jam', 'is-major': item.isMajor, 'is-selected': isMarkerSelected(item) },
+            'align-' + item.align,
+          ]" :style="{ left: item.percent + '%', bottom: item.lane * 10 + 'px' }" @click="handleMarkerClick(item)">
             <span class="tick-square"></span>
           </button>
         </el-tooltip>
@@ -108,6 +82,8 @@ const props = defineProps<{
   taskEnd: string
   matrixData: MatrixResult | null
   selectedNorad?: number | null
+  selectedMarkerMs?: number | null
+  selectedMarkerType?: TimelineMarkerType | null
 }>()
 
 const emit = defineEmits<{
@@ -184,11 +160,8 @@ const MARKER_META: Record<
 }
 
 const rawMarkers = computed<TimelineMarker[]>(() => {
-  if (!timelineModel.value) return []
-  if (!props.selectedNorad) {
-    return timelineModel.value.markers.filter((m) => m.type === 'task_start' || m.type === 'task_end')
-  }
-  return timelineModel.value.markers
+  if (!timelineModel.value || !props.selectedNorad) return []
+  return timelineModel.value.markers.filter((m) => m.type !== 'task_start' && m.type !== 'task_end')
 })
 
 /** 合并过近的干扰节点，主节点独立展示 */
@@ -298,18 +271,36 @@ const handleMarkerClick = (item: { ms: number; type: TimelineMarkerType; title: 
   emit('marker-click', { ms: item.ms, type: item.type, label: item.title })
 }
 
-const syncTaskStart = () => {
-  if (taskStartMs.value) emit('time-change', taskStartMs.value)
+const isMarkerSelected = (item: DisplayMarkerItem) =>
+  props.selectedMarkerMs != null &&
+  item.ms === props.selectedMarkerMs &&
+  (!props.selectedMarkerType || item.type === props.selectedMarkerType)
+
+const syncSelectedSatelliteTime = () => {
+  if (!taskStartMs.value) return
+  if (!props.selectedNorad) {
+    emit('time-change', taskStartMs.value)
+    return
+  }
+  const firstMs = timelineModel.value?.firstTransmitMs
+  if (firstMs) {
+    emit('time-change', firstMs)
+    emit('marker-click', { ms: firstMs, type: 'first_transmit', label: '首次传输' })
+    return
+  }
+  emit('time-change', taskStartMs.value)
 }
 
-watch([taskStartMs, taskEndMs], () => syncTaskStart(), { immediate: true })
+watch([taskStartMs, taskEndMs], () => {
+  if (taskStartMs.value) emit('time-change', taskStartMs.value)
+}, { immediate: true })
 
 watch(
   () => props.selectedNorad,
-  () => syncTaskStart()
+  () => syncSelectedSatelliteTime()
 )
 
-defineExpose({ syncTaskStart })
+defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
 </script>
 
 <style scoped lang="scss">
@@ -467,7 +458,7 @@ defineExpose({ syncTaskStart })
 .ruler-tick-btn {
   position: absolute;
   transform: translateX(-50%);
-  padding: 0;
+  padding: 6px;
   border: none;
   background: transparent;
   cursor: pointer;
@@ -507,6 +498,12 @@ defineExpose({ syncTaskStart })
   &:hover .tick-square {
     transform: scale(1.15);
     box-shadow: 0 0 10px rgba(64, 242, 255, 0.5);
+  }
+
+  &.is-selected .tick-square {
+    transform: scale(1.2);
+    box-shadow: 0 0 0 2px #67e8f9, 0 0 12px rgba(103, 232, 249, 0.7);
+    border-color: #67e8f9;
   }
 
   &.tick-task_start .tick-square,

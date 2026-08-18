@@ -8,6 +8,24 @@
 
       <!-- 烈度与视图模式切换选项 -->
       <div class="header-center">
+        <button class="nav-tab-btn all-links-btn" :class="{ active: linkFocusNorad == null }"
+          @click="handleShowAllLinks">
+          全部链路
+        </button>
+
+        <div class="selection-status">
+          <span class="status-item">
+            <span class="label-text">当前系列</span>
+            <strong class="status-val">{{ currentSeriesText }}</strong>
+          </span>
+          <span class="status-item">
+            <span class="label-text">当前卫星</span>
+            <strong class="status-val">{{ currentSatelliteText }}</strong>
+          </span>
+        </div>
+
+        <div class="v-divider"></div>
+
         <!-- 卫星系列筛选 -->
         <div class="series-filter-group">
           <span class="label-text">卫星系列</span>
@@ -127,7 +145,9 @@
             <div class="mission-timeline-wrap">
               <BattleMissionTimeline v-if="taskTimeRange" :task-start="taskTimeRange.start"
                 :task-end="taskTimeRange.end" :matrix-data="matrixData" :selected-norad="selectedNorad"
-                @time-change="handleTimelineTimeChange" @marker-click="handleTimelineMarkerClick" />
+                :selected-marker-ms="selectedTimelinePoint?.ms ?? null"
+                :selected-marker-type="selectedTimelinePoint?.type ?? null" @time-change="handleTimelineTimeChange"
+                @marker-click="handleTimelineMarkerClick" />
             </div>
           </div>
         </div>
@@ -154,10 +174,6 @@ import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
 import BattleMissionTimeline from '@/components/BattleSituation/BattleMissionTimeline.vue'
 import {
-  analyzeSatelliteFullChain,
-  chainToEdgeIds,
-  collectJamStrikeEdgeIdsAtTime,
-  collectPostStrikePrimaryEdgeIds,
   getSatelliteRelatedEdgeIds,
   resolveChainForTimelineMarker,
   type ChainNode,
@@ -170,6 +186,8 @@ defineOptions({
 const store = useLayoutStore()
 
 const selectedNorad = ref<number | null>(null)
+const linkFocusNorad = ref<number | null>(null)
+const selectedReceiveId = ref<string | null>(null)
 const selectedTimelinePoint = ref<{
   ms: number
   type: TimelineChainMarkerType
@@ -219,10 +237,34 @@ const layerLabelItems = computed(() => {
   ]
 })
 
+const resolveSatName = (norad: number | null): string => {
+  if (norad == null) return '未选择'
+  const data = matrixData.value
+  const satObj =
+    (data?.satelliteMatrixList || []).find((s) => s.norad === norad) ||
+    (data?.initMatrixList || []).find((s) => s.norad === norad)
+  return satObj?.name || `Sat-${norad}`
+}
+
+const currentSeriesText = computed(() => store.selectedSatSeries || '未选择')
+const currentSatelliteText = computed(() => resolveSatName(selectedNorad.value ?? linkFocusNorad.value))
+
+const handleShowAllLinks = () => {
+  linkFocusNorad.value = null
+  selectedNorad.value = null
+  selectedReceiveId.value = null
+  selectedTimelinePoint.value = null
+  selectedNodeInfo.value = null
+  updateGraphHighlightState()
+  refreshGraphForTime()
+}
+
 const handleSelectSatellite = (norad: number | null) => {
   selectedNorad.value = norad
+  selectedReceiveId.value = null
   selectedTimelinePoint.value = null
   if (norad) {
+    linkFocusNorad.value = norad
     const data = matrixData.value
     const satObj =
       (data?.satelliteMatrixList || []).find((s) => s.norad === norad) ||
@@ -241,6 +283,45 @@ const handleSelectSatellite = (norad: number | null) => {
   refreshGraphForTime()
 }
 
+const isStationNodeId = (nodeId: string): boolean => {
+  const data = matrixData.value
+  if (!data) return false
+  return (
+    (data.stationRelationList?.stationObjList || []).some((st) => st.stationId === nodeId) ||
+    (data.initRelationList?.stationObjList || []).some((st) => st.stationId === nodeId)
+  )
+}
+
+const handleSelectReceiveStation = (receiveId: string, model: any) => {
+  if (!selectedNorad.value) {
+    parseAndSelectNode(model)
+    updateGraphHighlightState()
+    return
+  }
+  if (selectedReceiveId.value === receiveId) {
+    selectedReceiveId.value = null
+    const norad = selectedNorad.value
+    const data = matrixData.value
+    const satObj =
+      (data?.satelliteMatrixList || []).find((s) => s.norad === norad) ||
+      (data?.initMatrixList || []).find((s) => s.norad === norad)
+    selectedNodeInfo.value = {
+      id: `sat-${norad}`,
+      name: satObj?.name || `Sat-${norad}`,
+      type: 'sat',
+      norad,
+    }
+    updateGraphHighlightState()
+    refreshGraphForTime()
+    return
+  }
+
+  selectedReceiveId.value = receiveId
+  parseAndSelectNode(model)
+  updateGraphHighlightState()
+  refreshGraphForTime()
+}
+
 const handleTimelineTimeChange = (ms: number) => {
   setCurrentTimestamp(ms)
 }
@@ -250,6 +331,7 @@ const handleTimelineMarkerClick = (payload: {
   type: TimelineChainMarkerType
   label: string
 }) => {
+  selectedReceiveId.value = null
   selectedTimelinePoint.value = payload
   setCurrentTimestamp(payload.ms)
   refreshGraphForTime()
@@ -266,10 +348,53 @@ const chainLayerLabel = (layer: ChainNode['layer']): string => {
 }
 
 const timelineChainDisplay = computed(() => {
-  if (!selectedNorad.value || !selectedTimelinePoint.value || !matrixData.value) return null
+  if (!selectedNorad.value || !matrixData.value) return null
+  const data = matrixData.value
+  const norad = selectedNorad.value
+  const receiveId = selectedReceiveId.value
+
+  if (receiveId) {
+    const satObj =
+      (data.satelliteMatrixList || []).find((s) => s.norad === norad) ||
+      (data.initMatrixList || []).find((s) => s.norad === norad)
+    const recObj =
+      (data.stationRelationList?.receiveObjList || []).find((r) => r.receiveId === receiveId) ||
+      (data.initRelationList?.receiveObjList || []).find((r) => r.receiveId === receiveId)
+    const windows = getSatTransitWindowsMerged(data, norad).filter((w: any) => w.receiveId === receiveId)
+    const atMs = selectedTimelinePoint.value?.ms || currentTimestamp.value
+    const activeWin = windows.find((w: any) => {
+      const start = parseToTimestamp(getWindowStartStr(w))
+      const end = parseToTimestamp(getWindowEndStr(w))
+      return atMs >= start && atMs <= end
+    }) || windows[0]
+    const stationRel =
+      (data.initRelationList?.relations || []).find((rel) => rel.from === receiveId) ||
+      (data.stationRelationList?.relations || []).find((rel) => rel.from === receiveId)
+    const stationObj =
+      (data.initRelationList?.stationObjList || []).find((st) => st.stationId === stationRel?.to) ||
+      (data.stationRelationList?.stationObjList || []).find((st) => st.stationId === stationRel?.to)
+
+    const nodes: ChainNode[] = [
+      { layer: 'SAT', id: `sat-${norad}`, name: satObj?.name || `Sat-${norad}`, icon: '🛰️' },
+      { layer: 'RECEIVE', id: receiveId, name: recObj?.receiveName || receiveId, icon: '📡' },
+    ]
+    if (stationObj) {
+      nodes.push({ layer: 'STATION', id: stationObj.stationId, name: stationObj.stationName, icon: '🖥️' })
+    }
+
+    return {
+      label: activeWin?.strikeStatus === 1 ? '星地链路（干扰中）' : '星地链路',
+      timeText: formatTimeStr(atMs),
+      chain: activeWin
+        ? { blocked: false, nodes, finishTime: getWindowEndStr(activeWin), finishTimestamp: null }
+        : { blocked: true, nodes: [], blockedReason: '当前卫星与该地面站无过境窗口', finishTime: null, finishTimestamp: null },
+    }
+  }
+
+  if (!selectedTimelinePoint.value) return null
   const chain = resolveChainForTimelineMarker(
-    matrixData.value,
-    selectedNorad.value,
+    data,
+    norad,
     selectedTimelinePoint.value.type,
     selectedTimelinePoint.value.ms
   )
@@ -319,6 +444,7 @@ const handleSeriesChange = (series: string) => {
   if (!series) return
   store.setSelectedSatSeries(series)
   selectedNorad.value = null
+  linkFocusNorad.value = null
   selectedNodeInfo.value = null
   void fetchMatrixData(true)
 }
@@ -332,7 +458,10 @@ watch(
 )
 
 watch(selectedNorad, (norad) => {
-  if (!norad) selectedTimelinePoint.value = null
+  if (!norad) {
+    selectedTimelinePoint.value = null
+    selectedReceiveId.value = null
+  }
 })
 
 watch(selectedTimelinePoint, () => {
@@ -465,7 +594,7 @@ const nodeLayoutCache = new Map<string, number>()
 let graphTopologyKey = ''
 
 const getGraphTopologyKey = () =>
-  `${store.selectedSatSeries}|${currentIntensity.value}|${matrixData.value?.series ?? ''}|${selectedNorad.value ?? ''}|${g6Container.value?.clientWidth ?? 0}|${g6Container.value?.clientHeight ?? 0}`
+  `${store.selectedSatSeries}|${currentIntensity.value}|${matrixData.value?.series ?? ''}|${linkFocusNorad.value ?? ''}|${selectedReceiveId.value ?? ''}|${g6Container.value?.clientWidth ?? 0}|${g6Container.value?.clientHeight ?? 0}`
 
 const applyCachedNodePositions = (nodes: any[]) => {
   nodes.forEach((node) => {
@@ -774,6 +903,7 @@ const fetchMatrixData = async (force = false) => {
     if (data) {
       matrixData.value = data
       selectedNorad.value = null
+      linkFocusNorad.value = null
       selectedNodeInfo.value = null
     }
   } catch (err: any) {
@@ -800,6 +930,7 @@ watch(
     if (newStoreMatrix) {
       matrixData.value = newStoreMatrix
       selectedNorad.value = null
+      linkFocusNorad.value = null
       selectedNodeInfo.value = null
       nextTick(() => {
         graphTopologyKey = ''
@@ -820,6 +951,7 @@ watch(
   (series, prev) => {
     if (series && series !== prev) {
       selectedNorad.value = null
+      linkFocusNorad.value = null
       selectedNodeInfo.value = null
       void fetchMatrixData(true)
     }
@@ -987,76 +1119,122 @@ const countLinkPhase = (counts: { normal: number; striking: number; severed: num
   else counts.normal++
 }
 
-const isRedTimelineMarker = (type: TimelineChainMarkerType): boolean => type === 'jam'
+const inferEdgePhase = (edge: any): LinkPhase => {
+  if (edge.phase === 'striking' || edge.phase === 'severed' || edge.phase === 'normal') return edge.phase
+  const stroke = String(edge.style?.stroke || '')
+  if (stroke === LINK_COLORS.striking) return 'striking'
+  if (stroke === LINK_COLORS.severed) return 'severed'
+  return 'normal'
+}
 
 const paintEdgePhase = (
   edge: any,
-  phase: LinkPhase
+  phase: LinkPhase,
+  extraStyle: Record<string, unknown> = {}
 ): any => {
-  const extraStyle: Record<string, unknown> = {}
+  const arrowExtra: Record<string, unknown> = { ...extraStyle }
   if (edge.style?.endArrow) {
-    extraStyle.endArrow = {
+    arrowExtra.endArrow = {
       ...(edge.style.endArrow as object),
       fill: LINK_COLORS[phase],
     }
   }
-  const edgeVisual = buildEdgeVisual(phase, 0, extraStyle)
+  const delayMin = Number(edge.delayMin) || 0
+  const edgeVisual = buildEdgeVisual(phase, delayMin, arrowExtra)
   return {
     ...edge,
+    phase,
     label: edgeVisual.label,
     labelCfg: edgeVisual.labelCfg,
     style: { ...edge.style, ...edgeVisual.style },
   }
 }
 
-/** 统一链路着色：未选中 / 选中卫星 / 时间轴关键点 */
+const isEdgeForSatelliteReceive = (edge: any, satId: string, receiveId: string): boolean => {
+  const source = String(edge.source)
+  const target = String(edge.target)
+  if (source === satId && target === receiveId) return true
+  if (source === receiveId || target === receiveId) return true
+  return false
+}
+
+const findFirstTransmitEdgeIds = (data: MatrixResult, norad: number, atMs: number): Set<string> => {
+  const ids = new Set<string>()
+  const initSat = data.initMatrixList?.find((s) => s.norad === norad)
+  const postSat = data.satelliteMatrixList?.find((s) => s.norad === norad)
+  const windows = (initSat?.initWindows && initSat.initWindows.length > 0)
+    ? initSat.initWindows
+    : [...(initSat?.initWindows || []), ...(postSat?.stationWindows || [])]
+  let best: any = null
+  let bestDiff = Number.POSITIVE_INFINITY
+  let bestStart = Number.POSITIVE_INFINITY
+
+  windows.forEach((win: any) => {
+    const recId = win?.receiveId
+    if (!recId) return
+    const start = parseToTimestamp(getWindowStartStr(win))
+    if (!start) return
+    const diff = Math.abs(start - atMs)
+    if (diff < bestDiff || (diff === bestDiff && start < bestStart)) {
+      best = win
+      bestDiff = diff
+      bestStart = start
+    }
+  })
+
+  if (!best?.receiveId) return ids
+  const recId = String(best.receiveId)
+  const satId = `sat-${norad}`
+  ids.add(`edge-${satId}-${recId}`)
+  ids.add(`edge-sat-${norad}-${recId}`)
+  return ids
+}
+
+/** 按选中卫星过滤拓扑；开始过境只高亮首条星地链路；选中地面站只强调对应链路不隐藏其它 */
 const applyGraphLinkPolicy = (
   data: MatrixResult,
   nodes: any[],
   edges: any[]
 ): { nodes: any[]; edges: any[]; linkCounts: { normal: number; striking: number; severed: number } } => {
-  const norad = selectedNorad.value
+  const norad = linkFocusNorad.value
+  const receiveId = selectedReceiveId.value
   const timeline = selectedTimelinePoint.value
   const linkCounts = { normal: 0, striking: 0, severed: 0 }
 
   let visibleEdges = edges
-  let highlightEdgeIds = new Set<string>()
-
-  if (timeline && norad) {
-    const chain = resolveChainForTimelineMarker(data, norad, timeline.type, timeline.ms)
-    if (chain.blocked && isRedTimelineMarker(timeline.type)) {
-      highlightEdgeIds = collectJamStrikeEdgeIdsAtTime(data, norad, timeline.ms)
-    } else if (!chain.blocked) {
-      highlightEdgeIds = chainToEdgeIds(chain)
-    }
+  if (norad) {
     const allowed = getSatelliteRelatedEdgeIds(data, norad)
     visibleEdges = edges.filter((e) => allowed.has(String(e.id)))
-  } else if (norad) {
-    const allowed = getSatelliteRelatedEdgeIds(data, norad)
-    const postChain = analyzeSatelliteFullChain(data, norad, true)
-    highlightEdgeIds = postChain.blocked ? new Set<string>() : chainToEdgeIds(postChain)
-    visibleEdges = edges.filter((e) => allowed.has(String(e.id)))
-  } else {
-    highlightEdgeIds = collectPostStrikePrimaryEdgeIds(data)
   }
+
+  const satId = norad != null ? `sat-${norad}` : ''
+  const firstTransmitIds =
+    selectedNorad.value && timeline?.type === 'first_transmit'
+      ? findFirstTransmitEdgeIds(data, selectedNorad.value, timeline.ms)
+      : new Set<string>()
 
   const paintedEdges = visibleEdges.map((edge) => {
     const edgeId = String(edge.id)
-    let phase: LinkPhase = 'severed'
+    const basePhase = inferEdgePhase(edge)
 
-    if (timeline && norad) {
-      if (highlightEdgeIds.has(edgeId)) {
-        phase = isRedTimelineMarker(timeline.type) ? 'striking' : 'normal'
-      } else {
-        phase = 'severed'
-      }
-    } else {
-      phase = highlightEdgeIds.has(edgeId) ? 'normal' : 'severed'
+    if (firstTransmitIds.size > 0) {
+      const painted = paintEdgePhase(
+        edge,
+        firstTransmitIds.has(edgeId) ? 'normal' : 'severed',
+        firstTransmitIds.has(edgeId) ? { lineWidth: 3 } : {}
+      )
+      countLinkPhase(linkCounts, inferEdgePhase(painted))
+      return painted
     }
 
-    const painted = paintEdgePhase(edge, phase)
-    countLinkPhase(linkCounts, phase)
-    return painted
+    if (norad && receiveId && isEdgeForSatelliteReceive(edge, satId, receiveId)) {
+      const painted = paintEdgePhase(edge, basePhase, { lineWidth: basePhase === 'striking' ? 3.2 : 2.8 })
+      countLinkPhase(linkCounts, basePhase)
+      return painted
+    }
+
+    countLinkPhase(linkCounts, basePhase)
+    return edge
   })
 
   const visibleNodeIds = new Set<string>()
@@ -1064,6 +1242,7 @@ const applyGraphLinkPolicy = (
     visibleNodeIds.add(e.source)
     visibleNodeIds.add(e.target)
   })
+  if (norad) visibleNodeIds.add(`sat-${norad}`)
 
   const filteredNodes = norad ? nodes.filter((n) => visibleNodeIds.has(n.id)) : nodes
 
@@ -1718,6 +1897,7 @@ const buildG6GraphData = () => {
         sourceAnchor: 1,
         targetAnchor: 0,
         type: 'struck-cubic',
+        phase,
         label: edgeVisual.label,
         labelCfg: edgeVisual.labelCfg,
         style: edgeVisual.style,
@@ -1753,6 +1933,7 @@ const buildG6GraphData = () => {
         sourceAnchor: 1,
         targetAnchor: 0,
         type: 'struck-cubic',
+        phase,
         label: edgeVisual.label,
         labelCfg: edgeVisual.labelCfg,
         style: edgeVisual.style,
@@ -1780,6 +1961,7 @@ const buildG6GraphData = () => {
         sourceAnchor: 1,
         targetAnchor: 0,
         type: 'struck-cubic',
+        phase,
         label: edgeVisual.label,
         labelCfg: edgeVisual.labelCfg,
         style: edgeVisual.style,
@@ -1903,12 +2085,12 @@ const initOrUpdateGraph = () => {
         return
       }
 
-      selectedNorad.value = null
-      if (selectedNodeInfo.value?.id === nodeId) {
-        selectedNodeInfo.value = null
-      } else {
-        parseAndSelectNode(model)
+      if (model.kind === 'receive' || (!nodeId.startsWith('sat-') && !isStationNodeId(nodeId))) {
+        handleSelectReceiveStation(nodeId, model)
+        return
       }
+
+      parseAndSelectNode(model)
       updateGraphHighlightState()
     })
 
@@ -1982,6 +2164,42 @@ const parseAndSelectNode = (model: any) => {
  */
 const updateGraphHighlightState = () => {
   if (!graph || graph.get('destroyed')) return
+
+  const receiveId = selectedReceiveId.value
+  const satId = selectedNorad.value != null ? `sat-${selectedNorad.value}` : null
+
+  if (selectedTimelinePoint.value?.type === 'first_transmit' && satId) {
+    graph.getNodes().forEach((node: any) => {
+      const id = String(node.get('id'))
+      graph.setItemState(node, 'selected', id === satId)
+      graph.setItemState(node, 'inactive', false)
+      graph.setItemState(node, 'highlight', false)
+      graph.setItemState(node, 'active', false)
+    })
+    graph.getEdges().forEach((edge: any) => {
+      graph.setItemState(edge, 'inactive', false)
+      graph.setItemState(edge, 'active', false)
+    })
+    return
+  }
+
+  if (receiveId && satId) {
+    graph.getNodes().forEach((node: any) => {
+      const id = String(node.get('id'))
+      const focus = id === receiveId || id === satId
+      graph.setItemState(node, 'selected', focus)
+      graph.setItemState(node, 'inactive', false)
+      graph.setItemState(node, 'highlight', focus)
+      graph.setItemState(node, 'active', false)
+    })
+    graph.getEdges().forEach((edge: any) => {
+      const onPath = isEdgeForSatelliteReceive(edge.getModel(), satId, receiveId)
+      graph.setItemState(edge, 'highlight', onPath)
+      graph.setItemState(edge, 'inactive', false)
+      graph.setItemState(edge, 'active', false)
+    })
+    return
+  }
 
   if (!selectedNodeInfo.value) {
     highlightActiveElements()
@@ -2109,6 +2327,42 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 15px;
+}
+
+.all-links-btn {
+  border: 1px solid rgba(0, 225, 255, 0.28);
+  background: rgba(8, 14, 26, 0.7);
+}
+
+.selection-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 225, 255, 0.18);
+  background: rgba(8, 14, 26, 0.7);
+
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .label-text {
+    font-size: 12px;
+    color: #94a3b8;
+  }
+
+  .status-val {
+    font-size: 13px;
+    font-weight: 700;
+    color: #67e8f9;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 .series-filter-group {

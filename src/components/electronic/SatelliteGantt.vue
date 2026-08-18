@@ -232,10 +232,12 @@
             </el-button>
             <el-button size="small" type="primary" @click="jumpToTaskEnd">终点</el-button>
             <span class="playback-divider"></span>
-            <span class="playback-label">速度</span>
-            <el-select v-model="gridsPerSecond" size="small" class="speed-select" @change="onSpeedChange">
-              <el-option v-for="opt in GRIDS_PER_SECOND_OPTIONS" :key="opt" :label="`${opt} 格/秒`" :value="opt" />
-            </el-select>
+            <div class="speed-control">
+              <span class="playback-label">速度</span>
+              <el-select v-model="gridsPerSecond" size="small" class="speed-select" @change="onSpeedChange">
+                <el-option v-for="opt in GRIDS_PER_SECOND_OPTIONS" :key="opt" :label="`${opt} 格/秒`" :value="opt" />
+              </el-select>
+            </div>
             <span class="playback-time">{{ currentPlayTimeText }}</span>
           </div>
           <div class="playback-track" :class="{ 'is-dragging': isDraggingPlayhead }" ref="playbackTrackRef"
@@ -1522,10 +1524,25 @@ watch(playheadLeftPx, (left) => {
 
         .playback-label {
           color: #94a3b8;
+          flex-shrink: 0;
+        }
+
+        .speed-control {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          flex: 0 0 auto;
+          white-space: nowrap;
         }
 
         .speed-select {
-          width: 100px;
+          width: 92px;
+          flex: none;
+
+          :deep(.el-select__wrapper) {
+            min-width: 92px;
+            width: 92px;
+          }
         }
 
         .playback-time {
