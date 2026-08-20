@@ -17,13 +17,9 @@
       </div>
 
       <el-scrollbar class="link-scroll">
-        <div
-          v-for="item in linkItems"
-          :key="item.id"
-          class="link-card"
-          :class="{ active: selectedLinkId === item.id, struck: item.struck, ok: !item.struck }"
-          @click="handleSelect(item)"
-        >
+        <div v-for="item in linkItems" :key="item.id" :ref="(el) => setLinkCardRef(item.id, el as HTMLElement | null)"
+          class="link-card" :class="{ active: selectedLinkId === item.id, struck: item.struck, ok: !item.struck }"
+          @click="handleSelect(item)">
           <div class="link-card-top">
             <div class="link-path">
               <template v-for="(node, idx) in item.nodes" :key="`${item.id}-${idx}`">
@@ -34,9 +30,11 @@
                 <span v-if="idx < item.nodes.length - 1" class="path-arrow">→</span>
               </template>
             </div>
-            <span class="status-badge" :class="item.struck ? 'struck' : 'ok'">
-              {{ item.struck ? '被打击' : '正常' }}
-            </span>
+            <div class="link-card-badges">
+              <span class="status-badge" :class="item.struck ? 'struck' : 'ok'">
+                {{ item.struck ? '被打击' : '正常' }}
+              </span>
+            </div>
           </div>
           <div class="link-meta">
             <span class="meta-line meta-line--time">
@@ -64,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch, nextTick } from 'vue'
 import type { MatrixResult } from '@/api/electronic'
 import {
   collectSatelliteTransmissionLinks,
@@ -164,6 +162,30 @@ const handleSelect = (item: LinkListItem) => {
   const nextId = props.selectedLinkId === item.id ? null : item.id
   emit('select-link', nextId)
 }
+
+/** 链路卡片 DOM 引用，用于选中后滚动定位 */
+const linkCardRefs = new Map<string, HTMLElement>()
+
+/**
+ * 记录链路卡片 DOM 引用
+ * @param linkId 链路 ID
+ * @param el 卡片元素
+ */
+const setLinkCardRef = (linkId: string, el: HTMLElement | null) => {
+  if (el) linkCardRefs.set(linkId, el)
+  else linkCardRefs.delete(linkId)
+}
+
+/** 选中链路时自动滚动到可视区域 */
+watch(
+  () => props.selectedLinkId,
+  (linkId) => {
+    if (!linkId) return
+    nextTick(() => {
+      linkCardRefs.get(linkId)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    })
+  }
+)
 </script>
 
 <style lang="scss" scoped>
@@ -226,9 +248,28 @@ const handleSelect = (item: LinkListItem) => {
 .link-scroll {
   flex: 1;
   min-height: 0;
+
+  :deep(.el-scrollbar__bar.is-vertical) {
+    right: 0;
+    width: 6px;
+  }
+
+  :deep(.el-scrollbar__thumb) {
+    background: rgba(0, 225, 255, 0.28);
+    border-radius: 4px;
+  }
+
+  :deep(.el-scrollbar__view) {
+    padding: 0 10px 4px 0;
+    box-sizing: border-box;
+  }
 }
 
 .link-card {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   padding: 10px 10px 10px 12px;
   margin-bottom: 6px;
   border-radius: 6px;
@@ -236,11 +277,13 @@ const handleSelect = (item: LinkListItem) => {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-left: 3px solid transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   text-align: left;
+  overflow: hidden;
 
   &:hover {
     border-color: rgba(0, 225, 255, 0.35);
+    background: rgba(22, 42, 70, 0.9);
   }
 
   &.ok {
@@ -255,14 +298,22 @@ const handleSelect = (item: LinkListItem) => {
   &.active {
     border-color: #00e1ff;
     border-left-color: #00e1ff;
-    background: rgba(0, 225, 255, 0.1);
-    box-shadow: 0 0 12px rgba(0, 225, 255, 0.12);
+    background: linear-gradient(135deg, rgba(0, 225, 255, 0.22) 0%, rgba(12, 28, 48, 0.95) 55%);
+    box-shadow:
+      inset 0 0 0 1px rgba(0, 225, 255, 0.45),
+      inset 0 0 20px rgba(0, 225, 255, 0.1);
 
     &.struck {
-      border-color: rgba(148, 163, 184, 0.55);
-      border-left-color: #94a3b8;
-      background: rgba(148, 163, 184, 0.08);
-      box-shadow: none;
+      border-color: #38bdf8;
+      border-left-color: #f87171;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(36, 20, 28, 0.92) 55%);
+      box-shadow:
+        inset 0 0 0 1px rgba(56, 189, 248, 0.55),
+        inset 0 0 18px rgba(56, 189, 248, 0.1);
+    }
+
+    .path-arrow {
+      color: #7dd3fc;
     }
   }
 
@@ -271,6 +322,14 @@ const handleSelect = (item: LinkListItem) => {
     justify-content: space-between;
     align-items: flex-start;
     gap: 8px;
+  }
+
+  .link-card-badges {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex-shrink: 0;
   }
 
   .link-path {
@@ -386,6 +445,17 @@ const handleSelect = (item: LinkListItem) => {
     background: rgba(148, 163, 184, 0.15);
     border: 1px solid rgba(148, 163, 184, 0.35);
   }
+}
+
+.selected-indicator {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: #0f172a;
+  background: linear-gradient(135deg, #22d3ee, #38bdf8);
+  border: 1px solid #67e8f9;
+  box-shadow: inset 0 0 6px rgba(255, 255, 255, 0.25);
 }
 
 .empty-tip {

@@ -332,6 +332,7 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
 
       .battle-grid__side {
         height: 100%;
+        min-height: 0;
         overflow: hidden;
       }
 
