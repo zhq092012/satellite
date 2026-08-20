@@ -146,7 +146,8 @@
               <BattleMissionTimeline v-if="taskTimeRange" :task-start="taskTimeRange.start"
                 :task-end="taskTimeRange.end" :matrix-data="matrixData" :selected-norad="selectedNorad"
                 :selected-marker-ms="selectedTimelinePoint?.ms ?? null"
-                :selected-marker-type="selectedTimelinePoint?.type ?? null" @time-change="handleTimelineTimeChange"
+                :selected-marker-type="selectedTimelinePoint?.type ?? null"
+                :selected-marker-label="selectedTimelinePoint?.label ?? null" @time-change="handleTimelineTimeChange"
                 @marker-click="handleTimelineMarkerClick" />
             </div>
           </div>

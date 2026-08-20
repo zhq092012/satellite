@@ -84,6 +84,7 @@ const props = defineProps<{
   selectedNorad?: number | null
   selectedMarkerMs?: number | null
   selectedMarkerType?: TimelineMarkerType | null
+  selectedMarkerLabel?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -161,23 +162,12 @@ const MARKER_META: Record<
 
 const rawMarkers = computed<TimelineMarker[]>(() => {
   if (!timelineModel.value || !props.selectedNorad) return []
-  return timelineModel.value.markers.filter((m) => m.type !== 'task_start' && m.type !== 'task_end')
+  return timelineModel.value.markers.filter((m) => m.type === 'jam' || m.type === 'first_transmit')
 })
 
-/** 合并过近的干扰节点，主节点独立展示 */
+/** 每个过境站单独展示，不合并相近时间点 */
 const displayMarkerItems = computed<DisplayMarkerItem[]>(() => {
-  const span = taskEndMs.value - taskStartMs.value
-  const clusterThreshold = span * 0.012
   const sorted = [...rawMarkers.value].sort((a, b) => a.ms - b.ms)
-
-  const majors: TimelineMarker[] = []
-  const jams: TimelineMarker[] = []
-  sorted.forEach((m) => {
-    if (m.type === 'jam') jams.push(m)
-    else majors.push(m)
-  })
-
-  const items: DisplayMarkerItem[] = []
   const usedLanes = new Map<number, number>()
 
   const allocLane = (percent: number): number => {
@@ -187,62 +177,23 @@ const displayMarkerItems = computed<DisplayMarkerItem[]>(() => {
     return lane % 3
   }
 
-  majors.forEach((marker, idx) => {
+  return sorted.map((marker, idx) => {
     const meta = MARKER_META[marker.type]
     const percent = msToPercent(marker.ms)
-    items.push({
-      key: `${marker.type}-${idx}`,
+    return {
+      key: `${marker.type}-${marker.receiveId || marker.label}-${idx}`,
       type: marker.type,
       ms: marker.ms,
       percent,
       align: getMarkerAlign(percent),
       lane: allocLane(percent),
-      isMajor: meta.isMajor,
+      isMajor: marker.type === 'first_transmit',
       icon: meta.icon,
-      title: meta.title,
+      title: marker.label || meta.title,
       timeText: formatTimelineTime(marker.ms),
       desc: marker.detail || undefined,
-    })
-  })
-
-  let jamGroup: TimelineMarker[] = []
-  const flushJamGroup = () => {
-    if (!jamGroup.length) return
-    const first = jamGroup[0]
-    const percent = msToPercent(first.ms)
-    const meta = MARKER_META.jam
-    items.push({
-      key: `jam-group-${first.ms}-${jamGroup.length}`,
-      type: 'jam',
-      ms: first.ms,
-      percent,
-      align: getMarkerAlign(percent),
-      lane: allocLane(percent),
-      isMajor: false,
-      icon: meta.icon,
-      title: jamGroup.length > 1 ? `干扰 × ${jamGroup.length}` : meta.title,
-      timeText: formatTimelineTime(first.ms),
-      subItems: jamGroup.map((j) => j.detail || j.label),
-    })
-    jamGroup = []
-  }
-
-  jams.forEach((marker) => {
-    if (!jamGroup.length) {
-      jamGroup.push(marker)
-      return
-    }
-    const last = jamGroup[jamGroup.length - 1]
-    if (Math.abs(marker.ms - last.ms) <= clusterThreshold) {
-      jamGroup.push(marker)
-    } else {
-      flushJamGroup()
-      jamGroup.push(marker)
     }
   })
-  flushJamGroup()
-
-  return items.sort((a, b) => a.ms - b.ms)
 })
 
 const rulerTicks = computed(() => {
@@ -274,7 +225,8 @@ const handleMarkerClick = (item: { ms: number; type: TimelineMarkerType; title: 
 const isMarkerSelected = (item: DisplayMarkerItem) =>
   props.selectedMarkerMs != null &&
   item.ms === props.selectedMarkerMs &&
-  (!props.selectedMarkerType || item.type === props.selectedMarkerType)
+  (!props.selectedMarkerType || item.type === props.selectedMarkerType) &&
+  (!props.selectedMarkerLabel || item.title === props.selectedMarkerLabel)
 
 const syncSelectedSatelliteTime = () => {
   if (!taskStartMs.value) return
@@ -282,10 +234,10 @@ const syncSelectedSatelliteTime = () => {
     emit('time-change', taskStartMs.value)
     return
   }
-  const firstMs = timelineModel.value?.firstTransmitMs
-  if (firstMs) {
-    emit('time-change', firstMs)
-    emit('marker-click', { ms: firstMs, type: 'first_transmit', label: '首次传输' })
+  const firstPass = timelineModel.value?.markers.find((m) => m.type === 'jam' || m.type === 'first_transmit')
+  if (firstPass) {
+    emit('time-change', firstPass.ms)
+    emit('marker-click', { ms: firstPass.ms, type: firstPass.type, label: firstPass.label })
     return
   }
   emit('time-change', taskStartMs.value)

@@ -1055,6 +1055,13 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
       color: #64748b;
     }
 
+    .jam-target {
+      flex: 1;
+      min-width: 0;
+      line-height: 1.45;
+      word-break: break-all;
+    }
+
     .jam-target-type {
       color: #94a3b8;
       font-size: 10px;

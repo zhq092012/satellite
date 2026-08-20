@@ -4,7 +4,6 @@ import type {
   Weapon,
   WeaponAttackRecord,
 } from '@/api/electronic'
-import { formatFullDateTime } from '@/utils/tools/dateFormat'
 
 export interface ChainNode {
   layer: 'SAT' | 'RELAY' | 'RECEIVE' | 'STATION'
@@ -452,14 +451,6 @@ export const analyzeSatelliteFullChain = (
   }
 }
 
-const matchTargetInSet = (target: string, related: Set<string>): boolean => {
-  if (!target) return false
-  for (const name of related) {
-    if (target === name || target.includes(name) || name.includes(target)) return true
-  }
-  return false
-}
-
 const mapTargetType = (targetType: string): JamWeaponRecord['targetType'] => {
   if (targetType.includes('中继')) return '中继卫星'
   if (targetType.includes('接收') || targetType.includes('地面')) return '接收站'
@@ -467,56 +458,11 @@ const mapTargetType = (targetType: string): JamWeaponRecord['targetType'] => {
   return '卫星'
 }
 
-const pushWeaponRecord = (
-  list: JamWeaponRecord[],
-  dedupe: Set<string>,
-  record: JamWeaponRecord
-) => {
-  const key = `${record.weaponName}|${record.targetName}|${record.timeRange}`
-  if (dedupe.has(key)) return
-  dedupe.add(key)
-  list.push(record)
-}
-
-const collectRelatedNodeNames = (matrix: MatrixResult, norad: number): Set<string> => {
-  const names = new Set<string>()
-  const satNameMap = buildSatNameMap(matrix)
-
-  const initSat = matrix.initMatrixList?.find((s) => s.norad === norad)
-  const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
-  const satName = postSat?.name || initSat?.name
-  if (satName) names.add(satName)
-  names.add(String(norad))
-
-  const relayRel = matrix.relayRelation?.relations?.find((r) => Number(r.from) === norad)
-  if (relayRel) {
-    const relayNorad = Number(relayRel.to)
-    const relayName = satNameMap.get(relayNorad)
-    if (relayName) names.add(relayName)
-    names.add(String(relayNorad))
-  }
-
-  const allWindows = [
-    ...(initSat?.initWindows || []),
-    ...(postSat?.stationWindows || []),
-  ]
-  allWindows.forEach((win) => {
-    if (win.receiveName) names.add(win.receiveName)
-    if (win.receiveId) names.add(win.receiveId)
-  })
-
-  const relationLists = [matrix.initRelationList, matrix.stationRelationList].filter(Boolean)
-  relationLists.forEach((relData) => {
-  const receiveIds = new Set(allWindows.map((w) => w.receiveId).filter(Boolean))
-    ;(relData?.relations || []).forEach((rel) => {
-      if (!receiveIds.has(rel.from)) return
-      const station = relData?.stationObjList?.find((s) => s.stationId === rel.to)
-      if (station?.stationName) names.add(station.stationName)
-      names.add(rel.to)
-    })
-  })
-
-  return names
+interface AggregatedWeapon {
+  weaponName: string
+  weaponType?: string
+  source: JamWeaponRecord['source']
+  targets: Map<string, JamWeaponRecord['targetType']>
 }
 
 export const collectSatelliteJamWeapons = (
@@ -525,77 +471,77 @@ export const collectSatelliteJamWeapons = (
 ): JamWeaponRecord[] => {
   if (!matrix || !norad) return []
 
-  const records: JamWeaponRecord[] = []
-  const dedupe = new Set<string>()
-  const relatedNames = collectRelatedNodeNames(matrix, norad)
-
   const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
   const initSat = matrix.initMatrixList?.find((s) => s.norad === norad)
   const satName = postSat?.name || initSat?.name || ''
+  const struckWindows = (postSat?.stationWindows || []).filter((win) => win.strikeStatus === 1)
+  const struckReceiveIds = new Set(struckWindows.map((win) => win.receiveId).filter(Boolean))
+  const struckReceiveNames = new Set(struckWindows.map((win) => win.receiveName).filter(Boolean))
 
-  ;(matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord) => {
-    if (!matchTargetInSet(plan.target || '', relatedNames)) return
+  const aggs = new Map<string, AggregatedWeapon>()
 
-    const windows = plan.windows?.length
-      ? plan.windows
-      : [{ beginWindow: plan.beginTime, endWindow: plan.endTime }]
+  const addWeapon = (
+    name: string,
+    type: string | undefined,
+    targetName: string,
+    targetType: JamWeaponRecord['targetType'],
+    source: JamWeaponRecord['source']
+  ) => {
+    if (!name || !targetName) return
+    const key = `${name}|${type || ''}`
+    let agg = aggs.get(key)
+    if (!agg) {
+      agg = { weaponName: name, weaponType: type, source, targets: new Map() }
+      aggs.set(key, agg)
+    }
+    if (!agg.weaponType && type) agg.weaponType = type
+    agg.targets.set(targetName, targetType)
+  }
 
-    windows.forEach((win) => {
-      const begin = win.beginWindow || plan.beginTime || ''
-      const end = win.endWindow || plan.endTime || ''
-      pushWeaponRecord(records, dedupe, {
-        weaponName: plan.weaponName,
-        weaponType: plan.weaponType,
-        targetName: plan.target,
-        targetType: mapTargetType(plan.targetType || ''),
-        timeRange: `${formatFullDateTime(begin)} ~ ${formatFullDateTime(end)}`,
-        source: 'attackPlan',
-      })
+  struckWindows.forEach((win) => {
+    const targetName = win.receiveName || win.receiveId
+    ;(win.weapons || []).forEach((w: Weapon) => {
+      addWeapon(w.name, w.type, targetName, '接收站', 'window')
     })
   })
 
   if (postSat?.satelliteStatus === 1) {
     ;(postSat.weapons || []).forEach((w: Weapon) => {
-      pushWeaponRecord(records, dedupe, {
-        weaponName: w.name,
-        weaponType: w.type,
-        targetName: satName,
-        targetType: '卫星',
-        timeRange: '卫星被干扰期间',
-        source: 'satellite',
-      })
+      addWeapon(w.name, w.type, satName, '卫星', 'satellite')
     })
   }
 
-  ;(postSat?.stationWindows || []).forEach((win) => {
-    if (win.strikeStatus !== 1) return
-    const begin = getWindowStartStr(win as Record<string, string>)
-    const end = getWindowEndStr(win as Record<string, string>)
-    const timeRange = `${formatFullDateTime(begin)} ~ ${formatFullDateTime(end)}`
-
-    ;(win.weapons || []).forEach((w: Weapon) => {
-      pushWeaponRecord(records, dedupe, {
-        weaponName: w.name,
-        weaponType: w.type,
-        targetName: win.receiveName || win.receiveId,
-        targetType: '接收站',
-        timeRange,
-        source: 'window',
-      })
-    })
-
-    if (!win.weapons?.length) {
-      pushWeaponRecord(records, dedupe, {
-        weaponName: '电磁干扰',
-        targetName: win.receiveName || win.receiveId,
-        targetType: '接收站',
-        timeRange,
-        source: 'window',
-      })
-    }
+  ;(matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string }) => {
+    const matchedById = !!plan.targetId && struckReceiveIds.has(plan.targetId)
+    const matchedByName = !!plan.target && struckReceiveNames.has(plan.target)
+    if (!matchedById && !matchedByName) return
+    addWeapon(
+      plan.weaponName,
+      plan.weaponType,
+      plan.target,
+      mapTargetType(plan.targetType || ''),
+      'attackPlan'
+    )
   })
 
-  return records
+  if (!aggs.size && struckWindows.length) {
+    struckWindows.forEach((win) => {
+      addWeapon('电磁干扰', undefined, win.receiveName || win.receiveId, '接收站', 'window')
+    })
+  }
+
+  return Array.from(aggs.values()).map((agg) => {
+    const targetNames = Array.from(agg.targets.keys())
+    const types = Array.from(new Set(agg.targets.values()))
+    return {
+      weaponName: agg.weaponName,
+      weaponType: agg.weaponType,
+      targetName: targetNames.join('、'),
+      targetType: types.length === 1 ? types[0] : '接收站',
+      timeRange: `打击 ${targetNames.length} 个目标`,
+      source: agg.source,
+    }
+  })
 }
 
 export const getSatelliteDisplayInfo = (
