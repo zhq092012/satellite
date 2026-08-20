@@ -256,7 +256,10 @@ const activeTab = ref<RightPanelTab>('infrastructure')
 watch(
   () => props.selectedSatelliteNorad,
   (norad) => {
-    if (!norad) return
+    if (!norad) {
+      activeTab.value = 'infrastructure'
+      return
+    }
     activeTab.value = 'satellite-link'
     nextTick(() => {
       panelScrollRef.value?.scrollTo({ top: 0 })

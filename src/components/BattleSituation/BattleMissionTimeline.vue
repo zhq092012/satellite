@@ -1,7 +1,10 @@
 <template>
   <div class="battle-mission-timeline" v-if="taskStartMs && taskEndMs > taskStartMs">
     <div class="timeline-header">
-      <span class="header-title">任务时间标尺</span>
+      <span class="header-title">{{ selectedNorad ? '任务时间标尺' : 'TLE 轨道仿真时间尺' }}</span>
+      <span v-if="!selectedNorad && currentTimeMs" class="current-time-tag">
+        {{ formatTimelineTime(currentTimeMs) }}
+      </span>
       <div class="legend-row" v-if="selectedNorad">
         <span class="legend-chip chip-normal">正常通信</span>
         <span class="legend-chip chip-jam">干扰窗口</span>
@@ -19,8 +22,8 @@
         </div>
       </div>
 
-      <!-- 色段轨道 -->
-      <div class="timeline-track">
+      <!-- 色段轨道（仅选中卫星时展示任务分析色段） -->
+      <div v-if="selectedNorad" class="timeline-track">
         <div class="track-base"></div>
         <div v-if="timelineModel?.firstTransmitMs" class="track-segment segment-normal"
           :style="segmentStyle(taskStartMs, timelineModel.firstTransmitMs)"></div>
@@ -28,6 +31,19 @@
           class="track-segment segment-jam" :style="segmentStyle(seg.startMs, seg.endMs)"></div>
         <div v-if="timelineModel?.postChainFinishMs && !timelineModel.allBlocked" class="track-segment segment-post"
           :style="segmentStyle(lastJamEndMs, timelineModel.postChainFinishMs)"></div>
+      </div>
+      <div v-else class="timeline-track timeline-track--orbit">
+        <div class="track-base"></div>
+      </div>
+
+      <!-- 轨道仿真游标（未选中卫星时跟随时钟推进） -->
+      <div
+        v-if="!selectedNorad && playheadPercent != null"
+        class="orbit-playhead"
+        :style="{ left: playheadPercent + '%' }"
+      >
+        <span class="orbit-playhead-line"></span>
+        <span class="orbit-playhead-dot"></span>
       </div>
 
       <!-- 方形节点标尺 -->
@@ -87,6 +103,8 @@ const props = defineProps<{
   matrixData: MatrixResult | null
   /** 当前选中的卫星 NORAD 编号。 */
   selectedNorad?: number | null
+  /** 当前时钟时刻（毫秒），用于轨道仿真游标。 */
+  currentTimeMs?: number | null
   /** 当前选中的时间点。 */
   selectedMarkerMs?: number | null
   /** 当前选中的时间点类型。 */
@@ -121,6 +139,12 @@ const parseTaskTime = (value: string): number => {
 const taskStartMs = computed(() => parseTaskTime(props.taskStart))
 /** 任务结束时间的毫秒时间戳。 */
 const taskEndMs = computed(() => parseTaskTime(props.taskEnd))
+
+/** 轨道仿真模式下时间轴游标位置（百分比） */
+const playheadPercent = computed<number | null>(() => {
+  if (props.selectedNorad || !props.currentTimeMs || !taskStartMs.value || !taskEndMs.value) return null
+  return msToPercent(props.currentTimeMs)
+})
 
 /** 当前选中卫星的时间轴模型。 */
 const timelineModel = computed<SatelliteTimelineModel | null>(() =>
@@ -302,10 +326,7 @@ const isMarkerSelected = (item: DisplayMarkerItem): boolean =>
 /** 根据当前选中卫星同步时间轴默认时间。 */
 const syncSelectedSatelliteTime = () => {
   if (!taskStartMs.value) return
-  if (!props.selectedNorad) {
-    emit('time-change', taskStartMs.value)
-    return
-  }
+  if (!props.selectedNorad) return
   const firstPass = timelineModel.value?.markers.find((m) => m.type === 'jam' || m.type === 'first_transmit')
   if (firstPass) {
     emit('time-change', firstPass.ms)
@@ -321,12 +342,17 @@ const syncSelectedSatelliteTime = () => {
 }
 
 watch([taskStartMs, taskEndMs], () => {
-  if (taskStartMs.value) emit('time-change', taskStartMs.value)
+  if (!taskStartMs.value) return
+  if (props.selectedNorad) {
+    syncSelectedSatelliteTime()
+  }
 }, { immediate: true })
 
 watch(
   () => props.selectedNorad,
-  () => syncSelectedSatelliteTime()
+  (norad) => {
+    if (norad) syncSelectedSatelliteTime()
+  }
 )
 
 defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
@@ -359,6 +385,17 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
     font-weight: 600;
     color: #40f2ff;
     letter-spacing: 0.3px;
+  }
+
+  .current-time-tag {
+    margin-left: auto;
+    font-size: 11px;
+    font-family: monospace;
+    color: #67e8f9;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(0, 225, 255, 0.1);
+    border: 1px solid rgba(0, 225, 255, 0.25);
   }
 
   .legend-row {
@@ -448,6 +485,44 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
   height: 10px;
   border-radius: 2px;
   overflow: hidden;
+
+  &--orbit .track-base {
+    background: linear-gradient(90deg, rgba(30, 58, 95, 0.9), rgba(14, 116, 144, 0.35));
+    border-color: rgba(56, 189, 248, 0.35);
+  }
+}
+
+.orbit-playhead {
+  position: absolute;
+  top: 30px;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+
+  .orbit-playhead-line {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: linear-gradient(180deg, rgba(34, 211, 238, 0.2), #22d3ee);
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.65);
+  }
+
+  .orbit-playhead-dot {
+    position: absolute;
+    left: 50%;
+    top: -2px;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    border-radius: 50%;
+    background: #22d3ee;
+    border: 2px solid #e0f2fe;
+    box-shadow: 0 0 10px rgba(34, 211, 238, 0.8);
+  }
 }
 
 .track-base {

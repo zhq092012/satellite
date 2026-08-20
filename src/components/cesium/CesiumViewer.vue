@@ -42,6 +42,11 @@ const props = defineProps<{
   selectedNorad?: number | null
 }>()
 
+/** 向父组件通知时钟推进（用于轨道仿真时间轴游标） */
+const emit = defineEmits<{
+  (e: 'clock-tick', ms: number): void
+}>()
+
 // Cesium Viewer 实例（全局唯一），未初始化时为 undefined
 let viewer: Cesium.Viewer
 // 容器尺寸监听器，用于在容器尺寸变化时同步 Viewer 渲染
@@ -199,6 +204,7 @@ const initViewer = async () => {
       viewer.scene.maximumRenderTimeChange = 0.1
 
       initTaskClock()
+      syncOrbitAnimationMode()
 
       // 绑定自定义的相机监听（用于显示相机位置/角度等）
       // listenCameraLocaion(viewer)
@@ -825,6 +831,53 @@ const satelliteRenderBusy = ref(false)
 let satelliteRenderToken = 0
 // 时间轴回放速度（倍速），默认 1.0 倍
 const playbackSpeed = ref(1.0)
+/** 未选中卫星时 TLE 轨道仿真的时钟倍速 */
+const ORBIT_PLAYBACK_MULTIPLIER = 120
+
+/**
+ * 注册时钟 Tick 监听：动画模式下驱动 requestRender 并上报当前时刻
+ */
+const ensureClockTickListener = () => {
+  if (!viewer || viewer.isDestroyed() || clockTickRemoveListener) return
+  clockTickRemoveListener = viewer.clock.onTick.addEventListener((clock: Cesium.Clock) => {
+    if (!viewer || viewer.isDestroyed()) return
+    if (clock.shouldAnimate) {
+      emit('clock-tick', Cesium.JulianDate.toDate(clock.currentTime).getTime())
+    }
+    viewer.scene.requestRender()
+  })
+}
+
+/**
+ * 根据是否选中卫星，切换轨道仿真动画 / 任务时间定格模式
+ */
+const syncOrbitAnimationMode = () => {
+  if (!viewer || viewer.isDestroyed()) return
+  ensureClockTickListener()
+  if (props.selectedNorad) {
+    viewer.clock.clockRange = Cesium.ClockRange.CLAMPED
+    setClockPlaying(false)
+    return
+  }
+  viewer.clock.clockRange = Cesium.ClockRange.LOOP
+  setClockPlaying(true, ORBIT_PLAYBACK_MULTIPLIER)
+}
+
+/**
+ * 获取当前 Cesium 时钟时刻（毫秒时间戳）
+ * @returns 当前时钟毫秒值
+ */
+const getClockTimeMs = (): number => {
+  if (!viewer || viewer.isDestroyed()) return 0
+  return Cesium.JulianDate.toDate(viewer.clock.currentTime).getTime()
+}
+
+/**
+ * 启动 TLE 轨道仿真（未选中卫星时由父组件调用）
+ */
+const startTleOrbitAnimation = () => {
+  syncOrbitAnimationMode()
+}
 
 /**
  * 根据当前任务初始化 Cesium 时钟范围（不启用默认 UI 时间轴）
@@ -873,6 +926,7 @@ watch(
   () => {
     if (viewer && !viewer.isDestroyed()) {
       initTaskClock()
+      syncOrbitAnimationMode()
     }
   }
 )
@@ -1364,11 +1418,12 @@ const highlightSatellite = (sate: { norad_id: string }) => {
   viewer.scene.requestRender()
 }
 
-// 监听 selectedNorad 属性，联动更新高亮与轨迹
+// 监听 selectedNorad 属性，联动更新高亮、轨迹与时钟模式
 watch(
   () => props.selectedNorad,
   (newNorad) => {
     if (!viewer || viewer.isDestroyed()) return
+    syncOrbitAnimationMode()
     if (newNorad) {
       highlightSatellite({ norad_id: String(newNorad) })
     } else {
@@ -1467,7 +1522,7 @@ onBeforeUnmount(() => {
 
 /**
  * [功能]
- * 暂停时钟推演动画 (用于未选择单颗卫星时静态展示)
+ * 暂停时钟推演动画 (选中卫星后进入任务时间分析模式)
  */
 const pauseClockAnimation = () => {
   setClockPlaying(false)
@@ -1507,10 +1562,12 @@ defineExpose({
   markBattle,
   highlightSatellite,
   pauseClockAnimation,
+  startTleOrbitAnimation,
   jumpToTimeAndPlay,
   initTaskClock,
   setClockTime,
   setClockPlaying,
+  getClockTimeMs,
   refreshAfterActivate,
 })
 </script>

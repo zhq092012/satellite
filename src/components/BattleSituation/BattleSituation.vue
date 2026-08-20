@@ -19,6 +19,7 @@
               ref="cesiumViewerRef"
               :matrix-data="matrixData"
               :selected-norad="selectedNorad"
+              @clock-tick="handleClockTick"
             />
             <BattleMissionTimeline
               v-if="taskTimeRange"
@@ -26,6 +27,7 @@
               :task-end="taskTimeRange.end"
               :matrix-data="matrixData"
               :selected-norad="selectedNorad"
+              :current-time-ms="currentClockMs"
               @time-change="handleTimelineTimeChange"
             />
           </div>
@@ -66,6 +68,9 @@ const cesiumViewerRef = ref<InstanceType<typeof CesiumViewer> | null>(null)
 /** [变量说明] 当前选中的敌方卫星 NORAD 编号 (默认未选中任何卫星为 null，代表静态视图定位战场) */
 const selectedNorad = ref<number | null>(null)
 
+/** 地球时钟当前时刻（毫秒），用于轨道仿真时间轴游标 */
+const currentClockMs = ref<number>(0)
+
 /** [计算属性说明] 全局共享的侦察/打击算法矩阵结果 */
 const matrixData = computed<MatrixResult | null>(() => store.matrixData)
 
@@ -78,6 +83,37 @@ const taskTimeRange = computed(() => {
 
 const handleTimelineTimeChange = (ms: number) => {
   cesiumViewerRef.value?.setClockTime(ms)
+  currentClockMs.value = ms
+}
+
+/**
+ * 接收 Cesium 时钟 Tick，同步轨道仿真时间轴游标
+ * @param ms 当前时钟毫秒时间戳
+ */
+const handleClockTick = (ms: number) => {
+  if (!selectedNorad.value) {
+    currentClockMs.value = ms
+  }
+}
+
+/**
+ * 根据是否选中卫星，切换地球时钟模式：
+ * - 未选中：TLE 轨道仿真动画
+ * - 已选中：暂停动画，使用任务时间标尺
+ */
+const syncGlobeTimeMode = () => {
+  nextTick(() => {
+    if (!cesiumViewerRef.value) return
+    if (selectedNorad.value) {
+      cesiumViewerRef.value.pauseClockAnimation()
+      const clockMs = cesiumViewerRef.value.getClockTimeMs?.()
+      if (clockMs) currentClockMs.value = clockMs
+    } else {
+      cesiumViewerRef.value.startTleOrbitAnimation?.()
+      const clockMs = cesiumViewerRef.value.getClockTimeMs?.()
+      if (clockMs) currentClockMs.value = clockMs
+    }
+  })
 }
 
 /**
@@ -126,19 +162,20 @@ const handleSelectSatellite = (norad: number | null) => {
   store.setSelectedAnalysisNorad(norad)
   const taskId = store.activedTask?.id
 
-  // 1. 未选择卫星/取消选择 (相机定位战场)
+  // 1. 未选择卫星/取消选择 (相机定位战场，恢复 TLE 轨道仿真)
   if (!norad || !taskId) {
     if (cesiumViewerRef.value) {
-      cesiumViewerRef.value.pauseClockAnimation()
       cesiumViewerRef.value.markBattle()
     }
+    syncGlobeTimeMode()
     return
   }
 
-  // 2. 选中具体卫星，高亮该实体并使 3D 相机视角平滑飞赴定位（不触发时间轴调整）
+  // 2. 选中具体卫星，高亮该实体并使 3D 相机视角平滑飞赴定位，暂停轨道仿真
   if (cesiumViewerRef.value) {
     cesiumViewerRef.value.highlightSatellite({ norad_id: String(norad) })
   }
+  syncGlobeTimeMode()
 }
 
 /**
@@ -173,23 +210,11 @@ watch(
     store.clearMatrixData()
     selectedNorad.value = null
     store.setSelectedAnalysisNorad(null)
-    void pauseClockAnimation()
+    syncGlobeTimeMode()
     }
   },
   { immediate: true }
 )
-
-/**
- * [函数说明]
- * 暂停 Cesium 时钟推演动画
- */
-async function pauseClockAnimation() {
-  if (!selectedNorad.value) {
-    nextTick(() => {
-      cesiumViewerRef.value?.pauseClockAnimation()
-    })
-  }
-}
 
 /**
  * [函数说明]
@@ -208,8 +233,8 @@ onMounted(() => {
     if (store.selectedSatSeries) {
       void fetchMatrixDataBySeries(store.selectedSatSeries)
     }
+    syncGlobeTimeMode()
   })
-  void pauseClockAnimation()
 })
 
 onActivated(() => {
@@ -229,6 +254,7 @@ onActivated(() => {
     } else if (store.selectedSatSeries) {
       void fetchMatrixDataBySeries(store.selectedSatSeries)
     }
+    syncGlobeTimeMode()
   })
 })
 
@@ -241,7 +267,7 @@ watch(
   () => store.activedTask?.id,
   async (taskId, prevTaskId) => {
     if (!taskId || taskId === prevTaskId) return
-    await pauseClockAnimation()
+    syncGlobeTimeMode()
     markBattleArea()
     if (store.selectedSatSeries) {
       await fetchMatrixDataBySeries(store.selectedSatSeries)
