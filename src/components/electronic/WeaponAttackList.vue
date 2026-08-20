@@ -158,7 +158,6 @@ const loadMatrixData = async () => {
   try {
     const data = await store.fetchReconnaissanceAttackMatrix({
       taskId: store.activedTask?.id || 0,
-      intensityLevel: store.intensityLevel || '低烈度',
       series: store.selectedSatSeries || '',
     })
     if (data) {

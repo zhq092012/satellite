@@ -34,15 +34,18 @@ interface State {
   battleCenterOritentation: Cesium.HeadingPitchRoll | null // 战场中心朝向（航向、俯仰、滚转）
   satelliteTotal: number // 卫星总数
 
-  /** [全局共享] 当前选中的交战烈度 ('低烈度' | '中烈度' | '高烈度') */
-  intensityLevel: string
-
   /** [全局共享] 四个 Tab 页共用的算法侦察/打击矩阵查询结果 */
   matrixData: MatrixResult | null
   /** [全局共享] 算法矩阵加载状态 */
   matrixLoading: boolean
   /** [全局共享] 算法矩阵当前查询条件 Key 缓存 */
   matrixQueryKey: string
+  /** 顶层功能 Tab 当前激活项 */
+  mainActiveTab: string
+  /** 从整体态势跳转拓扑分析时待聚焦的卫星 NORAD */
+  topoFocusNorad: number | null
+  /** 整体态势 / 拓扑分析共享的当前分析卫星 NORAD */
+  selectedAnalysisNorad: number | null
 }
 export const useLayoutStore = defineStore('layout-store', {
   state: (): State => {
@@ -62,7 +65,6 @@ export const useLayoutStore = defineStore('layout-store', {
       selectedInfrastructureNode: null,
       selectedSatType: '',
       selectedSatSeries: '',
-      intensityLevel: '低烈度',
 
       allSatelliteOfTask: [],
       effectModel: true,
@@ -74,6 +76,9 @@ export const useLayoutStore = defineStore('layout-store', {
       matrixData: null,
       matrixLoading: false,
       matrixQueryKey: '',
+      mainActiveTab: '整体态势分析',
+      topoFocusNorad: null,
+      selectedAnalysisNorad: null,
     }
   },
   getters: {
@@ -209,30 +214,17 @@ export const useLayoutStore = defineStore('layout-store', {
       this.selectedSatSeries = series
     },
     /**
-     * [功能]
-     * 设置当前选中的交战烈度并保存至全局 Store
-     * @param intensity 烈度名称 ('低烈度' | '中烈度' | '高烈度')
-     */
-    setIntensityLevel(intensity: string) {
-      this.intensityLevel = intensity
-    },
-    /**
      * [功能说明]
      * 统一在 Store 中执行算法侦察打击矩阵查询并全局持久共享
-     * @param params 查询参数 (taskId, series, intensityLevel)
+     * @param params 查询参数 (taskId, series)
      * @param force 是否强制重新请求
      */
     async fetchReconnaissanceAttackMatrix(
-      params?: { taskId?: number; series?: string; intensityLevel?: string },
+      params?: { taskId?: number; series?: string },
       force = false
     ): Promise<MatrixResult | null> {
       const taskId = params?.taskId ?? this.activedTask?.id ?? 0
       const series = params?.series ?? this.selectedSatSeries ?? ''
-
-      if (params?.intensityLevel) {
-        this.intensityLevel = params.intensityLevel
-      }
-      const intensityLevel = this.intensityLevel || '低烈度'
 
       if (!taskId) {
         this.matrixData = null
@@ -240,7 +232,7 @@ export const useLayoutStore = defineStore('layout-store', {
         return null
       }
 
-      const queryKey = `${taskId}_${series}_${intensityLevel}`
+      const queryKey = `${taskId}_${series}`
       // 若已有缓存且非强制刷新，直接返回 store 中的 matrixData
       if (!force && this.matrixQueryKey === queryKey && this.matrixData) {
         return this.matrixData
@@ -251,7 +243,6 @@ export const useLayoutStore = defineStore('layout-store', {
         const res = await getReconnaissanceAttackMatrix({
           taskId,
           series,
-          intensityLevel,
         })
         if (res && res.code === 200 && res.data) {
           this.matrixData = res.data
@@ -273,9 +264,41 @@ export const useLayoutStore = defineStore('layout-store', {
       this.matrixData = null
       this.matrixQueryKey = ''
     },
+    /**
+     * 切换顶层功能 Tab
+     * @param tab Tab 名称
+     */
+    setMainActiveTab(tab: string) {
+      this.mainActiveTab = tab
+    },
+    /**
+     * 设置当前分析选中的卫星 NORAD（整体态势与拓扑分析共享）
+     * @param norad 卫星 NORAD 编号，取消选择时传 null
+     */
+    setSelectedAnalysisNorad(norad: number | null) {
+      this.selectedAnalysisNorad = norad
+    },
+    /**
+     * 从整体态势跳转到拓扑分析并聚焦指定卫星
+     * @param norad 卫星 NORAD 编号
+     */
+    navigateToTopoAnalysis(norad: number) {
+      this.selectedAnalysisNorad = norad
+      this.topoFocusNorad = norad
+      this.mainActiveTab = '态势拓扑分析'
+    },
+    /**
+     * 读取并清除待聚焦的拓扑卫星 NORAD（避免重复触发）
+     * @returns 待聚焦 NORAD 或 null
+     */
+    consumeTopoFocusNorad(): number | null {
+      const norad = this.topoFocusNorad
+      this.topoFocusNorad = null
+      return norad
+    },
   },
   persist: {
     storage: localStorage,
-    pick: ['activedTask', 'battle', 'showBattleList', 'allSatelliteOfTask', 'satelliteTotal', 'selectedSatType', 'selectedSatSeries', 'intensityLevel'],
+    pick: ['activedTask', 'battle', 'showBattleList', 'allSatelliteOfTask', 'satelliteTotal', 'selectedSatType', 'selectedSatSeries'],
   },
 })

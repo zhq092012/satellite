@@ -64,6 +64,29 @@
       </div>
     </div>
 
+    <!-- 当前分析卫星醒目展示条 -->
+    <div v-if="selectedSatelliteInfo" class="current-sat-banner">
+      <div class="banner-left">
+        <span class="banner-pulse"></span>
+        <span class="banner-icon">🛰️</span>
+        <div class="banner-text">
+          <span class="banner-label">当前分析卫星</span>
+          <strong class="banner-name">{{ selectedSatelliteInfo.name }}</strong>
+        </div>
+      </div>
+      <div class="banner-right">
+        <span class="banner-chip">NORAD {{ selectedSatelliteInfo.norad }}</span>
+        <span class="banner-chip" v-if="selectedSatelliteInfo.satType">{{ selectedSatelliteInfo.satType }}</span>
+        <span class="banner-chip">过境窗口 {{ selectedSatelliteInfo.windowCount }} 个</span>
+        <span class="banner-status" :class="selectedSatelliteInfo.struck ? 'struck' : 'ok'">
+          {{ selectedSatelliteInfo.struck ? '卫星被干扰' : '正常' }}
+        </span>
+      </div>
+    </div>
+    <div v-else class="current-sat-banner current-sat-banner--empty">
+      <span>👆 请先在整体态势中选择卫星，或在左侧列表点击卫星节点</span>
+    </div>
+
     <!-- 左-中-右 三栏主容器布局 -->
     <div class="gantt-main-body" v-loading="loading">
       <!-- 1. 左侧栏 (Left Sidebar): 列表索引、图例 Legend、统计 -->
@@ -106,7 +129,7 @@
         </div>
 
         <!-- 卫星与接收站层次索引树/列表 -->
-        <div class="sat-tree-list">
+        <div class="sat-tree-list" ref="satTreeListRef">
           <div class="tree-header">卫星节点 ({{ filteredSatellites.length }})</div>
           <div v-for="sat in filteredSatellites" :key="sat.norad" class="sat-tree-item" :class="{
             'is-sat-struck': sat.satelliteStatus === 1,
@@ -344,24 +367,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch, nextTick } from 'vue'
 import type { MatrixResult, SatelliteMatrix, StationWindow, Weapon, CommucationMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
+
+defineOptions({
+  name: 'SatelliteGantt',
+})
 const store = useLayoutStore()
 // [类型定义]
 // 组件接收的 Props 参数类型
 interface SatelliteGanttProps {
   /** 算法矩阵根接口返回数据 MatrixResult 或 CommucationMatrix (可选) */
   matrixData?: MatrixResult | CommucationMatrix | any
-  /** 烈度 */
-  intensity?: string
 }
 
 // [变量声明]
 // 组件定义 Props 属性，若外层未提供则组件自主发起网络请求获取
 const props = withDefaults(defineProps<SatelliteGanttProps>(), {
   matrixData: null,
-  intensity: '低烈度',
 })
 
 // [变量用途]
@@ -386,6 +410,7 @@ const selectedBarId = ref<string | null>(null)
 const selectedStationKey = ref<string | null>(null)
 
 const scrollContainerRef = ref<HTMLDivElement | null>(null)
+const satTreeListRef = ref<HTMLDivElement | null>(null)
 const playbackTrackRef = ref<HTMLDivElement | null>(null)
 const isDraggingPlayhead = ref(false)
 const ganttRowRefs = new Map<number, HTMLElement>()
@@ -411,7 +436,19 @@ const scrollToSatRow = (norad: number) => {
 const scrollToSatTreeItem = (norad: number) => {
   nextTick(() => {
     const itemEl = satTreeItemRefs.get(norad)
-    itemEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    const container = satTreeListRef.value
+    if (!itemEl) return
+
+    if (container) {
+      const containerRect = container.getBoundingClientRect()
+      const itemRect = itemEl.getBoundingClientRect()
+      const offset = itemRect.top - containerRect.top + container.scrollTop
+      const scrollTop = offset - container.clientHeight / 2 + itemEl.offsetHeight / 2
+      container.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' })
+      return
+    }
+
+    itemEl.scrollIntoView({ block: 'center', behavior: 'smooth' })
   })
 }
 
@@ -534,7 +571,6 @@ const loadMatrixData = async () => {
   try {
     const data = await store.fetchReconnaissanceAttackMatrix({
       taskId: store.activedTask?.id || 0,
-      intensityLevel: props.intensity || '低烈度',
       series: store.selectedSatSeries || '',
     })
     if (data) {
@@ -587,6 +623,23 @@ const filteredSatellites = computed<SatelliteMatrix[]>(() => {
   })
 })
 
+/** 顶部醒目展示的当前选中卫星信息 */
+const selectedSatelliteInfo = computed(() => {
+  if (selectedSatNorad.value == null) return null
+  const norad = selectedSatNorad.value
+  const sat =
+    currentData.value?.satelliteMatrixList?.find((item) => item.norad === norad) ||
+    currentData.value?.initMatrixList?.find((item) => item.norad === norad)
+  if (!sat) return null
+  return {
+    norad,
+    name: sat.name,
+    satType: sat.satType || '',
+    struck: 'satelliteStatus' in sat ? sat.satelliteStatus === 1 : false,
+    windowCount: 'stationWindows' in sat ? sat.stationWindows?.length || 0 : 0,
+  }
+})
+
 /**
  * [功能说明]
  * 任务时间边界（严格使用 beginDate ~ endDate）
@@ -602,11 +655,9 @@ const taskTimeBounds = computed<{ minTs: number; maxTs: number } | null>(() => {
 
 /**
  * [功能说明]
- * 定义甘特图动词 Label (高烈度为“被摧毁”，中/低烈度为“被干扰”)
+ * 定义甘特图动词 Label
  */
-const ganttLabel = computed<string>(() => {
-  return props.intensity === '高烈度' ? '被摧毁' : '被干扰'
-})
+const ganttLabel = computed<string>(() => '被干扰')
 
 /**
  * [功能说明]
@@ -833,8 +884,13 @@ const getWindowStartTs = (win: any): number | null => {
   return parseToTimestamp(startStr)
 }
 
+/**
+ * 取卫星打击前/打击后过境窗口中最早的开始时刻。
+ * @param sat 矩阵中的卫星对象
+ * @returns 最早窗口开始时间戳（秒）；无窗口时返回 null
+ */
 const getFirstStationStartTs = (sat: any): number | null => {
-  const windows = sat?.stationWindows || sat?.initWindows || []
+  const windows = [...(sat?.stationWindows || []), ...(sat?.initWindows || [])]
   let earliest: number | null = null
   windows.forEach((win: any) => {
     const ts = getWindowStartTs(win)
@@ -842,6 +898,60 @@ const getFirstStationStartTs = (sat: any): number | null => {
     if (earliest == null || ts < earliest) earliest = ts
   })
   return earliest
+}
+
+/**
+ * 将播放头同步到指定卫星的第一个过境窗口（优先落在甘特条内部）。
+ * @param norad 卫星 NORAD
+ * @param sat 可选原始卫星对象，甘特条尚未生成时用于兜底
+ */
+const seekToSatelliteFirstWindow = (norad: number, sat?: any) => {
+  const row = processedGanttRows.value.find((item) => item.norad === norad)
+  const firstBar = row?.bars.length
+    ? [...row.bars].sort((a, b) => a.startTimestamp - b.startTimestamp || a.endTimestamp - b.endTimestamp)[0]
+    : undefined
+  if (firstBar) {
+    seekPlayheadIntoBar(firstBar)
+    return
+  }
+  const firstTs = getFirstStationStartTs(sat)
+  if (firstTs != null) currentPlayTs.value = snapToGrid(firstTs)
+}
+
+/**
+ * 将播放头所在位置滚入甘特图可视区域。
+ * @param force 为 true 时无论当前是否可见都强制滚动对齐
+ */
+const scrollPlayheadIntoView = (force = false) => {
+  const container = scrollContainerRef.value
+  if (!container) return
+  const target = 180 + playheadLeftPx.value
+  const viewLeft = container.scrollLeft
+  const viewRight = viewLeft + container.clientWidth
+  if (force || target < viewLeft + 100 || target > viewRight - 100) {
+    container.scrollLeft = Math.max(target - container.clientWidth * 0.4, 0)
+  }
+}
+
+/**
+ * 将甘特图对齐到当前卫星的第一个过境窗口（行、列表、播放头、横向滚动）。
+ */
+const syncGanttViewToCurrentSatelliteFirstWindow = () => {
+  const norad = selectedSatNorad.value ?? store.selectedAnalysisNorad
+  if (norad == null) return
+
+  const sat =
+    currentData.value?.satelliteMatrixList?.find((item) => item.norad === norad) ||
+    currentData.value?.initMatrixList?.find((item) => item.norad === norad)
+
+  selectedSatNorad.value = norad
+  selectedBarId.value = null
+  selectedStationKey.value = null
+  stopPlayback()
+  scrollToSatRow(norad)
+  scrollToSatTreeItem(norad)
+  seekToSatelliteFirstWindow(norad, sat)
+  nextTick(() => scrollPlayheadIntoView(true))
 }
 
 const stationWindowKey = (norad: number, win: any) =>
@@ -1106,6 +1216,7 @@ const isBarAtPlayhead = (bar: ProcessedGanttBar) => playheadBarIdSet.value.has(b
 const handleSelectBar = (bar: ProcessedGanttBar) => {
   selectedBarId.value = bar.id
   selectedSatNorad.value = bar.satNorad
+  store.setSelectedAnalysisNorad(bar.satNorad)
   selectedStationKey.value = stationWindowKey(bar.satNorad, {
     receiveId: bar.receiveId,
     peakWindow: bar.peakWindow,
@@ -1119,16 +1230,48 @@ const handleSelectBar = (bar: ProcessedGanttBar) => {
 
 const selectSatelliteRow = (sat: SatelliteMatrix) => {
   selectedSatNorad.value = sat.norad
+  store.setSelectedAnalysisNorad(sat.norad)
   selectedBarId.value = null
   selectedStationKey.value = null
   stopPlayback()
   scrollToSatRow(sat.norad)
-  const firstTs = getFirstStationStartTs(sat)
-  if (firstTs != null) seekToPrevGrid(firstTs)
+  seekToSatelliteFirstWindow(sat.norad, sat)
+}
+
+/**
+ * 从 Store 恢复整体态势已选中的卫星，并同步时间轴到该星第一个过境窗口。
+ * @param forceSeekFirstWindow 即使当前已选中同一卫星，也强制把播放头对到第一个窗口
+ */
+const applySharedSatelliteSelection = (forceSeekFirstWindow = false) => {
+  const norad = store.selectedAnalysisNorad
+  if (norad == null) return
+
+  const sat =
+    currentData.value?.satelliteMatrixList?.find((item) => item.norad === norad) ||
+    currentData.value?.initMatrixList?.find((item) => item.norad === norad)
+  if (!sat) return
+
+  const noradChanged = selectedSatNorad.value !== norad
+  if (noradChanged) {
+    if (currentData.value?.satelliteMatrixList?.some((item) => item.norad === norad)) {
+      selectSatelliteRow(sat as SatelliteMatrix)
+      scrollToSatTreeItem(norad)
+      return
+    }
+    selectedSatNorad.value = norad
+    scrollToSatRow(norad)
+    seekToSatelliteFirstWindow(norad, sat)
+  } else if (forceSeekFirstWindow) {
+    scrollToSatRow(norad)
+    seekToSatelliteFirstWindow(norad, sat)
+  }
+
+  scrollToSatTreeItem(norad)
 }
 
 const selectStationWindow = (sat: SatelliteMatrix, win: StationWindow) => {
   selectedSatNorad.value = sat.norad
+  store.setSelectedAnalysisNorad(sat.norad)
   selectedStationKey.value = stationWindowKey(sat.norad, win)
   stopPlayback()
   scrollToSatRow(sat.norad)
@@ -1358,6 +1501,13 @@ onMounted(() => {
   if (taskTimeBounds.value) {
     currentPlayTs.value = taskTimeBounds.value.minTs
   }
+  nextTick(() => applySharedSatelliteSelection(true))
+})
+
+onActivated(() => {
+  nextTick(() => {
+    syncGanttViewToCurrentSatelliteFirstWindow()
+  })
 })
 
 onBeforeUnmount(() => {
@@ -1368,7 +1518,15 @@ onBeforeUnmount(() => {
 watch(
   () => timeBounds.value.minTs,
   (minTs) => {
-    if (minTs) currentPlayTs.value = minTs
+    if (!minTs) return
+    if (selectedSatNorad.value != null) {
+      const sat =
+        currentData.value?.satelliteMatrixList?.find((item) => item.norad === selectedSatNorad.value) ||
+        currentData.value?.initMatrixList?.find((item) => item.norad === selectedSatNorad.value)
+      seekToSatelliteFirstWindow(selectedSatNorad.value, sat)
+      return
+    }
+    currentPlayTs.value = minTs
   }
 )
 
@@ -1378,18 +1536,19 @@ watch(
     if (props.matrixData) {
       internalMatrixData.value = props.matrixData
     }
+    nextTick(() => applySharedSatelliteSelection())
   }
 )
 
-watch(playheadLeftPx, (left) => {
-  const container = scrollContainerRef.value
-  if (!container) return
-  const target = 180 + left
-  const viewLeft = container.scrollLeft
-  const viewRight = viewLeft + container.clientWidth
-  if (target < viewLeft + 100 || target > viewRight - 100) {
-    container.scrollLeft = Math.max(target - container.clientWidth * 0.4, 0)
+watch(
+  () => [currentData.value, store.selectedAnalysisNorad] as const,
+  () => {
+    nextTick(() => applySharedSatelliteSelection())
   }
+)
+
+watch(playheadLeftPx, () => {
+  scrollPlayheadIntoView()
 })
 </script>
 
@@ -1484,6 +1643,121 @@ watch(playheadLeftPx, (left) => {
           font-weight: 600;
         }
       }
+    }
+  }
+
+  /* 当前分析卫星醒目条 */
+  .current-sat-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 20px;
+    background: linear-gradient(90deg, rgba(0, 225, 255, 0.14) 0%, rgba(8, 15, 26, 0.95) 55%);
+    border-bottom: 1px solid rgba(0, 225, 255, 0.35);
+    box-shadow: 0 4px 18px rgba(0, 225, 255, 0.08);
+
+    .banner-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .banner-pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00e1ff;
+      box-shadow: 0 0 10px #00e1ff;
+      animation: sat-pulse 1.6s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    .banner-icon {
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .banner-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+
+      .banner-label {
+        font-size: 11px;
+        color: #7dd3fc;
+        letter-spacing: 0.5px;
+      }
+
+      .banner-name {
+        font-size: 18px;
+        font-weight: 800;
+        color: #00e1ff;
+        text-shadow: 0 0 12px rgba(0, 225, 255, 0.45);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    .banner-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .banner-chip {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #bae6fd;
+      white-space: nowrap;
+    }
+
+    .banner-status {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 4px;
+
+      &.ok {
+        color: #86efac;
+        background: rgba(34, 197, 94, 0.15);
+        border: 1px solid rgba(34, 197, 94, 0.35);
+      }
+
+      &.struck {
+        color: #fca5a5;
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid rgba(239, 68, 68, 0.35);
+      }
+    }
+
+    &--empty {
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.9);
+      border-bottom-color: #334155;
+      color: #64748b;
+      font-size: 13px;
+      box-shadow: none;
+    }
+  }
+
+  @keyframes sat-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.55;
+      transform: scale(0.85);
     }
   }
 

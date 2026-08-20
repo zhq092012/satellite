@@ -30,7 +30,7 @@
 
     <!-- 下层内容展示区域 -->
     <main class="bottom-content">
-      <keep-alive :include="['BattleSituation', 'ElectronicWarfareG6', 'SatelliteGantt', 'WeaponAttackList']">
+      <keep-alive :include="['BattleSituation', 'ElectronicWarfareG6', 'SatelliteGantt', 'WeaponAttackList', 'StrikePlanGenerator']">
         <component :is="currentComponent" :key="activeTab" />
       </keep-alive>
     </main>
@@ -82,6 +82,7 @@ import BattleSituation from '@/components/BattleSituation/BattleSituation.vue'
 import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue'
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import WeaponAttackList from '@/components/electronic/WeaponAttackList.vue'
+import StrikePlanGenerator from '@/components/electronic/StrikePlanGenerator.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import { getBattleList, getTaskList } from '@/api/dashboard'
 import type { BattleForm, TaskForm } from '@/types/dashboard'
@@ -103,8 +104,11 @@ interface MenuTabItem {
   component: Component
 }
 
-/** [变量说明] 当前激活的菜单项 Key */
-const activeTab = ref<string>('整体态势分析')
+/** [变量说明] 当前激活的菜单项 Key（与 Store 同步） */
+const activeTab = computed({
+  get: () => store.mainActiveTab,
+  set: (key: string) => store.setMainActiveTab(key),
+})
 
 /** [变量说明] 顶层四个切换菜单按钮配置 */
 const menuTabs: MenuTabItem[] = [
@@ -112,6 +116,7 @@ const menuTabs: MenuTabItem[] = [
   { key: '态势拓扑分析', name: '态势拓扑分析', icon: '🕸️', component: ElectronicWarfareG6 },
   { key: '甘特图分析', name: '甘特图分析', icon: '📊', component: SatelliteGantt },
   { key: '打击窗口分析', name: '打击窗口分析', icon: '🎯', component: WeaponAttackList },
+  { key: '打击方案生成', name: '打击方案生成', icon: '⚔️', component: StrikePlanGenerator },
 ]
 
 /** [计算属性说明] 动态组件引用 */
@@ -125,7 +130,7 @@ const currentComponent = computed<Component>(() => {
  * @param key 目标菜单 Key
  */
 const switchTab = (key: string) => {
-  activeTab.value = key
+  store.setMainActiveTab(key)
 }
 
 /** [变量说明] 任务选择弹窗显隐控制 */

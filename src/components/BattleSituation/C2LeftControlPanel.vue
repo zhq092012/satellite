@@ -88,8 +88,12 @@
           </div>
           <div class="card-footer" @click.stop>
             <span class="click-hint" v-if="selectedNorad === sat.norad">✓ 已选择分析</span>
-            <el-button class="detail-btn" size="small" link type="primary" @click="openThreatDetail(sat)">
+            <el-button v-if="sortMode === 'threat'" class="detail-btn" size="small" link type="primary"
+              @click="openThreatDetail(sat)">
               查看详情
+            </el-button>
+            <el-button v-else class="detail-btn" size="small" link type="primary" @click="openTopoAnalysis(sat)">
+              拓扑分析
             </el-button>
           </div>
         </div>
@@ -546,6 +550,16 @@ const openThreatDetail = async (sat: SatListItem) => {
 const handleThreatDialogClosed = () => {
   threatInfo.value = null
   threatDialogSat.value = null
+}
+
+/**
+ * 跳转至态势拓扑分析页，并聚焦当前卫星的全部传输链路
+ *
+ * @param sat 待分析的卫星
+ */
+const openTopoAnalysis = (sat: SatListItem) => {
+  emit('select-satellite', sat.norad)
+  store.navigateToTopoAnalysis(sat.norad)
 }
 /**
  * 归一化威胁度分数，将 0-1 的分数转换为百分制

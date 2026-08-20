@@ -92,6 +92,7 @@ const fetchMatrixDataBySeries = async (series: string) => {
   if (!taskId || !series) {
     store.clearMatrixData()
     selectedNorad.value = null
+    store.setSelectedAnalysisNorad(null)
     return
   }
 
@@ -99,7 +100,6 @@ const fetchMatrixDataBySeries = async (series: string) => {
     const data = await store.fetchReconnaissanceAttackMatrix({
       taskId,
       series,
-      intensityLevel: store.intensityLevel || '低烈度',
     })
     if (data) {
       // 默认保持不选择任何卫星 (selectedNorad 为 null)，相机视角直接定位战场
@@ -123,6 +123,7 @@ const fetchMatrixDataBySeries = async (series: string) => {
  */
 const handleSelectSatellite = (norad: number | null) => {
   selectedNorad.value = norad
+  store.setSelectedAnalysisNorad(norad)
   const taskId = store.activedTask?.id
 
   // 1. 未选择卫星/取消选择 (相机定位战场)
@@ -169,9 +170,10 @@ watch(
     if (newSeries) {
       void fetchMatrixDataBySeries(newSeries)
     } else {
-      store.clearMatrixData()
-      selectedNorad.value = null
-      void pauseClockAnimation()
+    store.clearMatrixData()
+    selectedNorad.value = null
+    store.setSelectedAnalysisNorad(null)
+    void pauseClockAnimation()
     }
   },
   { immediate: true }
@@ -213,6 +215,10 @@ onMounted(() => {
 onActivated(() => {
   nextTick(() => {
     markBattleArea()
+    if (store.selectedAnalysisNorad && selectedNorad.value !== store.selectedAnalysisNorad) {
+      selectedNorad.value = store.selectedAnalysisNorad
+      cesiumViewerRef.value?.highlightSatellite({ norad_id: String(store.selectedAnalysisNorad) })
+    }
     cesiumViewerRef.value?.refreshAfterActivate?.()
     if (store.selectedSatSeries && store.matrixData) {
       if (selectedNorad.value) {

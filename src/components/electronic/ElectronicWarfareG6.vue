@@ -3,16 +3,11 @@
     <!-- 顶部导航与控制栏 Header -->
     <div class="cema-header">
       <div class="header-left">
-        <span class="header-title glow-text">三层链路拓扑毁伤分析</span>
+        <span class="header-title glow-text">三层节点拓扑毁伤分析</span>
       </div>
 
-      <!-- 烈度与视图模式切换选项 -->
+      <!-- 视图模式与系列筛选 -->
       <div class="header-center">
-        <button class="nav-tab-btn all-links-btn" :class="{ active: linkFocusNorad == null }"
-          @click="handleShowAllLinks">
-          全部链路
-        </button>
-
         <div class="selection-status">
           <span class="status-item">
             <span class="label-text">当前系列</span>
@@ -36,14 +31,6 @@
         </div>
 
         <div class="v-divider"></div>
-
-        <!-- 1. 交战烈度切换按钮组 -->
-        <div class="intensity-group">
-          <button v-for="level in intensityOptions" :key="level" class="nav-tab-btn"
-            :class="{ active: currentIntensity === level }" @click="handleIntensityChange(level)">
-            {{ level }}
-          </button>
-        </div>
       </div>
 
       <!-- 右侧信息栏 -->
@@ -59,8 +46,12 @@
     <div class="cema-workspace">
       <div class="topo-main-body">
         <div class="topo-side topo-side--left">
-          <C2LeftControlPanel :matrix-data="matrixData" :selected-norad="selectedNorad"
-            @select-satellite="handleSelectSatellite" />
+          <TopoLeftPanel
+            :matrix-data="matrixData"
+            :selected-norad="selectedNorad"
+            :selected-link-id="selectedLinkId"
+            @select-link="handleSelectLink"
+          />
         </div>
 
         <div class="topo-center-column">
@@ -81,38 +72,6 @@
               <span class="stat-dot dot-rec"></span>
               <span>通信目标: <strong>{{ store.battle?.name || '战场目标区域' }}</strong></span>
             </div>
-            <div class="stat-badge">
-              <span class="stat-dot dot-normal-link"></span>
-              <span>正常: <strong>{{ normalLinkCount }}</strong> 条</span>
-            </div>
-            <div class="stat-badge alert-stat">
-              <span class="stat-dot dot-striking-link"></span>
-              <span>正在干扰: <strong>{{ strikingLinkCount }}</strong> 条</span>
-            </div>
-            <div class="stat-badge">
-              <span class="stat-dot dot-severed-link"></span>
-              <span>已干扰: <strong>{{ severedLinkCount }}</strong> 条</span>
-            </div>
-          </div>
-
-          <div class="topo-chain-banner" v-if="selectedNorad && timelineChainDisplay">
-            <div class="chain-banner-head">
-              <span class="chain-banner-title">{{ timelineChainDisplay.label }}</span>
-              <span class="chain-banner-time">{{ timelineChainDisplay.timeText }}</span>
-            </div>
-            <template v-if="!timelineChainDisplay.chain.blocked">
-              <div class="chain-banner-flow">
-                <template v-for="(node, idx) in timelineChainDisplay.chain.nodes" :key="node.layer + node.id">
-                  <div class="chain-banner-step">
-                    <span class="step-icon">{{ node.icon }}</span>
-                    <span class="step-name" :title="node.name">{{ node.name }}</span>
-                    <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
-                  </div>
-                  <span v-if="idx < timelineChainDisplay.chain.nodes.length - 1" class="chain-banner-arrow">→</span>
-                </template>
-              </div>
-            </template>
-            <div v-else class="chain-banner-blocked">{{ timelineChainDisplay.chain.blockedReason }}</div>
           </div>
 
           <div class="topo-graph-stack">
@@ -154,8 +113,13 @@
         </div>
 
         <div class="topo-side topo-side--right">
-          <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad"
-            @clear-satellite-selection="handleSelectSatellite(null)" />
+          <TopoRightPanel
+            :matrix-data="matrixData"
+            :selected-norad="selectedNorad"
+            :selected-link-id="selectedLinkId"
+            :selected-node-id="selectedPanelNodeId"
+            :selected-node-layer="selectedPanelNodeLayer"
+          />
         </div>
       </div>
     </div>
@@ -168,15 +132,10 @@ import G6 from '@antv/g6'
 import { useLayoutStore } from '@/store/modules/layout'
 import { getSatelliteTypeSerials, type MatrixResult, type Weapon } from '@/api/electronic'
 import type { FuncType } from '@/types/electronic'
-import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
-import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
+import TopoLeftPanel from '@/components/electronic/TopoLeftPanel.vue'
+import TopoRightPanel from '@/components/electronic/TopoRightPanel.vue'
 import BattleMissionTimeline from '@/components/BattleSituation/BattleMissionTimeline.vue'
-import {
-  getSatelliteRelatedEdgeIds,
-  resolveChainForTimelineMarker,
-  type ChainNode,
-  type TimelineChainMarkerType,
-} from '@/utils/satelliteFullChainAnalysis'
+import { type TimelineChainMarkerType, collectSatelliteTransmissionLinks, type ChainNode } from '@/utils/satelliteFullChainAnalysis'
 
 defineOptions({
   name: 'ElectronicWarfareG6',
@@ -184,8 +143,10 @@ defineOptions({
 const store = useLayoutStore()
 
 const selectedNorad = ref<number | null>(null)
-const linkFocusNorad = ref<number | null>(null)
+const selectedLinkId = ref<string | null>(null)
 const selectedReceiveId = ref<string | null>(null)
+const selectedPanelNodeId = ref<string | null>(null)
+const selectedPanelNodeLayer = ref<'sat' | 'receive' | 'station' | null>(null)
 const selectedTimelinePoint = ref<{
   ms: number
   type: TimelineChainMarkerType
@@ -246,24 +207,34 @@ const resolveSatName = (norad: number | null): string => {
 }
 
 const currentSeriesText = computed(() => store.selectedSatSeries || '未选择')
-const currentSatelliteText = computed(() => resolveSatName(selectedNorad.value ?? linkFocusNorad.value))
+const currentSatelliteText = computed(() => resolveSatName(selectedNorad.value))
 
-const handleShowAllLinks = () => {
-  linkFocusNorad.value = null
-  selectedNorad.value = null
-  selectedReceiveId.value = null
-  selectedTimelinePoint.value = null
-  selectedNodeInfo.value = null
+const handleTopoNodeSelect = (
+  payload: { id: string; layer: 'sat' | 'receive' | 'station'; norad?: number } | null
+) => {
+  if (!payload) {
+    selectedPanelNodeId.value = null
+    selectedPanelNodeLayer.value = null
+    return
+  }
+  selectedPanelNodeId.value = payload.id
+  selectedPanelNodeLayer.value = payload.layer
+}
+
+const handleSelectLink = (linkId: string | null) => {
+  selectedLinkId.value = linkId
   updateGraphHighlightState()
-  refreshGraphForTime()
 }
 
 const handleSelectSatellite = (norad: number | null) => {
   selectedNorad.value = norad
+  store.setSelectedAnalysisNorad(norad)
+  selectedLinkId.value = null
   selectedReceiveId.value = null
   selectedTimelinePoint.value = null
   if (norad) {
-    linkFocusNorad.value = norad
+    selectedPanelNodeId.value = `sat-${norad}`
+    selectedPanelNodeLayer.value = 'sat'
     const data = matrixData.value
     const satObj =
       (data?.satelliteMatrixList || []).find((s) => s.norad === norad) ||
@@ -276,6 +247,8 @@ const handleSelectSatellite = (norad: number | null) => {
       norad,
     }
   } else {
+    selectedPanelNodeId.value = null
+    selectedPanelNodeLayer.value = null
     selectedNodeInfo.value = null
   }
   updateGraphHighlightState()
@@ -337,74 +310,6 @@ const handleTimelineMarkerClick = (payload: {
   refreshGraphForTime()
 }
 
-const chainLayerLabel = (layer: ChainNode['layer']): string => {
-  const map: Record<ChainNode['layer'], string> = {
-    SAT: '卫星',
-    RELAY: '中继',
-    RECEIVE: '地面站',
-    STATION: '数据中心',
-  }
-  return map[layer]
-}
-
-const timelineChainDisplay = computed(() => {
-  if (!selectedNorad.value || !matrixData.value) return null
-  const data = matrixData.value
-  const norad = selectedNorad.value
-  const receiveId = selectedReceiveId.value
-
-  if (receiveId) {
-    const satObj =
-      (data.satelliteMatrixList || []).find((s) => s.norad === norad) ||
-      (data.initMatrixList || []).find((s) => s.norad === norad)
-    const recObj =
-      (data.stationRelationList?.receiveObjList || []).find((r) => r.receiveId === receiveId) ||
-      (data.initRelationList?.receiveObjList || []).find((r) => r.receiveId === receiveId)
-    const windows = getSatTransitWindowsMerged(data, norad).filter((w: any) => w.receiveId === receiveId)
-    const atMs = selectedTimelinePoint.value?.ms || currentTimestamp.value
-    const activeWin = windows.find((w: any) => {
-      const start = parseToTimestamp(getWindowStartStr(w))
-      const end = parseToTimestamp(getWindowEndStr(w))
-      return atMs >= start && atMs <= end
-    }) || windows[0]
-    const stationRel =
-      (data.initRelationList?.relations || []).find((rel) => rel.from === receiveId) ||
-      (data.stationRelationList?.relations || []).find((rel) => rel.from === receiveId)
-    const stationObj =
-      (data.initRelationList?.stationObjList || []).find((st) => st.stationId === stationRel?.to) ||
-      (data.stationRelationList?.stationObjList || []).find((st) => st.stationId === stationRel?.to)
-
-    const nodes: ChainNode[] = [
-      { layer: 'SAT', id: `sat-${norad}`, name: satObj?.name || `Sat-${norad}`, icon: '🛰️' },
-      { layer: 'RECEIVE', id: receiveId, name: recObj?.receiveName || receiveId, icon: '📡' },
-    ]
-    if (stationObj) {
-      nodes.push({ layer: 'STATION', id: stationObj.stationId, name: stationObj.stationName, icon: '🖥️' })
-    }
-
-    return {
-      label: activeWin?.strikeStatus === 1 ? '星地链路（干扰中）' : '星地链路',
-      timeText: formatTimeStr(atMs),
-      chain: activeWin
-        ? { blocked: false, nodes, finishTime: getWindowEndStr(activeWin), finishTimestamp: null }
-        : { blocked: true, nodes: [], blockedReason: '当前卫星与该地面站无过境窗口', finishTime: null, finishTimestamp: null },
-    }
-  }
-
-  if (!selectedTimelinePoint.value) return null
-  const chain = resolveChainForTimelineMarker(
-    data,
-    norad,
-    selectedTimelinePoint.value.type,
-    selectedTimelinePoint.value.ms
-  )
-  return {
-    label: selectedTimelinePoint.value.label,
-    timeText: formatTimeStr(selectedTimelinePoint.value.ms),
-    chain,
-  }
-})
-
 // 卫星类型与系列映射
 const typeSerialsMap = ref<Record<string, string[]>>({})
 
@@ -443,8 +348,10 @@ const fetchTypeSerials = async (taskId?: number) => {
 const handleSeriesChange = (series: string) => {
   if (!series) return
   store.setSelectedSatSeries(series)
+  store.setSelectedAnalysisNorad(null)
   selectedNorad.value = null
-  linkFocusNorad.value = null
+  selectedPanelNodeId.value = null
+  selectedPanelNodeLayer.value = null
   selectedNodeInfo.value = null
   void fetchMatrixData(true)
 }
@@ -461,8 +368,29 @@ watch(selectedNorad, (norad) => {
   if (!norad) {
     selectedTimelinePoint.value = null
     selectedReceiveId.value = null
+    selectedLinkId.value = null
   }
+  refreshGraphForTime()
 })
+
+watch(selectedLinkId, () => {
+  updateGraphHighlightState()
+})
+
+/**
+ * 从整体态势共享状态同步当前分析卫星
+ */
+const syncTopoSelectionFromStore = () => {
+  const focusNorad = store.consumeTopoFocusNorad()
+  const norad = focusNorad ?? store.selectedAnalysisNorad
+  if (norad != null && selectedNorad.value !== norad) {
+    handleSelectSatellite(norad)
+    return
+  }
+  if (norad != null && selectedNorad.value === norad && graph) {
+    refreshGraphForTime()
+  }
+}
 
 watch(selectedTimelinePoint, () => {
   refreshGraphForTime()
@@ -476,15 +404,6 @@ watch(seriesOptions, (options) => {
     void fetchMatrixData(true)
   }
 })
-
-// [类型用途]
-// 交战烈度选项类型定义
-type IntensityLevelType = '高烈度' | '中烈度' | '低烈度'
-const intensityOptions: IntensityLevelType[] = ['低烈度', '中烈度', '高烈度']
-
-// [变量用途]
-// 当前选中的交战烈度 (与全局 Store 中的 intensityLevel 同步)
-const currentIntensity = ref<IntensityLevelType>((store.intensityLevel as IntensityLevelType) || '低烈度')
 
 // [变量用途]
 // 后端算法接口返回的矩阵数据对象
@@ -594,7 +513,7 @@ const nodeLayoutCache = new Map<string, number>()
 let graphTopologyKey = ''
 
 const getGraphTopologyKey = () =>
-  `${store.selectedSatSeries}|${currentIntensity.value}|${matrixData.value?.series ?? ''}|${linkFocusNorad.value ?? ''}|${selectedReceiveId.value ?? ''}|${g6Container.value?.clientWidth ?? 0}|${g6Container.value?.clientHeight ?? 0}`
+  `${store.selectedSatSeries}|${matrixData.value?.series ?? ''}|${selectedNorad.value ?? ''}|${selectedLinkId.value ?? ''}|${g6Container.value?.clientWidth ?? 0}|${g6Container.value?.clientHeight ?? 0}`
 
 const applyCachedNodePositions = (nodes: any[]) => {
   nodes.forEach((node) => {
@@ -624,7 +543,6 @@ const refreshGraphForTime = () => {
   const height = g6Container.value.clientHeight
   if (!width || !height || width <= 0 || height <= 0) return
 
-  registerCustomG6Edge()
   const topoKey = getGraphTopologyKey()
   const structureChanged = topoKey !== graphTopologyKey
   const graphData = buildG6GraphData()
@@ -672,9 +590,9 @@ const refreshGraphForTime = () => {
     const model = edgeModelMap.get(id)
     if (model) {
       graph.showItem(edge)
-      graph.updateItem(edge, { label: model.label, labelCfg: model.labelCfg, style: model.style })
+      graph.updateItem(edge, { style: model.style })
     } else {
-      graph.hideItem(edge)
+      graph.removeItem(edge)
     }
   })
 
@@ -691,52 +609,6 @@ const setCurrentTimestamp = (ts: number, refreshGraph = true) => {
   if (!refreshGraph) return
   refreshGraphForTime()
   highlightActiveElements()
-}
-
-/**
- * [功能说明]
- * 注册 AntV G6 自定义边 `struck-cubic`
- *
- * [处理规则]
- * - 绘制 Layer 1 -> Layer 2 -> Layer 3 的平滑三层连接曲线。
- * - 链路仅使用三种视觉：绿色实线（未受干扰）、红色实线（正在干扰）、灰色虚线（已经干扰）。
- */
-const registerCustomG6Edge = () => {
-  try {
-    G6.registerEdge(
-      'struck-cubic',
-      {
-        draw(cfg: any, group: any) {
-          const startPoint = cfg.startPoint
-          const endPoint = cfg.endPoint
-          const hgap = Math.abs(endPoint.y - startPoint.y) * 0.5
-          const path = [
-            ['M', startPoint.x, startPoint.y],
-            ['C', startPoint.x, startPoint.y + hgap, endPoint.x, endPoint.y - hgap, endPoint.x, endPoint.y],
-          ]
-
-          const stroke = cfg.style?.stroke || LINK_COLORS.normal
-          const lineDash = cfg.style?.lineDash
-
-          const shape = group.addShape('path', {
-            attrs: {
-              path,
-              stroke,
-              lineWidth: cfg.style?.lineWidth || 2,
-              lineDash,
-              endArrow: cfg.style?.endArrow,
-            },
-            name: 'path-shape',
-          })
-
-          return shape
-        },
-      },
-      'cubic-vertical'
-    )
-  } catch (err) {
-    // 允许重复注册场景吃掉注册警告
-  }
 }
 
 /**
@@ -803,8 +675,11 @@ const buildTopoNode = (opts: {
   x: number
   layer: number
   struck?: boolean
+  /** 是否在节点下方显示名称 */
+  showLabel?: boolean
 }) => {
   const struck = !!opts.struck
+  const showLabel = opts.showLabel !== false
   const colors = getTopoNodeColors(opts.kind, struck)
   const style = {
     fill: colors.fill,
@@ -822,7 +697,7 @@ const buildTopoNode = (opts: {
   }
   return {
     id: opts.id,
-    label: '',
+    label: showLabel ? opts.name : '',
     nodeName: opts.name,
     layer: opts.layer,
     x: opts.x,
@@ -834,7 +709,17 @@ const buildTopoNode = (opts: {
       [0.5, 1],
     ],
     style,
-    labelCfg: { style: { opacity: 0 } },
+    labelCfg: showLabel
+      ? {
+          position: 'bottom',
+          offset: 8,
+          style: {
+            fill: '#e2efff',
+            fontSize: 10,
+            fontWeight: 500,
+          },
+        }
+      : { style: { opacity: 0 } },
     stateStyles: {
       active: stateStyle,
       highlight: { ...stateStyle, shadowBlur: 22 },
@@ -884,6 +769,34 @@ const setupGraphTooltip = (g: any) => {
 }
 
 /**
+ * 根据 Store 中共享的卫星选择恢复拓扑页选中状态
+ */
+const applySharedSatelliteSelection = () => {
+  const norad = store.selectedAnalysisNorad
+  const data = matrixData.value
+  if (norad && data) {
+    selectedNorad.value = norad
+    selectedPanelNodeId.value = `sat-${norad}`
+    selectedPanelNodeLayer.value = 'sat'
+    const satObj =
+      (data.satelliteMatrixList || []).find((s) => s.norad === norad) ||
+      (data.initMatrixList || []).find((s) => s.norad === norad)
+    const isRelay = (data.relayRelation?.relayList || []).includes(norad)
+    selectedNodeInfo.value = {
+      id: `sat-${norad}`,
+      name: satObj?.name || `Sat-${norad}`,
+      type: isRelay ? 'relay' : 'sat',
+      norad,
+    }
+    return
+  }
+  selectedNorad.value = null
+  selectedPanelNodeId.value = null
+  selectedPanelNodeLayer.value = null
+  selectedNodeInfo.value = null
+}
+
+/**
  * [功能说明]
  * 调用后端 API 获取算法矩阵数据并更新 store (按 store 中的 selectedSatSeries 检索)
  * @param force 是否强制重新向 API 查询数据
@@ -895,16 +808,13 @@ const fetchMatrixData = async (force = false) => {
       {
         taskId: store.activedTask?.id || 0,
         series: store.selectedSatSeries || '',
-        intensityLevel: currentIntensity.value,
       },
       force
     )
 
     if (data) {
       matrixData.value = data
-      selectedNorad.value = null
-      linkFocusNorad.value = null
-      selectedNodeInfo.value = null
+      applySharedSatelliteSelection()
     }
   } catch (err: any) {
     console.warn('调用后端算法矩阵接口提示:', err)
@@ -922,16 +832,14 @@ const fetchMatrixData = async (force = false) => {
 
 /**
  * [监听器说明]
- * 监听 store 中共享的矩阵数据、卫星系列、激活任务和烈度改变，自动同步矩阵数据并更新图谱
+ * 监听 store 中共享的矩阵数据、卫星系列、激活任务改变，自动同步矩阵数据并更新图谱
  */
 watch(
   [() => store.matrixData, () => store.selectedSatSeries, () => store.activedTask?.id],
   ([newStoreMatrix]) => {
     if (newStoreMatrix) {
       matrixData.value = newStoreMatrix
-      selectedNorad.value = null
-      linkFocusNorad.value = null
-      selectedNodeInfo.value = null
+      applySharedSatelliteSelection()
       nextTick(() => {
         graphTopologyKey = ''
         nodeLayoutCache.clear()
@@ -951,37 +859,13 @@ watch(
   (series, prev) => {
     if (series && series !== prev) {
       selectedNorad.value = null
-      linkFocusNorad.value = null
+      selectedPanelNodeId.value = null
+      selectedPanelNodeLayer.value = null
       selectedNodeInfo.value = null
       void fetchMatrixData(true)
     }
   }
 )
-
-/**
- * [监听器说明]
- * 监听全局 Store 中的 intensityLevel 变动，保持组件内部选中烈度同步
- */
-watch(
-  () => store.intensityLevel,
-  (newLevel) => {
-    if (newLevel && newLevel !== currentIntensity.value) {
-      currentIntensity.value = newLevel as IntensityLevelType
-    }
-  }
-)
-
-/**
- * [功能说明]
- * 切换交战烈度，重新向后端查询最新计算矩阵，并实时更新全局 Store 状态
- * @param level 目标烈度名称 ('低烈度' | '中烈度' | '高烈度')
- */
-const handleIntensityChange = (level: IntensityLevelType) => {
-  if (currentIntensity.value === level) return
-  currentIntensity.value = level
-  store.setIntensityLevel(level)
-  void fetchMatrixData(true)
-}
 
 // ==================== 时间轴算法与转换函数 ====================
 
@@ -1002,251 +886,6 @@ const formatTimeStr = (ts: number): string => {
   const d = new Date(ts)
   const pad = (n: number) => (n < 10 ? '0' + n : String(n))
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-}
-
-const getWindowStartStr = (win: any): string => win.peakWindow || win.startWindow || win.beginWindow || ''
-const getWindowEndStr = (win: any): string => win.endWindow || ''
-
-const getVisibleTransitWindows = (windows: any[]): any[] => windows || []
-
-/** 融合打击前 initWindows 与打击后 stationWindows */
-const getSatTransitWindowsMerged = (data: any, norad: number): any[] => {
-  const initSat = (data.initMatrixList || []).find((s: any) => s.norad === norad)
-  const postSat = (data.satelliteMatrixList || []).find((s: any) => s.norad === norad)
-  const merged = [...(initSat?.initWindows || []), ...(postSat?.stationWindows || [])]
-  const map = new Map<string, any>()
-  merged.forEach((win) => {
-    const key = `${win.receiveId || ''}-${getWindowStartStr(win)}-${getWindowEndStr(win)}`
-    const existing = map.get(key)
-    if (!existing || (win.strikeStatus === 1 && existing.strikeStatus !== 1)) {
-      map.set(key, win)
-    }
-  })
-  return Array.from(map.values())
-}
-
-type LinkPhase = 'normal' | 'striking' | 'severed'
-
-const LINK_COLORS: Record<LinkPhase, string> = {
-  normal: '#52c41a',
-  striking: '#ff4d4f',
-  severed: '#94a3b8',
-}
-
-/** 根据当前推演时刻解析星地链路的打击阶段 */
-const resolveTransitLinkPhase = (visibleWins: any[], currentTs: number): { phase: LinkPhase; delayMin: number } => {
-  let phase: LinkPhase = 'normal'
-  let delayMin = 0
-
-  for (const win of visibleWins) {
-    const startTs = parseToTimestamp(getWindowStartStr(win))
-    const endTs = parseToTimestamp(getWindowEndStr(win))
-    const struck = win.strikeStatus === 1
-    const delay = Number(win.delayMin) || 0
-
-    if (!struck) continue
-
-    if (currentTs >= startTs && currentTs <= endTs) {
-      return { phase: 'striking', delayMin: Math.max(delayMin, delay) }
-    }
-    if (currentTs > endTs) {
-      phase = 'severed'
-      delayMin = Math.max(delayMin, delay)
-    }
-  }
-  return { phase, delayMin }
-}
-
-/** 解析星间中继链路阶段，规则与星地链路一致：绿实线 / 红实线 / 灰虚线 */
-const resolveRelayLinkPhase = (
-  rel: { from: string | number; to: string | number; visibilityWindows?: any[] },
-  satMap: Map<number, { status: number }>,
-  currentTs: number
-): { phase: LinkPhase; delayMin: number } => {
-  const fromSat = satMap.get(Number(rel.from))
-  const toSat = satMap.get(Number(rel.to))
-  const linkStruck = fromSat?.status === 1 || toSat?.status === 1
-  const visibleWins = getVisibleTransitWindows(rel.visibilityWindows || []).map((win) => ({
-    ...win,
-    strikeStatus: linkStruck ? 1 : Number(win.strikeStatus) || 0,
-    delayMin: Number(win.delayMin) || 0,
-  }))
-  let { phase, delayMin } = resolveTransitLinkPhase(visibleWins, currentTs)
-  if (phase === 'normal' && linkStruck) phase = 'severed'
-  return { phase, delayMin }
-}
-
-/** 解析地面站-数据中心链路阶段（融合打击前后通断） */
-const resolveGroundLinkPhase = (
-  rel: { from: string; to: string },
-  postRelSet: Set<string>,
-  receiveWins: any[],
-  currentTs: number
-): { phase: LinkPhase; delayMin: number } => {
-  const visibleWins = getVisibleTransitWindows(receiveWins)
-  const transitPhase = resolveTransitLinkPhase(visibleWins, currentTs)
-  if (transitPhase.phase === 'striking') return transitPhase
-
-  const inPost = postRelSet.has(`${rel.from}::${rel.to}`)
-  if (!inPost) {
-    const delayMin = Math.max(0, ...visibleWins.filter((w) => w.strikeStatus === 1).map((w) => Number(w.delayMin) || 0))
-    return { phase: 'severed', delayMin }
-  }
-  return transitPhase
-}
-
-const buildEdgeVisual = (
-  phase: LinkPhase,
-  delayMin = 0,
-  extraStyle: Record<string, unknown> = {}
-): { style: Record<string, unknown>; label: string; labelCfg?: Record<string, unknown> } => {
-  const style: Record<string, unknown> = {
-    stroke: LINK_COLORS[phase],
-    lineWidth: phase === 'striking' ? 2.5 : 2,
-    lineDash: phase === 'severed' ? [6, 4] : undefined,
-    ...extraStyle,
-  }
-  const label = phase === 'severed' && delayMin > 0 ? `+${delayMin}m` : ''
-  const labelCfg = label
-    ? { autoRotate: true, refY: -6, style: { fill: '#94a3b8', fontSize: 10, fontWeight: 600 } }
-    : undefined
-  return { style, label, labelCfg }
-}
-
-const countLinkPhase = (counts: { normal: number; striking: number; severed: number }, phase: LinkPhase) => {
-  if (phase === 'striking') counts.striking++
-  else if (phase === 'severed') counts.severed++
-  else counts.normal++
-}
-
-const inferEdgePhase = (edge: any): LinkPhase => {
-  if (edge.phase === 'striking' || edge.phase === 'severed' || edge.phase === 'normal') return edge.phase
-  const stroke = String(edge.style?.stroke || '')
-  if (stroke === LINK_COLORS.striking) return 'striking'
-  if (stroke === LINK_COLORS.severed) return 'severed'
-  return 'normal'
-}
-
-const paintEdgePhase = (
-  edge: any,
-  phase: LinkPhase,
-  extraStyle: Record<string, unknown> = {}
-): any => {
-  const arrowExtra: Record<string, unknown> = { ...extraStyle }
-  if (edge.style?.endArrow) {
-    arrowExtra.endArrow = {
-      ...(edge.style.endArrow as object),
-      fill: LINK_COLORS[phase],
-    }
-  }
-  const delayMin = Number(edge.delayMin) || 0
-  const edgeVisual = buildEdgeVisual(phase, delayMin, arrowExtra)
-  return {
-    ...edge,
-    phase,
-    label: edgeVisual.label,
-    labelCfg: edgeVisual.labelCfg,
-    style: { ...edge.style, ...edgeVisual.style },
-  }
-}
-
-const isEdgeForSatelliteReceive = (edge: any, satId: string, receiveId: string): boolean => {
-  const source = String(edge.source)
-  const target = String(edge.target)
-  if (source === satId && target === receiveId) return true
-  if (source === receiveId || target === receiveId) return true
-  return false
-}
-
-const findFirstTransmitEdgeIds = (data: MatrixResult, norad: number, atMs: number): Set<string> => {
-  const ids = new Set<string>()
-  const initSat = data.initMatrixList?.find((s) => s.norad === norad)
-  const postSat = data.satelliteMatrixList?.find((s) => s.norad === norad)
-  const windows = (initSat?.initWindows && initSat.initWindows.length > 0)
-    ? initSat.initWindows
-    : [...(initSat?.initWindows || []), ...(postSat?.stationWindows || [])]
-  let best: any = null
-  let bestDiff = Number.POSITIVE_INFINITY
-  let bestStart = Number.POSITIVE_INFINITY
-
-  windows.forEach((win: any) => {
-    const recId = win?.receiveId
-    if (!recId) return
-    const start = parseToTimestamp(getWindowStartStr(win))
-    if (!start) return
-    const diff = Math.abs(start - atMs)
-    if (diff < bestDiff || (diff === bestDiff && start < bestStart)) {
-      best = win
-      bestDiff = diff
-      bestStart = start
-    }
-  })
-
-  if (!best?.receiveId) return ids
-  const recId = String(best.receiveId)
-  const satId = `sat-${norad}`
-  ids.add(`edge-${satId}-${recId}`)
-  ids.add(`edge-sat-${norad}-${recId}`)
-  return ids
-}
-
-/** 按选中卫星过滤拓扑；开始过境只高亮首条星地链路；选中地面站只强调对应链路不隐藏其它 */
-const applyGraphLinkPolicy = (
-  data: MatrixResult,
-  nodes: any[],
-  edges: any[]
-): { nodes: any[]; edges: any[]; linkCounts: { normal: number; striking: number; severed: number } } => {
-  const norad = linkFocusNorad.value
-  const receiveId = selectedReceiveId.value
-  const timeline = selectedTimelinePoint.value
-  const linkCounts = { normal: 0, striking: 0, severed: 0 }
-
-  let visibleEdges = edges
-  if (norad) {
-    const allowed = getSatelliteRelatedEdgeIds(data, norad)
-    visibleEdges = edges.filter((e) => allowed.has(String(e.id)))
-  }
-
-  const satId = norad != null ? `sat-${norad}` : ''
-  const firstTransmitIds =
-    selectedNorad.value && timeline?.type === 'first_transmit'
-      ? findFirstTransmitEdgeIds(data, selectedNorad.value, timeline.ms)
-      : new Set<string>()
-
-  const paintedEdges = visibleEdges.map((edge) => {
-    const edgeId = String(edge.id)
-    const basePhase = inferEdgePhase(edge)
-
-    if (firstTransmitIds.size > 0) {
-      const painted = paintEdgePhase(
-        edge,
-        firstTransmitIds.has(edgeId) ? 'normal' : 'severed',
-        firstTransmitIds.has(edgeId) ? { lineWidth: 3 } : {}
-      )
-      countLinkPhase(linkCounts, inferEdgePhase(painted))
-      return painted
-    }
-
-    if (norad && receiveId && isEdgeForSatelliteReceive(edge, satId, receiveId)) {
-      const painted = paintEdgePhase(edge, basePhase, { lineWidth: basePhase === 'striking' ? 3.2 : 2.8 })
-      countLinkPhase(linkCounts, basePhase)
-      return painted
-    }
-
-    countLinkPhase(linkCounts, basePhase)
-    return edge
-  })
-
-  const visibleNodeIds = new Set<string>()
-  paintedEdges.forEach((e) => {
-    visibleNodeIds.add(e.source)
-    visibleNodeIds.add(e.target)
-  })
-  if (norad) visibleNodeIds.add(`sat-${norad}`)
-
-  const filteredNodes = norad ? nodes.filter((n) => visibleNodeIds.has(n.id)) : nodes
-
-  return { nodes: filteredNodes, edges: paintedEdges, linkCounts }
 }
 
 const currentTimeText = computed(() => formatTimeStr(currentTimestamp.value))
@@ -1606,376 +1245,264 @@ const highlightActiveElements = () => {
 const satNodeCount = ref(0)
 const receiveNodeCount = ref(0)
 const stationNodeCount = ref(0)
-const normalLinkCount = ref(0)
-const strikingLinkCount = ref(0)
-const severedLinkCount = ref(0)
 const currentTs = () => currentTimestamp.value
 
+/** 正常链路颜色（青色实线） */
+const LINK_COLOR_NORMAL = '#00e1ff'
+/** 被打击链路颜色（灰色虚线） */
+const LINK_COLOR_STRUCK = '#94a3b8'
+
 /**
- * 构建 3 层 AntV G6 图数据 (Layer 1 卫星 -> Layer 2 地面站 -> Layer 3 数据中心)
+ * 将链路节点映射为 G6 图节点 ID
+ * @param node 链路节点
+ * @returns G6 节点 ID
  */
-const buildG6GraphData = () => {
-  if (!matrixData.value) return { nodes: [], edges: [] }
-  syncGraphStageHeight()
-  const data: any = matrixData.value
+const resolveChainNodeGraphId = (node: ChainNode): string => {
+  if (node.layer === 'SAT' || node.layer === 'RELAY') return `sat-${node.id}`
+  return node.id
+}
 
-  // ==================== 通讯卫星模式两层拓扑构建 ====================
-  if (currentSatCategory.value === 'COMM') {
-    const nodes: any[] = []
-    const edges: any[] = []
-    const satMap = new Map<number, { norad: number; name: string; satType: string; status: number }>()
-
-      ; (data.initMatrixList || []).forEach((s: any) => {
-        satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType || '通讯卫星', status: 0 })
-      })
-      ; (data.satelliteMatrixList || []).forEach((s: any) => {
-        satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType || '通讯卫星', status: s.satelliteStatus || 0 })
-      })
-
-    const satList = Array.from(satMap.values())
-    satNodeCount.value = satList.length
-    receiveNodeCount.value = 1
-    stationNodeCount.value = 0
-
-    const containerW = g6Container.value ? g6Container.value.clientWidth : 0
-    if (containerW <= 0) return { nodes: [], edges: [] }
-    const startX = 140
-    const availableW = Math.max(containerW - startX - 30, 400)
-
-    // 1. 排布第一层 通讯卫星
-    satList.forEach((sat, i) => {
-      const id = `sat-${sat.norad}`
-      const x = startX + (availableW / (satList.length + 1)) * (i + 1)
-      nodes.push(
-        buildTopoNode({
-          id,
-          name: sat.name,
-          kind: 'sat',
-          x,
-          layer: 1,
-          struck: sat.status === 1,
-        })
-      )
-    })
-
-    const targetNodeId = 'target-area'
-    const targetName = store.battle?.name || '战场目标区域'
-    nodes.push(
-      buildTopoNode({
-        id: targetNodeId,
-        name: targetName,
-        kind: 'target',
-        x: containerW / 2,
-        layer: 2,
-      })
-    )
-
-    let linkCounts = { normal: 0, striking: 0, severed: 0 }
-
-    satList.forEach((sat) => {
-      const satId = `sat-${sat.norad}`
-      const visibleWins = getVisibleTransitWindows(getSatTransitWindowsMerged(data, sat.norad))
-      if (visibleWins.length === 0) return
-
-      let { phase, delayMin } = resolveTransitLinkPhase(visibleWins, currentTs())
-      if (phase === 'normal' && sat.status === 1) phase = 'severed'
-
-      const edgeVisual = buildEdgeVisual(phase, delayMin, {
-        endArrow: { path: G6.Arrow.triangle(6, 8, 0), fill: LINK_COLORS[phase] },
-      })
-      countLinkPhase(linkCounts, phase)
-
-      edges.push({
-        id: `edge-${satId}-${targetNodeId}`,
-        source: satId,
-        target: targetNodeId,
-        type: 'struck-cubic',
-        label: edgeVisual.label,
-        labelCfg: edgeVisual.labelCfg,
-        style: edgeVisual.style,
-      })
-    })
-
-    const applied = applyGraphLinkPolicy(data, nodes, edges)
-    normalLinkCount.value = applied.linkCounts.normal
-    strikingLinkCount.value = applied.linkCounts.striking
-    severedLinkCount.value = applied.linkCounts.severed
-    satNodeCount.value = applied.nodes.filter((node) => String(node.id).startsWith('sat-')).length
-
-    return { nodes: applied.nodes, edges: applied.edges }
+/**
+ * 构建链路边的视觉样式
+ * @param struck 是否被打击
+ * @param highlighted 是否高亮选中
+ * @returns G6 边样式对象
+ */
+const buildLinkEdgeStyle = (struck: boolean, highlighted: boolean) => {
+  const dimmed = selectedLinkId.value && !highlighted
+  return {
+    stroke: struck ? LINK_COLOR_STRUCK : LINK_COLOR_NORMAL,
+    lineWidth: highlighted ? 3.5 : struck ? 2 : 2.5,
+    lineDash: struck ? [6, 4] : undefined,
+    opacity: dimmed ? 0.22 : 1,
+    shadowColor: highlighted ? LINK_COLOR_NORMAL : undefined,
+    shadowBlur: highlighted ? 12 : 0,
   }
+}
 
-  // ==================== 侦察卫星模式三层拓扑构建 ====================
+/**
+ * 为选中卫星构建聚焦拓扑图（含全部传输链路与节点名称）
+ * @param norad 卫星 NORAD 编号
+ * @returns G6 图数据
+ */
+const buildFocusedSatelliteGraph = (norad: number) => {
+  const data = matrixData.value!
+  const links = collectSatelliteTransmissionLinks(data, norad)
   const nodes: any[] = []
   const edges: any[] = []
   const nodeSet = new Set<string>()
 
-  // 1. 提取普通卫星 (Layer 1) 与 中继卫星 (Layer 2)
-  // [变量用途] 保存节点 NORAD 到卫星详细信息及打击状态的映射
-  const satMap = new Map<number, { norad: number; name: string; satType: string; status: number }>()
-    ; (data.initMatrixList || []).forEach((s) => {
-      satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: 0 })
-    })
-
-    // 判断是否有卫星/中继卫星被打击
-    ; (data.satelliteMatrixList || []).forEach((s) => {
-      satMap.set(s.norad, { norad: s.norad, name: s.name, satType: s.satType, status: s.satelliteStatus || 0 })
-    })
-  // [逻辑说明] 提取星间中继拓扑关系中的中继卫星节点
-  if (data.relayRelation) {
-    ; (data.relayRelation.relayList || []).forEach((norad) => {
-      if (!satMap.has(norad)) {
-        satMap.set(norad, { norad, name: `TDRS-${norad}`, satType: '通信/数据中继', status: 0 })
-      }
-    })
-  }
-
-  const satList = Array.from(satMap.values())
-  satNodeCount.value = satList.length
-
-  // 判断是否为中继卫星 (satType 包含 "中继" 或在 relayRelation.relayList 中)
-  const isRelaySat = (s: { satType?: string; norad: number }) => {
-    const isRelayType = (s.satType || '').includes('中继')
-    const inRelayList = (data.relayRelation?.relayList || []).includes(s.norad)
-    return isRelayType || inRelayList
-  }
-
-  const normalSatList = satList.filter((s) => !isRelaySat(s))
-  const relaySatList = satList.filter((s) => isRelaySat(s))
-
-  // 2. Layer 3: 地面接收站 (Ground Stations)
-  const receiveMap = new Map<string, { receiveId: string; receiveName: string; status: number }>()
-  const relLists = [data.stationRelationList, data.initRelationList].filter(Boolean)
-
-  relLists.forEach((rl) => {
-    ; (rl.receiveObjList || []).forEach((rec) => {
-      const recStatus = rec.receiveStatus || 0
-      if (!receiveMap.has(rec.receiveId)) {
-        receiveMap.set(rec.receiveId, {
-          receiveId: rec.receiveId,
-          receiveName: rec.receiveName || rec.receiveId,
-          status: recStatus,
-        })
-      } else {
-        const existing = receiveMap.get(rec.receiveId)!
-        if (recStatus === 1) {
-          existing.status = 1
-        }
-      }
-    })
-  })
-  const receiveList = Array.from(receiveMap.values())
-  receiveNodeCount.value = receiveList.length
-
-  // 3. Layer 3: 中心云数据中心 (Data Centers)
-  const stationMap = new Map<string, { stationId: string; stationName: string; status: number }>()
-  relLists.forEach((rl) => {
-    ; (rl.stationObjList || []).forEach((st) => {
-      const stStatus = st.stationStatus || 0
-      if (!stationMap.has(st.stationId)) {
-        stationMap.set(st.stationId, {
-          stationId: st.stationId,
-          stationName: st.stationName || st.stationId,
-          status: stStatus,
-        })
-      } else {
-        const existing = stationMap.get(st.stationId)!
-        if (stStatus === 1) {
-          existing.status = 1
-        }
-      }
-    })
-  })
-  const stationList = Array.from(stationMap.values())
-  stationNodeCount.value = stationList.length
-
-  // 四层布局：按容器高度比例分配 Y 坐标
   const containerW = g6Container.value ? g6Container.value.clientWidth : 0
   if (containerW <= 0) return { nodes: [], edges: [] }
   const startX = 140
   const availableW = Math.max(containerW - startX - 30, 400)
 
-  normalSatList.forEach((sat, i) => {
-    const id = `sat-${sat.norad}`
-    nodeSet.add(id)
-    const x = startX + (availableW / (normalSatList.length + 1)) * (i + 1)
-    nodes.push(
-      buildTopoNode({
-        id,
-        name: sat.name,
-        kind: 'sat',
-        x,
-        layer: 1,
-        struck: sat.status === 1,
-      })
-    )
+  const satId = `sat-${norad}`
+  const initSat = data.initMatrixList?.find((s) => s.norad === norad)
+  const postSat = data.satelliteMatrixList?.find((s) => s.norad === norad)
+  const satName = postSat?.name || initSat?.name || `Sat-${norad}`
+  const satStruck = postSat?.satelliteStatus === 1
+
+  const receiveOrderMap = new Map<string, { id: string; name: string; earliestMs: number; struck: boolean }>()
+  const relayMap = new Map<string, { id: string; name: string }>()
+  const stationMap = new Map<string, { id: string; name: string; receiveId: string }>()
+
+  links.forEach((link) => {
+    link.nodes.forEach((n) => {
+      if (n.layer === 'RECEIVE') {
+        const existing = receiveOrderMap.get(n.id)
+        if (!existing || link.transmitStartMs < existing.earliestMs) {
+          receiveOrderMap.set(n.id, {
+            id: n.id,
+            name: n.name,
+            earliestMs: link.transmitStartMs,
+            struck: link.struck || existing?.struck || false,
+          })
+        } else if (link.struck) {
+          existing.struck = true
+        }
+      }
+      if (n.layer === 'RELAY') {
+        relayMap.set(n.id, { id: n.id, name: n.name })
+      }
+      if (n.layer === 'STATION') {
+        const receiveNode = link.nodes.find((x) => x.layer === 'RECEIVE')
+        stationMap.set(n.id, { id: n.id, name: n.name, receiveId: receiveNode?.id || '' })
+      }
+    })
   })
 
-  relaySatList.forEach((sat, i) => {
-    const id = `sat-${sat.norad}`
-    nodeSet.add(id)
-    const x = startX + (availableW / (relaySatList.length + 1)) * (i + 1)
-    nodes.push(
-      buildTopoNode({
-        id,
-        name: sat.name,
-        kind: 'relay',
-        x,
-        layer: 2,
-        struck: sat.status === 1,
-      })
-    )
+  const sortedReceives = Array.from(receiveOrderMap.values()).sort((a, b) => a.earliestMs - b.earliestMs)
+  const relayList = Array.from(relayMap.values())
+
+  satNodeCount.value = 1
+  receiveNodeCount.value = sortedReceives.length
+  stationNodeCount.value = stationMap.size
+
+  nodes.push(
+    buildTopoNode({
+      id: satId,
+      name: satName,
+      kind: 'sat',
+      x: containerW / 2,
+      layer: 1,
+      struck: satStruck,
+      showLabel: true,
+    })
+  )
+  nodeSet.add(satId)
+
+  relayList.forEach((relay, i) => {
+    const id = `sat-${relay.id}`
+    const x =
+      relayList.length === 1 ? containerW / 2 : startX + (availableW / (relayList.length + 1)) * (i + 1)
+    if (!nodeSet.has(id)) {
+      nodes.push(buildTopoNode({ id, name: relay.name, kind: 'relay', x, layer: 2, showLabel: true }))
+      nodeSet.add(id)
+    }
   })
 
-  receiveList.forEach((rec, i) => {
-    nodeSet.add(rec.receiveId)
-    const x = startX + (availableW / (receiveList.length + 1)) * (i + 1)
+  const receiveXMap = new Map<string, number>()
+  sortedReceives.forEach((rec, i) => {
+    const x =
+      sortedReceives.length === 1 ? containerW / 2 : startX + (availableW / (sortedReceives.length + 1)) * (i + 1)
+    receiveXMap.set(rec.id, x)
     nodes.push(
       buildTopoNode({
-        id: rec.receiveId,
-        name: rec.receiveName,
+        id: rec.id,
+        name: rec.name,
         kind: 'receive',
         x,
         layer: 3,
-        struck: rec.status === 1,
+        struck: rec.struck,
+        showLabel: true,
       })
     )
+    nodeSet.add(rec.id)
   })
 
-  stationList.forEach((st, i) => {
-    nodeSet.add(st.stationId)
-    const x = startX + (availableW / (stationList.length + 1)) * (i + 1)
+  const stationPlaced = new Set<string>()
+  stationMap.forEach((st) => {
+    if (stationPlaced.has(st.id)) return
+    const x = receiveXMap.get(st.receiveId) ?? containerW / 2
     nodes.push(
       buildTopoNode({
-        id: st.stationId,
-        name: st.stationName,
+        id: st.id,
+        name: st.name,
         kind: 'station',
         x,
         layer: 4,
-        struck: st.status === 1,
+        showLabel: true,
       })
     )
+    nodeSet.add(st.id)
+    stationPlaced.add(st.id)
   })
 
-  // ==================== 构建边 Edges (Layer 1->2 & Layer 2->3) ====================
-  const edgeSet = new Set<string>()
-  const linkCounts = { normal: 0, striking: 0, severed: 0 }
+  links.forEach((link) => {
+    const highlighted = selectedLinkId.value === link.id
+    for (let i = 0; i < link.nodes.length - 1; i++) {
+      const source = resolveChainNodeGraphId(link.nodes[i])
+      const target = resolveChainNodeGraphId(link.nodes[i + 1])
+      if (!nodeSet.has(source) || !nodeSet.has(target)) continue
+      const edgeId = `edge-${link.id}-${i}`
+      edges.push({
+        id: edgeId,
+        linkId: link.id,
+        source,
+        target,
+        sourceAnchor: 1,
+        targetAnchor: 0,
+        type: 'cubic-vertical',
+        linkStruck: link.struck,
+        style: buildLinkEdgeStyle(link.struck, highlighted),
+      })
+    }
+  })
 
-  // 保存全部节点坐标，避免时间刷新时布局抖动
   saveNodePositionsToCache(nodes)
+  return { nodes, edges }
+}
 
-  // 1. Layer 1 -> Layer 2 边 (卫星 -> 地面站)，融合打击前/打击后窗口
-  satList.forEach((sat) => {
-    const satId = `sat-${sat.norad}`
-    if (!nodeSet.has(satId)) return
-    const windows = getSatTransitWindowsMerged(data, sat.norad)
-    const receiveWindowsMap = new Map<string, any[]>()
+/**
+ * 通讯卫星聚焦拓扑：卫星 → 战场目标
+ * @param norad 卫星 NORAD 编号
+ * @returns G6 图数据
+ */
+const buildFocusedCommGraph = (norad: number) => {
+  const data = matrixData.value!
+  const nodes: any[] = []
+  const edges: any[] = []
+  const containerW = g6Container.value ? g6Container.value.clientWidth : 0
+  if (containerW <= 0) return { nodes: [], edges: [] }
 
-    windows.forEach((win: any) => {
-      const recId = win.receiveId
-      if (!recId || !nodeSet.has(recId)) return
-      if (!receiveWindowsMap.has(recId)) receiveWindowsMap.set(recId, [])
-      receiveWindowsMap.get(recId)!.push(win)
+  const initSat = data.initMatrixList?.find((s) => s.norad === norad)
+  const postSat = data.satelliteMatrixList?.find((s) => s.norad === norad)
+  const satName = postSat?.name || initSat?.name || `Sat-${norad}`
+  const struck = postSat?.satelliteStatus === 1
+  const satId = `sat-${norad}`
+  const targetNodeId = 'target-area'
+  const targetName = store.battle?.name || '战场目标区域'
+
+  satNodeCount.value = 1
+  receiveNodeCount.value = 1
+  stationNodeCount.value = 0
+
+  nodes.push(
+    buildTopoNode({
+      id: satId,
+      name: satName,
+      kind: 'sat',
+      x: containerW / 2,
+      layer: 1,
+      struck,
+      showLabel: true,
     })
-
-    receiveWindowsMap.forEach((recWins, recId) => {
-      const visibleWins = getVisibleTransitWindows(recWins)
-      if (visibleWins.length === 0) return
-
-      const edgeId = `edge-${satId}-${recId}`
-      if (edgeSet.has(edgeId)) return
-      edgeSet.add(edgeId)
-
-      const { phase, delayMin } = resolveTransitLinkPhase(visibleWins, currentTs())
-      const edgeVisual = buildEdgeVisual(phase, delayMin)
-      countLinkPhase(linkCounts, phase)
-
-      edges.push({
-        id: edgeId,
-        source: satId,
-        target: recId,
-        sourceAnchor: 1,
-        targetAnchor: 0,
-        type: 'struck-cubic',
-        phase,
-        label: edgeVisual.label,
-        labelCfg: edgeVisual.labelCfg,
-        style: edgeVisual.style,
-      })
+  )
+  nodes.push(
+    buildTopoNode({
+      id: targetNodeId,
+      name: targetName,
+      kind: 'target',
+      x: containerW / 2,
+      layer: 2,
+      showLabel: true,
     })
+  )
+
+  const highlighted = !selectedLinkId.value || selectedLinkId.value === `comm-${norad}`
+  edges.push({
+    id: `edge-comm-${norad}`,
+    linkId: `comm-${norad}`,
+    source: satId,
+    target: targetNodeId,
+    type: 'cubic-vertical',
+    linkStruck: struck,
+    style: buildLinkEdgeStyle(struck, highlighted),
   })
 
-  // 2. 地面站 -> 数据中心
-  const initRels = data.initRelationList?.relations || []
-  const postRels = data.stationRelationList?.relations || []
-  const postRelSet = new Set(postRels.map((r) => `${r.from}::${r.to}`))
+  saveNodePositionsToCache(nodes)
+  return { nodes, edges }
+}
 
-  initRels.forEach((rel) => {
-    const edgeId = `edge-${rel.from}-${rel.to}`
-    if (!edgeSet.has(edgeId) && nodeSet.has(rel.from) && nodeSet.has(rel.to)) {
-      edgeSet.add(edgeId)
+/**
+ * 构建选中卫星的聚焦拓扑图数据
+ */
+const buildG6GraphData = () => {
+  if (!matrixData.value) return { nodes: [], edges: [] }
+  syncGraphStageHeight()
 
-      const allReceiveWins: any[] = []
-      satList.forEach((sat) => {
-        getSatTransitWindowsMerged(data, sat.norad)
-          .filter((w) => w.receiveId === rel.from)
-          .forEach((w) => allReceiveWins.push(w))
-      })
+  if (!selectedNorad.value) {
+    satNodeCount.value = 0
+    receiveNodeCount.value = 0
+    stationNodeCount.value = 0
+    return { nodes: [], edges: [] }
+  }
 
-      const { phase, delayMin } = resolveGroundLinkPhase(rel, postRelSet as Set<string>, allReceiveWins, currentTs())
-      const edgeVisual = buildEdgeVisual(phase, delayMin)
-      countLinkPhase(linkCounts, phase)
-
-      edges.push({
-        id: edgeId,
-        source: rel.from,
-        target: rel.to,
-        sourceAnchor: 1,
-        targetAnchor: 0,
-        type: 'struck-cubic',
-        phase,
-        label: edgeVisual.label,
-        labelCfg: edgeVisual.labelCfg,
-        style: edgeVisual.style,
-      })
-    }
-  })
-
-  // 3. Layer 1 -> Layer 2 边 (星间数据中继拓扑关系: 普通卫星 -> 数据中继卫星)
-  const relayRels = data.relayRelation?.relations || []
-  relayRels.forEach((rel) => {
-    const sourceSatId = `sat-${rel.from}`
-    const targetSatId = `sat-${rel.to}`
-    const edgeId = `edge-relay-${rel.from}-${rel.to}`
-
-    if (!edgeSet.has(edgeId) && nodeSet.has(sourceSatId) && nodeSet.has(targetSatId)) {
-      edgeSet.add(edgeId)
-      const { phase, delayMin } = resolveRelayLinkPhase(rel, satMap, currentTs())
-      const edgeVisual = buildEdgeVisual(phase, delayMin)
-      countLinkPhase(linkCounts, phase)
-
-      edges.push({
-        id: edgeId,
-        source: sourceSatId,
-        target: targetSatId,
-        sourceAnchor: 1,
-        targetAnchor: 0,
-        type: 'struck-cubic',
-        phase,
-        label: edgeVisual.label,
-        labelCfg: edgeVisual.labelCfg,
-        style: edgeVisual.style,
-      })
-    }
-  })
-
-  const applied = applyGraphLinkPolicy(data, nodes, edges)
-  normalLinkCount.value = applied.linkCounts.normal
-  strikingLinkCount.value = applied.linkCounts.striking
-  severedLinkCount.value = applied.linkCounts.severed
-  satNodeCount.value = applied.nodes.filter((node) => String(node.id).startsWith('sat-')).length
-
-  return { nodes: applied.nodes, edges: applied.edges }
+  if (currentSatCategory.value === 'COMM') {
+    return buildFocusedCommGraph(selectedNorad.value)
+  }
+  return buildFocusedSatelliteGraph(selectedNorad.value)
 }
 
 /**
@@ -2000,9 +1527,6 @@ const initOrUpdateGraph = () => {
   // 容器处于 display: none 或尚未渲染（尺寸为 0）时直接返回，避免画布尺寸坍塌
   if (!width || !height || width <= 0 || height <= 0) return
 
-  // 自定义边
-  registerCustomG6Edge()
-
   const data = buildG6GraphData()
   applyCachedNodePositions(data.nodes)
   saveNodePositionsToCache(data.nodes)
@@ -2019,18 +1543,6 @@ const initOrUpdateGraph = () => {
       },
       defaultNode: {
         type: 'circle',
-      },
-      defaultEdge: {
-        type: 'struck-cubic',
-        labelCfg: {
-          autoRotate: true,
-          refY: -6,
-          style: {
-            fill: '#94a3b8',
-            fontSize: 10,
-            fontWeight: 600,
-          },
-        },
       },
       nodeStateStyles: {
         active: {
@@ -2052,17 +1564,6 @@ const initOrUpdateGraph = () => {
           opacity: 0.75,
         },
       },
-      edgeStateStyles: {
-        active: {
-          lineWidth: 2.5,
-        },
-        highlight: {
-          lineWidth: 2.5,
-        },
-        inactive: {
-          opacity: 0.45,
-        },
-      },
     })
     graph.data(data)
     graph.render()
@@ -2076,6 +1577,10 @@ const initOrUpdateGraph = () => {
       const nodeId = String(model.id)
 
       if (nodeId.startsWith('sat-')) {
+        const norad = Number(nodeId.replace('sat-', ''))
+        if (Number.isFinite(norad)) {
+          handleSelectSatellite(selectedNorad.value === norad ? null : norad)
+        }
         return
       }
 
@@ -2086,6 +1591,14 @@ const initOrUpdateGraph = () => {
 
       parseAndSelectNode(model)
       updateGraphHighlightState()
+    })
+
+    graph.on('edge:click', (evt: any) => {
+      const edgeItem = evt.item
+      if (!edgeItem) return
+      const linkId = String(edgeItem.getModel().linkId || '')
+      if (!linkId) return
+      handleSelectLink(selectedLinkId.value === linkId ? null : linkId)
     })
   } else {
     // 拓扑图已有实例：重新计算画布大小并替换渲染数据
@@ -2118,6 +1631,8 @@ const parseAndSelectNode = (model: any) => {
       type: isRelay ? 'relay' : 'sat',
       norad,
     }
+    selectedPanelNodeId.value = id
+    selectedPanelNodeLayer.value = 'sat'
   } else {
     // 判断节点是中心云数据中心还是地面接收站
     const isStation =
@@ -2134,6 +1649,8 @@ const parseAndSelectNode = (model: any) => {
         type: 'station',
         stationId: id,
       }
+      selectedPanelNodeId.value = id
+      selectedPanelNodeLayer.value = 'station'
     } else {
       const recObj =
         (data?.stationRelationList?.receiveObjList || []).find((r) => r.receiveId === id) ||
@@ -2144,16 +1661,37 @@ const parseAndSelectNode = (model: any) => {
         type: 'receive',
         receiveId: id,
       }
+      selectedPanelNodeId.value = id
+      selectedPanelNodeLayer.value = 'receive'
     }
   }
 }
 
 /**
- * [功能说明]
- * 更新 G6 图节点的选中样式：仅高亮当前节点，不联动高亮相连链路
+ * 更新 G6 图节点与链路的选中/高亮样式
  */
 const updateGraphHighlightState = () => {
   if (!graph || graph.get('destroyed')) return
+
+  if (selectedLinkId.value) {
+    graph.getNodes().forEach((node: any) => {
+      graph.setItemState(node, 'selected', false)
+      graph.setItemState(node, 'inactive', false)
+      graph.setItemState(node, 'highlight', false)
+      graph.setItemState(node, 'active', false)
+    })
+    graph.getEdges().forEach((edge: any) => {
+      const model = edge.getModel()
+      const linkId = String(model.linkId || '')
+      const struck = !!model.linkStruck
+      const highlighted = linkId === selectedLinkId.value
+      graph.updateItem(edge, { style: buildLinkEdgeStyle(struck, highlighted) })
+      graph.setItemState(edge, 'highlight', highlighted)
+      graph.setItemState(edge, 'inactive', false)
+      graph.setItemState(edge, 'active', false)
+    })
+    return
+  }
 
   const receiveId = selectedReceiveId.value
   const satId = selectedNorad.value != null ? `sat-${selectedNorad.value}` : null
@@ -2182,12 +1720,6 @@ const updateGraphHighlightState = () => {
       graph.setItemState(node, 'highlight', focus)
       graph.setItemState(node, 'active', false)
     })
-    graph.getEdges().forEach((edge: any) => {
-      const onPath = isEdgeForSatelliteReceive(edge.getModel(), satId, receiveId)
-      graph.setItemState(edge, 'highlight', onPath)
-      graph.setItemState(edge, 'inactive', false)
-      graph.setItemState(edge, 'active', false)
-    })
     return
   }
 
@@ -2214,6 +1746,8 @@ const updateGraphHighlightState = () => {
   })
 
   graph.getEdges().forEach((edge: any) => {
+    const model = edge.getModel()
+    graph.updateItem(edge, { style: buildLinkEdgeStyle(!!model.linkStruck, false) })
     graph.setItemState(edge, 'highlight', false)
     graph.setItemState(edge, 'inactive', false)
     graph.setItemState(edge, 'active', false)
@@ -2237,6 +1771,7 @@ const handleResize = () => {
 }
 
 onMounted(() => {
+  syncTopoSelectionFromStore()
   fetchMatrixData()
   window.addEventListener('resize', handleResize)
 
@@ -2256,6 +1791,7 @@ onMounted(() => {
  * KeepAlive 缓存组件切回激活状态时重新计算 DOM 尺寸并绘制拓扑
  */
 onActivated(() => {
+  syncTopoSelectionFromStore()
   nextTick(() => {
     setTimeout(() => {
       initOrUpdateGraph()
@@ -2371,7 +1907,6 @@ onUnmounted(() => {
   }
 }
 
-.intensity-group,
 .matrix-tab-group {
   display: flex;
   align-items: center;
