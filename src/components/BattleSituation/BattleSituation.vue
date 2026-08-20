@@ -171,11 +171,19 @@ const handleSelectSatellite = (norad: number | null) => {
     return
   }
 
-  // 2. 选中具体卫星，高亮该实体并使 3D 相机视角平滑飞赴定位，暂停轨道仿真
-  if (cesiumViewerRef.value) {
-    cesiumViewerRef.value.highlightSatellite({ norad_id: String(norad) })
-  }
+  // 2. 选中具体卫星：先暂停轨道仿真并同步任务时刻，再飞赴定位（须在时间轴同步之后）
   syncGlobeTimeMode()
+  scheduleFlyToSelectedSatellite(norad)
+}
+
+/**
+ * 在任务时间轴完成时刻同步后，再执行卫星高亮与相机飞赴
+ * @param norad 目标卫星 NORAD
+ */
+const scheduleFlyToSelectedSatellite = (norad: number) => {
+  nextTick(() => {
+    cesiumViewerRef.value?.highlightSatellite({ norad_id: String(norad) })
+  })
 }
 
 /**
@@ -242,12 +250,12 @@ onActivated(() => {
     markBattleArea()
     if (store.selectedAnalysisNorad && selectedNorad.value !== store.selectedAnalysisNorad) {
       selectedNorad.value = store.selectedAnalysisNorad
-      cesiumViewerRef.value?.highlightSatellite({ norad_id: String(store.selectedAnalysisNorad) })
+      scheduleFlyToSelectedSatellite(store.selectedAnalysisNorad)
     }
     cesiumViewerRef.value?.refreshAfterActivate?.()
     if (store.selectedSatSeries && store.matrixData) {
       if (selectedNorad.value) {
-        cesiumViewerRef.value?.highlightSatellite({ norad_id: String(selectedNorad.value) })
+        scheduleFlyToSelectedSatellite(selectedNorad.value)
       } else {
         cesiumViewerRef.value?.markBattle()
       }

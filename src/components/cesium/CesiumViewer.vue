@@ -1418,15 +1418,13 @@ const highlightSatellite = (sate: { norad_id: string }) => {
   viewer.scene.requestRender()
 }
 
-// 监听 selectedNorad 属性，联动更新高亮、轨迹与时钟模式
+// 监听 selectedNorad 属性，联动更新时钟模式（相机飞赴由父组件在时间轴同步后触发）
 watch(
   () => props.selectedNorad,
   (newNorad) => {
     if (!viewer || viewer.isDestroyed()) return
     syncOrbitAnimationMode()
-    if (newNorad) {
-      highlightSatellite({ norad_id: String(newNorad) })
-    } else {
+    if (!newNorad) {
       resetHighlightSatellites()
     }
   },
