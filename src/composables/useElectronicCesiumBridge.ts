@@ -87,7 +87,10 @@ export function useElectronicCesiumBridge(matrixData: Ref<MatrixResult | null | 
     if (!matrixData.value) return []
 
     const nodes: InfrastructureLocation[] = []
-    const relationData = matrixData.value.stationRelationList || matrixData.value.initRelationList
+    const relationData =
+      matrixData.value.initRelationList?.receiveObjList?.length || matrixData.value.initRelationList?.stationObjList?.length
+        ? matrixData.value.initRelationList
+        : matrixData.value.stationRelationList
 
     if (relationData?.receiveObjList) {
       relationData.receiveObjList.forEach((rec: ReceiveObj) => {

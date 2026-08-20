@@ -155,10 +155,6 @@
 
         <div class="topo-side topo-side--right">
           <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad"
-            :timeline-point-ms="selectedTimelinePoint?.ms ?? null"
-            :timeline-marker-type="selectedTimelinePoint?.type ?? null"
-            :timeline-marker-label="selectedTimelinePoint?.label ?? null"
-            :timeline-receive-id="selectedTimelinePoint?.receiveId ?? selectedTimelinePoint?.label ?? null"
             @clear-satellite-selection="handleSelectSatellite(null)" />
         </div>
       </div>

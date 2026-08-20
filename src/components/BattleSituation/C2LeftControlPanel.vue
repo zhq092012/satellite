@@ -3,7 +3,7 @@
     <!-- 面板标题 Header -->
     <div class="panel-header">
       <div class="header-title-box">
-        <span class="header-title glow-text-cyan">敌方网络与资产拓扑</span>
+        <span class="header-title glow-text-cyan">卫星类型与系列</span>
       </div>
       <span class="panel-badge">传输链路</span>
     </div>
@@ -23,8 +23,10 @@
       <!-- 卫星系列列表 (排成一列 list，全部类型或指定类型下均可展示) -->
       <div class="series-list-box" v-if="seriesOptions.length > 0">
         <div class="series-list-header">
-          <span class="series-title">📋 {{ selectedType ? `${selectedType} · 包含系列` : '全部系列列表' }}</span>
-          <span class="series-count">{{ seriesOptions.length }} 个</span>
+          <span class="series-title">📋 包含系列 {{ seriesOptions.length }} 个</span>
+          <span class="series-current" :title="selectedSeries || '未选择系列'">
+            当前系列：{{ selectedSeries || '未选择' }}
+          </span>
         </div>
         <div class="series-list">
           <div v-for="series in seriesOptions" :key="series" class="series-item"
@@ -41,9 +43,12 @@
     <div class="panel-section section-space">
       <div class="section-header-block">
         <div class="section-title">
-          <span class="title-icon">🌌</span>
-          <span>敌方天基过境与中继卫星</span>
+          <span class="title-icon">🛰️</span>
+          <span>敌方卫星列表</span>
           <span class="count-tag">{{ satList.length }} 颗</span>
+          <span v-if="selectedSatelliteName" class="current-sat" :title="selectedSatelliteName">
+            当前选择：{{ selectedSatelliteName }}
+          </span>
         </div>
         <div class="sort-toggle-bar">
           <button class="sort-btn" :class="{ active: sortMode === 'threat' }" @click="sortMode = 'threat'">
@@ -66,35 +71,26 @@
           <div class="card-top">
             <span class="sat-name">
               {{ sat.isRelay ? '📡' : '🛰️' }} <strong>{{ sat.name }}</strong>
+              <span v-if="sat.isRelay" class="relay-tag">中继</span>
             </span>
-            <span class="status-badge" :class="sat.isRelay ? 'badge-amber' : 'badge-cyan'">
-              {{ sat.isRelay ? '高轨中继' : '过境观测' }}
+            <span v-if="sortMode === 'threat'" class="metric-highlight"
+              :class="sat.threatScore != null ? getThreatLevelClass(sat.threatScore) : 'threat-unknown'">
+              威胁度 {{ sat.threatScore != null ? formatThreatScore(sat.threatScore) : '--' }}
+            </span>
+            <span v-else class="metric-highlight metric-duration">
+              链路时长 {{ sat.timeEffect ? formatDuration(sat.timeEffect.duration) : '--' }}
             </span>
           </div>
-
-          <div class="card-body-row">
-            <div class="card-details">
-              <span class="detail-tag">NORAD: {{ sat.norad }}</span>
-              <span class="detail-tag tag-type">{{ sat.satType || '天基节点' }}</span>
-              <span class="detail-tag tag-role" v-if="sat.isRelay">中继节点</span>
-              <div class="time-effect-grid" v-if="sat.timeEffect">
-                <span class="detail-tag tag-trans-time">开始: {{ formatTransTime(sat.timeEffect.beginTime) }}</span>
-                <span class="detail-tag tag-trans-time">结束: {{ formatTransTime(sat.timeEffect.endTime) }}</span>
-                <span class="detail-tag tag-trans-time">链路时长: {{ formatDuration(sat.timeEffect.duration) }}</span>
-                <span class="detail-tag tag-trans-time">接收站: {{ sat.timeEffect.receiveName || '--' }}</span>
-              </div>
-              <span class="detail-tag tag-trans-time muted" v-else>链路时长: --</span>
-              <span class="click-hint" v-if="selectedNorad === sat.norad">✓ 已选择分析</span>
-            </div>
-            <div class="card-side-actions" @click.stop>
-              <span v-if="sat.threatScore != null" class="threat-score" :class="getThreatLevelClass(sat.threatScore)">
-                威胁度 {{ formatThreatScore(sat.threatScore) }}
-              </span>
-              <span v-else class="threat-score threat-unknown">威胁度 --</span>
-              <el-button class="detail-btn" size="small" link type="primary" @click="openThreatDetail(sat)">
-                查看详情
-              </el-button>
-            </div>
+          <div class="card-station">接收站 {{ sat.timeEffect?.receiveName || '--' }}</div>
+          <div class="card-time-row">
+            <span>开始 {{ sat.timeEffect ? formatTransTime(sat.timeEffect.beginTime) : '--' }}</span>
+            <span>结束 {{ sat.timeEffect ? formatTransTime(sat.timeEffect.endTime) : '--' }}</span>
+          </div>
+          <div class="card-footer" @click.stop>
+            <span class="click-hint" v-if="selectedNorad === sat.norad">✓ 已选择分析</span>
+            <el-button class="detail-btn" size="small" link type="primary" @click="openThreatDetail(sat)">
+              查看详情
+            </el-button>
           </div>
         </div>
       </div>
@@ -659,6 +655,11 @@ const satList = computed<SatListItem[]>(() => {
   return list.sort((a, b) => normalizeThreatScore(b.threatScore) - normalizeThreatScore(a.threatScore))
 })
 
+const selectedSatelliteName = computed(() => {
+  if (props.selectedNorad == null) return ''
+  return satList.value.find((sat) => sat.norad === props.selectedNorad)?.name || `Sat-${props.selectedNorad}`
+})
+
 
 
 
@@ -744,8 +745,21 @@ const satList = computed<SatListItem[]>(() => {
     font-weight: 600;
     color: #b5d5ff;
 
-    .count-tag {
+    .current-sat {
+      flex: 1;
+      min-width: 0;
       margin-left: auto;
+      font-weight: 700;
+      color: #40f2ff;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .count-tag {
+      margin-left: 0;
+      flex-shrink: 0;
       font-size: 11px;
       padding: 1px 6px;
       border-radius: 10px;
@@ -877,13 +891,21 @@ const satList = computed<SatListItem[]>(() => {
 
       .series-title {
         font-weight: 600;
+        flex-shrink: 0;
       }
 
-      .series-count {
-        color: #38bdf8;
-        background: rgba(56, 189, 248, 0.15);
-        padding: 1px 6px;
-        border-radius: 8px;
+      .series-current {
+        flex: 1;
+        min-width: 0;
+        margin-left: 8px;
+        padding: 1px 8px;
+        border-radius: 4px;
+        text-align: right;
+        font-weight: 700;
+        color: #40f2ff;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     }
 
@@ -1001,6 +1023,7 @@ const satList = computed<SatListItem[]>(() => {
   border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
   transition: all 0.2s ease;
+  text-align: left;
 
   &:hover {
     border-color: rgba(0, 225, 255, 0.4);
@@ -1018,7 +1041,7 @@ const satList = computed<SatListItem[]>(() => {
     background: rgba(239, 68, 68, 0.14);
     box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
 
-    .threat-score {
+    .metric-highlight {
       color: #fecaca !important;
       background: rgba(239, 68, 68, 0.25) !important;
       border-color: rgba(239, 68, 68, 0.55) !important;
@@ -1030,7 +1053,7 @@ const satList = computed<SatListItem[]>(() => {
     background: rgba(249, 115, 22, 0.12);
     box-shadow: 0 0 8px rgba(249, 115, 22, 0.22);
 
-    .threat-score {
+    .metric-highlight {
       color: #fed7aa !important;
       background: rgba(249, 115, 22, 0.2) !important;
       border-color: rgba(249, 115, 22, 0.45) !important;
@@ -1042,7 +1065,7 @@ const satList = computed<SatListItem[]>(() => {
     background: rgba(250, 204, 21, 0.1);
     box-shadow: 0 0 6px rgba(250, 204, 21, 0.18);
 
-    .threat-score {
+    .metric-highlight {
       color: #fef08a !important;
       background: rgba(250, 204, 21, 0.18) !important;
       border-color: rgba(250, 204, 21, 0.4) !important;
@@ -1053,114 +1076,56 @@ const satList = computed<SatListItem[]>(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 6px;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 8px;
 
     .sat-name {
-      font-size: 13px;
+      font-size: 16px;
       color: #ffffff;
-    }
+      min-width: 0;
+      flex: 1;
+      text-align: left;
 
-    .status-badge {
-      font-size: 10px;
-      padding: 1px 5px;
-      border-radius: 4px;
-      flex-shrink: 0;
-
-      &.badge-cyan {
-        background: rgba(0, 225, 255, 0.15);
-        color: #38bdf8;
-      }
-
-      &.badge-amber {
-        background: rgba(245, 158, 11, 0.18);
+      .relay-tag {
+        margin-left: 6px;
+        font-size: 12px;
+        font-weight: 700;
         color: #fbbf24;
-      }
-    }
-  }
-
-  .card-body-row {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .card-details {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-    font-size: 11px;
-    flex: 1;
-    min-width: 0;
-
-    .detail-tag {
-      padding: 1px 4px;
-      border-radius: 3px;
-      background: rgba(255, 255, 255, 0.06);
-      color: #94a3b8;
-
-      &.tag-type {
-        color: #7dd3fc;
-      }
-
-      &.tag-trans-time {
-        color: #86efac;
-      }
-
-      &.muted {
-        color: #64748b;
-      }
-
-      &.tag-role {
-        color: #fcd34d;
+        background: rgba(245, 158, 11, 0.18);
+        border: 1px solid rgba(245, 158, 11, 0.4);
+        border-radius: 4px;
+        padding: 0 6px;
+        vertical-align: middle;
       }
     }
 
-    .click-hint {
-      color: #38bdf8;
-      font-weight: 600;
-    }
-
-    .time-effect-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px 6px;
-      width: 100%;
-      margin-top: 2px;
-    }
-  }
-
-  .card-side-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-    flex-shrink: 0;
-
-    .threat-score {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 6px;
+    .metric-highlight {
+      flex-shrink: 0;
+      font-size: 14px;
+      font-weight: 800;
+      padding: 2px 8px;
       border-radius: 4px;
       white-space: nowrap;
+      letter-spacing: 0.2px;
+      text-shadow: 0 0 8px currentColor;
 
       &.threat-high {
         color: #fca5a5;
-        background: rgba(239, 68, 68, 0.15);
-        border: 1px solid rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.18);
+        border: 1px solid rgba(239, 68, 68, 0.4);
       }
 
       &.threat-medium {
         color: #fdba74;
-        background: rgba(249, 115, 22, 0.15);
-        border: 1px solid rgba(249, 115, 22, 0.35);
+        background: rgba(249, 115, 22, 0.16);
+        border: 1px solid rgba(249, 115, 22, 0.38);
       }
 
       &.threat-low {
         color: #7dd3fc;
-        background: rgba(56, 189, 248, 0.12);
-        border: 1px solid rgba(56, 189, 248, 0.3);
+        background: rgba(56, 189, 248, 0.14);
+        border: 1px solid rgba(56, 189, 248, 0.35);
       }
 
       &.threat-unknown {
@@ -1168,12 +1133,54 @@ const satList = computed<SatListItem[]>(() => {
         background: rgba(100, 116, 139, 0.12);
         border: 1px solid rgba(100, 116, 139, 0.2);
       }
+
+      &.metric-duration {
+        color: #86efac;
+        background: rgba(34, 197, 94, 0.14);
+        border: 1px solid rgba(34, 197, 94, 0.35);
+      }
+    }
+  }
+
+  .card-station {
+    display: block;
+    width: 100%;
+    font-size: 14px;
+    color: #e2e8f0;
+    margin-bottom: 6px;
+    line-height: 1.4;
+    text-align: left;
+  }
+
+  .card-time-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    width: 100%;
+    font-size: 13px;
+    color: #86efac;
+    line-height: 1.4;
+    text-align: left;
+  }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+
+    .click-hint {
+      color: #38bdf8;
+      font-size: 11px;
+      font-weight: 600;
     }
 
     .detail-btn {
       font-size: 11px;
       padding: 0;
       height: auto;
+      margin-left: auto;
     }
   }
 }

@@ -28,6 +28,35 @@ export interface StationPassAnalysis {
   struck: boolean
 }
 
+export interface SatelliteTransmissionLink {
+  /** 链路唯一标识 */
+  id: string
+  /** 全链路节点序列 */
+  nodes: ChainNode[]
+  /** 地面接收站名称 */
+  receiveName: string
+  /** 传输时间区间展示 */
+  transmitTime: string
+  /** 传输开始时间戳（用于排序） */
+  transmitStartMs: number
+  /** 链路完成时间 */
+  finishTime: string
+  /** 是否被打击 */
+  struck: boolean
+  /** 打击武器名称（多个以顿号分隔） */
+  weaponNames: string
+  /** 武器类型（若唯一） */
+  weaponType?: string
+  /** 造成延迟（分钟） */
+  delayMin: number
+  /** 延迟描述 */
+  delayText: string
+  /** 是否因拓扑缺失而无法完成 */
+  blocked?: boolean
+  /** 阻断原因 */
+  blockedReason?: string
+}
+
 export interface NetworkChainStats {
   totalCount: number
   remainingCount: number
@@ -595,6 +624,175 @@ export const resolveStationPassChain = (
     currentTime: formatTimestampMs(atMs || finishTs),
     struck,
   }
+}
+
+const mergeSatelliteTransitWindows = (initWindows: Record<string, any>[] = [], stationWindows: Record<string, any>[] = []) => {
+  const map = new Map<string, Record<string, any>>()
+  ;[...initWindows, ...stationWindows].forEach((win) => {
+    const key = `${win.receiveId || win.receiveName || ''}-${getWindowStartStr(win)}-${getWindowEndStr(win)}`
+    const existing = map.get(key)
+    if (!existing || (Number(win.strikeStatus) === 1 && Number(existing.strikeStatus) !== 1)) {
+      map.set(key, win)
+    }
+  })
+  return Array.from(map.values())
+}
+
+const resolveWindowReceive = (
+  matrix: MatrixResult,
+  norad: number,
+  win: Record<string, any>
+): { receiveId: string; receiveName: string } | null => {
+  const receiveId = win.receiveId as string | undefined
+  const receiveName = win.receiveName as string | undefined
+  if (receiveId || receiveName) {
+    return { receiveId: receiveId || receiveName || '', receiveName: receiveName || receiveId || '' }
+  }
+
+  const timeEffect = matrix.timeEffects?.find((item) => item.norad === norad)
+  if (timeEffect?.receiveName) {
+    const relationData = getRelationData(matrix, false)
+    const matched = relationData.receiveObjList?.find((rec) => rec.receiveName === timeEffect.receiveName)
+    return {
+      receiveId: matched?.receiveId || timeEffect.receiveName,
+      receiveName: timeEffect.receiveName,
+    }
+  }
+  return null
+}
+
+const resolveWeaponsForWindow = (
+  matrix: MatrixResult,
+  postSat: MatrixResult['satelliteMatrixList'][number] | undefined,
+  win: Record<string, any>
+): { weaponNames: string; weaponType?: string } => {
+  const struck = Number(win.strikeStatus) === 1
+  const weaponMap = new Map<string, string | undefined>()
+
+  if (struck) {
+    ;(win.weapons || []).forEach((w: Weapon) => weaponMap.set(w.name, w.type))
+    const receiveId = win.receiveId as string | undefined
+    const receiveName = win.receiveName as string | undefined
+    ;(matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string }) => {
+      const matchedById = !!plan.targetId && !!receiveId && plan.targetId === receiveId
+      const matchedByName =
+        !!plan.target && (!!receiveName ? plan.target === receiveName : plan.target === receiveId)
+      if (matchedById || matchedByName) {
+        weaponMap.set(plan.weaponName, plan.weaponType)
+      }
+    })
+    if (!weaponMap.size) {
+      weaponMap.set('电磁干扰', undefined)
+    }
+  }
+
+  if (postSat?.satelliteStatus === 1) {
+    ;(postSat.weapons || []).forEach((w: Weapon) => {
+      if (!weaponMap.has(w.name)) weaponMap.set(w.name, w.type)
+    })
+  }
+
+  const names = Array.from(weaponMap.keys())
+  const types = Array.from(new Set(Array.from(weaponMap.values()).filter(Boolean) as string[]))
+  return {
+    weaponNames: names.length ? names.join('、') : '未打击',
+    weaponType: types.length === 1 ? types[0] : undefined,
+  }
+}
+
+/**
+ * 收集选中卫星的全部传输链路：每条链路包含路径、传输时间、打击武器与延迟
+ *
+ * @param matrix 算法矩阵数据
+ * @param norad 卫星 NORAD 编号
+ * @returns 按传输开始时间升序排列的链路列表
+ */
+export const collectSatelliteTransmissionLinks = (
+  matrix: MatrixResult | null,
+  norad: number
+): SatelliteTransmissionLink[] => {
+  if (!matrix || !norad) return []
+
+  const initSat = matrix.initMatrixList?.find((s) => s.norad === norad)
+  const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
+  const satName = postSat?.name || initSat?.name || `Sat-${norad}`
+  const windows = mergeSatelliteTransitWindows(
+    (initSat?.initWindows || []) as Record<string, any>[],
+    (postSat?.stationWindows || []) as Record<string, any>[]
+  )
+  const satNameMap = buildSatNameMap(matrix)
+  const links: SatelliteTransmissionLink[] = []
+
+  windows.forEach((win, index) => {
+    const receive = resolveWindowReceive(matrix, norad, win)
+    if (!receive) return
+
+    const { receiveId, receiveName } = receive
+    const groundStart = getWindowStartStr(win)
+    const groundEnd = getWindowEndStr(win) || groundStart
+    const groundStartTs = parseTimeToMs(groundStart)
+    const groundEndTs = parseTimeToMs(groundEnd) || groundStartTs
+    if (!groundStartTs) return
+
+    const relationData = getRelationData(matrix, false)
+    const receiveToStations = buildReceiveToStations(relationData, false)
+    let stationLinks = receiveToStations.get(receiveId) || []
+    if (!stationLinks.length) {
+      stationLinks = buildReceiveToStations(getRelationData(matrix, true), false).get(receiveId) || []
+    }
+
+    const nodes: ChainNode[] = [{ layer: 'SAT', id: String(norad), name: satName, icon: '🛰️' }]
+    const relayRel = matrix.relayRelation?.relations?.find((r) => Number(r.from) === norad)
+    const relayNorad = relayRel ? Number(relayRel.to) : null
+    const relayWindow = (relayRel?.visibilityWindows || []).find((vis) =>
+      windowsOverlapMs(vis.beginWindow, vis.endWindow, groundStart, groundEnd)
+    )
+    if (relayRel && relayNorad && relayWindow) {
+      nodes.push({
+        layer: 'RELAY',
+        id: String(relayNorad),
+        name: satNameMap.get(relayNorad) || `TDRS-${relayNorad}`,
+        icon: '📡',
+      })
+    }
+    nodes.push({ layer: 'RECEIVE', id: receiveId, name: receiveName, icon: '📡' })
+
+    let blocked = false
+    let blockedReason: string | undefined
+    const station = stationLinks[0]
+    if (station) {
+      nodes.push({ layer: 'STATION', id: station.stationId, name: station.stationName, icon: '💻' })
+    } else {
+      blocked = true
+      blockedReason = '该地面站未连接到数据中心'
+    }
+
+    const struck = Number(win.strikeStatus) === 1
+    const delayMin = Number(win.delayMin) || (struck ? Number(postSat?.delayMin) || 0 : 0)
+    const { weaponNames, weaponType } = resolveWeaponsForWindow(matrix, postSat, win)
+    const relayEndTs = relayWindow
+      ? parseTimeToMs(relayWindow.endWindow || relayWindow.beginWindow)
+      : 0
+    const finishTs = relayEndTs ? Math.max(relayEndTs, groundEndTs) : groundEndTs
+
+    links.push({
+      id: `${receiveId}-${groundStart}-${index}`,
+      nodes,
+      receiveName,
+      transmitTime: groundEnd && groundEnd !== groundStart ? `${groundStart} ~ ${groundEnd}` : groundStart,
+      transmitStartMs: groundStartTs,
+      finishTime: formatTimestampMs(finishTs),
+      struck,
+      weaponNames,
+      weaponType,
+      delayMin,
+      delayText: formatDelayText(delayMin, struck),
+      blocked,
+      blockedReason,
+    })
+  })
+
+  return links.sort((a, b) => a.transmitStartMs - b.transmitStartMs)
 }
 
 /** 统计全网打击前通信链路数，以及打击后仍可完成的全链路 */

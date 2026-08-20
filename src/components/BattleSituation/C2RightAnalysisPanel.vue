@@ -3,8 +3,8 @@
     <!-- 面板标题 Header -->
     <div class="panel-header">
       <div class="header-title-box">
-        <span class="header-icon">📊</span>
-        <span class="header-title glow-text-cyan">敌方数据传输与链路效能</span>
+        <span class="header-icon">🏢</span>
+        <span class="header-title glow-text-cyan">敌方地面接收站与数据中心</span>
       </div>
       <span class="panel-badge badge-blue">{{ selectedSatInfo ? selectedSatInfo.name : '正常传输分析' }}</span>
     </div>
@@ -30,89 +30,60 @@
             <span class="norad-tag">NORAD {{ selectedSatelliteNorad }}</span>
           </div>
 
-          <!-- 打击前最早全链路 -->
+          <!-- 全部传输链路 -->
           <div class="chain-block">
             <div class="chain-block-title">
-              打击前最早全链路通信
-              <span v-if="hasTimelinePoint" class="timeline-point-tag">{{ timelineMarkerLabel }}</span>
+              传输链路列表
+              <span class="weapon-count-tag">{{ transmissionLinks.length }} 条</span>
             </div>
-            <template v-if="!displayPreStrike.chain.blocked">
-              <div class="link-flow-card">
-                <template v-for="(node, idx) in displayPreStrike.chain.nodes" :key="'pre-' + node.layer + node.id">
-                  <div class="flow-step">
-                    <span class="step-icon">{{ node.icon }}</span>
-                    <span class="step-text" :title="node.name">{{ node.name }}</span>
-                    <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
-                  </div>
-                  <span v-if="idx < displayPreStrike.chain.nodes.length - 1" class="flow-arrow">→</span>
-                </template>
-              </div>
-              <div class="finish-time-row" v-if="displayPreStrike.chain.finishTime">
-                <span class="finish-label">完成时间</span>
-                <strong class="finish-val glow-green">{{ displayPreStrike.chain.finishTime }}</strong>
-              </div>
-              <div class="finish-time-row" v-if="hasTimelinePoint">
-                <span class="finish-label">当前时刻</span>
-                <strong class="finish-val glow-cyan">{{ displayPreStrike.currentTime }}</strong>
-              </div>
-              <div class="finish-time-row" v-if="hasTimelinePoint">
-                <span class="finish-label">延迟</span>
-                <strong class="finish-val" :class="displayPreStrike.struck ? 'glow-red' : 'glow-green'">
-                  {{ displayPreStrike.delayText }}
-                </strong>
-              </div>
-            </template>
-            <div v-else class="chain-blocked-tip">
-              {{ displayPreStrike.chain.blockedReason || '无可完成链路' }}
-            </div>
-          </div>
-
-          <!-- 打击后最早全链路 -->
-          <div class="chain-block">
-            <div class="chain-block-title">打击后最早全链路通信</div>
-            <template v-if="!postStrikeChain.blocked">
-              <div class="link-flow-card post-strike">
-                <template v-for="(node, idx) in postStrikeChain.nodes" :key="node.layer + node.id">
-                  <div class="flow-step">
-                    <span class="step-icon">{{ node.icon }}</span>
-                    <span class="step-text" :title="node.name">{{ node.name }}</span>
-                    <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
-                  </div>
-                  <span v-if="idx < postStrikeChain.nodes.length - 1" class="flow-arrow">→</span>
-                </template>
-              </div>
-              <div class="finish-time-row">
-                <span class="finish-label">完成时间</span>
-                <strong class="finish-val glow-cyan">{{ postStrikeChain.finishTime }}</strong>
-              </div>
-            </template>
-            <div v-else class="chain-blocked-tip danger">
-              {{ postStrikeChain.blockedReason }}
-              <span v-if="postStrikeChain.finishTime" class="blocked-time">{{ postStrikeChain.finishTime }}</span>
-            </div>
-          </div>
-
-          <!-- 干扰武器列表 -->
-          <div class="chain-block">
-            <div class="chain-block-title">
-              干扰武器列表
-              <span class="weapon-count-tag">{{ jamWeaponList.length }} 条</span>
-            </div>
-            <div v-if="jamWeaponList.length" class="weapon-jam-list">
-              <div v-for="(item, idx) in jamWeaponList" :key="idx" class="weapon-jam-item">
-                <div class="weapon-jam-header">
-                  <span class="weapon-name">🎯 {{ item.weaponName }}</span>
-                  <span v-if="item.weaponType" class="weapon-type-tag">{{ item.weaponType }}</span>
+            <div v-if="transmissionLinks.length" class="transmission-link-list">
+              <div
+                v-for="(link, idx) in transmissionLinks"
+                :key="link.id"
+                class="transmission-link-card"
+                :class="{ struck: link.struck, blocked: link.blocked }"
+              >
+                <div class="link-card-header">
+                  <span class="link-index">链路 {{ idx + 1 }}</span>
+                  <span class="link-receive">{{ link.receiveName }}</span>
                 </div>
-                <div class="weapon-jam-target">
-                  <span class="jam-arrow">→</span>
-                  <span class="jam-target">{{ targetTypeIcon(item.targetType) }} {{ item.targetName }}</span>
-                  <span class="jam-target-type">[{{ item.targetType }}]</span>
+                <div class="link-flow-card compact">
+                  <template v-for="(node, nodeIdx) in link.nodes" :key="link.id + '-' + node.layer + node.id">
+                    <div class="flow-step">
+                      <span class="step-icon">{{ node.icon }}</span>
+                      <span class="step-text" :title="node.name">{{ node.name }}</span>
+                      <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
+                    </div>
+                    <span v-if="nodeIdx < link.nodes.length - 1" class="flow-arrow">→</span>
+                  </template>
                 </div>
-                <div class="weapon-jam-time">{{ item.timeRange }}</div>
+                <div v-if="link.blocked" class="chain-blocked-tip">{{ link.blockedReason }}</div>
+                <div class="link-meta-grid">
+                  <div class="link-meta-item">
+                    <span class="meta-label">传输时间</span>
+                    <strong class="meta-val glow-cyan">{{ link.transmitTime }}</strong>
+                  </div>
+                  <div class="link-meta-item">
+                    <span class="meta-label">完成时间</span>
+                    <strong class="meta-val">{{ link.finishTime }}</strong>
+                  </div>
+                  <div class="link-meta-item">
+                    <span class="meta-label">打击武器</span>
+                    <strong class="meta-val">
+                      {{ link.weaponNames }}
+                      <span v-if="link.weaponType" class="weapon-type-tag">{{ link.weaponType }}</span>
+                    </strong>
+                  </div>
+                  <div class="link-meta-item">
+                    <span class="meta-label">造成延迟</span>
+                    <strong class="meta-val" :class="link.delayMin > 0 || link.struck ? 'glow-red' : 'glow-green'">
+                      {{ link.delayText }}
+                    </strong>
+                  </div>
+                </div>
               </div>
             </div>
-            <div v-else class="chain-blocked-tip muted">暂无与该卫星相关的干扰武器记录</div>
+            <div v-else class="chain-blocked-tip muted">暂无传输链路数据</div>
           </div>
         </div>
 
@@ -122,79 +93,55 @@
         </div>
       </div>
 
-      <!-- 2. 敌方全网传输资产与拓扑概览 -->
+      <!-- 2. 敌方地面接收站 -->
       <div class="panel-section">
         <div class="section-title">
-          <span class="title-icon">🌐</span>
-          <span>敌方全网传输资产统计</span>
+          <span class="title-icon">📡</span>
+          <span>地面接收站</span>
+          <span class="count-tag">{{ receiveStations.length }} 个</span>
+          <span v-if="selectedReceiveName" class="current-asset" :title="selectedReceiveName">
+            当前选择：{{ selectedReceiveName }}
+          </span>
         </div>
-
-        <div class="stats-grid">
-          <div class="stat-card">
-            <span class="stat-label">过境卫星</span>
-            <strong class="stat-val glow-cyan">{{ transitSatCount }} 颗</strong>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">中继节点</span>
-            <strong class="stat-val glow-amber">{{ relaySatCount }} 颗</strong>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">地面接收站</span>
-            <strong class="stat-val glow-blue">{{ receiveStationCount }} 个</strong>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">数据中心</span>
-            <strong class="stat-val glow-purple">{{ dataCenterCount }} 个</strong>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">通信链路</span>
-            <strong class="stat-val glow-cyan">{{ networkChainStats.totalCount }} 条</strong>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">打击后剩余</span>
-            <strong class="stat-val" :class="networkChainStats.remainingCount > 0 ? 'glow-green' : 'glow-red'">
-              {{ networkChainStats.remainingCount }} 条
-            </strong>
-          </div>
-        </div>
-
-        <div v-if="networkChainStats.remainingCount >= 1" class="remaining-chain-list">
-          <div class="remaining-chain-title">打击后剩余通信链路</div>
-          <div v-for="(chain, idx) in networkChainStats.remainingChains" :key="'remain-' + idx" class="chain-block remaining-chain-item">
-            <div class="link-flow-card post-strike">
-              <template v-for="(node, nIdx) in chain.nodes" :key="'rn-' + idx + node.layer + node.id">
-                <div class="flow-step">
-                  <span class="step-icon">{{ node.icon }}</span>
-                  <span class="step-text" :title="node.name">{{ node.name }}</span>
-                  <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
-                </div>
-                <span v-if="nIdx < chain.nodes.length - 1" class="flow-arrow">→</span>
-              </template>
+        <div class="asset-scroll-list">
+          <div v-for="node in receiveStations" :key="'rec-' + node.id" class="asset-card" :class="{
+            active: isGroundNodeSelected(node),
+            struck: node.status === 1,
+          }" @click="handleSelectGroundNode(node)">
+            <div class="card-top">
+              <span class="asset-name">📡 <strong>{{ node.name }}</strong></span>
+              <span class="metric-highlight" :class="node.status === 1 ? 'status-struck' : 'status-ok'">
+                {{ node.status === 1 ? '被打击' : '可用' }}
+              </span>
             </div>
-            <div class="finish-time-row" v-if="chain.finishTime">
-              <span class="finish-label">完成时间</span>
-              <strong class="finish-val glow-cyan">{{ chain.finishTime }}</strong>
-            </div>
+            <div class="card-line" v-if="node.usage">用途 {{ node.usage }}</div>
+            <div class="card-line">位置 {{ formatLatLon(node.latitude, node.longitude) }}</div>
           </div>
         </div>
       </div>
 
-      <!-- 3. 敌方地基网络设施清单 (Ground Layer) -->
+      <!-- 3. 敌方数据中心 -->
       <div class="panel-section">
         <div class="section-title">
-          <span class="title-icon">🏢</span>
-          <span>敌方地基接收站与数据中心</span>
-          <span class="count-tag">{{ groundNodes.length }} 个</span>
+          <span class="title-icon">💻</span>
+          <span>数据中心</span>
+          <span class="count-tag">{{ dataCenters.length }} 个</span>
+          <span v-if="selectedDataCenterName" class="current-asset" :title="selectedDataCenterName">
+            当前选择：{{ selectedDataCenterName }}
+          </span>
         </div>
-
-        <div class="ground-nodes-grid">
-          <div v-for="node in groundNodes" :key="`${node.type}-${node.id}`" class="ground-node-pill" :class="{
-            'node-center': node.type === 'STATION',
-            active: selectedInfrastructureNode?.id === node.id && selectedInfrastructureNode?.type === node.type,
+        <div class="asset-scroll-list">
+          <div v-for="node in dataCenters" :key="'st-' + node.id" class="asset-card" :class="{
+            active: isGroundNodeSelected(node),
+            struck: node.status === 1,
           }" @click="handleSelectGroundNode(node)">
-            <span class="node-icon">{{ node.type === 'STATION' ? '💻' : '📡' }}</span>
-            <span class="node-name" :title="node.name">{{ node.name }}</span>
-            <span class="node-type-label">{{ node.type === 'STATION' ? '数据中心' : '接收站' }}</span>
+            <div class="card-top">
+              <span class="asset-name">💻 <strong>{{ node.name }}</strong></span>
+              <span class="metric-highlight" :class="node.status === 1 ? 'status-struck' : 'status-ok'">
+                {{ node.status === 1 ? '被打击' : '可用' }}
+              </span>
+            </div>
+            <div class="card-line">位置 {{ formatLatLon(node.latitude, node.longitude) }}</div>
           </div>
         </div>
       </div>
@@ -217,14 +164,10 @@ import { type MatrixResult } from '@/api/electronic'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import { useLayoutStore } from '@/store/modules/layout'
 import {
-  analyzeSatelliteFullChain,
-  collectNetworkChainStats,
-  collectSatelliteJamWeapons,
+  collectSatelliteTransmissionLinks,
   getSatelliteDisplayInfo,
-  resolveStationPassChain,
   type ChainNode,
-  type JamWeaponRecord,
-  type StationPassAnalysis,
+  type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
 
 const store = useLayoutStore()
@@ -233,14 +176,6 @@ const props = defineProps<{
   matrixData: MatrixResult | null
   /** 当前选中的卫星 NORAD */
   selectedSatelliteNorad?: number | null
-  /** 时间轴关键点时刻 (ms) */
-  timelinePointMs?: number | null
-  /** 时间轴关键点类型 */
-  timelineMarkerType?: import('@/utils/satelliteFullChainAnalysis').TimelineChainMarkerType | null
-  /** 时间轴关键点标签 */
-  timelineMarkerLabel?: string | null
-  /** 时间轴过境站 ID / 名称 */
-  timelineReceiveId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -272,76 +207,12 @@ const selectedSatInfo = computed(() => {
   return getSatelliteDisplayInfo(activeMatrix.value, props.selectedSatelliteNorad)
 })
 /**
- * 打击前最早全链路分析结果
+ * 选中卫星的全部传输链路（含传输时间、打击武器、延迟）
  */
-const preStrikeChain = computed(() => {
-  if (!props.selectedSatelliteNorad) {
-    return analyzeSatelliteFullChain(null, 0, false)
-  }
-  return analyzeSatelliteFullChain(activeMatrix.value, props.selectedSatelliteNorad, false)
-})
-/**
- * 打击后最早全链路分析结果
- */
-const postStrikeChain = computed(() => {
-  if (!props.selectedSatelliteNorad) {
-    return analyzeSatelliteFullChain(null, 0, true)
-  }
-  return analyzeSatelliteFullChain(activeMatrix.value, props.selectedSatelliteNorad, true)
-})
-/**
- * 是否存在时间轴关键点链路 (选中卫星 + 时间轴时刻 + 时间轴类型)
- */
-const hasTimelinePoint = computed(
-  () =>
-    !!props.selectedSatelliteNorad &&
-    props.timelinePointMs != null &&
-    !!props.timelineMarkerType
-)
-/**
- * 打击前全链路：点击时间轴时展示当前过境站链路，否则展示最早可完成链路
- */
-const displayPreStrike = computed<StationPassAnalysis>(() => {
-  if (!props.selectedSatelliteNorad) {
-    return {
-      chain: analyzeSatelliteFullChain(null, 0, false),
-      delayMin: 0,
-      delayText: '未造成额外延迟',
-      currentTime: '',
-      struck: false,
-    }
-  }
-  if (hasTimelinePoint.value) {
-    return resolveStationPassChain(
-      activeMatrix.value,
-      props.selectedSatelliteNorad,
-      props.timelineReceiveId || props.timelineMarkerLabel,
-      props.timelinePointMs || 0
-    )
-  }
-  const chain = preStrikeChain.value
-  return {
-    chain,
-    delayMin: 0,
-    delayText: '未造成额外延迟',
-    currentTime: chain.finishTime || '',
-    struck: false,
-  }
-})
-/**
- * 选中卫星的干扰武器列表；点击时间轴时只显示当前过境站对应武器
- */
-const jamWeaponList = computed<JamWeaponRecord[]>(() => {
+const transmissionLinks = computed<SatelliteTransmissionLink[]>(() => {
   if (!props.selectedSatelliteNorad) return []
-  const receiveKey = hasTimelinePoint.value
-    ? props.timelineReceiveId || props.timelineMarkerLabel
-    : null
-  return collectSatelliteJamWeapons(activeMatrix.value, props.selectedSatelliteNorad, receiveKey)
+  return collectSatelliteTransmissionLinks(activeMatrix.value, props.selectedSatelliteNorad)
 })
-/**
- * 全网通信链路统计
- */
-const networkChainStats = computed(() => collectNetworkChainStats(activeMatrix.value))
 /**
  * 解析链路层的显示标签
  * @param layer 链路层类型
@@ -356,66 +227,28 @@ const chainLayerLabel = (layer: ChainNode['layer']): string => {
   }
   return map[layer]
 }
-/**
- * 解析目标类型的图标
- * @param type 目标类型
- * @returns 图标
- */
-const targetTypeIcon = (type: JamWeaponRecord['targetType']): string => {
-  const map: Record<JamWeaponRecord['targetType'], string> = {
-    卫星: '🛰️',
-    中继卫星: '🛰️',
-    接收站: '📡',
-    数据中心: '💻',
-  }
-  return map[type]
+
+interface GroundAssetItem extends InfrastructureLocation {
+  usage?: string
 }
 
-// 全网资产统计
-const transitSatCount = computed(() => {
-  const data = activeMatrix.value
-  if (!data) {
-    return 0
-  }
-  const list = data.initMatrixList
-  if (!list || list.length === 0) return 0
-  return list.filter((s) => !s.satType?.includes('中继')).length
-})
-/**
- * 中继卫星数量
- */
-const relaySatCount = computed(() => {
-  const data = activeMatrix.value
-  if (!data) {
-    return 0
-  }
-  if (!data.relayRelation || data.relayRelation.relayList.length === 0) return 0
-  return data.relayRelation.relayList.length
-})
-/**
- * 接收站的数量
- */
-const receiveStationCount = computed(() => {
-  const relationData = activeMatrix.value?.stationRelationList || activeMatrix.value?.initRelationList
-  return relationData?.receiveObjList?.length || 0
-})
-/**
- * 数据中心的数量
- */
-const dataCenterCount = computed(() => {
-  const relationData = activeMatrix.value?.stationRelationList || activeMatrix.value?.initRelationList
-  return relationData?.stationObjList?.length || 0
-})
-
-/**
- * 选中的敌方地面设施 (接收站或数据中心)
- * @returns 选中的敌方地面设施节点
- */
 const selectedInfrastructureNode = computed(() => store.selectedInfrastructureNode)
 
-/**
- * 解析经纬度字符串 (例如 "68.350,133.500") 为 [latitude, longitude]
- */
+const selectedReceiveName = computed(() => {
+  const node = selectedInfrastructureNode.value
+  if (!node || node.type !== 'RECEIVE') return ''
+  return node.name
+})
+
+const selectedDataCenterName = computed(() => {
+  const node = selectedInfrastructureNode.value
+  if (!node || node.type !== 'STATION') return ''
+  return node.name
+})
+
+const isGroundNodeSelected = (node: GroundAssetItem): boolean =>
+  selectedInfrastructureNode.value?.id === node.id && selectedInfrastructureNode.value?.type === node.type
+
 const parseLatLon = (latLonStr?: string): [number, number] => {
   if (!latLonStr) return [0, 0]
   const parts = latLonStr.split(',').map((val) => parseFloat(val.trim()))
@@ -425,58 +258,83 @@ const parseLatLon = (latLonStr?: string): [number, number] => {
   return [0, 0]
 }
 
-// 选择/取消选择敌方地面接收站或数据中心
-const handleSelectGroundNode = (node: InfrastructureLocation) => {
-  if (selectedInfrastructureNode.value?.id === node.id && selectedInfrastructureNode.value?.type === node.type) {
-    store.setSelectedInfrastructureNode(null)
-  } else {
-    store.setSelectedInfrastructureNode(node)
-  }
+const formatLatLon = (lat: number, lon: number): string => {
+  if (!lat && !lon) return '--'
+  return `${lat.toFixed(2)}, ${lon.toFixed(2)}`
 }
 
-// 提取敌方地面设施列表 (接收站 + 数据中心)
-const groundNodes = computed<InfrastructureLocation[]>(() => {
-  const matrixData = props.matrixData
-  if (!matrixData) return []
-  const nodes: InfrastructureLocation[] = []
-  // 优先使用 stationRelationList，如果没有则使用 initRelationList
-  let relationData = matrixData.stationRelationList
-  if (!relationData?.receiveObjList?.length) {
-    relationData = matrixData.initRelationList
+const getRelationSource = () => {
+  const matrix = props.matrixData
+  if (!matrix) return null
+  if (matrix.initRelationList?.receiveObjList?.length || matrix.initRelationList?.stationObjList?.length) {
+    return matrix.initRelationList
   }
-  // 提取接收站
-  if (relationData?.receiveObjList) {
-    relationData.receiveObjList.forEach((rec) => {
-      const [lat, lon] = parseLatLon(rec.receiveLatLon)
-      nodes.push({
-        id: rec.receiveId,
-        name: rec.receiveName,
-        type: 'RECEIVE',
-        latitude: lat,
-        longitude: lon,
-        altitude: 0,
-        status: rec.receiveStatus ?? 0,
-      })
-    })
-  }
-  // 提取数据中心
-  if (relationData?.stationObjList) {
-    relationData.stationObjList.forEach((st) => {
-      const [lat, lon] = parseLatLon(st.stationLatLon)
-      nodes.push({
-        id: st.stationId,
-        name: st.stationName,
-        type: 'STATION',
-        latitude: lat,
-        longitude: lon,
-        altitude: 0,
-        status: st.stationStatus ?? 0,
-      })
-    })
-  }
+  return matrix.stationRelationList || null
+}
 
-  return nodes
+const getPostStatusMap = (kind: 'receive' | 'station'): Map<string, number> => {
+  const map = new Map<string, number>()
+  const post = props.matrixData?.stationRelationList
+  if (kind === 'receive') {
+    ; (post?.receiveObjList || []).forEach((rec) => map.set(rec.receiveId, rec.receiveStatus ?? 0))
+  } else {
+    ; (post?.stationObjList || []).forEach((st) => map.set(st.stationId, st.stationStatus ?? 0))
+  }
+  return map
+}
+
+const receiveStations = computed<GroundAssetItem[]>(() => {
+  const relationData = getRelationSource()
+  if (!relationData?.receiveObjList) return []
+  const statusMap = getPostStatusMap('receive')
+  return relationData.receiveObjList.map((rec) => {
+    const [lat, lon] = parseLatLon(rec.receiveLatLon)
+    return {
+      id: rec.receiveId,
+      name: rec.receiveName,
+      type: 'RECEIVE' as const,
+      latitude: lat,
+      longitude: lon,
+      altitude: 0,
+      status: statusMap.get(rec.receiveId) ?? rec.receiveStatus ?? 0,
+      usage: (rec as { receiveUsage?: string }).receiveUsage,
+    }
+  })
 })
+
+const dataCenters = computed<GroundAssetItem[]>(() => {
+  const relationData = getRelationSource()
+  if (!relationData?.stationObjList) return []
+  const statusMap = getPostStatusMap('station')
+  return relationData.stationObjList.map((st) => {
+    const [lat, lon] = parseLatLon(st.stationLatLon)
+    return {
+      id: st.stationId,
+      name: st.stationName,
+      type: 'STATION' as const,
+      latitude: lat,
+      longitude: lon,
+      altitude: 0,
+      status: statusMap.get(st.stationId) ?? st.stationStatus ?? 0,
+    }
+  })
+})
+
+const handleSelectGroundNode = (node: GroundAssetItem) => {
+  if (isGroundNodeSelected(node)) {
+    store.setSelectedInfrastructureNode(null)
+    return
+  }
+  store.setSelectedInfrastructureNode({
+    id: node.id,
+    name: node.name,
+    type: node.type,
+    latitude: node.latitude,
+    longitude: node.longitude,
+    altitude: node.altitude,
+    status: node.status,
+  })
+}
 </script>
 
 <style lang="scss" scoped>
@@ -552,6 +410,18 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
     font-weight: 600;
     color: #b5d5ff;
 
+    .current-asset {
+      flex: 1;
+      min-width: 0;
+      margin-left: auto;
+      font-weight: 700;
+      color: #40f2ff;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .active-badge {
       margin-left: auto;
       font-size: 11px;
@@ -563,70 +433,81 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
   }
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-
-  .stat-card {
-    display: flex;
-    flex-direction: column;
-    padding: 8px;
-    border-radius: 6px;
-    background: rgba(18, 32, 54, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-
-    .stat-label {
-      font-size: 11px;
-      color: #94a3b8;
-    }
-
-    .stat-val {
-      font-size: 14px;
-      margin-top: 2px;
-    }
-
-    .glow-cyan {
-      color: #38bdf8;
-    }
-
-    .glow-amber {
-      color: #fbbf24;
-    }
-
-    .glow-blue {
-      color: #60a5fa;
-    }
-
-    .glow-purple {
-      color: #c084fc;
-    }
-
-    .glow-green {
-      color: #4ade80;
-    }
-
-    .glow-red {
-      color: #f87171;
-    }
-  }
-}
-
-.remaining-chain-list {
-  margin-top: 10px;
+.asset-scroll-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
-.remaining-chain-title {
-  font-size: 12px;
-  color: #94a3b8;
-  font-weight: 600;
-}
+.asset-card {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(18, 32, 54, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
 
-.remaining-chain-item {
-  padding: 8px;
+  &:hover {
+    border-color: rgba(0, 225, 255, 0.4);
+    background: rgba(22, 42, 70, 0.9);
+  }
+
+  &.active {
+    border-color: #00e1ff;
+    background: rgba(0, 225, 255, 0.16);
+    box-shadow: 0 0 10px rgba(0, 225, 255, 0.22);
+  }
+
+  &.struck {
+    border-color: rgba(239, 68, 68, 0.45);
+  }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 6px;
+
+    .asset-name {
+      font-size: 15px;
+      color: #ffffff;
+      min-width: 0;
+      flex: 1;
+      text-align: left;
+    }
+  }
+
+  .metric-highlight {
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+
+    &.status-ok {
+      color: #86efac;
+      background: rgba(34, 197, 94, 0.14);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+    }
+
+    &.status-struck {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.18);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+  }
+
+  .card-line {
+    width: 100%;
+    font-size: 13px;
+    color: #cbd5e1;
+    line-height: 1.45;
+    text-align: left;
+  }
 }
 
 .empty-sat-box {
@@ -752,6 +633,112 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
     color: #00e1ff;
     font-size: 14px;
     font-weight: 700;
+  }
+
+  &.compact {
+    padding: 8px;
+    gap: 2px;
+  }
+}
+
+.transmission-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 225, 255, 0.25);
+    border-radius: 2px;
+  }
+}
+
+.transmission-link-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgba(18, 32, 54, 0.75);
+  border: 1px solid rgba(0, 225, 255, 0.15);
+
+  &.struck {
+    border-color: rgba(239, 68, 68, 0.35);
+    background: rgba(36, 18, 24, 0.55);
+  }
+
+  &.blocked {
+    border-style: dashed;
+  }
+
+  .link-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+
+    .link-index {
+      font-size: 11px;
+      font-weight: 700;
+      color: #7dd3fc;
+    }
+
+    .link-receive {
+      font-size: 12px;
+      font-weight: 700;
+      color: #e2efff;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .link-meta-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .link-meta-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    background: rgba(8, 15, 26, 0.55);
+
+    .meta-label {
+      flex-shrink: 0;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .meta-val {
+      font-size: 11px;
+      font-weight: 700;
+      color: #e2efff;
+      text-align: right;
+      line-height: 1.45;
+    }
+
+    .weapon-type-tag {
+      display: inline-block;
+      margin-left: 4px;
+      padding: 0 4px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
   }
 }
 
@@ -898,75 +885,13 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
   }
 }
 
-.ground-nodes-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-}
-
-.ground-node-pill {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: rgba(18, 32, 54, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: rgba(56, 189, 248, 0.4);
-    background: rgba(30, 58, 95, 0.8);
-  }
-
-  &.active {
-    border-color: #38bdf8;
-    background: rgba(14, 165, 233, 0.25);
-    box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
-
-    .node-name {
-      color: #38bdf8;
-      font-weight: bold;
-    }
-  }
-
-  .node-icon {
-    font-size: 12px;
-  }
-
-  .node-name {
-    font-size: 12px;
-    color: #e2efff;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 80px;
-  }
-
-  .node-type-label {
-    margin-left: auto;
-    font-size: 10px;
-    color: #64748b;
-  }
-
-  &.node-center {
-    border-color: rgba(168, 85, 247, 0.3);
-
-    .node-type-label {
-      color: #c084fc;
-    }
-
-    &.active {
-      border-color: #a855f7;
-      background: rgba(168, 85, 247, 0.25);
-      box-shadow: 0 0 10px rgba(168, 85, 247, 0.35);
-
-      .node-name {
-        color: #e9d5ff;
-      }
-    }
-  }
+.count-tag {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
 }
 
 .norad-tag {

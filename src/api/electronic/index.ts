@@ -547,3 +547,99 @@ export const getSatelliteThreatInfo = (data: { norad: number; series: string; ta
   const url = `/api/algorithm/satelliteCapModel?sysType=${data.series}&taskId=${data.taskId}&norads=${data.norad}`
   return requestAPI.get<AxiosResponseType<SatelliteThreatInfo[]>>(url)
 }
+
+// ==================== 综合打击方案（军用/民用）响应类型 ====================
+
+/**
+ * 接收站过境窗口信息
+ *
+ * 描述某颗卫星飞往对应接收站时的可见时间窗口，
+ * 以及该窗口是否被红方武器打击/干扰。
+ *
+ * [字段规则]
+ * - strikeStatus: 0 表示该窗口未被打击，1 表示已被打击/干扰
+ * - weapons: 在该窗口上部署的针对接收站的武器列表，可能为空数组
+ */
+export interface ZhchPlanStationWindow {
+  /** 接收站唯一标识 */
+  receiveId: string
+  /** 接收站名称 */
+  receiveName: string
+  /** 过境窗口峰值时间（格式如 "2025-06-09T12:00:00Z"） */
+  peakWindow: string
+  /** 打击状态：0-未打击 1-已打击 */
+  strikeStatus: number
+  /** 针对该接收站窗口部署的武器列表 */
+  weapons: Weapon[]
+}
+
+/**
+ * 卫星矩阵项——描述单颗侦察卫星的打击/干扰详情
+ *
+ * [字段规则]
+ * - satelliteStatus: 0 表示该卫星未受打击/干扰，1 表示已被打击/干扰
+ * - orbitType: 轨道类型枚举（1-低轨 2-中轨 3-高轨 等）
+ * - delayMin: 阻断该卫星传输链路产生的延迟（分钟）
+ * - weapons: 直接针对该卫星部署的武器列表
+ * - stationWindows: 该卫星对应的所有接收站过境窗口
+ */
+export interface ZhchPlanSatelliteMatrix {
+  /** 卫星 NORAD 编号 */
+  norad: number
+  /** 卫星名称 */
+  name: string
+  /** 卫星类型（如"空间监视/军事"、"光学侦察"等） */
+  satType: string
+  /** 阻断该卫星传输链路的延迟时间（分钟） */
+  delayMin: number
+  /** 卫星打击状态：0-未打击 1-已打击 */
+  satelliteStatus: number
+  /** 轨道类型枚举值（1-低轨 2-中轨 3-高轨 等） */
+  orbitType: number
+  /** 用途类型（如"军用"、"民用"等） */
+  usage: string
+  /** 直接针对该卫星部署的武器列表 */
+  weapons: Weapon[]
+  /** 该卫星对应的接收站过境窗口列表 */
+  stationWindows: ZhchPlanStationWindow[]
+}
+
+/**
+ * 综合打击方案响应——基于军用/民用类型的卫星情报链路阻断方案
+ *
+ * 描述红方使用武器对蓝方侦察卫星与接收站进行干扰/打击的整体方案结果，
+ * 包括方案概述、涉及的卫星/接收站/武器统计、以及每颗卫星的详细打击矩阵。
+ *
+ * [业务场景]
+ * 蓝方侦察卫星侦察战场区域情报后，飞往对应接收站在可见窗口内传递数据。
+ * 红方部署武器对卫星或接收站实施干扰/打击，延时或阻断蓝方情报传递链路。
+ */
+export interface ZhchPlanResp {
+  /** 方案概述文字描述 */
+  summary: string
+  /** 涉及的侦察卫星数量 */
+  satNum: number
+  /** 涉及的接收站数量 */
+  receiveNum: number
+  /** 投入的武器总数量 */
+  weaponNum: number
+  /** 投入的武器种类名称列表（如 ["武器A", "武器B", "武器E"]） */
+  weaponTypes: string[]
+  /** 阻断卫星传输链路的平均时延（分钟） */
+  avgDelayMin: number
+  /** 卫星打击矩阵列表，每项描述一颗卫星的打击详情 */
+  satelliteMatrixList: ZhchPlanSatelliteMatrix[]
+}
+
+/**
+ * 基于军用/民用类型获取综合打击方案
+ *
+ * @param data.type - 卫星用途类型筛选条件（如"军用"、"民用"）
+ * @param data.taskId - 作战任务 ID
+ * @returns 包含综合打击方案数据的 Axios 响应 Promise
+ */
+export const getSatelliteThreatInfoByType = (data: { type: string; taskId: number }) => {
+  const url = `/api/algorithm/zhchPlan`
+  return requestAPI.post<AxiosResponseType<ZhchPlanResp>>(url, data)
+}
+

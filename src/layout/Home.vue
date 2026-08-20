@@ -104,7 +104,7 @@ interface MenuTabItem {
 }
 
 /** [变量说明] 当前激活的菜单项 Key */
-const activeTab = ref<string>('GIS态势分析')
+const activeTab = ref<string>('整体态势分析')
 
 /** [变量说明] 顶层四个切换菜单按钮配置 */
 const menuTabs: MenuTabItem[] = [
