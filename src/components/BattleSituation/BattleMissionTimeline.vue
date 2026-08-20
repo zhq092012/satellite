@@ -92,6 +92,8 @@ const props = defineProps<{
   /** 当前选中的时间点类型。 */
   selectedMarkerType?: TimelineMarkerType | null
   selectedMarkerLabel?: string | null
+  /** 当前选中的地面站 ID（用于精确匹配时间轴标记） */
+  selectedMarkerReceiveId?: string | null
 }>()
 
 /** 时间轴向父组件触发的事件。 */
@@ -188,6 +190,8 @@ interface DisplayMarkerItem {
   subItems?: string[]
   /** 过境接收站 ID。 */
   receiveId?: string
+  /** 与拓扑链路一致的排序序号。 */
+  orderIndex?: number
 }
 
 /** 各类时间轴标记的展示元数据。 */
@@ -229,7 +233,7 @@ const displayMarkerItems = computed<DisplayMarkerItem[]>(() => {
     /** 当前标记在时间轴上的位置。 */
     const percent = msToPercent(marker.ms)
     return {
-      key: `${marker.type}-${marker.receiveId || marker.label}-${idx}`,
+      key: `${marker.type}-${marker.receiveId || marker.label}-${marker.orderIndex ?? idx}`,
       type: marker.type,
       ms: marker.ms,
       percent,
@@ -241,7 +245,11 @@ const displayMarkerItems = computed<DisplayMarkerItem[]>(() => {
       timeText: formatTimelineTime(marker.ms),
       desc: marker.detail || undefined,
       receiveId: marker.receiveId,
+      orderIndex: marker.orderIndex ?? idx,
     }
+  }).sort((a, b) => {
+    if (a.percent !== b.percent) return a.percent - b.percent
+    return (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
   })
 })
 
@@ -288,6 +296,7 @@ const isMarkerSelected = (item: DisplayMarkerItem): boolean =>
   props.selectedMarkerMs != null &&
   item.ms === props.selectedMarkerMs &&
   (!props.selectedMarkerType || item.type === props.selectedMarkerType) &&
+  (!props.selectedMarkerReceiveId || item.receiveId === props.selectedMarkerReceiveId) &&
   (!props.selectedMarkerLabel || item.title === props.selectedMarkerLabel)
 
 /** 根据当前选中卫星同步时间轴默认时间。 */

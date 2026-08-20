@@ -39,10 +39,20 @@ export interface SatelliteTransmissionLink {
   transmitTime: string
   /** 传输开始时间戳（用于排序） */
   transmitStartMs: number
+  /** 传输结束时间戳（过境窗口结束） */
+  transmitEndMs: number
+  /** 地面接收站 ID */
+  receiveId: string
   /** 链路完成时间 */
   finishTime: string
   /** 是否被打击 */
   struck: boolean
+  /** 卫星是否被打击 */
+  satelliteStruck: boolean
+  /** 地面站是否被打击 */
+  receiveStruck: boolean
+  /** 打击目标描述（卫星 / 地面站 / 卫星 + 地面站 / 无） */
+  strikeTargetLabel: string
   /** 打击武器名称（多个以顿号分隔） */
   weaponNames: string
   /** 武器类型（若唯一） */
@@ -556,7 +566,7 @@ export const resolveStationPassChain = (
 
   const receiveId = win.receiveId || receiveKey
   const receiveName = win.receiveName || receiveId
-  const struck = Number((win as { strikeStatus?: number }).strikeStatus) === 1
+  const struck = isTransmissionLinkStruck(win as Record<string, any>, postSat)
   const delayMin =
     Number((win as { delayMin?: number }).delayMin) ||
     (struck ? Number(postSat?.delayMin) || 0 : 0)
@@ -638,6 +648,44 @@ const mergeSatelliteTransitWindows = (initWindows: Record<string, any>[] = [], s
   return Array.from(map.values())
 }
 
+/**
+ * 解析单条链路的打击目标：卫星、地面站或两者
+ *
+ * @param win 过境窗口
+ * @param postSat 打击后卫星矩阵项
+ * @returns 打击目标分解与展示文案
+ */
+export const resolveLinkStrikeTarget = (
+  win: Record<string, any>,
+  postSat: MatrixResult['satelliteMatrixList'][number] | undefined
+): {
+  satelliteStruck: boolean
+  receiveStruck: boolean
+  struck: boolean
+  label: string
+} => {
+  const satelliteStruck = postSat?.satelliteStatus === 1
+  const receiveStruck = Number(win.strikeStatus) === 1
+  const struck = satelliteStruck || receiveStruck
+  let label = '无'
+  if (satelliteStruck && receiveStruck) label = '卫星 + 地面站'
+  else if (satelliteStruck) label = '卫星'
+  else if (receiveStruck) label = '地面站'
+  return { satelliteStruck, receiveStruck, struck, label }
+}
+
+/**
+ * 判断单条传输链路是否被打击：地面站窗口 strikeStatus=1，或卫星 satelliteStatus=1 时链路均中断
+ *
+ * @param win 过境窗口
+ * @param postSat 打击后卫星矩阵项（含 satelliteStatus）
+ * @returns 链路是否被打击
+ */
+const isTransmissionLinkStruck = (
+  win: Record<string, any>,
+  postSat: MatrixResult['satelliteMatrixList'][number] | undefined
+): boolean => resolveLinkStrikeTarget(win, postSat).struck
+
 const resolveWindowReceive = (
   matrix: MatrixResult,
   norad: number,
@@ -666,10 +714,12 @@ const resolveWeaponsForWindow = (
   postSat: MatrixResult['satelliteMatrixList'][number] | undefined,
   win: Record<string, any>
 ): { weaponNames: string; weaponType?: string } => {
-  const struck = Number(win.strikeStatus) === 1
+  const windowStruck = Number(win.strikeStatus) === 1
+  const satStruck = postSat?.satelliteStatus === 1
+  const struck = windowStruck || satStruck
   const weaponMap = new Map<string, string | undefined>()
 
-  if (struck) {
+  if (windowStruck) {
     ;(win.weapons || []).forEach((w: Weapon) => weaponMap.set(w.name, w.type))
     const receiveId = win.receiveId as string | undefined
     const receiveName = win.receiveName as string | undefined
@@ -681,15 +731,27 @@ const resolveWeaponsForWindow = (
         weaponMap.set(plan.weaponName, plan.weaponType)
       }
     })
-    if (!weaponMap.size) {
-      weaponMap.set('电磁干扰', undefined)
-    }
   }
 
-  if (postSat?.satelliteStatus === 1) {
-    ;(postSat.weapons || []).forEach((w: Weapon) => {
+  if (satStruck) {
+    ;(postSat?.weapons || []).forEach((w: Weapon) => {
       if (!weaponMap.has(w.name)) weaponMap.set(w.name, w.type)
     })
+    const satNorad = postSat?.norad
+    const satName = postSat?.name
+    ;(matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string; targetType?: string }) => {
+      const matchedByNorad = !!plan.targetId && !!satNorad && String(plan.targetId) === String(satNorad)
+      const matchedByName = !!plan.target && !!satName && plan.target === satName
+      const targetIsSatellite =
+        !plan.targetType || plan.targetType.includes('卫星') || plan.targetType.toUpperCase() === 'SAT'
+      if ((matchedByNorad || matchedByName) && (targetIsSatellite || matchedByNorad)) {
+        weaponMap.set(plan.weaponName, plan.weaponType)
+      }
+    })
+  }
+
+  if (struck && !weaponMap.size) {
+    weaponMap.set('电磁干扰', undefined)
   }
 
   const names = Array.from(weaponMap.keys())
@@ -767,7 +829,8 @@ export const collectSatelliteTransmissionLinks = (
       blockedReason = '该地面站未连接到数据中心'
     }
 
-    const struck = Number(win.strikeStatus) === 1
+    const strikeTarget = resolveLinkStrikeTarget(win, postSat)
+    const struck = strikeTarget.struck
     const delayMin = Number(win.delayMin) || (struck ? Number(postSat?.delayMin) || 0 : 0)
     const { weaponNames, weaponType } = resolveWeaponsForWindow(matrix, postSat, win)
     const relayEndTs = relayWindow
@@ -779,10 +842,15 @@ export const collectSatelliteTransmissionLinks = (
       id: `${receiveId}-${groundStart}-${index}`,
       nodes,
       receiveName,
+      receiveId,
       transmitTime: groundEnd && groundEnd !== groundStart ? `${groundStart} ~ ${groundEnd}` : groundStart,
       transmitStartMs: groundStartTs,
+      transmitEndMs: groundEndTs,
       finishTime: formatTimestampMs(finishTs),
       struck,
+      satelliteStruck: strikeTarget.satelliteStruck,
+      receiveStruck: strikeTarget.receiveStruck,
+      strikeTargetLabel: strikeTarget.label,
       weaponNames,
       weaponType,
       delayMin,
@@ -792,7 +860,10 @@ export const collectSatelliteTransmissionLinks = (
     })
   })
 
-  return links.sort((a, b) => a.transmitStartMs - b.transmitStartMs)
+  return links.sort((a, b) => {
+    if (a.transmitStartMs !== b.transmitStartMs) return a.transmitStartMs - b.transmitStartMs
+    return a.receiveName.localeCompare(b.receiveName, 'zh-CN')
+  })
 }
 
 /** 统计全网打击前通信链路数，以及打击后仍可完成的全链路 */

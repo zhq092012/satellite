@@ -1226,11 +1226,19 @@ const resetHighlightSatellites = () => {
 
       if (entity && entity.label) {
         entity.label.fillColor = new Cesium.ConstantProperty(satColor)
+        const isMatrixNode = entityIdStr.startsWith('sat-node-')
         const satNodeEnt = norad ? viewer.entities.getById(`sat-node-${norad}`) : null
-        if (satNodeEnt) {
+        const fallbackName =
+          satInfo?.name || cachedSatelliteList?.find((s) => Number(s.norad_id) === norad)?.name_en
+
+        if (isMatrixNode && norad) {
+          // 矩阵卫星节点是主标签载体，取消高亮后必须恢复显示
+          entity.label.text = new Cesium.ConstantProperty(buildSatelliteLabelText(norad, fallbackName))
+          entity.label.show = new Cesium.ConstantProperty(true)
+        } else if (satNodeEnt) {
+          // 同 NORAD 的 TLE 备用实体仅隐藏重复标签
           entity.label.show = new Cesium.ConstantProperty(false)
         } else if (norad) {
-          const fallbackName = cachedSatelliteList?.find((s) => Number(s.norad_id) === norad)?.name_en
           entity.label.text = new Cesium.ConstantProperty(buildSatelliteLabelText(norad, fallbackName))
           entity.label.show = new Cesium.ConstantProperty(true)
         }

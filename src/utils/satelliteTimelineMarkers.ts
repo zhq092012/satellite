@@ -1,7 +1,7 @@
 import type { MatrixResult } from '@/api/electronic'
 import {
   analyzeSatelliteFullChain,
-  parseTimeToMs,
+  collectSatelliteTransmissionLinks,
 } from '@/utils/satelliteFullChainAnalysis'
 
 export type TimelineMarkerType =
@@ -18,6 +18,8 @@ export interface TimelineMarker {
   label: string
   detail?: string
   receiveId?: string
+  /** 与拓扑图链路一致的排序序号（同时间戳时保证从左到右顺序） */
+  orderIndex?: number
 }
 
 export interface TimelineJamSegment {
@@ -39,40 +41,38 @@ export interface SatelliteTimelineModel {
 
 const clampMs = (ms: number, min: number, max: number): number => Math.min(max, Math.max(min, ms))
 
-const getWindowStartStr = (win: Record<string, string | undefined>): string =>
-  win.peakWindow || win.startWindow || win.beginWindow || ''
+/**
+ * 从传输链路列表构建时间轴干扰/打击色段
+ *
+ * @param links 按过站时间排序的传输链路
+ * @param taskStartMs 任务开始时间戳
+ * @param taskEndMs 任务结束时间戳
+ * @returns 时间轴色段列表
+ */
+const collectJamSegmentsFromLinks = (
+  links: ReturnType<typeof collectSatelliteTransmissionLinks>,
+  taskStartMs: number,
+  taskEndMs: number
+): TimelineJamSegment[] =>
+  links
+    .filter((link) => link.struck)
+    .map((link) => ({
+      startMs: clampMs(link.transmitStartMs, taskStartMs, taskEndMs),
+      endMs: clampMs(link.transmitEndMs || link.transmitStartMs, taskStartMs, taskEndMs),
+      label: link.receiveName,
+      weaponName: link.weaponNames?.split('、')[0],
+    }))
+    .sort((a, b) => a.startMs - b.startMs || a.label.localeCompare(b.label, 'zh-CN'))
 
-const getStationPassWindows = (matrix: MatrixResult, norad: number) => {
-  const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
-  if (postSat?.stationWindows?.length) return postSat.stationWindows
-  const initSat = matrix.initMatrixList?.find((s) => s.norad === norad)
-  return initSat?.initWindows || []
-}
-
-const collectJamSegments = (matrix: MatrixResult, norad: number, taskStartMs: number, taskEndMs: number): TimelineJamSegment[] => {
-  const segments: TimelineJamSegment[] = []
-  const dedupe = new Set<string>()
-
-  getStationPassWindows(matrix, norad).forEach((win) => {
-    if (Number((win as { strikeStatus?: number }).strikeStatus) !== 1) return
-    const startMs = parseTimeToMs(getWindowStartStr(win as Record<string, string>))
-    const endMs = parseTimeToMs(win.endWindow || '')
-    if (!startMs) return
-    const end = endMs || startMs
-    const key = `${win.receiveId || win.receiveName}-${startMs}`
-    if (dedupe.has(key)) return
-    dedupe.add(key)
-    segments.push({
-      startMs: clampMs(startMs, taskStartMs, taskEndMs),
-      endMs: clampMs(end, taskStartMs, taskEndMs),
-      label: win.receiveName || win.receiveId,
-      weaponName: (win as { weapons?: { name?: string }[] }).weapons?.[0]?.name,
-    })
-  })
-
-  return segments.sort((a, b) => a.startMs - b.startMs)
-}
-
+/**
+ * 构建选中卫星的任务时间轴模型，标记与拓扑图链路一一对应
+ *
+ * @param matrix 算法矩阵数据
+ * @param norad 卫星 NORAD 编号
+ * @param taskStartMs 任务开始时间戳
+ * @param taskEndMs 任务结束时间戳
+ * @returns 时间轴模型
+ */
 export const buildSatelliteTimelineModel = (
   matrix: MatrixResult | null,
   norad: number | null,
@@ -86,11 +86,13 @@ export const buildSatelliteTimelineModel = (
       type: 'task_start',
       ms: taskStartMs,
       label: '任务开始',
+      orderIndex: -2,
     },
     {
       type: 'task_end',
       ms: taskEndMs,
       label: '任务结束',
+      orderIndex: Number.MAX_SAFE_INTEGER,
     },
   ]
 
@@ -106,36 +108,33 @@ export const buildSatelliteTimelineModel = (
 
   if (!matrix || !norad) return emptyModel
 
-  const passSeen = new Set<string>()
+  const links = collectSatelliteTransmissionLinks(matrix, norad)
   let firstTransmitMs: number | null = null
-  getStationPassWindows(matrix, norad).forEach((win) => {
-    const startMs = parseTimeToMs(getWindowStartStr(win as Record<string, string>))
-    if (!startMs) return
-    const receiveId = win.receiveId || win.receiveName || ''
-    const passKey = `${receiveId}-${startMs}`
-    if (passSeen.has(passKey)) return
-    passSeen.add(passKey)
 
-    const ms = clampMs(startMs, taskStartMs, taskEndMs)
+  links.forEach((link, orderIndex) => {
+    const ms = clampMs(link.transmitStartMs, taskStartMs, taskEndMs)
     if (firstTransmitMs == null || ms < firstTransmitMs) firstTransmitMs = ms
 
-    const struck = Number((win as { strikeStatus?: number }).strikeStatus) === 1
-    const stationName = win.receiveName || receiveId || '地面站'
-    const weaponName = (win as { weapons?: { name?: string }[] }).weapons?.[0]?.name
+    const detailParts: string[] = []
+    if (link.struck) {
+      detailParts.push(`打击目标：${link.strikeTargetLabel}`)
+      if (link.weaponNames && link.weaponNames !== '未打击') detailParts.push(link.weaponNames)
+      if (link.delayMin > 0) detailParts.push(`延迟 +${link.delayMin} 分钟`)
+    } else {
+      detailParts.push(`过境 ${link.receiveName}`)
+    }
+
     markers.push({
-      type: struck ? 'jam' : 'first_transmit',
+      type: link.struck ? 'jam' : 'first_transmit',
       ms,
-      label: stationName,
-      detail: struck
-        ? weaponName
-          ? `${weaponName} → ${stationName}`
-          : stationName
-        : `过境 ${stationName}`,
-      receiveId: win.receiveId,
+      label: link.receiveName,
+      detail: detailParts.join(' · '),
+      receiveId: link.receiveId,
+      orderIndex,
     })
   })
 
-  const jamSegments = collectJamSegments(matrix, norad, taskStartMs, taskEndMs)
+  const jamSegments = collectJamSegmentsFromLinks(links, taskStartMs, taskEndMs)
   const postChain = analyzeSatelliteFullChain(matrix, norad, true)
   const allBlocked = postChain.blocked
   const postChainFinishMs =
@@ -143,7 +142,10 @@ export const buildSatelliteTimelineModel = (
       ? clampMs(postChain.finishTimestamp, taskStartMs, taskEndMs)
       : null
 
-  markers.sort((a, b) => a.ms - b.ms)
+  markers.sort((a, b) => {
+    if (a.ms !== b.ms) return a.ms - b.ms
+    return (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+  })
 
   return {
     taskStartMs,

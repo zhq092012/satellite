@@ -106,7 +106,9 @@
                 :task-end="taskTimeRange.end" :matrix-data="matrixData" :selected-norad="selectedNorad"
                 :selected-marker-ms="selectedTimelinePoint?.ms ?? null"
                 :selected-marker-type="selectedTimelinePoint?.type ?? null"
-                :selected-marker-label="selectedTimelinePoint?.label ?? null" @time-change="handleTimelineTimeChange"
+                :selected-marker-label="selectedTimelinePoint?.label ?? null"
+                :selected-marker-receive-id="selectedTimelinePoint?.receiveId ?? selectedReceiveId"
+                @time-change="handleTimelineTimeChange"
                 @marker-click="handleTimelineMarkerClick" />
             </div>
           </div>
@@ -264,7 +266,23 @@ const isStationNodeId = (nodeId: string): boolean => {
   )
 }
 
+const syncTimelineForReceive = (receiveId: string) => {
+  const norad = selectedNorad.value
+  const data = matrixData.value
+  if (!norad || !data) return
+  const link = collectSatelliteTransmissionLinks(data, norad).find((item) => item.receiveId === receiveId)
+  if (!link) return
+  selectedTimelinePoint.value = {
+    ms: link.transmitStartMs,
+    type: link.struck ? 'jam' : 'first_transmit',
+    label: link.receiveName,
+    receiveId: link.receiveId,
+  }
+}
+
 const handleSelectReceiveStation = (receiveId: string, model: any) => {
+  selectedLinkId.value = null
+
   if (!selectedNorad.value) {
     parseAndSelectNode(model)
     updateGraphHighlightState()
@@ -272,11 +290,14 @@ const handleSelectReceiveStation = (receiveId: string, model: any) => {
   }
   if (selectedReceiveId.value === receiveId) {
     selectedReceiveId.value = null
+    selectedTimelinePoint.value = null
     const norad = selectedNorad.value
     const data = matrixData.value
     const satObj =
       (data?.satelliteMatrixList || []).find((s) => s.norad === norad) ||
       (data?.initMatrixList || []).find((s) => s.norad === norad)
+    selectedPanelNodeId.value = `sat-${norad}`
+    selectedPanelNodeLayer.value = 'sat'
     selectedNodeInfo.value = {
       id: `sat-${norad}`,
       name: satObj?.name || `Sat-${norad}`,
@@ -284,14 +305,13 @@ const handleSelectReceiveStation = (receiveId: string, model: any) => {
       norad,
     }
     updateGraphHighlightState()
-    refreshGraphForTime()
     return
   }
 
   selectedReceiveId.value = receiveId
   parseAndSelectNode(model)
+  syncTimelineForReceive(receiveId)
   updateGraphHighlightState()
-  refreshGraphForTime()
 }
 
 const handleTimelineTimeChange = (ms: number) => {
@@ -304,10 +324,27 @@ const handleTimelineMarkerClick = (payload: {
   label: string
   receiveId?: string
 }) => {
-  selectedReceiveId.value = null
+  selectedLinkId.value = null
   selectedTimelinePoint.value = payload
+  if (payload.receiveId) {
+    selectedReceiveId.value = payload.receiveId
+    selectedPanelNodeId.value = payload.receiveId
+    selectedPanelNodeLayer.value = 'receive'
+    const data = matrixData.value
+    const recObj =
+      (data?.stationRelationList?.receiveObjList || []).find((r) => r.receiveId === payload.receiveId) ||
+      (data?.initRelationList?.receiveObjList || []).find((r) => r.receiveId === payload.receiveId)
+    selectedNodeInfo.value = {
+      id: payload.receiveId,
+      name: recObj?.receiveName || payload.label,
+      type: 'receive',
+      receiveId: payload.receiveId,
+    }
+  } else {
+    selectedReceiveId.value = null
+  }
   setCurrentTimestamp(payload.ms)
-  refreshGraphForTime()
+  updateGraphHighlightState()
 }
 
 // 卫星类型与系列映射
@@ -393,7 +430,7 @@ const syncTopoSelectionFromStore = () => {
 }
 
 watch(selectedTimelinePoint, () => {
-  refreshGraphForTime()
+  updateGraphHighlightState()
 })
 
 watch(seriesOptions, (options) => {
@@ -668,6 +705,16 @@ const getTopoNodeColors = (kind: TopoNodeKind, struck: boolean) => {
   }
 }
 
+/**
+ * 格式化地面站节点下方显示的延时副标题
+ * @param delayMin 延时分钟数
+ * @returns 有延时时返回如 "+2672.9 分钟"，否则 undefined
+ */
+const formatReceiveDelaySubLabel = (delayMin: number): string | undefined => {
+  if (delayMin > 0) return `+${delayMin} 分钟`
+  return undefined
+}
+
 const buildTopoNode = (opts: {
   id: string
   name: string
@@ -677,9 +724,17 @@ const buildTopoNode = (opts: {
   struck?: boolean
   /** 是否在节点下方显示名称 */
   showLabel?: boolean
+  /** 名称下方的副标题（如造成的延时） */
+  subLabel?: string
 }) => {
   const struck = !!opts.struck
   const showLabel = opts.showLabel !== false
+  const hasSubLabel = showLabel && !!opts.subLabel
+  const labelText = showLabel
+    ? hasSubLabel
+      ? `${opts.name}\n${opts.subLabel}`
+      : opts.name
+    : ''
   const colors = getTopoNodeColors(opts.kind, struck)
   const style = {
     fill: colors.fill,
@@ -697,8 +752,9 @@ const buildTopoNode = (opts: {
   }
   return {
     id: opts.id,
-    label: showLabel ? opts.name : '',
+    label: labelText,
     nodeName: opts.name,
+    kind: opts.kind,
     layer: opts.layer,
     x: opts.x,
     y: getLayerY(opts.layer),
@@ -712,11 +768,13 @@ const buildTopoNode = (opts: {
     labelCfg: showLabel
       ? {
           position: 'bottom',
-          offset: 8,
+          offset: hasSubLabel ? 14 : 8,
           style: {
             fill: '#e2efff',
-            fontSize: 10,
+            fontSize: hasSubLabel ? 9 : 10,
             fontWeight: 500,
+            lineHeight: 14,
+            textAlign: 'center',
           },
         }
       : { style: { opacity: 0 } },
@@ -1303,7 +1361,10 @@ const buildFocusedSatelliteGraph = (norad: number) => {
   const satName = postSat?.name || initSat?.name || `Sat-${norad}`
   const satStruck = postSat?.satelliteStatus === 1
 
-  const receiveOrderMap = new Map<string, { id: string; name: string; earliestMs: number; struck: boolean }>()
+  const receiveOrderMap = new Map<
+    string,
+    { id: string; name: string; earliestMs: number; receiveStruck: boolean; delayMin: number }
+  >()
   const relayMap = new Map<string, { id: string; name: string }>()
   const stationMap = new Map<string, { id: string; name: string; receiveId: string }>()
 
@@ -1316,10 +1377,12 @@ const buildFocusedSatelliteGraph = (norad: number) => {
             id: n.id,
             name: n.name,
             earliestMs: link.transmitStartMs,
-            struck: link.struck || existing?.struck || false,
+            receiveStruck: link.receiveStruck || existing?.receiveStruck || false,
+            delayMin: link.delayMin || existing?.delayMin || 0,
           })
-        } else if (link.struck) {
-          existing.struck = true
+        } else {
+          if (link.receiveStruck) existing.receiveStruck = true
+          if (link.delayMin > existing.delayMin) existing.delayMin = link.delayMin
         }
       }
       if (n.layer === 'RELAY') {
@@ -1332,7 +1395,9 @@ const buildFocusedSatelliteGraph = (norad: number) => {
     })
   })
 
-  const sortedReceives = Array.from(receiveOrderMap.values()).sort((a, b) => a.earliestMs - b.earliestMs)
+  const sortedReceives = Array.from(receiveOrderMap.values()).sort(
+    (a, b) => a.earliestMs - b.earliestMs || a.name.localeCompare(b.name, 'zh-CN')
+  )
   const relayList = Array.from(relayMap.values())
 
   satNodeCount.value = 1
@@ -1374,8 +1439,9 @@ const buildFocusedSatelliteGraph = (norad: number) => {
         kind: 'receive',
         x,
         layer: 3,
-        struck: rec.struck,
+        struck: rec.receiveStruck,
         showLabel: true,
+        subLabel: formatReceiveDelaySubLabel(rec.delayMin),
       })
     )
     nodeSet.add(rec.id)
@@ -1578,8 +1644,17 @@ const initOrUpdateGraph = () => {
 
       if (nodeId.startsWith('sat-')) {
         const norad = Number(nodeId.replace('sat-', ''))
-        if (Number.isFinite(norad)) {
-          handleSelectSatellite(selectedNorad.value === norad ? null : norad)
+        if (!Number.isFinite(norad)) return
+        if (selectedNorad.value !== norad) {
+          handleSelectSatellite(norad)
+        } else {
+          selectedLinkId.value = null
+          selectedReceiveId.value = null
+          selectedTimelinePoint.value = null
+          selectedPanelNodeId.value = `sat-${norad}`
+          selectedPanelNodeLayer.value = 'sat'
+          parseAndSelectNode(model)
+          updateGraphHighlightState()
         }
         return
       }
@@ -1589,6 +1664,9 @@ const initOrUpdateGraph = () => {
         return
       }
 
+      selectedLinkId.value = null
+      selectedReceiveId.value = null
+      selectedTimelinePoint.value = null
       parseAndSelectNode(model)
       updateGraphHighlightState()
     })
@@ -1693,32 +1771,46 @@ const updateGraphHighlightState = () => {
     return
   }
 
-  const receiveId = selectedReceiveId.value
+  const receiveId = selectedReceiveId.value || selectedTimelinePoint.value?.receiveId || null
   const satId = selectedNorad.value != null ? `sat-${selectedNorad.value}` : null
-
-  if (selectedTimelinePoint.value?.type === 'first_transmit' && satId) {
-    graph.getNodes().forEach((node: any) => {
-      const id = String(node.get('id'))
-      graph.setItemState(node, 'selected', id === satId)
-      graph.setItemState(node, 'inactive', false)
-      graph.setItemState(node, 'highlight', false)
-      graph.setItemState(node, 'active', false)
-    })
-    graph.getEdges().forEach((edge: any) => {
-      graph.setItemState(edge, 'inactive', false)
-      graph.setItemState(edge, 'active', false)
-    })
-    return
-  }
 
   if (receiveId && satId) {
     graph.getNodes().forEach((node: any) => {
       const id = String(node.get('id'))
       const focus = id === receiveId || id === satId
       graph.setItemState(node, 'selected', focus)
-      graph.setItemState(node, 'inactive', false)
-      graph.setItemState(node, 'highlight', focus)
+      graph.setItemState(node, 'inactive', !focus)
+      graph.setItemState(node, 'highlight', id === receiveId)
       graph.setItemState(node, 'active', false)
+    })
+    graph.getEdges().forEach((edge: any) => {
+      const model = edge.getModel()
+      const source = String(model.source)
+      const target = String(model.target)
+      const onReceivePath =
+        (source === satId && target === receiveId) ||
+        source === receiveId ||
+        target === receiveId
+      graph.updateItem(edge, { style: buildLinkEdgeStyle(!!model.linkStruck, onReceivePath) })
+      graph.setItemState(edge, 'highlight', onReceivePath)
+      graph.setItemState(edge, 'inactive', !onReceivePath)
+      graph.setItemState(edge, 'active', false)
+    })
+    return
+  }
+
+  if (selectedTimelinePoint.value?.type === 'first_transmit' && satId && !receiveId) {
+    graph.getNodes().forEach((node: any) => {
+      const id = String(node.get('id'))
+      graph.setItemState(node, 'selected', id === satId)
+      graph.setItemState(node, 'inactive', id !== satId)
+      graph.setItemState(node, 'highlight', false)
+      graph.setItemState(node, 'active', false)
+    })
+    graph.getEdges().forEach((edge: any) => {
+      graph.setItemState(edge, 'inactive', false)
+      graph.setItemState(edge, 'active', false)
+      graph.setItemState(edge, 'highlight', false)
     })
     return
   }

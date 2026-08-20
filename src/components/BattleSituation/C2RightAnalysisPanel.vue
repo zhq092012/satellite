@@ -1,151 +1,161 @@
 <template>
   <aside class="c2-panel c2-panel--right dark-theme">
-    <!-- 面板标题 Header -->
     <div class="panel-header">
       <div class="header-title-box">
         <span class="header-icon">🏢</span>
         <span class="header-title glow-text-cyan">敌方地面接收站与数据中心</span>
       </div>
-      <span class="panel-badge badge-blue">{{ selectedSatInfo ? selectedSatInfo.name : '正常传输分析' }}</span>
+      <span class="panel-badge badge-blue">
+        {{ activeTab === 'satellite-link' && selectedSatInfo ? selectedSatInfo.name : '资产清单' }}
+      </span>
     </div>
 
-    <!-- 全面板纵向滚动容器 -->
-    <el-scrollbar ref="panelScrollRef" class="panel-body-scroll">
-      <!-- 1. 选中卫星全链路分析（点击后置顶展示） -->
-      <div class="panel-section panel-section--sat-analysis" v-if="selectedSatelliteNorad">
-        <div class="section-title title-highlight">
-          <span>
-            <span class="title-icon">🛰️</span>
-            <span>选中卫星链路分析</span>
-          </span>
-          <button class="close-node-btn" @click="emit('clear-satellite-selection')">清除</button>
-        </div>
-
-        <div v-if="selectedSatInfo" class="sat-analysis-box">
-          <div class="sat-header-row">
-            <div class="sat-title-group">
-              <span class="sat-name-large">{{ selectedSatInfo.name }}</span>
-              <span class="sat-type-tag">{{ selectedSatInfo.satType }}</span>
+    <el-tabs v-model="activeTab" class="panel-tabs">
+      <el-tab-pane label="地面站与数据中心" name="infrastructure">
+        <el-scrollbar class="panel-body-scroll">
+          <div class="panel-section">
+            <div class="section-title">
+              <span class="title-icon">📡</span>
+              <span>地面接收站</span>
+              <span class="count-tag">{{ receiveStations.length }} 个</span>
+              <span v-if="selectedReceiveName" class="current-asset" :title="selectedReceiveName">
+                当前选择：{{ selectedReceiveName }}
+              </span>
             </div>
-            <span class="norad-tag">NORAD {{ selectedSatelliteNorad }}</span>
-          </div>
-
-          <!-- 全部传输链路 -->
-          <div class="chain-block">
-            <div class="chain-block-title">
-              传输链路列表
-              <span class="weapon-count-tag">{{ transmissionLinks.length }} 条</span>
-            </div>
-            <div v-if="transmissionLinks.length" class="transmission-link-list">
+            <div class="asset-scroll-list">
               <div
-                v-for="(link, idx) in transmissionLinks"
-                :key="link.id"
-                class="transmission-link-card"
-                :class="{ struck: link.struck, blocked: link.blocked }"
+                v-for="node in receiveStations"
+                :key="'rec-' + node.id"
+                class="asset-card"
+                :class="{ active: isGroundNodeSelected(node) }"
+                @click="handleSelectGroundNode(node)"
               >
-                <div class="link-card-header">
-                  <span class="link-index">链路 {{ idx + 1 }}</span>
-                  <span class="link-receive">{{ link.receiveName }}</span>
+                <div class="card-top">
+                  <span class="asset-name">📡 <strong>{{ node.name }}</strong></span>
                 </div>
-                <div class="link-flow-card compact">
-                  <template v-for="(node, nodeIdx) in link.nodes" :key="link.id + '-' + node.layer + node.id">
-                    <div class="flow-step">
-                      <span class="step-icon">{{ node.icon }}</span>
-                      <span class="step-text" :title="node.name">{{ node.name }}</span>
-                      <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
-                    </div>
-                    <span v-if="nodeIdx < link.nodes.length - 1" class="flow-arrow">→</span>
-                  </template>
-                </div>
-                <div v-if="link.blocked" class="chain-blocked-tip">{{ link.blockedReason }}</div>
-                <div class="link-meta-grid">
-                  <div class="link-meta-item">
-                    <span class="meta-label">传输时间</span>
-                    <strong class="meta-val glow-cyan">{{ link.transmitTime }}</strong>
-                  </div>
-                  <div class="link-meta-item">
-                    <span class="meta-label">完成时间</span>
-                    <strong class="meta-val">{{ link.finishTime }}</strong>
-                  </div>
-                  <div class="link-meta-item">
-                    <span class="meta-label">打击武器</span>
-                    <strong class="meta-val">
-                      {{ link.weaponNames }}
-                      <span v-if="link.weaponType" class="weapon-type-tag">{{ link.weaponType }}</span>
-                    </strong>
-                  </div>
-                  <div class="link-meta-item">
-                    <span class="meta-label">造成延迟</span>
-                    <strong class="meta-val" :class="link.delayMin > 0 || link.struck ? 'glow-red' : 'glow-green'">
-                      {{ link.delayText }}
-                    </strong>
-                  </div>
-                </div>
+                <div class="card-line" v-if="node.usage">用途 {{ node.usage }}</div>
+                <div class="card-line">位置 {{ formatLatLon(node.latitude, node.longitude) }}</div>
               </div>
             </div>
-            <div v-else class="chain-blocked-tip muted">暂无传输链路数据</div>
           </div>
-        </div>
 
-        <div v-else class="empty-sat-box">
-          <span class="empty-icon">🛰️</span>
-          <p class="empty-text">当前系列下未找到该卫星数据</p>
-        </div>
-      </div>
-
-      <!-- 2. 敌方地面接收站 -->
-      <div class="panel-section">
-        <div class="section-title">
-          <span class="title-icon">📡</span>
-          <span>地面接收站</span>
-          <span class="count-tag">{{ receiveStations.length }} 个</span>
-          <span v-if="selectedReceiveName" class="current-asset" :title="selectedReceiveName">
-            当前选择：{{ selectedReceiveName }}
-          </span>
-        </div>
-        <div class="asset-scroll-list">
-          <div v-for="node in receiveStations" :key="'rec-' + node.id" class="asset-card" :class="{
-            active: isGroundNodeSelected(node),
-            struck: node.status === 1,
-          }" @click="handleSelectGroundNode(node)">
-            <div class="card-top">
-              <span class="asset-name">📡 <strong>{{ node.name }}</strong></span>
-              <span class="metric-highlight" :class="node.status === 1 ? 'status-struck' : 'status-ok'">
-                {{ node.status === 1 ? '被打击' : '可用' }}
+          <div class="panel-section">
+            <div class="section-title">
+              <span class="title-icon">💻</span>
+              <span>数据中心</span>
+              <span class="count-tag">{{ dataCenters.length }} 个</span>
+              <span v-if="selectedDataCenterName" class="current-asset" :title="selectedDataCenterName">
+                当前选择：{{ selectedDataCenterName }}
               </span>
             </div>
-            <div class="card-line" v-if="node.usage">用途 {{ node.usage }}</div>
-            <div class="card-line">位置 {{ formatLatLon(node.latitude, node.longitude) }}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 3. 敌方数据中心 -->
-      <div class="panel-section">
-        <div class="section-title">
-          <span class="title-icon">💻</span>
-          <span>数据中心</span>
-          <span class="count-tag">{{ dataCenters.length }} 个</span>
-          <span v-if="selectedDataCenterName" class="current-asset" :title="selectedDataCenterName">
-            当前选择：{{ selectedDataCenterName }}
-          </span>
-        </div>
-        <div class="asset-scroll-list">
-          <div v-for="node in dataCenters" :key="'st-' + node.id" class="asset-card" :class="{
-            active: isGroundNodeSelected(node),
-            struck: node.status === 1,
-          }" @click="handleSelectGroundNode(node)">
-            <div class="card-top">
-              <span class="asset-name">💻 <strong>{{ node.name }}</strong></span>
-              <span class="metric-highlight" :class="node.status === 1 ? 'status-struck' : 'status-ok'">
-                {{ node.status === 1 ? '被打击' : '可用' }}
-              </span>
+            <div class="asset-scroll-list">
+              <div
+                v-for="node in dataCenters"
+                :key="'st-' + node.id"
+                class="asset-card"
+                :class="{ active: isGroundNodeSelected(node) }"
+                @click="handleSelectGroundNode(node)"
+              >
+                <div class="card-top">
+                  <span class="asset-name">💻 <strong>{{ node.name }}</strong></span>
+                </div>
+                <div class="card-line">位置 {{ formatLatLon(node.latitude, node.longitude) }}</div>
+              </div>
             </div>
-            <div class="card-line">位置 {{ formatLatLon(node.latitude, node.longitude) }}</div>
           </div>
-        </div>
-      </div>
-    </el-scrollbar>
+        </el-scrollbar>
+      </el-tab-pane>
+
+      <el-tab-pane label="选中卫星链路分析" name="satellite-link">
+        <el-scrollbar ref="panelScrollRef" class="panel-body-scroll">
+          <div v-if="selectedSatelliteNorad" class="panel-section panel-section--sat-analysis">
+            <div class="section-title title-highlight">
+              <span>
+                <span class="title-icon">🛰️</span>
+                <span>选中卫星链路分析</span>
+              </span>
+              <button class="close-node-btn" @click="emit('clear-satellite-selection')">清除</button>
+            </div>
+
+            <div v-if="selectedSatInfo" class="sat-analysis-box">
+              <div class="sat-header-row">
+                <div class="sat-title-group">
+                  <span class="sat-name-large">{{ selectedSatInfo.name }}</span>
+                  <span class="sat-type-tag">{{ selectedSatInfo.satType }}</span>
+                </div>
+                <span class="norad-tag">NORAD {{ selectedSatelliteNorad }}</span>
+              </div>
+
+              <div class="chain-block">
+                <div class="chain-block-title">
+                  传输链路列表
+                  <span class="weapon-count-tag">{{ transmissionLinks.length }} 条</span>
+                </div>
+                <div v-if="transmissionLinks.length" class="transmission-link-list">
+                  <div
+                    v-for="(link, idx) in transmissionLinks"
+                    :key="link.id"
+                    class="transmission-link-card"
+                    :class="{ struck: link.struck, blocked: link.blocked }"
+                  >
+                    <div class="link-card-header">
+                      <span class="link-index">链路 {{ idx + 1 }}</span>
+                      <span class="link-receive">{{ link.receiveName }}</span>
+                    </div>
+                    <div class="link-flow-card compact">
+                      <template v-for="(node, nodeIdx) in link.nodes" :key="link.id + '-' + node.layer + node.id">
+                        <div class="flow-step">
+                          <span class="step-icon">{{ node.icon }}</span>
+                          <span class="step-text" :title="node.name">{{ node.name }}</span>
+                          <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
+                        </div>
+                        <span v-if="nodeIdx < link.nodes.length - 1" class="flow-arrow">→</span>
+                      </template>
+                    </div>
+                    <div v-if="link.blocked" class="chain-blocked-tip">{{ link.blockedReason }}</div>
+                    <div class="link-meta-grid">
+                      <div class="link-meta-item">
+                        <span class="meta-label">传输时间</span>
+                        <strong class="meta-val glow-cyan">{{ link.transmitTime }}</strong>
+                      </div>
+                      <div class="link-meta-item">
+                        <span class="meta-label">完成时间</span>
+                        <strong class="meta-val">{{ link.finishTime }}</strong>
+                      </div>
+                      <div class="link-meta-item">
+                        <span class="meta-label">打击武器</span>
+                        <strong class="meta-val">
+                          {{ link.weaponNames }}
+                          <span v-if="link.weaponType" class="weapon-type-tag">{{ link.weaponType }}</span>
+                        </strong>
+                      </div>
+                      <div class="link-meta-item">
+                        <span class="meta-label">造成延迟</span>
+                        <strong class="meta-val" :class="link.delayMin > 0 || link.struck ? 'glow-red' : 'glow-green'">
+                          {{ link.delayText }}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="chain-blocked-tip muted">暂无传输链路数据</div>
+              </div>
+            </div>
+
+            <div v-else class="empty-sat-box">
+              <span class="empty-icon">🛰️</span>
+              <p class="empty-text">当前系列下未找到该卫星数据</p>
+            </div>
+          </div>
+
+          <div v-else class="empty-sat-box tab-empty-box">
+            <span class="empty-icon">🛰️</span>
+            <p class="empty-text">请先在左侧列表或地图上选择一颗卫星</p>
+            <p class="empty-sub">选择后将在此展示该卫星的全部传输链路分析</p>
+          </div>
+        </el-scrollbar>
+      </el-tab-pane>
+    </el-tabs>
   </aside>
 </template>
 
@@ -182,12 +192,17 @@ const emit = defineEmits<{
   (e: 'clear-satellite-selection'): void
 }>()
 
+/** 右侧面板 Tab：地面站资产 / 选中卫星链路 */
+type RightPanelTab = 'infrastructure' | 'satellite-link'
+
 const panelScrollRef = ref<{ setScrollTop: (value: number) => void } | null>(null)
+const activeTab = ref<RightPanelTab>('infrastructure')
 
 watch(
   () => props.selectedSatelliteNorad,
   (norad) => {
     if (!norad) return
+    activeTab.value = 'satellite-link'
     nextTick(() => {
       panelScrollRef.value?.setScrollTop(0)
     })
@@ -272,21 +287,9 @@ const getRelationSource = () => {
   return matrix.stationRelationList || null
 }
 
-const getPostStatusMap = (kind: 'receive' | 'station'): Map<string, number> => {
-  const map = new Map<string, number>()
-  const post = props.matrixData?.stationRelationList
-  if (kind === 'receive') {
-    ; (post?.receiveObjList || []).forEach((rec) => map.set(rec.receiveId, rec.receiveStatus ?? 0))
-  } else {
-    ; (post?.stationObjList || []).forEach((st) => map.set(st.stationId, st.stationStatus ?? 0))
-  }
-  return map
-}
-
 const receiveStations = computed<GroundAssetItem[]>(() => {
   const relationData = getRelationSource()
   if (!relationData?.receiveObjList) return []
-  const statusMap = getPostStatusMap('receive')
   return relationData.receiveObjList.map((rec) => {
     const [lat, lon] = parseLatLon(rec.receiveLatLon)
     return {
@@ -296,7 +299,7 @@ const receiveStations = computed<GroundAssetItem[]>(() => {
       latitude: lat,
       longitude: lon,
       altitude: 0,
-      status: statusMap.get(rec.receiveId) ?? rec.receiveStatus ?? 0,
+      status: rec.receiveStatus ?? 0,
       usage: (rec as { receiveUsage?: string }).receiveUsage,
     }
   })
@@ -305,7 +308,6 @@ const receiveStations = computed<GroundAssetItem[]>(() => {
 const dataCenters = computed<GroundAssetItem[]>(() => {
   const relationData = getRelationSource()
   if (!relationData?.stationObjList) return []
-  const statusMap = getPostStatusMap('station')
   return relationData.stationObjList.map((st) => {
     const [lat, lon] = parseLatLon(st.stationLatLon)
     return {
@@ -315,7 +317,7 @@ const dataCenters = computed<GroundAssetItem[]>(() => {
       latitude: lat,
       longitude: lon,
       altitude: 0,
-      status: statusMap.get(st.stationId) ?? st.stationStatus ?? 0,
+      status: st.stationStatus ?? 0,
     }
   })
 })
@@ -358,7 +360,60 @@ const handleSelectGroundNode = (node: GroundAssetItem) => {
   .panel-body-scroll {
     flex: 1;
     overflow-y: auto;
+    height: calc(100vh - 220px);
+    min-height: 320px;
   }
+}
+
+.panel-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+
+  :deep(.el-tabs__header) {
+    margin: 0 0 8px;
+    border-bottom: 1px solid rgba(0, 225, 255, 0.15);
+  }
+
+  :deep(.el-tabs__nav-wrap::after) {
+    display: none;
+  }
+
+  :deep(.el-tabs__item) {
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 0 12px;
+    height: 34px;
+    line-height: 34px;
+
+    &.is-active {
+      color: #40f2ff;
+    }
+
+    &:hover {
+      color: #7dd3fc;
+    }
+  }
+
+  :deep(.el-tabs__active-bar) {
+    background-color: #00e1ff;
+    height: 2px;
+  }
+
+  :deep(.el-tabs__content) {
+    flex: 1;
+    min-height: 0;
+  }
+
+  :deep(.el-tab-pane) {
+    height: 100%;
+  }
+}
+
+.tab-empty-box {
+  margin-top: 24px;
 }
 
 .panel-header {
@@ -459,10 +514,6 @@ const handleSelectGroundNode = (node: GroundAssetItem) => {
     box-shadow: 0 0 10px rgba(0, 225, 255, 0.22);
   }
 
-  &.struck {
-    border-color: rgba(239, 68, 68, 0.45);
-  }
-
   .card-top {
     display: flex;
     justify-content: space-between;
@@ -477,27 +528,6 @@ const handleSelectGroundNode = (node: GroundAssetItem) => {
       min-width: 0;
       flex: 1;
       text-align: left;
-    }
-  }
-
-  .metric-highlight {
-    flex-shrink: 0;
-    font-size: 13px;
-    font-weight: 800;
-    padding: 2px 8px;
-    border-radius: 4px;
-    white-space: nowrap;
-
-    &.status-ok {
-      color: #86efac;
-      background: rgba(34, 197, 94, 0.14);
-      border: 1px solid rgba(34, 197, 94, 0.35);
-    }
-
-    &.status-struck {
-      color: #fca5a5;
-      background: rgba(239, 68, 68, 0.18);
-      border: 1px solid rgba(239, 68, 68, 0.4);
     }
   }
 
