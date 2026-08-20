@@ -312,12 +312,11 @@ export interface MatrixResult {
 
 /**
  * 获取（侦察卫星）过境、过基站、延迟、打击以及战场矩阵的数据。
- * @param data 请求参数对象 (norad, taskId, intensityLevel)
+ * @param data 请求参数对象 (taskId, series)
  * @returns 包含 MatrixResult 的 Axios 响应 Promise
  */
 export const getReconnaissanceAttackMatrix = (data: {
   taskId: number
-  intensityLevel: string
   series: string
   stationIds?: string[]
   noradIds?: number[]
