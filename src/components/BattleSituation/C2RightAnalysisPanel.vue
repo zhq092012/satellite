@@ -30,82 +30,67 @@
             <span class="norad-tag">NORAD {{ selectedSatelliteNorad }}</span>
           </div>
 
-          <!-- 时间轴关键点链路（点击时间轴后展示） -->
-          <div class="chain-block chain-block--timeline" v-if="hasTimelinePoint">
+          <!-- 打击前最早全链路 -->
+          <div class="chain-block">
             <div class="chain-block-title">
-              当前时刻链路
-              <span class="timeline-point-tag">{{ timelineMarkerLabel }}</span>
+              打击前最早全链路通信
+              <span v-if="hasTimelinePoint" class="timeline-point-tag">{{ timelineMarkerLabel }}</span>
             </div>
-            <div class="timeline-point-time">{{ timelinePointTimeText }}</div>
-            <template v-if="!timelinePointChain.blocked">
-              <div class="link-flow-card post-strike">
-                <template v-for="(node, idx) in timelinePointChain.nodes" :key="'tl-' + node.layer + node.id">
+            <template v-if="!displayPreStrike.chain.blocked">
+              <div class="link-flow-card">
+                <template v-for="(node, idx) in displayPreStrike.chain.nodes" :key="'pre-' + node.layer + node.id">
                   <div class="flow-step">
                     <span class="step-icon">{{ node.icon }}</span>
                     <span class="step-text" :title="node.name">{{ node.name }}</span>
                     <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
                   </div>
-                  <span v-if="idx < timelinePointChain.nodes.length - 1" class="flow-arrow">→</span>
+                  <span v-if="idx < displayPreStrike.chain.nodes.length - 1" class="flow-arrow">→</span>
                 </template>
               </div>
-              <div class="finish-time-row" v-if="timelinePointChain.finishTime">
-                <span class="finish-label">链路完成时间</span>
-                <strong class="finish-val glow-cyan">{{ timelinePointChain.finishTime }}</strong>
+              <div class="finish-time-row" v-if="displayPreStrike.chain.finishTime">
+                <span class="finish-label">完成时间</span>
+                <strong class="finish-val glow-green">{{ displayPreStrike.chain.finishTime }}</strong>
+              </div>
+              <div class="finish-time-row" v-if="hasTimelinePoint">
+                <span class="finish-label">当前时刻</span>
+                <strong class="finish-val glow-cyan">{{ displayPreStrike.currentTime }}</strong>
+              </div>
+              <div class="finish-time-row" v-if="hasTimelinePoint">
+                <span class="finish-label">延迟</span>
+                <strong class="finish-val" :class="displayPreStrike.struck ? 'glow-red' : 'glow-green'">
+                  {{ displayPreStrike.delayText }}
+                </strong>
               </div>
             </template>
-            <div v-else class="chain-blocked-tip danger">
-              {{ timelinePointChain.blockedReason || '该时刻无可用链路' }}
+            <div v-else class="chain-blocked-tip">
+              {{ displayPreStrike.chain.blockedReason || '无可完成链路' }}
             </div>
           </div>
 
-          <!-- 打击前最早全链路 -->
-          <template v-if="!hasTimelinePoint">
-            <div class="chain-block">
-              <div class="chain-block-title">打击前最早全链路通信</div>
-              <template v-if="!preStrikeChain.blocked">
-                <div class="link-flow-card">
-                  <template v-for="(node, idx) in preStrikeChain.nodes" :key="node.layer + node.id">
-                    <div class="flow-step">
-                      <span class="step-icon">{{ node.icon }}</span>
-                      <span class="step-text" :title="node.name">{{ node.name }}</span>
-                      <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
-                    </div>
-                    <span v-if="idx < preStrikeChain.nodes.length - 1" class="flow-arrow">→</span>
-                  </template>
-                </div>
-                <div class="finish-time-row">
-                  <span class="finish-label">完成时间</span>
-                  <strong class="finish-val glow-green">{{ preStrikeChain.finishTime }}</strong>
-                </div>
-              </template>
-              <div v-else class="chain-blocked-tip">{{ preStrikeChain.blockedReason || '无可完成链路' }}</div>
-            </div>
-
-            <!-- 打击后最早全链路 -->
-            <div class="chain-block">
-              <div class="chain-block-title">打击后最早全链路通信</div>
-              <template v-if="!postStrikeChain.blocked">
-                <div class="link-flow-card post-strike">
-                  <template v-for="(node, idx) in postStrikeChain.nodes" :key="node.layer + node.id">
-                    <div class="flow-step">
-                      <span class="step-icon">{{ node.icon }}</span>
-                      <span class="step-text" :title="node.name">{{ node.name }}</span>
-                      <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
-                    </div>
-                    <span v-if="idx < postStrikeChain.nodes.length - 1" class="flow-arrow">→</span>
-                  </template>
-                </div>
-                <div class="finish-time-row">
-                  <span class="finish-label">完成时间</span>
-                  <strong class="finish-val glow-cyan">{{ postStrikeChain.finishTime }}</strong>
-                </div>
-              </template>
-              <div v-else class="chain-blocked-tip danger">
-                {{ postStrikeChain.blockedReason }}
-                <span v-if="postStrikeChain.finishTime" class="blocked-time">{{ postStrikeChain.finishTime }}</span>
+          <!-- 打击后最早全链路 -->
+          <div class="chain-block">
+            <div class="chain-block-title">打击后最早全链路通信</div>
+            <template v-if="!postStrikeChain.blocked">
+              <div class="link-flow-card post-strike">
+                <template v-for="(node, idx) in postStrikeChain.nodes" :key="node.layer + node.id">
+                  <div class="flow-step">
+                    <span class="step-icon">{{ node.icon }}</span>
+                    <span class="step-text" :title="node.name">{{ node.name }}</span>
+                    <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
+                  </div>
+                  <span v-if="idx < postStrikeChain.nodes.length - 1" class="flow-arrow">→</span>
+                </template>
               </div>
+              <div class="finish-time-row">
+                <span class="finish-label">完成时间</span>
+                <strong class="finish-val glow-cyan">{{ postStrikeChain.finishTime }}</strong>
+              </div>
+            </template>
+            <div v-else class="chain-blocked-tip danger">
+              {{ postStrikeChain.blockedReason }}
+              <span v-if="postStrikeChain.finishTime" class="blocked-time">{{ postStrikeChain.finishTime }}</span>
             </div>
-          </template>
+          </div>
 
           <!-- 干扰武器列表 -->
           <div class="chain-block">
@@ -161,6 +146,36 @@
             <span class="stat-label">数据中心</span>
             <strong class="stat-val glow-purple">{{ dataCenterCount }} 个</strong>
           </div>
+          <div class="stat-card">
+            <span class="stat-label">通信链路</span>
+            <strong class="stat-val glow-cyan">{{ networkChainStats.totalCount }} 条</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">打击后剩余</span>
+            <strong class="stat-val" :class="networkChainStats.remainingCount > 0 ? 'glow-green' : 'glow-red'">
+              {{ networkChainStats.remainingCount }} 条
+            </strong>
+          </div>
+        </div>
+
+        <div v-if="networkChainStats.remainingCount >= 1" class="remaining-chain-list">
+          <div class="remaining-chain-title">打击后剩余通信链路</div>
+          <div v-for="(chain, idx) in networkChainStats.remainingChains" :key="'remain-' + idx" class="chain-block remaining-chain-item">
+            <div class="link-flow-card post-strike">
+              <template v-for="(node, nIdx) in chain.nodes" :key="'rn-' + idx + node.layer + node.id">
+                <div class="flow-step">
+                  <span class="step-icon">{{ node.icon }}</span>
+                  <span class="step-text" :title="node.name">{{ node.name }}</span>
+                  <span class="step-sub">{{ chainLayerLabel(node.layer) }}</span>
+                </div>
+                <span v-if="nIdx < chain.nodes.length - 1" class="flow-arrow">→</span>
+              </template>
+            </div>
+            <div class="finish-time-row" v-if="chain.finishTime">
+              <span class="finish-label">完成时间</span>
+              <strong class="finish-val glow-cyan">{{ chain.finishTime }}</strong>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -203,12 +218,13 @@ import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBr
 import { useLayoutStore } from '@/store/modules/layout'
 import {
   analyzeSatelliteFullChain,
+  collectNetworkChainStats,
   collectSatelliteJamWeapons,
   getSatelliteDisplayInfo,
-  resolveChainForTimelineMarker,
+  resolveStationPassChain,
   type ChainNode,
   type JamWeaponRecord,
-  type TimelineChainMarkerType,
+  type StationPassAnalysis,
 } from '@/utils/satelliteFullChainAnalysis'
 
 const store = useLayoutStore()
@@ -223,6 +239,8 @@ const props = defineProps<{
   timelineMarkerType?: import('@/utils/satelliteFullChainAnalysis').TimelineChainMarkerType | null
   /** 时间轴关键点标签 */
   timelineMarkerLabel?: string | null
+  /** 时间轴过境站 ID / 名称 */
+  timelineReceiveId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -281,36 +299,49 @@ const hasTimelinePoint = computed(
     !!props.timelineMarkerType
 )
 /**
- * 时间轴关键点链路分析结果
+ * 打击前全链路：点击时间轴时展示当前过境站链路，否则展示最早可完成链路
  */
-const timelinePointChain = computed(() => {
-  if (!hasTimelinePoint.value || !props.selectedSatelliteNorad || props.timelinePointMs == null) {
-    return analyzeSatelliteFullChain(null, 0, true)
+const displayPreStrike = computed<StationPassAnalysis>(() => {
+  if (!props.selectedSatelliteNorad) {
+    return {
+      chain: analyzeSatelliteFullChain(null, 0, false),
+      delayMin: 0,
+      delayText: '未造成额外延迟',
+      currentTime: '',
+      struck: false,
+    }
   }
-  return resolveChainForTimelineMarker(
-    activeMatrix.value,
-    props.selectedSatelliteNorad,
-    props.timelineMarkerType as TimelineChainMarkerType,
-    props.timelinePointMs
-  )
+  if (hasTimelinePoint.value) {
+    return resolveStationPassChain(
+      activeMatrix.value,
+      props.selectedSatelliteNorad,
+      props.timelineReceiveId || props.timelineMarkerLabel,
+      props.timelinePointMs || 0
+    )
+  }
+  const chain = preStrikeChain.value
+  return {
+    chain,
+    delayMin: 0,
+    delayText: '未造成额外延迟',
+    currentTime: chain.finishTime || '',
+    struck: false,
+  }
 })
 /**
- * 时间轴关键点时刻文本 (格式化为 YYYY-MM-DD HH:mm:ss)】
- */
-const timelinePointTimeText = computed(() => {
-  if (props.timelinePointMs == null) return ''
-  const d = new Date(props.timelinePointMs)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-})
-/**
- * 选中卫星的干扰武器列表 (JamWeaponRecord[])
- * @returns 选中卫星的干扰武器列表
+ * 选中卫星的干扰武器列表；点击时间轴时只显示当前过境站对应武器
  */
 const jamWeaponList = computed<JamWeaponRecord[]>(() => {
   if (!props.selectedSatelliteNorad) return []
-  return collectSatelliteJamWeapons(activeMatrix.value, props.selectedSatelliteNorad)
+  const receiveKey = hasTimelinePoint.value
+    ? props.timelineReceiveId || props.timelineMarkerLabel
+    : null
+  return collectSatelliteJamWeapons(activeMatrix.value, props.selectedSatelliteNorad, receiveKey)
 })
+/**
+ * 全网通信链路统计
+ */
+const networkChainStats = computed(() => collectNetworkChainStats(activeMatrix.value))
 /**
  * 解析链路层的显示标签
  * @param layer 链路层类型
@@ -570,7 +601,32 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
     .glow-purple {
       color: #c084fc;
     }
+
+    .glow-green {
+      color: #4ade80;
+    }
+
+    .glow-red {
+      color: #f87171;
+    }
   }
+}
+
+.remaining-chain-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.remaining-chain-title {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.remaining-chain-item {
+  padding: 8px;
 }
 
 .empty-sat-box {
@@ -994,6 +1050,10 @@ const groundNodes = computed<InfrastructureLocation[]>(() => {
 
   .glow-cyan {
     color: #38bdf8;
+  }
+
+  .glow-red {
+    color: #f87171;
   }
 }
 

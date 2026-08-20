@@ -158,6 +158,7 @@
             :timeline-point-ms="selectedTimelinePoint?.ms ?? null"
             :timeline-marker-type="selectedTimelinePoint?.type ?? null"
             :timeline-marker-label="selectedTimelinePoint?.label ?? null"
+            :timeline-receive-id="selectedTimelinePoint?.receiveId ?? selectedTimelinePoint?.label ?? null"
             @clear-satellite-selection="handleSelectSatellite(null)" />
         </div>
       </div>
@@ -193,6 +194,7 @@ const selectedTimelinePoint = ref<{
   ms: number
   type: TimelineChainMarkerType
   label: string
+  receiveId?: string
 } | null>(null)
 
 const taskTimeRange = computed(() => {
@@ -331,6 +333,7 @@ const handleTimelineMarkerClick = (payload: {
   ms: number
   type: TimelineChainMarkerType
   label: string
+  receiveId?: string
 }) => {
   selectedReceiveId.value = null
   selectedTimelinePoint.value = payload

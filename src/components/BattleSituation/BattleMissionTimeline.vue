@@ -99,7 +99,7 @@ const emit = defineEmits<{
   /** 通知父组件切换当前时间。 */
   (e: 'time-change', ms: number): void
   /** 通知父组件点击了时间轴标记。 */
-  (e: 'marker-click', payload: { ms: number; type: TimelineMarkerType; label: string }): void
+  (e: 'marker-click', payload: { ms: number; type: TimelineMarkerType; label: string; receiveId?: string }): void
 }>()
 
 /** 时间轴轨道元素引用。 */
@@ -186,6 +186,8 @@ interface DisplayMarkerItem {
   desc?: string
   /** 干扰聚合项的子项描述。 */
   subItems?: string[]
+  /** 过境接收站 ID。 */
+  receiveId?: string
 }
 
 /** 各类时间轴标记的展示元数据。 */
@@ -238,6 +240,7 @@ const displayMarkerItems = computed<DisplayMarkerItem[]>(() => {
       title: marker.label || meta.title,
       timeText: formatTimelineTime(marker.ms),
       desc: marker.detail || undefined,
+      receiveId: marker.receiveId,
     }
   })
 })
@@ -275,9 +278,9 @@ const rulerTicks = computed(() => {
 })
 
 /** 处理时间轴标记点击并向父组件同步时间与标记信息。 */
-const handleMarkerClick = (item: { ms: number; type: TimelineMarkerType; title: string }) => {
+const handleMarkerClick = (item: DisplayMarkerItem) => {
   emit('time-change', item.ms)
-  emit('marker-click', { ms: item.ms, type: item.type, label: item.title })
+  emit('marker-click', { ms: item.ms, type: item.type, label: item.title, receiveId: item.receiveId })
 }
 
 /** 判断时间轴标记是否与外部传入的选中状态一致。 */
@@ -297,7 +300,12 @@ const syncSelectedSatelliteTime = () => {
   const firstPass = timelineModel.value?.markers.find((m) => m.type === 'jam' || m.type === 'first_transmit')
   if (firstPass) {
     emit('time-change', firstPass.ms)
-    emit('marker-click', { ms: firstPass.ms, type: firstPass.type, label: firstPass.label })
+    emit('marker-click', {
+      ms: firstPass.ms,
+      type: firstPass.type,
+      label: firstPass.label,
+      receiveId: firstPass.receiveId,
+    })
     return
   }
   emit('time-change', taskStartMs.value)
