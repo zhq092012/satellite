@@ -839,7 +839,7 @@ export const collectSatelliteTransmissionLinks = (
     const finishTs = relayEndTs ? Math.max(relayEndTs, groundEndTs) : groundEndTs
 
     links.push({
-      id: `${receiveId}-${groundStart}-${index}`,
+      id: `${norad}-${receiveId}-${groundStart}-${index}`,
       nodes,
       receiveName,
       receiveId,
@@ -864,6 +864,44 @@ export const collectSatelliteTransmissionLinks = (
     if (a.transmitStartMs !== b.transmitStartMs) return a.transmitStartMs - b.transmitStartMs
     return a.receiveName.localeCompare(b.receiveName, 'zh-CN')
   })
+}
+
+/**
+ * 收集当前系列矩阵中全部普通卫星的传输链路（按传输开始时间升序）
+ *
+ * @param matrix 算法矩阵数据
+ * @returns 全系列传出链路列表
+ */
+export const collectSeriesTransmissionLinks = (matrix: MatrixResult | null): SatelliteTransmissionLink[] => {
+  if (!matrix) return []
+  const links: SatelliteTransmissionLink[] = []
+  listNormalSatelliteNorads(matrix).forEach((norad) => {
+    links.push(...collectSatelliteTransmissionLinks(matrix, norad))
+  })
+  return links.sort((a, b) => {
+    if (a.transmitStartMs !== b.transmitStartMs) return a.transmitStartMs - b.transmitStartMs
+    return a.receiveName.localeCompare(b.receiveName, 'zh-CN')
+  })
+}
+
+/**
+ * 根据链路 ID 查找传输链路（优先单星范围，否则在全系列中检索）
+ *
+ * @param matrix 算法矩阵数据
+ * @param linkId 链路唯一标识
+ * @param norad 可选的卫星 NORAD，传入时仅在单星链路中查找
+ * @returns 匹配的链路，未找到时返回 null
+ */
+export const findTransmissionLinkById = (
+  matrix: MatrixResult | null,
+  linkId: string,
+  norad?: number | null
+): SatelliteTransmissionLink | null => {
+  if (!matrix || !linkId) return null
+  if (norad != null) {
+    return collectSatelliteTransmissionLinks(matrix, norad).find((item) => item.id === linkId) ?? null
+  }
+  return collectSeriesTransmissionLinks(matrix).find((item) => item.id === linkId) ?? null
 }
 
 /** 统计全网打击前通信链路数，以及打击后仍可完成的全链路 */

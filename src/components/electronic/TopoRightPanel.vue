@@ -99,7 +99,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { MatrixResult, StationRelationList } from '@/api/electronic'
-import { collectSatelliteTransmissionLinks, resolveLinkStrikeTarget } from '@/utils/satelliteFullChainAnalysis'
+import { collectSatelliteTransmissionLinks, findTransmissionLinkById, resolveLinkStrikeTarget } from '@/utils/satelliteFullChainAnalysis'
 
 /** 节点详情窗口项 */
 interface DetailWindowItem {
@@ -266,10 +266,8 @@ const detail = computed<NodeDetailView | null>(() => {
   const data = props.matrixData
   if (!data) return null
 
-  if (props.selectedLinkId && props.selectedNorad) {
-    const link = collectSatelliteTransmissionLinks(data, props.selectedNorad).find(
-      (item) => item.id === props.selectedLinkId
-    )
+  if (props.selectedLinkId) {
+    const link = findTransmissionLinkById(data, props.selectedLinkId, props.selectedNorad)
     if (!link) return null
     const linkNodes: DetailLinkNode[] = link.nodes.map((n) => {
       const layer = mapLinkLayer(n.layer)

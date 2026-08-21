@@ -137,7 +137,7 @@ import type { FuncType } from '@/types/electronic'
 import TopoLeftPanel from '@/components/electronic/TopoLeftPanel.vue'
 import TopoRightPanel from '@/components/electronic/TopoRightPanel.vue'
 import BattleMissionTimeline from '@/components/BattleSituation/BattleMissionTimeline.vue'
-import { type TimelineChainMarkerType, collectSatelliteTransmissionLinks, type ChainNode } from '@/utils/satelliteFullChainAnalysis'
+import { type TimelineChainMarkerType, collectSatelliteTransmissionLinks, collectSeriesTransmissionLinks, listNormalSatelliteNorads, type ChainNode, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 
 defineOptions({
   name: 'ElectronicWarfareG6',
@@ -209,7 +209,13 @@ const resolveSatName = (norad: number | null): string => {
 }
 
 const currentSeriesText = computed(() => store.selectedSatSeries || '未选择')
-const currentSatelliteText = computed(() => resolveSatName(selectedNorad.value))
+const currentSatelliteText = computed(() => {
+  if (selectedNorad.value != null) return resolveSatName(selectedNorad.value)
+  const data = matrixData.value
+  if (!data) return '未选择'
+  const count = listNormalSatelliteNorads(data).length
+  return count > 0 ? `系列全部 (${count}颗)` : '未选择'
+})
 
 const handleTopoNodeSelect = (
   payload: { id: string; layer: 'sat' | 'receive' | 'station'; norad?: number } | null
@@ -1339,13 +1345,13 @@ const buildLinkEdgeStyle = (struck: boolean, highlighted: boolean) => {
 }
 
 /**
- * 为选中卫星构建聚焦拓扑图（含全部传输链路与节点名称）
- * @param norad 卫星 NORAD 编号
+ * 根据链路集合构建侦察系列拓扑图（支持单星或全系列）
+ * @param norads 参与布局的卫星 NORAD 列表
+ * @param links 传输链路集合
  * @returns G6 图数据
  */
-const buildFocusedSatelliteGraph = (norad: number) => {
+const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmissionLink[]) => {
   const data = matrixData.value!
-  const links = collectSatelliteTransmissionLinks(data, norad)
   const nodes: any[] = []
   const edges: any[] = []
   const nodeSet = new Set<string>()
@@ -1355,11 +1361,17 @@ const buildFocusedSatelliteGraph = (norad: number) => {
   const startX = 140
   const availableW = Math.max(containerW - startX - 30, 400)
 
-  const satId = `sat-${norad}`
-  const initSat = data.initMatrixList?.find((s) => s.norad === norad)
-  const postSat = data.satelliteMatrixList?.find((s) => s.norad === norad)
-  const satName = postSat?.name || initSat?.name || `Sat-${norad}`
-  const satStruck = postSat?.satelliteStatus === 1
+  const satOrderMap = new Map<number, { norad: number; name: string; earliestMs: number; struck: boolean }>()
+  norads.forEach((norad) => {
+    const initSat = data.initMatrixList?.find((s) => s.norad === norad)
+    const postSat = data.satelliteMatrixList?.find((s) => s.norad === norad)
+    satOrderMap.set(norad, {
+      norad,
+      name: postSat?.name || initSat?.name || `Sat-${norad}`,
+      earliestMs: Number.MAX_SAFE_INTEGER,
+      struck: postSat?.satelliteStatus === 1,
+    })
+  })
 
   const receiveOrderMap = new Map<
     string,
@@ -1369,6 +1381,15 @@ const buildFocusedSatelliteGraph = (norad: number) => {
   const stationMap = new Map<string, { id: string; name: string; receiveId: string }>()
 
   links.forEach((link) => {
+    const satNode = link.nodes.find((n) => n.layer === 'SAT')
+    if (satNode) {
+      const norad = Number(satNode.id)
+      const existingSat = satOrderMap.get(norad)
+      if (existingSat && link.transmitStartMs < existingSat.earliestMs) {
+        existingSat.earliestMs = link.transmitStartMs
+      }
+    }
+
     link.nodes.forEach((n) => {
       if (n.layer === 'RECEIVE') {
         const existing = receiveOrderMap.get(n.id)
@@ -1395,27 +1416,38 @@ const buildFocusedSatelliteGraph = (norad: number) => {
     })
   })
 
+  const sortedSats = Array.from(satOrderMap.values()).sort((a, b) => {
+    const aMs = a.earliestMs === Number.MAX_SAFE_INTEGER ? Infinity : a.earliestMs
+    const bMs = b.earliestMs === Number.MAX_SAFE_INTEGER ? Infinity : b.earliestMs
+    if (aMs !== bMs) return aMs - bMs
+    return a.name.localeCompare(b.name, 'zh-CN')
+  })
   const sortedReceives = Array.from(receiveOrderMap.values()).sort(
     (a, b) => a.earliestMs - b.earliestMs || a.name.localeCompare(b.name, 'zh-CN')
   )
   const relayList = Array.from(relayMap.values())
 
-  satNodeCount.value = 1
+  satNodeCount.value = sortedSats.length
   receiveNodeCount.value = sortedReceives.length
   stationNodeCount.value = stationMap.size
 
-  nodes.push(
-    buildTopoNode({
-      id: satId,
-      name: satName,
-      kind: 'sat',
-      x: containerW / 2,
-      layer: 1,
-      struck: satStruck,
-      showLabel: true,
-    })
-  )
-  nodeSet.add(satId)
+  sortedSats.forEach((sat, i) => {
+    const satId = `sat-${sat.norad}`
+    const x =
+      sortedSats.length === 1 ? containerW / 2 : startX + (availableW / (sortedSats.length + 1)) * (i + 1)
+    nodes.push(
+      buildTopoNode({
+        id: satId,
+        name: sat.name,
+        kind: 'sat',
+        x,
+        layer: 1,
+        struck: sat.struck,
+        showLabel: true,
+      })
+    )
+    nodeSet.add(satId)
+  })
 
   relayList.forEach((relay, i) => {
     const id = `sat-${relay.id}`
@@ -1491,6 +1523,26 @@ const buildFocusedSatelliteGraph = (norad: number) => {
 }
 
 /**
+ * 为选中卫星构建聚焦拓扑图（含全部传输链路与节点名称）
+ * @param norad 卫星 NORAD 编号
+ * @returns G6 图数据
+ */
+const buildFocusedSatelliteGraph = (norad: number) => {
+  const data = matrixData.value!
+  return buildReconGraphFromLinks([norad], collectSatelliteTransmissionLinks(data, norad))
+}
+
+/**
+ * 构建当前系列全部卫星的侦察拓扑图
+ * @returns G6 图数据
+ */
+const buildSeriesReconGraph = () => {
+  const data = matrixData.value!
+  const norads = listNormalSatelliteNorads(data)
+  return buildReconGraphFromLinks(norads, collectSeriesTransmissionLinks(data))
+}
+
+/**
  * 通讯卫星聚焦拓扑：卫星 → 战场目标
  * @param norad 卫星 NORAD 编号
  * @returns G6 图数据
@@ -1552,6 +1604,76 @@ const buildFocusedCommGraph = (norad: number) => {
 }
 
 /**
+ * 构建当前系列全部通讯卫星的拓扑图：多颗卫星 → 战场目标
+ * @returns G6 图数据
+ */
+const buildSeriesCommGraph = () => {
+  const data = matrixData.value!
+  const nodes: any[] = []
+  const edges: any[] = []
+  const containerW = g6Container.value ? g6Container.value.clientWidth : 0
+  if (containerW <= 0) return { nodes: [], edges: [] }
+
+  const startX = 140
+  const availableW = Math.max(containerW - startX - 30, 400)
+  const norads = listNormalSatelliteNorads(data)
+  const targetNodeId = 'target-area'
+  const targetName = store.battle?.name || '战场目标区域'
+
+  satNodeCount.value = norads.length
+  receiveNodeCount.value = 1
+  stationNodeCount.value = 0
+
+  norads.forEach((norad, i) => {
+    const initSat = data.initMatrixList?.find((s) => s.norad === norad)
+    const postSat = data.satelliteMatrixList?.find((s) => s.norad === norad)
+    const satName = postSat?.name || initSat?.name || `Sat-${norad}`
+    const struck = postSat?.satelliteStatus === 1
+    const satId = `sat-${norad}`
+    const x =
+      norads.length === 1 ? containerW / 2 : startX + (availableW / (norads.length + 1)) * (i + 1)
+
+    nodes.push(
+      buildTopoNode({
+        id: satId,
+        name: satName,
+        kind: 'sat',
+        x,
+        layer: 1,
+        struck,
+        showLabel: true,
+      })
+    )
+
+    const linkId = `comm-${norad}`
+    const highlighted = !selectedLinkId.value || selectedLinkId.value === linkId
+    edges.push({
+      id: `edge-comm-${norad}`,
+      linkId,
+      source: satId,
+      target: targetNodeId,
+      type: 'cubic-vertical',
+      linkStruck: struck,
+      style: buildLinkEdgeStyle(struck, highlighted),
+    })
+  })
+
+  nodes.push(
+    buildTopoNode({
+      id: targetNodeId,
+      name: targetName,
+      kind: 'target',
+      x: containerW / 2,
+      layer: 2,
+      showLabel: true,
+    })
+  )
+
+  saveNodePositionsToCache(nodes)
+  return { nodes, edges }
+}
+
+/**
  * 构建选中卫星的聚焦拓扑图数据
  */
 const buildG6GraphData = () => {
@@ -1559,10 +1681,10 @@ const buildG6GraphData = () => {
   syncGraphStageHeight()
 
   if (!selectedNorad.value) {
-    satNodeCount.value = 0
-    receiveNodeCount.value = 0
-    stationNodeCount.value = 0
-    return { nodes: [], edges: [] }
+    if (currentSatCategory.value === 'COMM') {
+      return buildSeriesCommGraph()
+    }
+    return buildSeriesReconGraph()
   }
 
   if (currentSatCategory.value === 'COMM') {

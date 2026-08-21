@@ -6,14 +6,18 @@
       <span class="count-tag">{{ linkItems.length }}</span>
     </div>
 
-    <div v-if="!selectedNorad" class="empty-tip top-empty">
-      请先在「整体态势分析」中选择一颗卫星，再查看其传输链路
+    <div v-if="!matrixData" class="empty-tip top-empty">
+      暂无矩阵数据，请先选择任务与卫星系列
     </div>
 
-    <template v-else>
+    <div v-else-if="!linkItems.length && selectedNorad" class="empty-tip top-empty">
+      该卫星暂无传输链路
+    </div>
+
+    <template v-else-if="linkItems.length">
       <div class="sat-hint">
-        <span>🛰️ {{ satelliteName }}</span>
-        <span class="norad-tag">NORAD {{ selectedNorad }}</span>
+        <span>🛰️ {{ contextTitle }}</span>
+        <span class="norad-tag">{{ contextSubLabel }}</span>
       </div>
 
       <el-scrollbar class="link-scroll">
@@ -55,9 +59,10 @@
             </span>
           </div>
         </div>
-        <div v-if="!linkItems.length" class="empty-tip">该卫星暂无传输链路</div>
       </el-scrollbar>
     </template>
+
+    <div v-else class="empty-tip top-empty">该系列暂无传输链路</div>
   </aside>
 </template>
 
@@ -66,7 +71,9 @@ import { computed, watch, nextTick } from 'vue'
 import type { MatrixResult } from '@/api/electronic'
 import {
   collectSatelliteTransmissionLinks,
+  collectSeriesTransmissionLinks,
   getSatelliteDisplayInfo,
+  listNormalSatelliteNorads,
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
 
@@ -117,6 +124,22 @@ const satelliteName = computed(() => {
   return getSatelliteDisplayInfo(props.matrixData, props.selectedNorad)?.name || `Sat-${props.selectedNorad}`
 })
 
+/** 系列内普通卫星数量 */
+const seriesSatelliteCount = computed(() => {
+  if (!props.matrixData) return 0
+  return listNormalSatelliteNorads(props.matrixData).length
+})
+
+/** 链路清单上下文标题（单星 / 全系列） */
+const contextTitle = computed(() =>
+  props.selectedNorad ? satelliteName.value : '系列全部卫星'
+)
+
+/** 链路清单上下文副标题 */
+const contextSubLabel = computed(() =>
+  props.selectedNorad ? `NORAD ${props.selectedNorad}` : `共 ${seriesSatelliteCount.value} 颗`
+)
+
 /**
  * 将链路节点层级映射为样式类名
  * @param layer 原始层级标识
@@ -148,10 +171,13 @@ const toLinkListItem = (link: SatelliteTransmissionLink): LinkListItem => ({
   delayMin: link.delayMin,
 })
 
-/** 当前卫星的全部传输链路（按过站时间升序） */
+/** 当前展示的全部传输链路（单星或全系列，按过站时间升序） */
 const linkItems = computed<LinkListItem[]>(() => {
-  if (!props.matrixData || !props.selectedNorad) return []
-  return collectSatelliteTransmissionLinks(props.matrixData, props.selectedNorad).map(toLinkListItem)
+  if (!props.matrixData) return []
+  const links = props.selectedNorad
+    ? collectSatelliteTransmissionLinks(props.matrixData, props.selectedNorad)
+    : collectSeriesTransmissionLinks(props.matrixData)
+  return links.map(toLinkListItem)
 })
 
 /**
