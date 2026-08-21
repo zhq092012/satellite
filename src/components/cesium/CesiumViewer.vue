@@ -3,14 +3,8 @@
     <div ref="creditEl" class="credit"></div>
     <!-- 我方武器图层开关 -->
     <div class="map-layer-controls">
-      <el-switch
-        v-model="showOurWeapons"
-        active-color="#ef6b73"
-        inactive-color="#4b5563"
-        active-text="我方武器"
-        size="small"
-        @change="handleOurWeaponsToggle"
-      />
+      <el-switch v-model="showOurWeapons" active-color="#ef6b73" inactive-color="#4b5563" active-text="我方武器"
+        size="small" @change="handleOurWeaponsToggle" />
     </div>
     <div v-if="satelliteRenderBusy" class="render-loading">
       <div class="render-loading__panel">
@@ -27,7 +21,6 @@ import { useElectronicCesiumBridge, type InfrastructureLocation } from '@/compos
 import { useLayoutStore } from '@/store/modules/layout'
 import type { SatelliteData, Weapon } from '@/types/dashboard'
 import { markBattleArea } from '@/utils/tools/functionTool'
-import { createWeaponIconDataUri, getWeaponIconScale } from '@/utils/tools/svgIcons'
 import * as Cesium from 'cesium'
 import { CallbackProperty } from 'cesium'
 import * as satellitejs from 'satellite.js'
@@ -125,7 +118,7 @@ const syncViewerRenderLoopWithContainer = () => {
   // 当容器尺寸为 0 时暂停渲染，避免 Cesium 在更新 framebuffer 时创建 0 宽高纹理。
   viewer.useDefaultRenderLoop = canRender
   if (!canRender) return
-  ;(viewer as any).resize?.()
+    ; (viewer as any).resize?.()
   flushPendingInfrastructureRender()
   if (!viewer.isDestroyed()) {
     viewer.scene.requestRender()
@@ -365,6 +358,41 @@ const getInfraShapeImage = (shape: 'triangle' | 'square'): string => {
   return dataUrl
 }
 
+/**
+ * 生成我方武器倒立三角形 Billboard 贴图（锥尖朝下）
+ *
+ * @returns 倒立三角形 PNG Data URL
+ */
+const getOurWeaponShapeImage = (): string => {
+  const cacheKey = 'inverted-triangle'
+  const cached = infraShapeImageCache.get(cacheKey)
+  if (cached) return cached
+
+  const size = 48
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return ''
+
+  ctx.clearRect(0, 0, size, size)
+  ctx.fillStyle = '#ffffff'
+  ctx.strokeStyle = '#111111'
+  ctx.lineWidth = 3
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  ctx.moveTo(size / 2, size - 4)
+  ctx.lineTo(4, 4)
+  ctx.lineTo(size - 4, 4)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+
+  const dataUrl = canvas.toDataURL('image/png')
+  infraShapeImageCache.set(cacheKey, dataUrl)
+  return dataUrl
+}
+
 const isInfrastructureSelected = (node: InfrastructureLocation): boolean => {
   const selected = store.selectedInfrastructureNode
   return !!selected && selected.id === node.id && selected.type === node.type
@@ -406,6 +434,37 @@ const flyToInfrastructureNode = (node: InfrastructureLocation) => {
     duration: 1.5,
     offset,
   })
+}
+
+/**
+ * 视角平滑定位到我方武器节点上空
+ *
+ * @param weapon 武器对象（含经纬度与射程）
+ */
+const flyToOurWeapon = (weapon: { id?: string; name: string; latitude: number; longitude: number; range?: number }) => {
+  if (!viewer || !Number.isFinite(weapon.latitude) || !Number.isFinite(weapon.longitude)) return
+
+  const weaponPos =
+    findOurWeaponEntity(weapon)?.position?.getValue(Cesium.JulianDate.now()) ??
+    Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 0)
+  const boundingSphere = new Cesium.BoundingSphere(weaponPos, 0)
+  const rangeKm = Math.max(10, Number(weapon.range ?? 500))
+  const cameraHeight = Math.min(Math.max(rangeKm * 3000, 800000), 3000000)
+  const offset = new Cesium.HeadingPitchRange(Cesium.Math.toRadians(0), Cesium.Math.toRadians(-50), cameraHeight)
+
+  const entity = findOurWeaponEntity(weapon)
+
+  if (entity) {
+    viewer.flyTo(entity, {
+      duration: 1.5,
+      offset,
+    })
+  } else {
+    viewer.camera.flyToBoundingSphere(boundingSphere, {
+      duration: 1.5,
+      offset,
+    })
+  }
 }
 
 // 监听 store 中选中的地面基础设施节点，如果外部选择变更则定位相机
@@ -635,6 +694,153 @@ const redWeaponDataList = ref<Weapon[]>([])
 // 保存创建在 Cesium Viewer 中的我方武器实体引用列表。
 const redWeaponEntities = shallowRef<Cesium.Entity[]>([])
 
+/** 我方武器实体默认样式缓存（用于高亮后恢复） */
+interface OurWeaponEntityStyle {
+  /** Billboard 着色 */
+  billboardColor: Cesium.Color
+  /** 标签文字颜色 */
+  labelFillColor: Cesium.Color
+  /** 射程圈填充色 */
+  ellipseMaterial: Cesium.Color
+  /** 射程圈描边色 */
+  ellipseOutlineColor: Cesium.Color
+}
+
+const ourWeaponStyleCache = new Map<string, OurWeaponEntityStyle>()
+const OUR_WEAPON_HIGHLIGHT_COLOR = Cesium.Color.YELLOW
+const OUR_WEAPON_DEFAULT_COLOR = Cesium.Color.fromCssColorString('#ef6b73')
+const OUR_WEAPON_DEFAULT_LABEL_COLOR = Cesium.Color.fromCssColorString('#ff9e9e')
+/** 与敌方地面站图标一致的 Billboard 尺寸（像素） */
+const OUR_WEAPON_BILLBOARD_SIZE = 22
+/** 武器标签最大可见距离（米），超过后不再显示 */
+const OUR_WEAPON_LABEL_MAX_DISTANCE = 60000000
+
+/**
+ * 根据武器信息查找地图上对应的 Cesium 实体
+ *
+ * @param weapon 武器对象
+ * @returns 匹配的 Entity 或 undefined
+ */
+const findOurWeaponEntity = (weapon: {
+  id?: string
+  name: string
+  latitude: number
+  longitude: number
+}): Cesium.Entity | undefined => {
+  if (!viewer) return undefined
+  if (weapon.id) {
+    const byId = viewer.entities.getById(`our-weapon-${weapon.id}`)
+    if (byId) return byId
+  }
+  const byName = redWeaponEntities.value.find((entity) => entity.name === weapon.name)
+  if (byName) return byName
+  return redWeaponEntities.value.find((entity) => {
+    const pos = entity.position?.getValue(Cesium.JulianDate.now())
+    if (!pos) return false
+    const carto = Cesium.Cartographic.fromCartesian(pos)
+    const lat = Cesium.Math.toDegrees(carto.latitude)
+    const lon = Cesium.Math.toDegrees(carto.longitude)
+    return Math.abs(lat - weapon.latitude) < 0.02 && Math.abs(lon - weapon.longitude) < 0.02
+  })
+}
+
+/**
+ * 恢复所有我方武器实体至默认样式，并移除高亮环
+ */
+const resetOurWeaponHighlight = () => {
+  if (!viewer || viewer.isDestroyed()) return
+
+  redWeaponEntities.value.forEach((entity) => {
+    const entityId = String(entity.id ?? '')
+    const cached = ourWeaponStyleCache.get(entityId)
+    if (!cached) return
+
+    const highlightRing = viewer.entities.getById(`${entityId}-highlight-ring`)
+    if (highlightRing) {
+      viewer.entities.remove(highlightRing)
+    }
+
+    if (entity.billboard) {
+      entity.billboard.color = new Cesium.ConstantProperty(cached.billboardColor)
+    }
+    if (entity.label) {
+      entity.label.fillColor = new Cesium.ConstantProperty(cached.labelFillColor)
+    }
+    if (entity.ellipse) {
+      entity.ellipse.material = new Cesium.ColorMaterialProperty(cached.ellipseMaterial)
+      entity.ellipse.outlineColor = new Cesium.ConstantProperty(cached.ellipseOutlineColor)
+    }
+  })
+
+  viewer.scene.requestRender()
+}
+
+/**
+ * 将指定我方武器在地图上以黄色高亮显示
+ *
+ * @param weapon 武器对象
+ */
+const highlightOurWeaponOnMap = (weapon: {
+  id?: string
+  name: string
+  latitude: number
+  longitude: number
+  range?: number
+}) => {
+  if (!viewer || viewer.isDestroyed()) return
+
+  resetOurWeaponHighlight()
+
+  const entity = findOurWeaponEntity(weapon)
+  if (!entity) return
+
+  const entityId = String(entity.id ?? '')
+  const rangeMeters = Math.max(10000, Number(weapon.range ?? 0) * 1000)
+  const ringRadius = Math.min(Math.max(rangeMeters * 0.08, 30000), 120000)
+
+  if (entity.billboard) {
+    entity.billboard.color = new Cesium.ConstantProperty(OUR_WEAPON_HIGHLIGHT_COLOR)
+  }
+  if (entity.label) {
+    entity.label.fillColor = new Cesium.ConstantProperty(OUR_WEAPON_HIGHLIGHT_COLOR)
+  }
+  if (entity.ellipse) {
+    entity.ellipse.material = new Cesium.ColorMaterialProperty(OUR_WEAPON_HIGHLIGHT_COLOR.withAlpha(0.22))
+    entity.ellipse.outlineColor = new Cesium.ConstantProperty(OUR_WEAPON_HIGHLIGHT_COLOR)
+  }
+
+  viewer.entities.add({
+    id: `${entityId}-highlight-ring`,
+    position: entity.position,
+    ellipse: {
+      semiMajorAxis: ringRadius,
+      semiMinorAxis: ringRadius,
+      material: OUR_WEAPON_HIGHLIGHT_COLOR.withAlpha(0.35),
+      outline: true,
+      outlineColor: OUR_WEAPON_HIGHLIGHT_COLOR,
+      outlineWidth: 3,
+      height: 0,
+    },
+  })
+
+  viewer.scene.requestRender()
+}
+
+watch(
+  () => store.selectedOurWeapon,
+  (weapon) => {
+    if (weapon) {
+      flyToOurWeapon(weapon)
+      highlightOurWeaponOnMap(weapon)
+    } else {
+      resetOurWeaponHighlight()
+    }
+    if (viewer && !viewer.isDestroyed()) {
+      viewer.scene.requestRender()
+    }
+  }
+)
+
 /**
  * [功能]
  * 根据开关状态更新我方武器实体在地图上的显隐
@@ -658,6 +864,11 @@ const handleOurWeaponsToggle = (visible: boolean | string | number) => {
   const show = Boolean(visible)
   store.setShowOurWeapons(show)
   updateOurWeaponsVisibility(show)
+  if (!show) {
+    resetOurWeaponHighlight()
+  } else if (store.selectedOurWeapon) {
+    highlightOurWeaponOnMap(store.selectedOurWeapon)
+  }
 }
 
 /**
@@ -668,8 +879,9 @@ const handleOurWeaponsToggle = (visible: boolean | string | number) => {
  * 调用 getAllWeapons API 接口获取全量武器数据模型
  *
  * [处理规则]
- * - 使用 createWeaponIconDataUri 根据武器类型 (如：导弹/干扰/定向能/天基/火炮) 动态生成特定 SVG 图标
- * - 在实体上绑定 Point, Billboard, Label 与 Ellipse (武器作用半径/防线)
+ * - 使用倒立三角形 Billboard 标记武器部署位置，尺寸与敌方地面站图标一致
+ * - 在实体上绑定 Label 与 Ellipse（武器作用半径/防线）
+ * - 标签在相机距离过远时自动隐藏
  * - 初始显隐受 store.showOurWeapons 状态控制
  */
 const loadAndRenderRedWeapons = async () => {
@@ -695,8 +907,14 @@ const renderRedWeaponsOnCesium = () => {
   // 清理旧的武器实体
   redWeaponEntities.value.forEach((entity) => {
     viewer?.entities.remove(entity)
+    const entityId = String(entity.id ?? '')
+    const highlightRing = viewer?.entities.getById(`${entityId}-highlight-ring`)
+    if (highlightRing) {
+      viewer?.entities.remove(highlightRing)
+    }
   })
   redWeaponEntities.value = []
+  ourWeaponStyleCache.clear()
 
   const weapons = redWeaponDataList.value
   const newEntities: Cesium.Entity[] = []
@@ -705,10 +923,8 @@ const renderRedWeaponsOnCesium = () => {
     if (!Number.isFinite(weapon.longitude) || !Number.isFinite(weapon.latitude)) return
 
     const weaponId = `our-weapon-${weapon.id ?? index}`
-    const position = Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 500)
-    const iconScale = getWeaponIconScale(weapon.type)
-    const weaponColor = Cesium.Color.fromCssColorString('#ef6b73')
-    const iconUri = createWeaponIconDataUri(weapon.type, weaponColor, iconScale)
+    const position = Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 0)
+    const weaponColor = OUR_WEAPON_DEFAULT_COLOR
     const rangeMeters = Math.max(10000, Number(weapon.range ?? 0) * 1000)
 
     const entity = viewer.entities.add({
@@ -717,24 +933,27 @@ const renderRedWeaponsOnCesium = () => {
       position: new Cesium.ConstantPositionProperty(position),
       show: store.showOurWeapons,
       billboard: {
-        image: iconUri,
-        scale: iconScale,
-        width: 30 * iconScale,
-        height: 30 * iconScale,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        heightReference: Cesium.HeightReference.NONE,
+        image: getOurWeaponShapeImage(),
+        color: weaponColor,
+        width: OUR_WEAPON_BILLBOARD_SIZE,
+        height: OUR_WEAPON_BILLBOARD_SIZE,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        disableDepthTestDistance: 0,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
       },
       label: {
         text: `${weapon.name} (${weapon.type || '武器'})`,
-        font: '12px sans-serif',
-        fillColor: Cesium.Color.fromCssColorString('#ff9e9e'),
+        font: 'bold 13px sans-serif',
+        fillColor: OUR_WEAPON_DEFAULT_LABEL_COLOR,
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        pixelOffset: new Cesium.Cartesian2(0, 22),
         showBackground: true,
-        backgroundColor: new Cesium.Color(0, 0, 0, 0.45),
-        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 10000000),
+        backgroundColor: new Cesium.Color(0, 0, 0, 0.3),
+        pixelOffset: new Cesium.Cartesian2(0, -28),
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, OUR_WEAPON_LABEL_MAX_DISTANCE),
       },
       ellipse: {
         semiMajorAxis: rangeMeters,
@@ -756,10 +975,20 @@ const renderRedWeaponsOnCesium = () => {
     })
 
     newEntities.push(entity)
+
+    ourWeaponStyleCache.set(weaponId, {
+      billboardColor: weaponColor,
+      labelFillColor: OUR_WEAPON_DEFAULT_LABEL_COLOR,
+      ellipseMaterial: OUR_WEAPON_DEFAULT_COLOR.withAlpha(0.1),
+      ellipseOutlineColor: OUR_WEAPON_DEFAULT_COLOR.withAlpha(0.5),
+    })
   })
 
   redWeaponEntities.value = newEntities
   updateOurWeaponsVisibility(store.showOurWeapons)
+  if (store.selectedOurWeapon) {
+    highlightOurWeaponOnMap(store.selectedOurWeapon)
+  }
 }
 
 // [变量用途]
@@ -1615,6 +1844,7 @@ defineExpose({
   getClockTimeMs,
   refreshAfterActivate,
   setOurWeaponsVisible: (visible: boolean) => handleOurWeaponsToggle(visible),
+  flyToOurWeapon,
 })
 </script>
 <style lang="scss" scoped>
@@ -1624,19 +1854,23 @@ defineExpose({
   height: 100%;
   min-height: 0;
   overflow: hidden;
+
   /* 1. 进入前：藏在左边 */
   .slide-enter-from {
     transform: translateX(-100%);
   }
+
   /* 2. 进入过程 & 离开过程：做动画 */
   .slide-enter-active,
   .slide-leave-active {
     transition: transform 0.5s ease-in-out;
   }
+
   /* 3. 离开后：再滑回去 */
   .slide-leave-to {
     transform: translateX(-100%);
   }
+
   .credit {
     display: none;
   }
@@ -1706,6 +1940,7 @@ defineExpose({
       transform: rotate(360deg);
     }
   }
+
   .legend {
     position: absolute;
     padding: 20px;
@@ -1714,6 +1949,7 @@ defineExpose({
     z-index: 1;
     text-align: left;
   }
+
   .situation-panel {
     position: absolute;
     top: 5px;
@@ -1772,6 +2008,7 @@ defineExpose({
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 
       &.is-red {
+
         .camp-card__header,
         .section-title {
           color: #ff7f7f;
@@ -1790,6 +2027,7 @@ defineExpose({
       }
 
       &.is-blue {
+
         .camp-card__header,
         .section-title {
           color: #55bbff;
@@ -1996,6 +2234,7 @@ defineExpose({
       padding: 6px 2px;
     }
   }
+
   .our-scroll {
     position: absolute;
     right: 0;
@@ -2005,17 +2244,21 @@ defineExpose({
     width: 400px;
     font-size: 14px;
     background: rgba($color: #000000, $alpha: 1);
+
     .legend-title {
       padding: 8px;
     }
+
     .satellite-details:first-of-type {
       margin: 0 8px 8px 8px;
     }
+
     .satellite-details {
       display: grid;
       grid-template-columns: 0.8fr 1fr;
       gap: 6px;
-      margin: 8px; /* 每个 p 独立一行并有间距 */
+      margin: 8px;
+      /* 每个 p 独立一行并有间距 */
       padding: 5px;
       width: 95%;
       box-sizing: border-box;
@@ -2024,31 +2267,39 @@ defineExpose({
       background: var(--nav-bar-background);
       border-radius: 2px;
       cursor: pointer;
-      > * {
+
+      >* {
         // 每个 grid-item
         min-width: 0; // 1. 允许收缩
-        overflow-wrap: break-word; /* 2. 超长单词换行 */
+        overflow-wrap: break-word;
+        /* 2. 超长单词换行 */
         align-self: start; // 3. 内容不足时靠上对齐
         text-align: left; // 4. 左对齐（默认，可省） */
       }
 
       .full-row {
-        grid-column: 1 / -1; /* 从第 1 列开始，到最后一列结束 */
+        grid-column: 1 / -1;
+        /* 从第 1 列开始，到最后一列结束 */
         display: flex;
+
         strong {
           min-width: 150px;
         }
       }
+
       .sat-name {
         font-size: 18px;
       }
+
       .score-row {
         grid-column: 1/-1;
         display: flex;
         flex-direction: column;
+
         .mark-label {
           color: cyan;
         }
+
         .score {
           color: yellow;
           font-size: 16px;
@@ -2057,6 +2308,7 @@ defineExpose({
       }
     }
   }
+
   .toolbox {
     padding: 0 5px;
     z-index: 1;
@@ -2070,6 +2322,7 @@ defineExpose({
     width: 100%;
     flex-wrap: wrap;
   }
+
   .constellation-toolbar {
     position: absolute;
     top: 10px;
@@ -2083,12 +2336,14 @@ defineExpose({
     border-radius: 999px;
     background: rgba(4, 18, 30, 0.76);
     backdrop-filter: blur(8px);
+
     .constellation-toolbar__badge {
       color: #d8efff;
       font-size: 12px;
       white-space: nowrap;
     }
   }
+
   .timeline-panel {
     background: rgba($color: #000000, $alpha: 0.8);
     z-index: 1;
@@ -2098,15 +2353,18 @@ defineExpose({
     transform: translate(-50%, 0);
     padding: 10px;
     border-radius: 5px;
+
     .timeline-controls {
       display: flex;
       gap: 2px;
       justify-content: center;
     }
   }
+
   .speed-panel {
     display: none;
   }
+
   .sat-panel {
     position: absolute;
     top: 40px;
@@ -2118,22 +2376,27 @@ defineExpose({
     pointer-events: auto;
     z-index: 999;
     width: 320px;
+
     .close-btn {
       float: right;
       cursor: pointer;
       margin-left: 8px;
     }
+
     .sat-Content {
       padding: 10px;
-      & > div {
+
+      &>div {
         text-align: left;
         color: #dfdfdf;
         padding: 2px;
       }
-      & > div:first-child {
+
+      &>div:first-child {
         display: flex;
         justify-content: space-between;
       }
+
       .desc {
         font-size: 12px;
         line-height: 20px;

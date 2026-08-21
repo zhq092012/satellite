@@ -56,6 +56,8 @@ interface State {
   selectedZhchUsageTypes: string[]
   /** 整体态势地图上是否显示我方武器图层 */
   showOurWeapons: boolean
+  /** 右侧面板选中的我方武器（用于地图定位） */
+  selectedOurWeapon: { id?: string; name: string; latitude: number; longitude: number; range?: number } | null
 }
 export const useLayoutStore = defineStore('layout-store', {
   state: (): State => {
@@ -94,6 +96,7 @@ export const useLayoutStore = defineStore('layout-store', {
       zhchPlanLoading: false,
       selectedZhchUsageTypes: ['军用'],
       showOurWeapons: false,
+      selectedOurWeapon: null,
     }
   },
   getters: {
@@ -315,6 +318,18 @@ export const useLayoutStore = defineStore('layout-store', {
      */
     setShowOurWeapons(show: boolean) {
       this.showOurWeapons = show
+      if (!show) {
+        this.selectedOurWeapon = null
+      }
+    },
+    /**
+     * 设置右侧面板选中的我方武器，并触发地图定位
+     * @param weapon 选中的武器对象或 null（取消选择）
+     */
+    setSelectedOurWeapon(
+      weapon: { id?: string; name: string; latitude: number; longitude: number; range?: number } | null
+    ) {
+      this.selectedOurWeapon = weapon
     },
     /**
      * 读取并清除待聚焦的拓扑卫星 NORAD（避免重复触发）

@@ -35,6 +35,19 @@
 
       <!-- 右侧信息栏 -->
       <div class="header-right">
+        <!-- 拓扑视图模式切换 -->
+        <div class="matrix-tab-group topo-view-tabs">
+          <button
+            v-for="tab in topoViewTabs"
+            :key="tab.key"
+            class="nav-tab-btn"
+            :class="{ active: topoViewMode === tab.key }"
+            @click="handleTopoViewModeChange(tab.key)"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+
         <div class="header-right-item">
           <span class="label-text">当前任务:</span>
           <span class="digital-font time-value glow-text-cyan">{{ store.activedTask?.name || '实时推演场景' }}</span>
@@ -75,8 +88,8 @@
           </div>
 
           <div class="topo-graph-stack">
-            <div class="graph-stage">
-              <div class="graph-layer-labels">
+            <div class="graph-stage" ref="graphStageRef">
+              <div v-if="topoViewMode === 'layered'" class="graph-layer-labels">
                 <div v-for="item in layerLabelItems" :key="item.key" class="graph-layer-label" :class="item.className"
                   :style="{ top: item.top }">
                   <span class="layer-icon">{{ item.icon }}</span>
@@ -85,7 +98,29 @@
                   </div>
                 </div>
               </div>
-              <div ref="g6Container" class="g6-chart-container" v-loading="loading"></div>
+              <!-- 三层拓扑 (G6) -->
+              <div
+                v-show="topoViewMode === 'layered'"
+                ref="g6Container"
+                class="g6-chart-container"
+                v-loading="loading"
+              />
+              <!-- 平面 / 立体星环拓扑 -->
+              <TopoStarRingView
+                v-if="topoViewMode !== 'layered'"
+                :view-mode="topoViewMode === 'planar-ring' ? 'planar' : 'stereo'"
+                :nodes="starRingGraphData.nodes"
+                :edges="starRingGraphData.edges"
+                :is-comm="currentSatCategory === 'COMM'"
+                :position-labels="positionLabels"
+                :selected-node-id="selectedPanelNodeId"
+                :selected-link-id="selectedLinkId"
+                :selected-receive-id="selectedReceiveId"
+                :selected-sat-id="selectedNorad != null ? `sat-${selectedNorad}` : null"
+                :active-node-ids="activeNodeIds"
+                @node-click="handleStarRingNodeClick"
+                @edge-click="handleStarRingEdgeClick"
+              />
             </div>
 
             <div class="graph-time-toolbar">
@@ -136,12 +171,27 @@ import { getSatelliteTypeSerials, type MatrixResult, type Weapon } from '@/api/e
 import type { FuncType } from '@/types/electronic'
 import TopoLeftPanel from '@/components/electronic/TopoLeftPanel.vue'
 import TopoRightPanel from '@/components/electronic/TopoRightPanel.vue'
+import TopoStarRingView from '@/components/electronic/TopoStarRingView.vue'
 import BattleMissionTimeline from '@/components/BattleSituation/BattleMissionTimeline.vue'
 import { type TimelineChainMarkerType, collectSatelliteTransmissionLinks, collectSeriesTransmissionLinks, listNormalSatelliteNorads, type ChainNode, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 
 defineOptions({
   name: 'ElectronicWarfareG6',
 })
+
+/** 拓扑视图模式：三层拓扑 / 平面星环 / 立体星环 */
+type TopoViewMode = 'layered' | 'planar-ring' | 'stereo-ring'
+
+/** 拓扑视图切换按钮配置 */
+const topoViewTabs: { key: TopoViewMode; label: string }[] = [
+  { key: 'layered', label: '三层拓扑' },
+  { key: 'planar-ring', label: '平面星环' },
+  { key: 'stereo-ring', label: '立体星环' },
+]
+
+/** 当前拓扑视图模式，默认三层拓扑 */
+const topoViewMode = ref<TopoViewMode>('layered')
+
 const store = useLayoutStore()
 
 const selectedNorad = ref<number | null>(null)
@@ -164,6 +214,20 @@ const taskTimeRange = computed(() => {
 
 // G6 画布容器 DOM ref
 const g6Container = ref<HTMLDivElement | null>(null)
+/** 拓扑图舞台容器（星环 / 三层拓扑共用尺寸） */
+const graphStageRef = ref<HTMLDivElement | null>(null)
+
+/**
+ * 获取拓扑图舞台有效宽高（星环模式下 G6 容器可能为 display:none）
+ * @returns 舞台宽高
+ */
+const getGraphStageSize = () => {
+  const el = graphStageRef.value || g6Container.value
+  return {
+    width: el?.clientWidth ?? 0,
+    height: el?.clientHeight ?? 0,
+  }
+}
 
 const graphStageHeight = ref(480)
 
@@ -171,7 +235,7 @@ const RECON_LAYER_Y_RATIOS = [0.14, 0.33, 0.54, 0.75] as const
 const COMM_LAYER_Y_RATIOS = [0.2, 0.72] as const
 
 const syncGraphStageHeight = () => {
-  const height = g6Container.value?.clientHeight ?? 0
+  const { height } = getGraphStageSize()
   if (height > 0) graphStageHeight.value = height
 }
 
@@ -556,7 +620,7 @@ const nodeLayoutCache = new Map<string, number>()
 let graphTopologyKey = ''
 
 const getGraphTopologyKey = () =>
-  `${store.selectedSatSeries}|${matrixData.value?.series ?? ''}|${selectedNorad.value ?? ''}|${selectedLinkId.value ?? ''}|${g6Container.value?.clientWidth ?? 0}|${g6Container.value?.clientHeight ?? 0}`
+  `${store.selectedSatSeries}|${matrixData.value?.series ?? ''}|${selectedNorad.value ?? ''}|${selectedLinkId.value ?? ''}|${getGraphStageSize().width}|${getGraphStageSize().height}`
 
 const applyCachedNodePositions = (nodes: any[]) => {
   nodes.forEach((node) => {
@@ -579,12 +643,18 @@ const resetGraphViewport = () => {
 }
 
 const refreshGraphForTime = () => {
-  if (!g6Container.value) return
   syncGraphStageHeight()
   ensureCurrentTimestampValid()
-  const width = g6Container.value.clientWidth
-  const height = g6Container.value.clientHeight
+  const { width, height } = getGraphStageSize()
   if (!width || !height || width <= 0 || height <= 0) return
+
+  // 星环模式：仅刷新统计数据，由 TopoStarRingView 自行渲染
+  if (topoViewMode.value !== 'layered') {
+    buildG6GraphData()
+    return
+  }
+
+  if (!g6Container.value) return
 
   const topoKey = getGraphTopologyKey()
   const structureChanged = topoKey !== graphTopologyKey
@@ -1267,6 +1337,89 @@ const isWindowActiveAtCurrentTime = (win: WindowItemWrapper) => {
   return currentTimestamp.value >= win.startTimestamp && currentTimestamp.value <= win.endTimestamp
 }
 
+/** 当前时刻活跃的节点 ID 集合（星环视图高亮用） */
+const activeNodeIds = computed(() => {
+  const ids = new Set<string>()
+  allWindowsList.value.filter((w) => isWindowActiveAtCurrentTime(w)).forEach((w) => {
+    ids.add(`sat-${w.satNorad}`)
+    ids.add(w.receiveId)
+  })
+  const relayRels = matrixData.value?.relayRelation?.relations || []
+  relayRels.forEach((rel) => {
+    if (ids.has(`sat-${rel.from}`)) ids.add(`sat-${rel.to}`)
+  })
+  return ids
+})
+
+/** 星环视图使用的图数据（与三层拓扑共用 buildG6GraphData） */
+const starRingGraphData = computed(() => {
+  if (!matrixData.value) return { nodes: [], edges: [] }
+  return buildG6GraphData()
+})
+
+/** 最内虚线环展示的阵地名称 */
+const positionLabels = computed(() => {
+  const circles = Array.from(store.battleCircleMap.values())
+  if (circles.length) return circles.map((c) => c.name)
+  if (store.battle?.name) return [store.battle.name]
+  return ['阵地']
+})
+
+/**
+ * 切换拓扑视图模式
+ * @param mode 目标视图模式
+ */
+const handleTopoViewModeChange = (mode: TopoViewMode) => {
+  if (topoViewMode.value === mode) return
+  topoViewMode.value = mode
+  nextTick(() => {
+    if (mode === 'layered') {
+      graphTopologyKey = ''
+      initOrUpdateGraph()
+    }
+  })
+}
+
+/**
+ * 星环视图节点点击，复用三层拓扑的节点选择逻辑
+ * @param node 被点击的节点
+ */
+const handleStarRingNodeClick = (node: { id: string; kind?: string; norad?: number }) => {
+  const nodeId = String(node.id)
+  if (nodeId.startsWith('sat-')) {
+    const norad = Number(nodeId.replace('sat-', ''))
+    if (!Number.isFinite(norad)) return
+    if (selectedNorad.value !== norad) {
+      handleSelectSatellite(norad)
+    } else {
+      selectedLinkId.value = null
+      selectedReceiveId.value = null
+      selectedTimelinePoint.value = null
+      selectedPanelNodeId.value = `sat-${norad}`
+      selectedPanelNodeLayer.value = 'sat'
+      parseAndSelectNode({ id: nodeId, kind: node.kind })
+    }
+    return
+  }
+  if (node.kind === 'receive' || (!nodeId.startsWith('sat-') && !isStationNodeId(nodeId))) {
+    handleSelectReceiveStation(nodeId, { id: nodeId, kind: node.kind })
+    return
+  }
+  selectedLinkId.value = null
+  selectedReceiveId.value = null
+  selectedTimelinePoint.value = null
+  parseAndSelectNode({ id: nodeId, kind: node.kind })
+}
+
+/**
+ * 星环视图链路点击
+ * @param linkId 链路 ID
+ */
+const handleStarRingEdgeClick = (linkId: string) => {
+  if (!linkId) return
+  handleSelectLink(selectedLinkId.value === linkId ? null : linkId)
+}
+
 const highlightActiveElements = () => {
   if (!graph) return
   const activeWins = allWindowsList.value.filter((w) => isWindowActiveAtCurrentTime(w))
@@ -1356,7 +1509,7 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
   const edges: any[] = []
   const nodeSet = new Set<string>()
 
-  const containerW = g6Container.value ? g6Container.value.clientWidth : 0
+  const containerW = getGraphStageSize().width
   if (containerW <= 0) return { nodes: [], edges: [] }
   const startX = 140
   const availableW = Math.max(containerW - startX - 30, 400)
@@ -1551,7 +1704,7 @@ const buildFocusedCommGraph = (norad: number) => {
   const data = matrixData.value!
   const nodes: any[] = []
   const edges: any[] = []
-  const containerW = g6Container.value ? g6Container.value.clientWidth : 0
+  const containerW = getGraphStageSize().width
   if (containerW <= 0) return { nodes: [], edges: [] }
 
   const initSat = data.initMatrixList?.find((s) => s.norad === norad)
@@ -1611,7 +1764,7 @@ const buildSeriesCommGraph = () => {
   const data = matrixData.value!
   const nodes: any[] = []
   const edges: any[] = []
-  const containerW = g6Container.value ? g6Container.value.clientWidth : 0
+  const containerW = getGraphStageSize().width
   if (containerW <= 0) return { nodes: [], edges: [] }
 
   const startX = 140
@@ -1709,8 +1862,7 @@ const initOrUpdateGraph = () => {
   ensureCurrentTimestampValid()
 
   // 准确获取 DOM 容器宽高度 (clientWidth / clientHeight)
-  const width = g6Container.value.clientWidth
-  const height = g6Container.value.clientHeight
+  const { width, height } = getGraphStageSize()
 
   // 容器处于 display: none 或尚未渲染（尺寸为 0）时直接返回，避免画布尺寸坍塌
   if (!width || !height || width <= 0 || height <= 0) return
@@ -1980,7 +2132,11 @@ let resizeTimer: number | null = null
 const handleResize = () => {
   if (resizeTimer) window.clearTimeout(resizeTimer)
   resizeTimer = window.setTimeout(() => {
-    initOrUpdateGraph()
+    if (topoViewMode.value === 'layered') {
+      initOrUpdateGraph()
+    } else {
+      refreshGraphForTime()
+    }
   }, 60)
 }
 
@@ -1989,15 +2145,18 @@ onMounted(() => {
   fetchMatrixData()
   window.addEventListener('resize', handleResize)
 
-  if (g6Container.value && typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (entry && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
-        handleResize()
-      }
-    })
-    resizeObserver.observe(g6Container.value)
-  }
+  nextTick(() => {
+    const observeTarget = graphStageRef.value || g6Container.value
+    if (observeTarget && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0]
+        if (entry && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+          handleResize()
+        }
+      })
+      resizeObserver.observe(observeTarget)
+    }
+  })
 })
 
 /**
@@ -2008,7 +2167,11 @@ onActivated(() => {
   syncTopoSelectionFromStore()
   nextTick(() => {
     setTimeout(() => {
-      initOrUpdateGraph()
+      if (topoViewMode.value === 'layered') {
+        initOrUpdateGraph()
+      } else {
+        refreshGraphForTime()
+      }
     }, 50)
   })
 })
@@ -2169,6 +2332,16 @@ onUnmounted(() => {
   gap: 16px;
   font-size: 13px;
   color: #94a3b8;
+
+  .topo-view-tabs {
+    margin-right: 4px;
+
+    .nav-tab-btn {
+      padding: 4px 10px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+  }
 
   .label-text {
     margin-right: 5px;

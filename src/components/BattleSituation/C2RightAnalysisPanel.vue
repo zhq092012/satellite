@@ -2,15 +2,23 @@
   <aside class="c2-panel c2-panel--right dark-theme">
     <div class="panel-header">
       <div class="header-title-box">
-        <span class="header-icon">🏢</span>
-        <span class="header-title glow-text-cyan">敌方地面接收站与数据中心</span>
+        <span class="header-icon">{{ showOurWeaponsMode ? '🛡️' : '🏢' }}</span>
+        <span class="header-title" :class="showOurWeaponsMode ? 'glow-text-red' : 'glow-text-cyan'">
+          {{ showOurWeaponsMode ? '我方武器清单' : '敌方地面接收站与数据中心' }}
+        </span>
       </div>
-      <span class="panel-badge badge-blue">
-        {{ activeTab === 'satellite-link' && selectedSatInfo ? selectedSatInfo.name : '资产清单' }}
+      <span class="panel-badge" :class="showOurWeaponsMode ? 'badge-red' : 'badge-blue'">
+        {{
+          showOurWeaponsMode
+            ? `${ourWeapons.length} 件武器`
+            : activeTab === 'satellite-link' && selectedSatInfo
+              ? selectedSatInfo.name
+              : '资产清单'
+        }}
       </span>
     </div>
 
-    <div class="panel-tab-bar">
+    <div v-if="!showOurWeaponsMode" class="panel-tab-bar">
       <button
         type="button"
         class="panel-tab-btn"
@@ -30,7 +38,58 @@
     </div>
 
     <div class="panel-tab-content">
-      <div v-if="activeTab === 'infrastructure'" class="panel-body-scroll">
+      <div v-if="showOurWeaponsMode" class="panel-body-scroll">
+        <div class="panel-section">
+          <div class="section-title">
+            <span class="title-icon">🎯</span>
+            <span>我方武器资产</span>
+            <span class="count-tag count-tag--red">{{ ourWeapons.length }} 件</span>
+            <span v-if="selectedOurWeaponName" class="current-asset" :title="selectedOurWeaponName">
+              当前选择：{{ selectedOurWeaponName }}
+            </span>
+          </div>
+          <div v-if="weaponsLoading" class="empty-sat-box tab-empty-box">
+            <span class="empty-icon">⏳</span>
+            <p class="empty-text">正在加载武器清单...</p>
+          </div>
+          <div v-else-if="!ourWeapons.length" class="empty-sat-box tab-empty-box">
+            <span class="empty-icon">🛡️</span>
+            <p class="empty-text">暂无我方武器数据</p>
+          </div>
+          <div v-else class="asset-scroll-list">
+            <div
+              v-for="weapon in ourWeapons"
+              :key="'weapon-' + (weapon.id ?? weapon.name)"
+              class="asset-card asset-card--weapon"
+              :class="{ active: isWeaponSelected(weapon) }"
+              @click="handleSelectWeapon(weapon)"
+            >
+              <div class="card-top">
+                <span class="asset-name">🎯 <strong>{{ weapon.name }}</strong></span>
+                <span class="weapon-type-tag">{{ weapon.type || '武器' }}</span>
+              </div>
+              <div v-if="weapon.country" class="card-line">
+                <span class="card-label">所属</span>
+                <span class="card-val">{{ weapon.country }}</span>
+              </div>
+              <div v-if="weapon.satellite_type" class="card-line">
+                <span class="card-label">适用目标</span>
+                <span class="card-val">{{ weapon.satellite_type }}</span>
+              </div>
+              <div class="card-line">
+                <span class="card-label">位置</span>
+                <span class="card-val">{{ formatLatLon(weapon.latitude, weapon.longitude) }}</span>
+              </div>
+              <div class="card-line">
+                <span class="card-label">射程</span>
+                <span class="card-val glow-amber">{{ weapon.range }} km</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="activeTab === 'infrastructure'" class="panel-body-scroll">
         <div class="panel-section">
           <div class="section-title">
             <span class="title-icon">📡</span>
@@ -224,8 +283,10 @@
  * - 展现过境时间窗口、传输延时、最短用时、资产统计与资产详情
  * - 不包含任何攻击/毁伤/打压战果内容
  */
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, onMounted } from 'vue'
 import { type MatrixResult } from '@/api/electronic'
+import { getAllWeapons } from '@/api/dashboard'
+import type { Weapon } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import { useLayoutStore } from '@/store/modules/layout'
 import {
@@ -253,9 +314,53 @@ type RightPanelTab = 'infrastructure' | 'satellite-link'
 const panelScrollRef = ref<HTMLDivElement | null>(null)
 const activeTab = ref<RightPanelTab>('infrastructure')
 
+/** 是否处于我方武器展示模式（与地图开关联动） */
+const showOurWeaponsMode = computed(() => store.showOurWeapons)
+
+/** 我方武器清单数据 */
+const ourWeapons = ref<Weapon[]>([])
+
+/** 我方武器清单加载状态 */
+const weaponsLoading = ref(false)
+
+/**
+ * 拉取我方武器清单
+ */
+const loadOurWeapons = async () => {
+  weaponsLoading.value = true
+  try {
+    const res = await getAllWeapons()
+    if (res.code === 200 && res.data?.weapons) {
+      ourWeapons.value = res.data.weapons
+    } else {
+      ourWeapons.value = []
+    }
+  } catch (err) {
+    console.error('获取我方武器清单失败:', err)
+    ourWeapons.value = []
+  } finally {
+    weaponsLoading.value = false
+  }
+}
+
+watch(
+  () => store.showOurWeapons,
+  (visible) => {
+    if (visible) {
+      if (!ourWeapons.value.length) {
+        void loadOurWeapons()
+      }
+    } else {
+      store.setSelectedOurWeapon(null)
+    }
+  },
+  { immediate: true }
+)
+
 watch(
   () => props.selectedSatelliteNorad,
   (norad) => {
+    if (showOurWeaponsMode.value) return
     if (!norad) {
       activeTab.value = 'infrastructure'
       return
@@ -266,6 +371,47 @@ watch(
     })
   }
 )
+
+/** 当前选中的我方武器 */
+const selectedOurWeapon = computed(() => store.selectedOurWeapon)
+
+/** 当前选中的我方武器名称 */
+const selectedOurWeaponName = computed(() => selectedOurWeapon.value?.name ?? '')
+
+/**
+ * 判断武器卡片是否为当前选中项
+ * @param weapon 武器对象
+ */
+const isWeaponSelected = (weapon: Weapon): boolean => {
+  const selected = selectedOurWeapon.value
+  if (!selected) return false
+  if (selected.id && weapon.id) return selected.id === weapon.id
+  return selected.name === weapon.name
+}
+
+/**
+ * 点击武器卡片：定位到地图上的武器节点（再次点击取消选择）
+ * @param weapon 武器对象
+ */
+const handleSelectWeapon = (weapon: Weapon) => {
+  if (isWeaponSelected(weapon)) {
+    store.setSelectedOurWeapon(null)
+    return
+  }
+  store.setSelectedOurWeapon({
+    id: weapon.id,
+    name: weapon.name,
+    latitude: weapon.latitude,
+    longitude: weapon.longitude,
+    range: weapon.range,
+  })
+}
+
+onMounted(() => {
+  if (store.showOurWeapons) {
+    void loadOurWeapons()
+  }
+})
 
 
 /**
@@ -542,6 +688,11 @@ const handleSelectGroundNode = (node: GroundAssetItem) => {
     text-shadow: 0 0 8px rgba(64, 242, 255, 0.4);
   }
 
+  .glow-text-red {
+    color: #ff9e9e;
+    text-shadow: 0 0 8px rgba(239, 107, 115, 0.4);
+  }
+
   .panel-badge {
     padding: 2px 8px;
     font-size: 11px;
@@ -549,6 +700,12 @@ const handleSelectGroundNode = (node: GroundAssetItem) => {
     background: rgba(56, 189, 248, 0.15);
     color: #38bdf8;
     border: 1px solid rgba(56, 189, 248, 0.3);
+
+    &.badge-red {
+      background: rgba(239, 107, 115, 0.15);
+      color: #ff9e9e;
+      border-color: rgba(239, 107, 115, 0.35);
+    }
   }
 }
 
@@ -615,6 +772,22 @@ const handleSelectGroundNode = (node: GroundAssetItem) => {
 
   &--station {
     border-left-color: rgba(167, 139, 250, 0.55);
+  }
+
+  &--weapon {
+    border-left-color: rgba(239, 107, 115, 0.65);
+    cursor: pointer;
+
+    &:hover {
+      border-color: rgba(239, 107, 115, 0.45);
+      background: rgba(42, 22, 28, 0.85);
+    }
+
+    &.active {
+      border-color: #ef6b73;
+      background: rgba(239, 107, 115, 0.16);
+      box-shadow: 0 0 10px rgba(239, 107, 115, 0.22);
+    }
   }
 
   &:hover {
@@ -715,6 +888,17 @@ const handleSelectGroundNode = (node: GroundAssetItem) => {
       background: rgba(16, 185, 129, 0.12);
       border: 1px solid rgba(16, 185, 129, 0.28);
     }
+  }
+
+  .weapon-type-tag {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: #fca5a5;
+    background: rgba(239, 107, 115, 0.15);
+    border: 1px solid rgba(239, 107, 115, 0.3);
   }
 }
 
@@ -1165,6 +1349,11 @@ const handleSelectGroundNode = (node: GroundAssetItem) => {
   border-radius: 8px;
   background: rgba(56, 189, 248, 0.15);
   color: #38bdf8;
+
+  &--red {
+    background: rgba(239, 107, 115, 0.15);
+    color: #fca5a5;
+  }
 }
 
 .norad-tag {

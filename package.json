@@ -35,6 +35,7 @@
     "papaparse": "^5.5.2",
     "pinia": "^3.0.2",
     "pinia-plugin-persistedstate": "^4.2.0",
+    "postprocessing": "^6.39.4",
     "prismjs": "^1.30.0",
     "satellite.js": "^6.0.1",
     "three": "^0.180.0",
