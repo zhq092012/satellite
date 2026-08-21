@@ -19,6 +19,9 @@
         <el-button type="primary" size="small" :loading="store.zhchPlanLoading" @click="handleGenerate">
           生成方案
         </el-button>
+        <el-button size="small" :loading="cacheClearing" @click="handleClearCache">
+          清除缓存
+        </el-button>
       </div>
 
       <div class="header-right" v-if="isSingleMode && primaryPlan">
@@ -146,6 +149,7 @@
 import { computed, onMounted, ref, watch, defineComponent, h, type PropType } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ZhchPlanResp, ZhchPlanSatelliteMatrix } from '@/api/electronic'
+import { refreshZhchPlanCache } from '@/api/electronic'
 import { useLayoutStore, ZHCH_USAGE_TYPE_OPTIONS } from '@/store/modules/layout'
 import PlanSummaryBlock from './strike-plan/PlanSummaryBlock.vue'
 import SatelliteCard from './strike-plan/SatelliteCard.vue'
@@ -177,6 +181,9 @@ const expandedWindowKeys = ref<Set<string>>(new Set())
 
 /** 多栏对比模式下已展开的卫星矩阵用途类型 */
 const expandedMatrixTypes = ref<Set<string>>(new Set())
+
+/** 清除服务端缓存请求中 */
+const cacheClearing = ref(false)
 
 /** 当前勾选的用途类型（过滤旧版「军用」等无效值） */
 const selectedUsageTypes = computed(() =>
@@ -268,6 +275,34 @@ const handleGenerate = async () => {
   const ok = await store.fetchZhchPlans(selectedUsageTypes.value, true)
   if (!ok) {
     ElMessage.warning('获取打击方案失败，请稍后重试')
+  }
+}
+
+/**
+ * 清除打击方案服务端缓存，并清空本地已缓存方案
+ */
+const handleClearCache = async () => {
+  const taskId = store.activedTask?.id
+  if (!taskId) {
+    ElMessage.warning('请先选择战场与任务')
+    return
+  }
+
+  cacheClearing.value = true
+  try {
+    const res = await refreshZhchPlanCache(taskId)
+    if (res.code === 200) {
+      store.clearZhchPlans()
+      expandedWindowKeys.value = new Set()
+      expandedMatrixTypes.value = new Set()
+      ElMessage.success('打击方案缓存已清除')
+    } else {
+      ElMessage.warning(res.msg || '清除缓存失败，请稍后重试')
+    }
+  } catch {
+    ElMessage.error('清除缓存失败，请稍后重试')
+  } finally {
+    cacheClearing.value = false
   }
 }
 
