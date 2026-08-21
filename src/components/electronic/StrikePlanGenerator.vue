@@ -3,20 +3,15 @@
     <!-- 顶部：用途类型选择与方案概览 -->
     <div class="plan-header">
       <div class="header-left">
-        <span class="header-icon">⚔️</span>
+        <span class="header-icon"></span>
         <span class="header-title glow-text">综合打击方案生成</span>
       </div>
 
       <div class="header-center">
         <span class="type-label">卫星用途类型</span>
         <div class="type-selector">
-          <button
-            v-for="item in usageTypeOptions"
-            :key="item.value"
-            class="type-btn"
-            :class="{ active: selectedUsageType === item.value }"
-            @click="handleUsageTypeChange(item.value)"
-          >
+          <button v-for="item in usageTypeOptions" :key="item.value" class="type-btn"
+            :class="{ active: selectedUsageType === item.value }" @click="handleUsageTypeChange(item.value)">
             {{ item.label }}
           </button>
         </div>
@@ -82,12 +77,8 @@
           </div>
 
           <div v-else class="satellite-grid">
-            <div
-              v-for="sat in planData.satelliteMatrixList"
-              :key="sat.norad"
-              class="satellite-card"
-              :class="{ struck: sat.satelliteStatus === 1 }"
-            >
+            <div v-for="sat in planData.satelliteMatrixList" :key="sat.norad" class="satellite-card"
+              :class="{ struck: sat.satelliteStatus === 1 }">
               <div class="sat-header">
                 <div class="sat-title">
                   <span class="sat-name">{{ sat.name }}</span>
@@ -126,12 +117,8 @@
               <div class="window-block">
                 <div class="block-title">接收站过境窗口 ({{ sat.stationWindows?.length || 0 }})</div>
                 <div v-if="sat.stationWindows?.length" class="window-list">
-                  <div
-                    v-for="win in sat.stationWindows"
-                    :key="win.receiveId + win.peakWindow"
-                    class="window-item"
-                    :class="{ struck: win.strikeStatus === 1 }"
-                  >
+                  <div v-for="win in sat.stationWindows" :key="win.receiveId + win.peakWindow" class="window-item"
+                    :class="{ struck: win.strikeStatus === 1 }">
                     <div class="window-top">
                       <span class="receive-name">📡 {{ win.receiveName }}</span>
                       <span class="strike-tag" :class="win.strikeStatus === 1 ? 'struck' : 'ok'">
@@ -211,7 +198,7 @@ const fetchStrikePlan = async () => {
       planData.value = res.data
     } else {
       planData.value = null
-      ElMessage.warning(res.message || '获取打击方案失败')
+      ElMessage.warning(res.msg || '获取打击方案失败')
     }
   } catch (error) {
     planData.value = null
