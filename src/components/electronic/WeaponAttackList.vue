@@ -5,6 +5,9 @@
       <div class="header-left">
         <span class="header-icon">🎯</span>
         <span class="header-title glow-text">武器打击时间窗口与计划矩阵</span>
+        <el-button type="primary" size="small" class="situation-btn" @click="handleNavigateToOurSituation">
+          🛡️ 我方态势
+        </el-button>
       </div>
 
       <!-- 统计指标与搜索 -->
@@ -353,6 +356,14 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   if (!plan.beginTime || !plan.endTime) return '即时/未知'
   return formatDuration(plan.beginTime, plan.endTime)
 }
+
+/**
+ * [功能说明]
+ * 跳转到整体态势分析 Tab，并在地图上默认显示我方武器图层
+ */
+const handleNavigateToOurSituation = () => {
+  store.navigateToOurSituation()
+}
 </script>
 
 <style lang="scss" scoped>
@@ -390,6 +401,20 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
       font-weight: 700;
       color: #00e1ff;
       letter-spacing: 0.5px;
+    }
+
+    .situation-btn {
+      margin-left: 12px;
+      background: linear-gradient(135deg, rgba(239, 107, 115, 0.85), rgba(220, 38, 38, 0.75));
+      border: 1px solid rgba(239, 107, 115, 0.6);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+
+      &:hover {
+        background: linear-gradient(135deg, rgba(239, 107, 115, 1), rgba(220, 38, 38, 0.9));
+        border-color: #ef6b73;
+      }
     }
   }
 

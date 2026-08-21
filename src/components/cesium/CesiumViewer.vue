@@ -1,6 +1,17 @@
 <template>
   <div ref="cesiumContainer" class="cesium-container">
     <div ref="creditEl" class="credit"></div>
+    <!-- 我方武器图层开关 -->
+    <div class="map-layer-controls">
+      <el-switch
+        v-model="showOurWeapons"
+        active-color="#ef6b73"
+        inactive-color="#4b5563"
+        active-text="我方武器"
+        size="small"
+        @change="handleOurWeaponsToggle"
+      />
+    </div>
     <div v-if="satelliteRenderBusy" class="render-loading">
       <div class="render-loading__panel">
         <div class="render-loading__spinner"></div>
@@ -611,7 +622,10 @@ const renderElectronicInfrastructureNodes = () => {
   viewer.scene.requestRender()
 }
 
-const showRedSatellites = ref(false)
+const showOurWeapons = computed({
+  get: () => store.showOurWeapons,
+  set: (value: boolean) => store.setShowOurWeapons(value),
+})
 
 // [变量用途]
 // 保存通过 getAllWeapons 查询得到的全量我方武器数据。
@@ -623,6 +637,31 @@ const redWeaponEntities = shallowRef<Cesium.Entity[]>([])
 
 /**
  * [功能]
+ * 根据开关状态更新我方武器实体在地图上的显隐
+ *
+ * @param visible 是否显示我方武器
+ */
+const updateOurWeaponsVisibility = (visible: boolean) => {
+  redWeaponEntities.value.forEach((entity) => {
+    entity.show = visible
+  })
+  viewer?.scene.requestRender()
+}
+
+/**
+ * [功能]
+ * 地图开关切换我方武器图层显隐
+ *
+ * @param visible 是否显示我方武器
+ */
+const handleOurWeaponsToggle = (visible: boolean | string | number) => {
+  const show = Boolean(visible)
+  store.setShowOurWeapons(show)
+  updateOurWeaponsVisibility(show)
+}
+
+/**
+ * [功能]
  * 查询我方所有武器资源列表并将其绘制到 Cesium 地球球面上
  *
  * [数据来源]
@@ -631,7 +670,7 @@ const redWeaponEntities = shallowRef<Cesium.Entity[]>([])
  * [处理规则]
  * - 使用 createWeaponIconDataUri 根据武器类型 (如：导弹/干扰/定向能/天基/火炮) 动态生成特定 SVG 图标
  * - 在实体上绑定 Point, Billboard, Label 与 Ellipse (武器作用半径/防线)
- * - 初始显隐受 showRedSatellites.value 状态控制
+ * - 初始显隐受 store.showOurWeapons 状态控制
  */
 const loadAndRenderRedWeapons = async () => {
   if (!viewer) return
@@ -676,7 +715,7 @@ const renderRedWeaponsOnCesium = () => {
       id: weaponId,
       name: weapon.name,
       position: new Cesium.ConstantPositionProperty(position),
-      show: showRedSatellites.value,
+      show: store.showOurWeapons,
       billboard: {
         image: iconUri,
         scale: iconScale,
@@ -720,6 +759,7 @@ const renderRedWeaponsOnCesium = () => {
   })
 
   redWeaponEntities.value = newEntities
+  updateOurWeaponsVisibility(store.showOurWeapons)
 }
 
 // [变量用途]
@@ -1418,6 +1458,13 @@ const highlightSatellite = (sate: { norad_id: string }) => {
   viewer.scene.requestRender()
 }
 
+watch(
+  () => store.showOurWeapons,
+  (visible) => {
+    updateOurWeaponsVisibility(visible)
+  }
+)
+
 // 监听 selectedNorad 属性，联动更新时钟模式（相机飞赴由父组件在时间轴同步后触发）
 watch(
   () => props.selectedNorad,
@@ -1567,6 +1614,7 @@ defineExpose({
   setClockPlaying,
   getClockTimeMs,
   refreshAfterActivate,
+  setOurWeaponsVisible: (visible: boolean) => handleOurWeaponsToggle(visible),
 })
 </script>
 <style lang="scss" scoped>
@@ -1591,6 +1639,27 @@ defineExpose({
   }
   .credit {
     display: none;
+  }
+
+  .map-layer-controls {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgba(8, 14, 26, 0.88);
+    border: 1px solid rgba(239, 107, 115, 0.35);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+
+    :deep(.el-switch__label) {
+      color: #e2e8f0;
+      font-size: 12px;
+    }
   }
 
   .render-loading {

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import * as Cesium from 'cesium'
-import { getReconnaissanceAttackMatrix, type MatrixResult } from '@/api/electronic'
+import { getReconnaissanceAttackMatrix, getSatelliteThreatInfoByType, type MatrixResult, type ZhchPlanResp } from '@/api/electronic'
 import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 
@@ -46,6 +46,16 @@ interface State {
   topoFocusNorad: number | null
   /** 整体态势 / 拓扑分析共享的当前分析卫星 NORAD */
   selectedAnalysisNorad: number | null
+  /** 综合打击方案：按用途类型缓存的查询结果（军用 / 民用 / 军民混用） */
+  zhchPlanMap: Record<string, ZhchPlanResp>
+  /** 综合打击方案缓存对应的任务 ID */
+  zhchPlanTaskId: number | null
+  /** 综合打击方案加载状态 */
+  zhchPlanLoading: boolean
+  /** 当前勾选的用途类型（多选） */
+  selectedZhchUsageTypes: string[]
+  /** 整体态势地图上是否显示我方武器图层 */
+  showOurWeapons: boolean
 }
 export const useLayoutStore = defineStore('layout-store', {
   state: (): State => {
@@ -79,6 +89,11 @@ export const useLayoutStore = defineStore('layout-store', {
       mainActiveTab: '整体态势分析',
       topoFocusNorad: null,
       selectedAnalysisNorad: null,
+      zhchPlanMap: {},
+      zhchPlanTaskId: null,
+      zhchPlanLoading: false,
+      selectedZhchUsageTypes: ['军用'],
+      showOurWeapons: false,
     }
   },
   getters: {
@@ -288,6 +303,20 @@ export const useLayoutStore = defineStore('layout-store', {
       this.mainActiveTab = '态势拓扑分析'
     },
     /**
+     * 从打击窗口分析跳转到整体态势，并默认开启我方武器图层
+     */
+    navigateToOurSituation() {
+      this.showOurWeapons = true
+      this.mainActiveTab = '整体态势分析'
+    },
+    /**
+     * 切换整体态势地图上我方武器图层的显隐
+     * @param show 是否显示我方武器
+     */
+    setShowOurWeapons(show: boolean) {
+      this.showOurWeapons = show
+    },
+    /**
      * 读取并清除待聚焦的拓扑卫星 NORAD（避免重复触发）
      * @returns 待聚焦 NORAD 或 null
      */
@@ -295,6 +324,73 @@ export const useLayoutStore = defineStore('layout-store', {
       const norad = this.topoFocusNorad
       this.topoFocusNorad = null
       return norad
+    },
+    /**
+     * 切换综合打击方案用途类型多选
+     * @param type 用途类型（军用 / 民用 / 军民混用）
+     */
+    toggleZhchUsageType(type: string) {
+      const idx = this.selectedZhchUsageTypes.indexOf(type)
+      if (idx >= 0) {
+        if (this.selectedZhchUsageTypes.length <= 1) return
+        this.selectedZhchUsageTypes.splice(idx, 1)
+      } else {
+        this.selectedZhchUsageTypes.push(type)
+      }
+    },
+    /**
+     * 清空综合打击方案缓存
+     */
+    clearZhchPlans() {
+      this.zhchPlanMap = {}
+      this.zhchPlanTaskId = null
+    },
+    /**
+     * 拉取并缓存指定用途类型的综合打击方案
+     * @param types 用途类型列表
+     * @param force 是否强制重新请求
+     */
+    async fetchZhchPlans(types?: string[], force = false): Promise<boolean> {
+      const taskId = this.activedTask?.id
+      if (!taskId) {
+        this.clearZhchPlans()
+        return false
+      }
+
+      const targetTypes = types?.length ? types : [...this.selectedZhchUsageTypes]
+      if (!targetTypes.length) return false
+
+      if (this.zhchPlanTaskId !== taskId) {
+        this.clearZhchPlans()
+      }
+
+      this.zhchPlanLoading = true
+      try {
+        const results = await Promise.all(
+          targetTypes.map(async (type) => {
+            if (!force && this.zhchPlanMap[type]) {
+              return { type, data: this.zhchPlanMap[type] }
+            }
+            const res = await getSatelliteThreatInfoByType({ type, taskId })
+            return { type, data: res.code === 200 ? res.data : null }
+          })
+        )
+
+        let hasData = false
+        results.forEach(({ type, data }) => {
+          if (data) {
+            this.zhchPlanMap[type] = data
+            hasData = true
+          }
+        })
+        this.zhchPlanTaskId = taskId
+        return hasData
+      } catch (err) {
+        console.error('获取综合打击方案失败:', err)
+        return false
+      } finally {
+        this.zhchPlanLoading = false
+      }
     },
   },
   persist: {

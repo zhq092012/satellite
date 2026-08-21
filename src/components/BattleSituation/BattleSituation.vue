@@ -253,6 +253,7 @@ onActivated(() => {
       scheduleFlyToSelectedSatellite(store.selectedAnalysisNorad)
     }
     cesiumViewerRef.value?.refreshAfterActivate?.()
+    cesiumViewerRef.value?.setOurWeaponsVisible?.(store.showOurWeapons)
     if (store.selectedSatSeries && store.matrixData) {
       if (selectedNorad.value) {
         scheduleFlyToSelectedSatellite(selectedNorad.value)
