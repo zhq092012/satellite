@@ -49,6 +49,14 @@
           <span v-if="selectedSatelliteName" class="current-sat" :title="selectedSatelliteName">
             当前选择：{{ selectedSatelliteName }}
           </span>
+          <button
+            v-if="selectedNorad != null"
+            type="button"
+            class="clear-sat-btn"
+            @click.stop="emit('select-satellite', null)"
+          >
+            清空所选
+          </button>
         </div>
         <div class="sort-toggle-bar">
           <button class="sort-btn" :class="{ active: sortMode === 'threat' }" @click="sortMode = 'threat'">
@@ -769,6 +777,25 @@ const selectedSatelliteName = computed(() => {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    .clear-sat-btn {
+      flex-shrink: 0;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(64, 242, 255, 0.35);
+      background: rgba(8, 18, 32, 0.85);
+      color: #7dd3fc;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: rgba(64, 242, 255, 0.55);
+        background: rgba(64, 242, 255, 0.12);
+        color: #e0faff;
+      }
     }
 
     .count-tag {

@@ -248,9 +248,15 @@ onMounted(() => {
 onActivated(() => {
   nextTick(() => {
     markBattleArea()
-    if (store.selectedAnalysisNorad && selectedNorad.value !== store.selectedAnalysisNorad) {
-      selectedNorad.value = store.selectedAnalysisNorad
+    if (store.selectedAnalysisNorad) {
+      if (selectedNorad.value !== store.selectedAnalysisNorad) {
+        selectedNorad.value = store.selectedAnalysisNorad
+      }
       scheduleFlyToSelectedSatellite(store.selectedAnalysisNorad)
+    } else if (selectedNorad.value != null) {
+      selectedNorad.value = null
+      cesiumViewerRef.value?.markBattle()
+      syncGlobeTimeMode()
     }
     cesiumViewerRef.value?.refreshAfterActivate?.()
     cesiumViewerRef.value?.setOurWeaponsVisible?.(store.showOurWeapons)

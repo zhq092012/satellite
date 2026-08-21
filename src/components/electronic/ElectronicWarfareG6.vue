@@ -19,6 +19,15 @@
           </span>
         </div>
 
+        <el-button
+          v-if="selectedNorad != null"
+          size="small"
+          class="clear-sat-btn"
+          @click="handleClearSelectedSatellite"
+        >
+          清空所选卫星
+        </el-button>
+
         <div class="v-divider"></div>
 
         <!-- 卫星系列筛选 -->
@@ -298,6 +307,13 @@ const handleSelectLink = (linkId: string | null) => {
   updateGraphHighlightState()
 }
 
+/**
+ * 清空当前选中卫星，回到系列全部视角
+ */
+const handleClearSelectedSatellite = () => {
+  handleSelectSatellite(null)
+}
+
 const handleSelectSatellite = (norad: number | null) => {
   selectedNorad.value = norad
   store.setSelectedAnalysisNorad(norad)
@@ -490,6 +506,10 @@ watch(selectedLinkId, () => {
 const syncTopoSelectionFromStore = () => {
   const focusNorad = store.consumeTopoFocusNorad()
   const norad = focusNorad ?? store.selectedAnalysisNorad
+  if (norad == null && selectedNorad.value != null) {
+    handleSelectSatellite(null)
+    return
+  }
   if (norad != null && selectedNorad.value !== norad) {
     handleSelectSatellite(norad)
     return
@@ -1578,6 +1598,22 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
   const sortedReceives = Array.from(receiveOrderMap.values()).sort(
     (a, b) => a.earliestMs - b.earliestMs || a.name.localeCompare(b.name, 'zh-CN')
   )
+
+  norads.forEach((norad) => {
+    const relayRel = data.relayRelation?.relations?.find(
+      (r) => Number(r.from) === norad || String(r.from) === String(norad)
+    )
+    if (!relayRel) return
+    const relayId = String(Number(relayRel.to))
+    if (relayMap.has(relayId)) return
+    const initSat = data.initMatrixList?.find((s) => s.norad === Number(relayId))
+    const postSat = data.satelliteMatrixList?.find((s) => s.norad === Number(relayId))
+    relayMap.set(relayId, {
+      id: relayId,
+      name: postSat?.name || initSat?.name || `TDRS-${relayId}`,
+    })
+  })
+
   const relayList = Array.from(relayMap.values())
 
   satNodeCount.value = sortedSats.length
@@ -1607,7 +1643,18 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
     const x =
       relayList.length === 1 ? containerW / 2 : startX + (availableW / (relayList.length + 1)) * (i + 1)
     if (!nodeSet.has(id)) {
-      nodes.push(buildTopoNode({ id, name: relay.name, kind: 'relay', x, layer: 2, showLabel: true }))
+      const relayPostSat = data.satelliteMatrixList?.find((s) => s.norad === Number(relay.id))
+      nodes.push(
+        buildTopoNode({
+          id,
+          name: relay.name,
+          kind: 'relay',
+          x,
+          layer: 2,
+          struck: relayPostSat?.satelliteStatus === 1,
+          showLabel: true,
+        })
+      )
       nodeSet.add(id)
     }
   })
@@ -2232,9 +2279,18 @@ onUnmounted(() => {
   gap: 15px;
 }
 
-.all-links-btn {
+.all-links-btn,
+.clear-sat-btn {
   border: 1px solid rgba(0, 225, 255, 0.28);
   background: rgba(8, 14, 26, 0.7);
+  color: #94eaff;
+}
+
+.clear-sat-btn:hover,
+.clear-sat-btn:focus {
+  border-color: rgba(0, 225, 255, 0.45);
+  background: rgba(0, 225, 255, 0.12);
+  color: #e0faff;
 }
 
 .selection-status {
