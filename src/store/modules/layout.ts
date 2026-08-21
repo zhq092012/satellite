@@ -59,6 +59,9 @@ interface State {
   /** 右侧面板选中的我方武器（用于地图定位） */
   selectedOurWeapon: { id?: string; name: string; latitude: number; longitude: number; range?: number } | null
 }
+
+/** 综合打击方案可选用途类型（与 StrikePlanGenerator 选项一致） */
+export const ZHCH_USAGE_TYPE_OPTIONS = ['打击军用', '打击民用', '打击军用民用'] as const
 export const useLayoutStore = defineStore('layout-store', {
   state: (): State => {
     return {
@@ -94,7 +97,7 @@ export const useLayoutStore = defineStore('layout-store', {
       zhchPlanMap: {},
       zhchPlanTaskId: null,
       zhchPlanLoading: false,
-      selectedZhchUsageTypes: ['军用'],
+      selectedZhchUsageTypes: ['打击军用'],
       showOurWeapons: false,
       selectedOurWeapon: null,
     }
@@ -341,10 +344,21 @@ export const useLayoutStore = defineStore('layout-store', {
       return norad
     },
     /**
+     * 过滤掉旧版用途类型（如「军用」），仅保留当前 UI 支持的选项
+     */
+    sanitizeZhchUsageTypes() {
+      const valid = new Set<string>(ZHCH_USAGE_TYPE_OPTIONS)
+      this.selectedZhchUsageTypes = this.selectedZhchUsageTypes.filter((t) => valid.has(t))
+      if (!this.selectedZhchUsageTypes.length) {
+        this.selectedZhchUsageTypes = ['打击军用']
+      }
+    },
+    /**
      * 切换综合打击方案用途类型多选
-     * @param type 用途类型（军用 / 民用 / 军民混用）
+     * @param type 用途类型（打击军用 / 打击民用 / 打击军用民用）
      */
     toggleZhchUsageType(type: string) {
+      this.sanitizeZhchUsageTypes()
       const idx = this.selectedZhchUsageTypes.indexOf(type)
       if (idx >= 0) {
         if (this.selectedZhchUsageTypes.length <= 1) return
@@ -375,6 +389,12 @@ export const useLayoutStore = defineStore('layout-store', {
       const targetTypes = types?.length ? types : [...this.selectedZhchUsageTypes]
       if (!targetTypes.length) return false
 
+      this.sanitizeZhchUsageTypes()
+      const validTypes = targetTypes.filter((t) =>
+        (ZHCH_USAGE_TYPE_OPTIONS as readonly string[]).includes(t)
+      )
+      if (!validTypes.length) return false
+
       if (this.zhchPlanTaskId !== taskId) {
         this.clearZhchPlans()
       }
@@ -382,7 +402,7 @@ export const useLayoutStore = defineStore('layout-store', {
       this.zhchPlanLoading = true
       try {
         const results = await Promise.all(
-          targetTypes.map(async (type) => {
+          validTypes.map(async (type) => {
             if (!force && this.zhchPlanMap[type]) {
               return { type, data: this.zhchPlanMap[type] }
             }

@@ -93,7 +93,7 @@
               查看详情
             </el-button>
             <el-button v-else class="detail-btn" size="small" link type="primary" @click="openTopoAnalysis(sat)">
-              拓扑分析
+              查看详情
             </el-button>
           </div>
         </div>

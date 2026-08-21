@@ -8,15 +8,11 @@
       </div>
 
       <div class="header-center">
-        <span class="type-label">卫星用途类型</span>
+        <span class="type-label">方案名称</span>
         <div class="type-selector">
-          <button
-            v-for="item in usageTypeOptions"
-            :key="item.value"
-            class="type-btn"
+          <button v-for="item in usageTypeOptions" :key="item.value" class="type-btn"
             :class="{ active: store.selectedZhchUsageTypes.includes(item.value) }"
-            @click="handleToggleUsageType(item.value)"
-          >
+            @click="handleToggleUsageType(item.value)">
             {{ item.label }}
           </button>
         </div>
@@ -97,38 +93,19 @@
           </div>
 
           <!-- 每颗卫星一行：左基准 / 右方案，同一 NORAD -->
-          <div
-            v-for="sat in compareSatelliteList"
-            :key="sat.norad"
-            class="compare-satellite-group"
-          >
-            <SatelliteCard
-              v-if="getBaselineSatellite(sat.norad)"
-              :sat="getBaselineSatellite(sat.norad)!"
-              panel-key="baseline"
-              variant="baseline"
-              :windows-collapsible="true"
-              :expanded-window-keys="expandedWindowKeys"
-              @toggle-windows="toggleSatWindows"
-            />
-            <SatelliteCard
-              :sat="sat"
-              :panel-key="selectedUsageTypes[0]"
-              variant="actual"
-              :windows-collapsible="true"
-              :expanded-window-keys="expandedWindowKeys"
-              @toggle-windows="toggleSatWindows"
-            />
+          <div v-for="sat in compareSatelliteList" :key="sat.norad" class="compare-satellite-group">
+            <SatelliteCard v-if="getBaselineSatellite(sat.norad)" :sat="getBaselineSatellite(sat.norad)!"
+              panel-key="baseline" variant="baseline" :windows-collapsible="true"
+              :expanded-window-keys="expandedWindowKeys" @toggle-windows="toggleSatWindows" />
+            <SatelliteCard :sat="sat" :panel-key="selectedUsageTypes[0]" variant="actual" :windows-collapsible="true"
+              :expanded-window-keys="expandedWindowKeys" @toggle-windows="toggleSatWindows" />
           </div>
         </div>
       </div>
 
       <!-- 多选：分栏对比统计 -->
-      <div
-        v-else-if="isMultiMode"
-        class="compare-columns"
-        :style="{ gridTemplateColumns: `repeat(${selectedUsageTypes.length}, minmax(0, 1fr))` }"
-      >
+      <div v-else-if="isMultiMode" class="compare-columns"
+        :style="{ gridTemplateColumns: `repeat(${selectedUsageTypes.length}, minmax(0, 1fr))` }">
         <div v-for="usageType in selectedUsageTypes" :key="usageType" class="compare-column">
           <div class="column-head">
             <span class="column-title">{{ usageType }}</span>
@@ -151,13 +128,8 @@
             </button>
 
             <div v-if="isMatrixExpanded(usageType)" class="satellite-section">
-              <SatelliteMatrixGrid
-                :plan="getPlanByType(usageType)!"
-                :panel-key="usageType"
-                :windows-collapsible="true"
-                :expanded-window-keys="expandedWindowKeys"
-                @toggle-windows="toggleSatWindows"
-              />
+              <SatelliteMatrixGrid :plan="getPlanByType(usageType)!" :panel-key="usageType" :windows-collapsible="true"
+                :expanded-window-keys="expandedWindowKeys" @toggle-windows="toggleSatWindows" />
             </div>
           </div>
 
@@ -171,10 +143,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, defineComponent, h, type PropType } from 'vue'
+import { computed, onMounted, ref, watch, defineComponent, h, type PropType } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ZhchPlanResp, ZhchPlanSatelliteMatrix } from '@/api/electronic'
-import { useLayoutStore } from '@/store/modules/layout'
+import { useLayoutStore, ZHCH_USAGE_TYPE_OPTIONS } from '@/store/modules/layout'
 import PlanSummaryBlock from './strike-plan/PlanSummaryBlock.vue'
 import SatelliteCard from './strike-plan/SatelliteCard.vue'
 
@@ -188,14 +160,17 @@ interface UsageTypeOption {
   value: string
 }
 
-/** 可选用途类型：军用 / 民用 / 军民混用 */
-const usageTypeOptions: UsageTypeOption[] = [
-  { label: '军用', value: '军用' },
-  { label: '民用', value: '民用' },
-  { label: '军民混用', value: '军民混用' },
-]
+/** 可选用途类型：全部打击军用 / 全部打击民用 / 打击军用民用 */
+const usageTypeOptions: UsageTypeOption[] = ZHCH_USAGE_TYPE_OPTIONS.map((value) => ({
+  label: value,
+  value,
+}))
 
 const store = useLayoutStore()
+
+onMounted(() => {
+  store.sanitizeZhchUsageTypes()
+})
 
 /** 已展开的接收站过境窗口（panelKey-norad） */
 const expandedWindowKeys = ref<Set<string>>(new Set())
@@ -203,23 +178,27 @@ const expandedWindowKeys = ref<Set<string>>(new Set())
 /** 多栏对比模式下已展开的卫星矩阵用途类型 */
 const expandedMatrixTypes = ref<Set<string>>(new Set())
 
-/** 当前勾选的用途类型 */
-const selectedUsageTypes = computed(() => [...store.selectedZhchUsageTypes])
+/** 当前勾选的用途类型（过滤旧版「军用」等无效值） */
+const selectedUsageTypes = computed(() =>
+  store.selectedZhchUsageTypes.filter((type) =>
+    (ZHCH_USAGE_TYPE_OPTIONS as readonly string[]).includes(type)
+  )
+)
 
 /** 是否已有可展示的方案（任一勾选类型有缓存） */
 const hasVisiblePlans = computed(() =>
-  store.selectedZhchUsageTypes.some((type) => !!store.zhchPlanMap[type])
+  selectedUsageTypes.value.some((type) => !!store.zhchPlanMap[type])
 )
 
 /** 是否为单选对比模式 */
-const isSingleMode = computed(() => store.selectedZhchUsageTypes.length === 1)
+const isSingleMode = computed(() => selectedUsageTypes.value.length === 1)
 
 /** 是否为多选对比模式 */
-const isMultiMode = computed(() => store.selectedZhchUsageTypes.length >= 2)
+const isMultiMode = computed(() => selectedUsageTypes.value.length >= 2)
 
 /** 单选模式下当前方案 */
 const primaryPlan = computed(() => {
-  const type = store.selectedZhchUsageTypes[0]
+  const type = selectedUsageTypes.value[0]
   return type ? store.zhchPlanMap[type] ?? null : null
 })
 
@@ -283,9 +262,10 @@ const handleGenerate = async () => {
     ElMessage.warning('请先选择战场与任务')
     return
   }
+  store.sanitizeZhchUsageTypes()
   expandedWindowKeys.value = new Set()
   expandedMatrixTypes.value = new Set()
-  const ok = await store.fetchZhchPlans(store.selectedZhchUsageTypes, true)
+  const ok = await store.fetchZhchPlans(selectedUsageTypes.value, true)
   if (!ok) {
     ElMessage.warning('获取打击方案失败，请稍后重试')
   }
@@ -407,18 +387,18 @@ const SatelliteMatrixGrid = defineComponent({
           ]),
           sat.weapons?.length
             ? h('div', { class: 'weapon-block' }, [
-                h('div', { class: 'block-title' }, '针对卫星的武器'),
-                h(
-                  'div',
-                  { class: 'weapon-list' },
-                  sat.weapons.map((weapon) =>
-                    h('span', { class: 'weapon-chip', key: weapon.id || weapon.name }, [
-                      weapon.name,
-                      weapon.type ? h('em', ` (${weapon.type})`) : null,
-                    ])
-                  )
-                ),
-              ])
+              h('div', { class: 'block-title' }, '针对卫星的武器'),
+              h(
+                'div',
+                { class: 'weapon-list' },
+                sat.weapons.map((weapon) =>
+                  h('span', { class: 'weapon-chip', key: weapon.id || weapon.name }, [
+                    weapon.name,
+                    weapon.type ? h('em', ` (${weapon.type})`) : null,
+                  ])
+                )
+              ),
+            ])
             : null,
           h('div', { class: 'window-block' }, [
             h(
@@ -436,37 +416,37 @@ const SatelliteMatrixGrid = defineComponent({
             ),
             winExpanded && sat.stationWindows?.length
               ? h(
-                  'div',
-                  { class: 'window-list' },
-                  sat.stationWindows.map((win) =>
-                    h(
-                      'div',
-                      {
-                        class: ['window-item', win.strikeStatus === 1 ? 'struck' : ''],
-                        key: win.receiveId + win.peakWindow,
-                      },
-                      [
-                        h('div', { class: 'window-top' }, [
-                          h('span', { class: 'receive-name' }, `📡 ${win.receiveName}`),
-                          h(
-                            'span',
-                            { class: ['strike-tag', win.strikeStatus === 1 ? 'struck' : 'ok'] },
-                            win.strikeStatus === 1 ? '已打击' : '未打击'
+                'div',
+                { class: 'window-list' },
+                sat.stationWindows.map((win) =>
+                  h(
+                    'div',
+                    {
+                      class: ['window-item', win.strikeStatus === 1 ? 'struck' : ''],
+                      key: win.receiveId + win.peakWindow,
+                    },
+                    [
+                      h('div', { class: 'window-top' }, [
+                        h('span', { class: 'receive-name' }, `📡 ${win.receiveName}`),
+                        h(
+                          'span',
+                          { class: ['strike-tag', win.strikeStatus === 1 ? 'struck' : 'ok'] },
+                          win.strikeStatus === 1 ? '已打击' : '未打击'
+                        ),
+                      ]),
+                      h('div', { class: 'window-time' }, `过境时间：${formatWindowTime(win.peakWindow)}`),
+                      win.weapons?.length
+                        ? h('div', { class: 'window-weapons' }, [
+                          h('span', { class: 'weapon-label' }, '武器：'),
+                          ...win.weapons.map((w) =>
+                            h('span', { class: 'mini-weapon', key: w.id || w.name }, w.name)
                           ),
-                        ]),
-                        h('div', { class: 'window-time' }, `过境时间：${formatWindowTime(win.peakWindow)}`),
-                        win.weapons?.length
-                          ? h('div', { class: 'window-weapons' }, [
-                              h('span', { class: 'weapon-label' }, '武器：'),
-                              ...win.weapons.map((w) =>
-                                h('span', { class: 'mini-weapon', key: w.id || w.name }, w.name)
-                              ),
-                            ])
-                          : null,
-                      ]
-                    )
+                        ])
+                        : null,
+                    ]
                   )
                 )
+              )
               : winExpanded
                 ? h('div', { class: 'no-window-tip' }, '暂无接收站窗口数据')
                 : null,
@@ -645,7 +625,7 @@ watch(
   gap: 14px;
   align-items: stretch;
 
-  > * {
+  >* {
     min-width: 0;
   }
 }
@@ -722,7 +702,7 @@ watch(
   background: rgba(8, 15, 26, 0.4);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
 
-  > * {
+  >* {
     min-width: 0;
   }
 }

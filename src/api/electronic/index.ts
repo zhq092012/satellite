@@ -642,3 +642,12 @@ export const getSatelliteThreatInfoByType = (data: { type: string; taskId: numbe
   return requestAPI.post<AxiosResponseType<ZhchPlanResp>>(url, data)
 }
 
+/**
+ * 刷新打击方案生成缓存
+ * @param data.taskId - 作战任务 ID
+ * @returns 包含综合打击方案数据的 Axios 响应 Promise
+ */
+export const refreshZhchPlanCache = (taskId: number) => {
+  const url = `/api/algorithm/delSeriesCache?taskId=${taskId}`
+  return requestAPI.get<AxiosResponseType<string>>(url)
+}
