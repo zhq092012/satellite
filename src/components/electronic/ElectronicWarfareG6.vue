@@ -19,12 +19,8 @@
           </span>
         </div>
 
-        <el-button
-          v-if="selectedNorad != null"
-          size="small"
-          class="clear-sat-btn"
-          @click="handleClearSelectedSatellite"
-        >
+        <el-button v-if="selectedNorad != null" size="small" class="clear-sat-btn"
+          @click="handleClearSelectedSatellite">
           清空所选卫星
         </el-button>
 
@@ -44,19 +40,6 @@
 
       <!-- 右侧信息栏 -->
       <div class="header-right">
-        <!-- 拓扑视图模式切换 -->
-        <div class="matrix-tab-group topo-view-tabs">
-          <button
-            v-for="tab in topoViewTabs"
-            :key="tab.key"
-            class="nav-tab-btn"
-            :class="{ active: topoViewMode === tab.key }"
-            @click="handleTopoViewModeChange(tab.key)"
-          >
-            {{ tab.label }}
-          </button>
-        </div>
-
         <div class="header-right-item">
           <span class="label-text">当前任务:</span>
           <span class="digital-font time-value glow-text-cyan">{{ store.activedTask?.name || '实时推演场景' }}</span>
@@ -68,12 +51,8 @@
     <div class="cema-workspace">
       <div class="topo-main-body">
         <div class="topo-side topo-side--left">
-          <TopoLeftPanel
-            :matrix-data="matrixData"
-            :selected-norad="selectedNorad"
-            :selected-link-id="selectedLinkId"
-            @select-link="handleSelectLink"
-          />
+          <TopoLeftPanel :matrix-data="matrixData" :selected-norad="selectedNorad" :selected-link-id="selectedLinkId"
+            @select-link="handleSelectLink" />
         </div>
 
         <div class="topo-center-column">
@@ -98,7 +77,7 @@
 
           <div class="topo-graph-stack">
             <div class="graph-stage" ref="graphStageRef">
-              <div v-if="topoViewMode === 'layered'" class="graph-layer-labels">
+              <div class="graph-layer-labels">
                 <div v-for="item in layerLabelItems" :key="item.key" class="graph-layer-label" :class="item.className"
                   :style="{ top: item.top }">
                   <span class="layer-icon">{{ item.icon }}</span>
@@ -107,29 +86,7 @@
                   </div>
                 </div>
               </div>
-              <!-- 三层拓扑 (G6) -->
-              <div
-                v-show="topoViewMode === 'layered'"
-                ref="g6Container"
-                class="g6-chart-container"
-                v-loading="loading"
-              />
-              <!-- 平面 / 立体星环拓扑 -->
-              <TopoStarRingView
-                v-if="topoViewMode !== 'layered'"
-                :view-mode="topoViewMode === 'planar-ring' ? 'planar' : 'stereo'"
-                :nodes="starRingGraphData.nodes"
-                :edges="starRingGraphData.edges"
-                :is-comm="currentSatCategory === 'COMM'"
-                :position-labels="positionLabels"
-                :selected-node-id="selectedPanelNodeId"
-                :selected-link-id="selectedLinkId"
-                :selected-receive-id="selectedReceiveId"
-                :selected-sat-id="selectedNorad != null ? `sat-${selectedNorad}` : null"
-                :active-node-ids="activeNodeIds"
-                @node-click="handleStarRingNodeClick"
-                @edge-click="handleStarRingEdgeClick"
-              />
+              <div ref="g6Container" class="g6-chart-container" v-loading="loading" />
             </div>
 
             <div class="graph-time-toolbar">
@@ -152,20 +109,14 @@
                 :selected-marker-type="selectedTimelinePoint?.type ?? null"
                 :selected-marker-label="selectedTimelinePoint?.label ?? null"
                 :selected-marker-receive-id="selectedTimelinePoint?.receiveId ?? selectedReceiveId"
-                @time-change="handleTimelineTimeChange"
-                @marker-click="handleTimelineMarkerClick" />
+                @time-change="handleTimelineTimeChange" @marker-click="handleTimelineMarkerClick" />
             </div>
           </div>
         </div>
 
         <div class="topo-side topo-side--right">
-          <TopoRightPanel
-            :matrix-data="matrixData"
-            :selected-norad="selectedNorad"
-            :selected-link-id="selectedLinkId"
-            :selected-node-id="selectedPanelNodeId"
-            :selected-node-layer="selectedPanelNodeLayer"
-          />
+          <TopoRightPanel :matrix-data="matrixData" :selected-norad="selectedNorad" :selected-link-id="selectedLinkId"
+            :selected-node-id="selectedPanelNodeId" :selected-node-layer="selectedPanelNodeLayer" />
         </div>
       </div>
     </div>
@@ -180,26 +131,12 @@ import { getSatelliteTypeSerials, type MatrixResult, type Weapon } from '@/api/e
 import type { FuncType } from '@/types/electronic'
 import TopoLeftPanel from '@/components/electronic/TopoLeftPanel.vue'
 import TopoRightPanel from '@/components/electronic/TopoRightPanel.vue'
-import TopoStarRingView from '@/components/electronic/TopoStarRingView.vue'
 import BattleMissionTimeline from '@/components/BattleSituation/BattleMissionTimeline.vue'
 import { type TimelineChainMarkerType, collectSatelliteTransmissionLinks, collectSeriesTransmissionLinks, listNormalSatelliteNorads, type ChainNode, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 
 defineOptions({
   name: 'ElectronicWarfareG6',
 })
-
-/** 拓扑视图模式：三层拓扑 / 平面星环 / 立体星环 */
-type TopoViewMode = 'layered' | 'planar-ring' | 'stereo-ring'
-
-/** 拓扑视图切换按钮配置 */
-const topoViewTabs: { key: TopoViewMode; label: string }[] = [
-  { key: 'layered', label: '三层拓扑' },
-  { key: 'planar-ring', label: '平面星环' },
-  { key: 'stereo-ring', label: '立体星环' },
-]
-
-/** 当前拓扑视图模式，默认三层拓扑 */
-const topoViewMode = ref<TopoViewMode>('layered')
 
 const store = useLayoutStore()
 
@@ -223,7 +160,7 @@ const taskTimeRange = computed(() => {
 
 // G6 画布容器 DOM ref
 const g6Container = ref<HTMLDivElement | null>(null)
-/** 拓扑图舞台容器（星环 / 三层拓扑共用尺寸） */
+/** 拓扑图舞台容器 */
 const graphStageRef = ref<HTMLDivElement | null>(null)
 
 /**
@@ -668,12 +605,6 @@ const refreshGraphForTime = () => {
   const { width, height } = getGraphStageSize()
   if (!width || !height || width <= 0 || height <= 0) return
 
-  // 星环模式：仅刷新统计数据，由 TopoStarRingView 自行渲染
-  if (topoViewMode.value !== 'layered') {
-    buildG6GraphData()
-    return
-  }
-
   if (!g6Container.value) return
 
   const topoKey = getGraphTopologyKey()
@@ -863,16 +794,16 @@ const buildTopoNode = (opts: {
     style,
     labelCfg: showLabel
       ? {
-          position: 'bottom',
-          offset: hasSubLabel ? 14 : 8,
-          style: {
-            fill: '#e2efff',
-            fontSize: hasSubLabel ? 9 : 10,
-            fontWeight: 500,
-            lineHeight: 14,
-            textAlign: 'center',
-          },
-        }
+        position: 'bottom',
+        offset: hasSubLabel ? 14 : 8,
+        style: {
+          fill: '#e2efff',
+          fontSize: hasSubLabel ? 9 : 10,
+          fontWeight: 500,
+          lineHeight: 14,
+          textAlign: 'center',
+        },
+      }
       : { style: { opacity: 0 } },
     stateStyles: {
       active: stateStyle,
@@ -1355,89 +1286,6 @@ const initTimelineBounds = () => {
 
 const isWindowActiveAtCurrentTime = (win: WindowItemWrapper) => {
   return currentTimestamp.value >= win.startTimestamp && currentTimestamp.value <= win.endTimestamp
-}
-
-/** 当前时刻活跃的节点 ID 集合（星环视图高亮用） */
-const activeNodeIds = computed(() => {
-  const ids = new Set<string>()
-  allWindowsList.value.filter((w) => isWindowActiveAtCurrentTime(w)).forEach((w) => {
-    ids.add(`sat-${w.satNorad}`)
-    ids.add(w.receiveId)
-  })
-  const relayRels = matrixData.value?.relayRelation?.relations || []
-  relayRels.forEach((rel) => {
-    if (ids.has(`sat-${rel.from}`)) ids.add(`sat-${rel.to}`)
-  })
-  return ids
-})
-
-/** 星环视图使用的图数据（与三层拓扑共用 buildG6GraphData） */
-const starRingGraphData = computed(() => {
-  if (!matrixData.value) return { nodes: [], edges: [] }
-  return buildG6GraphData()
-})
-
-/** 最内虚线环展示的阵地名称 */
-const positionLabels = computed(() => {
-  const circles = Array.from(store.battleCircleMap.values())
-  if (circles.length) return circles.map((c) => c.name)
-  if (store.battle?.name) return [store.battle.name]
-  return ['阵地']
-})
-
-/**
- * 切换拓扑视图模式
- * @param mode 目标视图模式
- */
-const handleTopoViewModeChange = (mode: TopoViewMode) => {
-  if (topoViewMode.value === mode) return
-  topoViewMode.value = mode
-  nextTick(() => {
-    if (mode === 'layered') {
-      graphTopologyKey = ''
-      initOrUpdateGraph()
-    }
-  })
-}
-
-/**
- * 星环视图节点点击，复用三层拓扑的节点选择逻辑
- * @param node 被点击的节点
- */
-const handleStarRingNodeClick = (node: { id: string; kind?: string; norad?: number }) => {
-  const nodeId = String(node.id)
-  if (nodeId.startsWith('sat-')) {
-    const norad = Number(nodeId.replace('sat-', ''))
-    if (!Number.isFinite(norad)) return
-    if (selectedNorad.value !== norad) {
-      handleSelectSatellite(norad)
-    } else {
-      selectedLinkId.value = null
-      selectedReceiveId.value = null
-      selectedTimelinePoint.value = null
-      selectedPanelNodeId.value = `sat-${norad}`
-      selectedPanelNodeLayer.value = 'sat'
-      parseAndSelectNode({ id: nodeId, kind: node.kind })
-    }
-    return
-  }
-  if (node.kind === 'receive' || (!nodeId.startsWith('sat-') && !isStationNodeId(nodeId))) {
-    handleSelectReceiveStation(nodeId, { id: nodeId, kind: node.kind })
-    return
-  }
-  selectedLinkId.value = null
-  selectedReceiveId.value = null
-  selectedTimelinePoint.value = null
-  parseAndSelectNode({ id: nodeId, kind: node.kind })
-}
-
-/**
- * 星环视图链路点击
- * @param linkId 链路 ID
- */
-const handleStarRingEdgeClick = (linkId: string) => {
-  if (!linkId) return
-  handleSelectLink(selectedLinkId.value === linkId ? null : linkId)
 }
 
 const highlightActiveElements = () => {
@@ -2179,11 +2027,7 @@ let resizeTimer: number | null = null
 const handleResize = () => {
   if (resizeTimer) window.clearTimeout(resizeTimer)
   resizeTimer = window.setTimeout(() => {
-    if (topoViewMode.value === 'layered') {
-      initOrUpdateGraph()
-    } else {
-      refreshGraphForTime()
-    }
+    initOrUpdateGraph()
   }, 60)
 }
 
@@ -2214,11 +2058,7 @@ onActivated(() => {
   syncTopoSelectionFromStore()
   nextTick(() => {
     setTimeout(() => {
-      if (topoViewMode.value === 'layered') {
-        initOrUpdateGraph()
-      } else {
-        refreshGraphForTime()
-      }
+      initOrUpdateGraph()
     }, 50)
   })
 })
@@ -2340,42 +2180,6 @@ onUnmounted(() => {
   }
 }
 
-.matrix-tab-group {
-  display: flex;
-  align-items: center;
-  background: rgba(8, 14, 26, 0.7);
-  padding: 3px;
-  border-radius: 4px;
-  border: 1px solid rgba(0, 225, 255, 0.18);
-}
-
-.nav-tab-btn {
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  padding: 5px 13px;
-  font-size: 13px;
-  cursor: pointer;
-  border-radius: 3px;
-  transition: all 0.25s ease;
-
-  &:hover {
-    color: #00e1ff;
-  }
-
-  &.active {
-    background: linear-gradient(135deg, rgba(0, 225, 255, 0.35), rgba(0, 102, 255, 0.45));
-    color: #ffffff;
-    font-weight: 600;
-    box-shadow: 0 0 8px rgba(0, 225, 255, 0.3);
-  }
-
-  &.tab-matrix.active {
-    background: linear-gradient(135deg, rgba(255, 77, 79, 0.35), rgba(255, 120, 117, 0.45));
-    box-shadow: 0 0 8px rgba(255, 77, 79, 0.3);
-  }
-}
-
 .v-divider {
   width: 1px;
   height: 22px;
@@ -2388,16 +2192,6 @@ onUnmounted(() => {
   gap: 16px;
   font-size: 13px;
   color: #94a3b8;
-
-  .topo-view-tabs {
-    margin-right: 4px;
-
-    .nav-tab-btn {
-      padding: 4px 10px;
-      font-size: 12px;
-      white-space: nowrap;
-    }
-  }
 
   .label-text {
     margin-right: 5px;
