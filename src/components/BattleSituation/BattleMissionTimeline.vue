@@ -1,8 +1,11 @@
 <template>
   <div class="battle-mission-timeline" v-if="taskStartMs && taskEndMs > taskStartMs">
     <div class="timeline-header">
-      <span class="header-title">{{ selectedNorad ? '任务时间标尺' : 'TLE 轨道仿真时间尺' }}</span>
-      <span v-if="!selectedNorad && currentTimeMs" class="current-time-tag">
+      <span class="header-title">{{ isTaskTimelineMode ? '任务时间标尺' : 'TLE 轨道仿真时间尺' }}</span>
+      <span v-if="!isTaskTimelineMode && currentTimeMs" class="current-time-tag">
+        {{ formatTimelineTime(currentTimeMs) }}
+      </span>
+      <span v-else-if="forceTaskMode && !selectedNorad && currentTimeMs" class="current-time-tag">
         {{ formatTimelineTime(currentTimeMs) }}
       </span>
       <div class="legend-row" v-if="selectedNorad">
@@ -22,7 +25,6 @@
         </div>
       </div>
 
-      <!-- 色段轨道（仅选中卫星时展示任务分析色段） -->
       <div v-if="selectedNorad" class="timeline-track">
         <div class="track-base"></div>
         <div v-if="timelineModel?.firstTransmitMs" class="track-segment segment-normal"
@@ -32,18 +34,31 @@
         <div v-if="timelineModel?.postChainFinishMs && !timelineModel.allBlocked" class="track-segment segment-post"
           :style="segmentStyle(lastJamEndMs, timelineModel.postChainFinishMs)"></div>
       </div>
+      <div v-else-if="forceTaskMode" class="timeline-track timeline-track--task-focus">
+        <div class="track-base"></div>
+      </div>
       <div v-else class="timeline-track timeline-track--orbit">
         <div class="track-base"></div>
       </div>
 
-      <!-- 轨道仿真游标（未选中卫星时跟随时钟推进） -->
+      <!-- 轨道仿真游标（未进入任务时间模式时跟随时钟推进） -->
       <div
-        v-if="!selectedNorad && playheadPercent != null"
+        v-if="!isTaskTimelineMode && playheadPercent != null"
         class="orbit-playhead"
         :style="{ left: playheadPercent + '%' }"
       >
         <span class="orbit-playhead-line"></span>
         <span class="orbit-playhead-dot"></span>
+      </div>
+
+      <!-- 链路聚焦游标（选中传输链路但未选卫星时展示任务时刻） -->
+      <div
+        v-if="forceTaskMode && !selectedNorad && taskPlayheadPercent != null"
+        class="task-playhead"
+        :style="{ left: taskPlayheadPercent + '%' }"
+      >
+        <span class="task-playhead-line"></span>
+        <span class="task-playhead-dot"></span>
       </div>
 
       <!-- 方形节点标尺 -->
@@ -103,6 +118,8 @@ const props = defineProps<{
   matrixData: MatrixResult | null
   /** 当前选中的卫星 NORAD 编号。 */
   selectedNorad?: number | null
+  /** 未选卫星时强制使用任务时间标尺（如选中传输链路） */
+  forceTaskMode?: boolean
   /** 当前时钟时刻（毫秒），用于轨道仿真游标。 */
   currentTimeMs?: number | null
   /** 当前选中的时间点。 */
@@ -140,9 +157,20 @@ const taskStartMs = computed(() => parseTaskTime(props.taskStart))
 /** 任务结束时间的毫秒时间戳。 */
 const taskEndMs = computed(() => parseTaskTime(props.taskEnd))
 
+/** 是否处于任务时间标尺模式（选中卫星或聚焦传输链路） */
+const isTaskTimelineMode = computed(() => !!props.selectedNorad || !!props.forceTaskMode)
+
 /** 轨道仿真模式下时间轴游标位置（百分比） */
 const playheadPercent = computed<number | null>(() => {
-  if (props.selectedNorad || !props.currentTimeMs || !taskStartMs.value || !taskEndMs.value) return null
+  if (isTaskTimelineMode.value || !props.currentTimeMs || !taskStartMs.value || !taskEndMs.value) return null
+  return msToPercent(props.currentTimeMs)
+})
+
+/** 链路聚焦模式下任务时刻游标位置（百分比） */
+const taskPlayheadPercent = computed<number | null>(() => {
+  if (!props.forceTaskMode || props.selectedNorad || !props.currentTimeMs || !taskStartMs.value || !taskEndMs.value) {
+    return null
+  }
   return msToPercent(props.currentTimeMs)
 })
 
@@ -522,6 +550,39 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
     background: #22d3ee;
     border: 2px solid #e0f2fe;
     box-shadow: 0 0 10px rgba(34, 211, 238, 0.8);
+  }
+}
+
+.task-playhead {
+  position: absolute;
+  top: 30px;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+
+  .task-playhead-line {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: linear-gradient(180deg, rgba(245, 230, 163, 0.2), #f5e6a3);
+    box-shadow: 0 0 8px rgba(245, 230, 163, 0.55);
+  }
+
+  .task-playhead-dot {
+    position: absolute;
+    left: 50%;
+    top: -2px;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    border-radius: 50%;
+    background: #f5e6a3;
+    border: 2px solid #fef9c3;
+    box-shadow: 0 0 10px rgba(245, 230, 163, 0.75);
   }
 }
 

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import * as Cesium from 'cesium'
-import { getReconnaissanceAttackMatrix, getSatelliteThreatInfoByType, type MatrixResult, type ZhchPlanResp } from '@/api/electronic'
+import { getReconnaissanceAttackMatrix, getSatelliteThreatInfoByType, getSatelliteTypeSerials, type MatrixResult, type ZhchPlanResp } from '@/api/electronic'
+import { mergeMatrixResults } from '@/utils/satelliteFullChainAnalysis'
 import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 
@@ -40,6 +41,8 @@ interface State {
   matrixLoading: boolean
   /** [全局共享] 算法矩阵当前查询条件 Key 缓存 */
   matrixQueryKey: string
+  /** 矩阵拉取序号，用于丢弃过期的异步响应 */
+  matrixFetchToken: number
   /** 顶层功能 Tab 当前激活项 */
   mainActiveTab: string
   /** 从整体态势跳转拓扑分析时待聚焦的卫星 NORAD */
@@ -62,6 +65,11 @@ interface State {
 
 /** 综合打击方案可选用途类型（与 StrikePlanGenerator 选项一致） */
 export const ZHCH_USAGE_TYPE_OPTIONS = ['打击军用', '打击民用', '打击军用民用'] as const
+
+/** 同一 scope 的矩阵拉取 in-flight 去重，避免多组件并发请求互相覆盖 */
+let matrixScopeInflight: Promise<MatrixResult | null> | null = null
+let matrixScopeInflightKey = ''
+
 export const useLayoutStore = defineStore('layout-store', {
   state: (): State => {
     return {
@@ -91,6 +99,7 @@ export const useLayoutStore = defineStore('layout-store', {
       matrixData: null,
       matrixLoading: false,
       matrixQueryKey: '',
+      matrixFetchToken: 0,
       mainActiveTab: '整体态势分析',
       topoFocusNorad: null,
       selectedAnalysisNorad: null,
@@ -98,7 +107,7 @@ export const useLayoutStore = defineStore('layout-store', {
       zhchPlanTaskId: null,
       zhchPlanLoading: false,
       selectedZhchUsageTypes: ['打击军用'],
-      showOurWeapons: false,
+      showOurWeapons: true,
       selectedOurWeapon: null,
     }
   },
@@ -224,6 +233,9 @@ export const useLayoutStore = defineStore('layout-store', {
      * @param type 卫星类型名称
      */
     setSelectedSatType(type: string) {
+      if (this.selectedSatType !== type) {
+        this.matrixQueryKey = ''
+      }
       this.selectedSatType = type
     },
     /**
@@ -232,6 +244,10 @@ export const useLayoutStore = defineStore('layout-store', {
      * @param series 卫星系列名称
      */
     setSelectedSatSeries(series: string) {
+      if (this.selectedSatSeries !== series) {
+        this.matrixQueryKey = ''
+        this.matrixData = null
+      }
       this.selectedSatSeries = series
     },
     /**
@@ -248,17 +264,17 @@ export const useLayoutStore = defineStore('layout-store', {
       const series = params?.series ?? this.selectedSatSeries ?? ''
 
       if (!taskId) {
-        this.matrixData = null
-        this.matrixQueryKey = ''
+        this.clearMatrixData()
         return null
       }
 
       const queryKey = `${taskId}_${series}`
-      // 若已有缓存且非强制刷新，直接返回 store 中的 matrixData
       if (!force && this.matrixQueryKey === queryKey && this.matrixData) {
         return this.matrixData
       }
 
+      const token = ++this.matrixFetchToken
+      const scopeKey = series ? `${taskId}::series::${series}` : this.buildMatrixScopeKey(taskId)
       this.matrixLoading = true
       try {
         const res = await getReconnaissanceAttackMatrix({
@@ -266,14 +282,12 @@ export const useLayoutStore = defineStore('layout-store', {
           series,
         })
         if (res && res.code === 200 && res.data) {
-          this.matrixData = res.data
-          this.matrixQueryKey = queryKey
-          return res.data
+          return this.applyMatrixResult(token, scopeKey, taskId, queryKey, res.data)
         }
       } catch (err) {
         console.error('全局 Store 获取算法侦察打击矩阵失败:', err)
       } finally {
-        this.matrixLoading = false
+        this.finishMatrixFetch(token)
       }
       return this.matrixData
     },
@@ -284,6 +298,147 @@ export const useLayoutStore = defineStore('layout-store', {
     clearMatrixData() {
       this.matrixData = null
       this.matrixQueryKey = ''
+    },
+    /**
+     * 生成当前矩阵查询范围 Key（任务 + 类型 + 系列）
+     * @param taskId 任务 ID
+     */
+    buildMatrixScopeKey(taskId?: number): string {
+      const id = taskId ?? this.activedTask?.id ?? 0
+      if (!id) return ''
+      if (this.selectedSatSeries) return `${id}::series::${this.selectedSatSeries}`
+      return `${id}::all::${this.selectedSatType || 'ALL_TYPES'}`
+    },
+    /**
+     * 开始一次矩阵拉取，返回用于校验响应是否仍有效的上下文
+     */
+    beginMatrixFetch(): { token: number; scopeKey: string; queryKey: string; taskId: number } {
+      const taskId = this.activedTask?.id ?? 0
+      const token = ++this.matrixFetchToken
+      const scopeKey = this.buildMatrixScopeKey(taskId)
+      const queryKey = this.selectedSatSeries
+        ? `${taskId}_${this.selectedSatSeries}`
+        : `${taskId}__ALL_SERIES__${this.selectedSatType || 'ALL_TYPES'}__`
+      this.matrixLoading = true
+      return { token, scopeKey, queryKey, taskId }
+    },
+    /**
+     * 判断矩阵拉取序号是否仍为最新（仅校验 token，避免系列切换时 scope 比较误判）
+     */
+    isMatrixFetchCurrent(token: number): boolean {
+      return token === this.matrixFetchToken
+    },
+    /**
+     * 应用矩阵拉取结果；过期响应或空结果不会清空已有矩阵
+     */
+    applyMatrixResult(
+      token: number,
+      _scopeKey: string,
+      _taskId: number,
+      queryKey: string,
+      data: MatrixResult | null
+    ): MatrixResult | null {
+      if (!this.isMatrixFetchCurrent(token)) {
+        return this.matrixData
+      }
+      if (data) {
+        this.matrixData = data
+        this.matrixQueryKey = queryKey
+        return data
+      }
+      return this.matrixData
+    },
+    /**
+     * 结束矩阵拉取并关闭 loading（仅最新请求可关闭）
+     */
+    finishMatrixFetch(token: number) {
+      if (token === this.matrixFetchToken) {
+        this.matrixLoading = false
+      }
+    },
+    /**
+     * 按当前系列筛选范围拉取矩阵：选中系列时拉单系列，未选系列时合并全部系列。
+     * @param force 是否强制重新请求
+     */
+    async fetchMatrixForCurrentScope(force = false): Promise<MatrixResult | null> {
+      const taskId = this.activedTask?.id ?? 0
+      if (!taskId) {
+        this.clearMatrixData()
+        return null
+      }
+
+      const queryKey = this.selectedSatSeries
+        ? `${taskId}_${this.selectedSatSeries}`
+        : `${taskId}__ALL_SERIES__${this.selectedSatType || 'ALL_TYPES'}__`
+
+      if (!force && this.matrixQueryKey === queryKey && this.matrixData) {
+        return this.matrixData
+      }
+
+      const inflightKey = queryKey
+      if (matrixScopeInflight && matrixScopeInflightKey === inflightKey) {
+        return matrixScopeInflight
+      }
+
+      matrixScopeInflightKey = inflightKey
+      matrixScopeInflight = (async () => {
+        try {
+          if (this.selectedSatSeries) {
+            return await this.fetchReconnaissanceAttackMatrix(
+              { taskId, series: this.selectedSatSeries },
+              true
+            )
+          }
+
+          const { token, scopeKey, queryKey: activeQueryKey, taskId: activeTaskId } = this.beginMatrixFetch()
+          try {
+            const serialsRes = await getSatelliteTypeSerials(taskId)
+            if (!this.isMatrixFetchCurrent(token)) {
+              return this.matrixData
+            }
+
+            const typeSerialsMap = serialsRes.data || {}
+            const scopedSeries =
+              this.selectedSatType && typeSerialsMap[this.selectedSatType]?.length
+                ? typeSerialsMap[this.selectedSatType]
+                : Array.from(new Set(Object.values(typeSerialsMap).flat())).filter(Boolean)
+            const allSeries = Array.from(new Set(scopedSeries)).filter(Boolean)
+            if (!allSeries.length) {
+              return this.matrixData
+            }
+
+            const matrixList: MatrixResult[] = []
+            for (const series of allSeries) {
+              if (!this.isMatrixFetchCurrent(token)) {
+                return this.matrixData
+              }
+              try {
+                const res = await getReconnaissanceAttackMatrix({ taskId, series })
+                if (res?.code === 200 && res.data) {
+                  matrixList.push(res.data)
+                }
+              } catch (err) {
+                console.error(`获取系列 ${series} 矩阵失败:`, err)
+              }
+            }
+
+            const merged = mergeMatrixResults(matrixList)
+            return this.applyMatrixResult(token, scopeKey, activeTaskId, activeQueryKey, merged)
+          } catch (err) {
+            console.error('获取全部系列矩阵失败:', err)
+          } finally {
+            this.finishMatrixFetch(token)
+          }
+          return this.matrixData
+        } finally {
+          if (matrixScopeInflightKey === inflightKey) {
+            matrixScopeInflight = null
+            matrixScopeInflightKey = ''
+          }
+        }
+      })()
+
+      return matrixScopeInflight
     },
     /**
      * 切换顶层功能 Tab

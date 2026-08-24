@@ -5,6 +5,7 @@
         <el-tab-pane label="用户管理" name="users" />
         <el-tab-pane label="角色管理" name="roles" />
         <el-tab-pane label="菜单管理" name="menus" />
+        <el-tab-pane label="卫星管理" name="satellites" />
         <el-tab-pane label="武器管理" name="weapons" />
         <el-tab-pane label="基站管理" name="basestations" />
         <el-tab-pane label="导弹管理" name="missiles" />
@@ -28,6 +29,7 @@ const tabNameMap: Record<string, string> = {
   UserManage: 'users',
   RoleManage: 'roles',
   MenuManage: 'menus',
+  SatelliteManage: 'satellites',
   WeaponManage: 'weapons',
   BaseStationManage: 'basestations',
   MissileManage: 'missiles',
@@ -47,6 +49,8 @@ const handleTabChange = (tabName: string) => {
     router.push({ name: 'RoleManage' })
   } else if (tabName === 'menus') {
     router.push({ name: 'MenuManage' })
+  } else if (tabName === 'satellites') {
+    router.push({ name: 'SatelliteManage' })
   } else if (tabName === 'weapons') {
     router.push({ name: 'WeaponManage' })
   } else if (tabName === 'basestations') {

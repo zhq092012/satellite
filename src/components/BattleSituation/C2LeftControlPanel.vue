@@ -21,16 +21,38 @@
       </div>
 
       <!-- 卫星系列列表 (排成一列 list，全部类型或指定类型下均可展示) -->
-      <div class="series-list-box" v-if="seriesOptions.length > 0">
+      <div
+        v-if="seriesOptions.length > 0"
+        class="series-list-box"
+        :class="{ 'is-loading': seriesPanelLoading }"
+      >
+        <div v-if="seriesPanelLoading" class="series-loading-mask">
+          <span class="series-loading-spinner" aria-hidden="true" />
+          <span class="series-loading-text">正在加载系列数据...</span>
+        </div>
         <div class="series-list-header">
           <span class="series-title">📋 包含系列 {{ seriesOptions.length }} 个</span>
-          <span class="series-current" :title="selectedSeries || '未选择系列'">
-            当前系列：{{ selectedSeries || '未选择' }}
+          <span class="series-current" :title="selectedSeries || '全部系列'">
+            当前系列：{{ selectedSeries || '全部系列' }}
           </span>
         </div>
         <div class="series-list">
-          <div v-for="series in seriesOptions" :key="series" class="series-item"
-            :class="{ active: selectedSeries === series }" @click="selectSeries(series)">
+          <div
+            class="series-item"
+            :class="{ active: !selectedSeries, disabled: seriesPanelLoading }"
+            @click="selectSeries('')"
+          >
+            <span class="series-icon">🌐</span>
+            <span class="series-name">全部系列</span>
+            <span class="series-status">{{ !selectedSeries ? '✓ 已筛选' : '点击筛选' }}</span>
+          </div>
+          <div
+            v-for="series in seriesOptions"
+            :key="series"
+            class="series-item"
+            :class="{ active: selectedSeries === series, disabled: seriesPanelLoading }"
+            @click="selectSeries(series)"
+          >
             <span class="series-icon">🏷️</span>
             <span class="series-name">{{ series }}</span>
             <span class="series-status">{{ selectedSeries === series ? '✓ 已筛选' : '点击筛选' }}</span>
@@ -236,12 +258,20 @@ const store = useLayoutStore()
 /** 从接口获取的卫星类型与对应系列映射。 */
 const typeSerialsMap = ref<Record<string, string[]>>({})
 
-/** 当前选中的卫星类型筛选值，优先从 Store 持久化状态中恢复。 */
-const selectedType = ref<string>(store.selectedSatType || '')
+/** 当前选中的卫星类型筛选值，与 Store 全局同步。 */
+const selectedType = computed({
+  get: () => store.selectedSatType,
+  set: (val: string) => store.setSelectedSatType(val),
+})
 
-/** 当前选中的卫星系列筛选值，优先从 Store 持久化状态中恢复。 */
-const selectedSeries = ref<string>(store.selectedSatSeries || '')
+/** 当前选中的卫星系列筛选值，与 Store 全局同步。 */
+const selectedSeries = computed({
+  get: () => store.selectedSatSeries,
+  set: (val: string) => store.setSelectedSatSeries(val),
+})
 
+/** 系列矩阵加载中：禁用系列面板点击并显示 loading */
+const seriesPanelLoading = computed(() => store.matrixLoading)
 
 /**
  * 获取可供选择的卫星类型列表。
@@ -285,15 +315,13 @@ const isTypeDisabled = (type: string): boolean => {
  */
 const selectType = (type: string) => {
   if (!type || isTypeDisabled(type)) return
-  selectedType.value = type
-  store.setSelectedSatType(selectedType.value)
+  store.setSelectedSatType(type)
 
   /** 当前类型下可用的卫星系列列表。 */
   const availSeries = typeSerialsMap.value[type] || []
-  /** 类型切换后默认选中的卫星系列。 */
-  const newSeries = availSeries.length > 0 ? availSeries[0] : ''
-  selectedSeries.value = newSeries
-  store.setSelectedSatSeries(newSeries)
+  if (store.selectedSatSeries && !availSeries.includes(store.selectedSatSeries)) {
+    store.setSelectedSatSeries('')
+  }
 }
 
 /**
@@ -305,15 +333,13 @@ watch(
   (options) => {
     if (!options || options.length === 0) return
     /** 当前需要保留或恢复的卫星类型。 */
-    let currentType = selectedType.value || store.selectedSatType || ''
+    let currentType = store.selectedSatType || ''
     if (!currentType || isTypeDisabled(currentType) || !options.includes(currentType)) {
       /** 第一个未被禁用的卫星类型。 */
       const validOption = options.find((opt) => !isTypeDisabled(opt))
       if (validOption) {
-        selectType(validOption)
+        store.setSelectedSatType(validOption)
       }
-    } else if (selectedType.value !== currentType) {
-      selectedType.value = currentType
     }
   },
   { immediate: true }
@@ -321,20 +347,15 @@ watch(
 
 /**
  * [监听器说明]
- * 监听当前可用卫星系列列表，切换 Tab 组件挂载后自动恢复/对齐选中的系列，防止 Store 中系列清空导致敌方天基过境与中继卫星数据为空
+ * 当前类型下系列列表变化时，校验 Store 中已选系列是否仍有效
  */
 watch(
   seriesOptions,
   (sOptions) => {
     if (!sOptions || sOptions.length === 0) return
-    /** 当前需要保留或恢复的卫星系列。 */
-    let currentSeries = selectedSeries.value || store.selectedSatSeries || ''
-    if (!currentSeries || !sOptions.includes(currentSeries)) {
-      currentSeries = sOptions[0]
-    }
-    if (currentSeries && (selectedSeries.value !== currentSeries || store.selectedSatSeries !== currentSeries)) {
-      selectedSeries.value = currentSeries
-      store.setSelectedSatSeries(currentSeries)
+    const stored = store.selectedSatSeries
+    if (stored && !sOptions.includes(stored)) {
+      store.setSelectedSatSeries('')
     }
   },
   { immediate: true }
@@ -343,15 +364,15 @@ watch(
 /**
  * [函数说明]
  * 选择或切换选中的卫星系列，并同步保存至 Store
- * @param series 选中的卫星系列名称
+ * @param series 选中的卫星系列名称（空字符串表示全部系列）
  */
 const selectSeries = (series: string) => {
-  if (selectedSeries.value === series) {
-    selectedSeries.value = ''
+  if (seriesPanelLoading.value) return
+  if (store.selectedSatSeries === series) {
+    store.setSelectedSatSeries('')
   } else {
-    selectedSeries.value = series
+    store.setSelectedSatSeries(series)
   }
-  store.setSelectedSatSeries(selectedSeries.value)
 }
 
 /**
@@ -396,8 +417,6 @@ watch(
   () => store.activedTask?.id,
   (newTaskId) => {
     if (!newTaskId) {
-      selectedType.value = ''
-      selectedSeries.value = ''
       store.setSelectedSatType('')
       store.setSelectedSatSeries('')
     }
@@ -538,7 +557,7 @@ const openThreatDetail = async (sat: SatListItem) => {
     /** 卫星威胁度详情接口响应。 */
     const res = await getSatelliteThreatInfo({
       norad: sat.norad,
-      series: selectedType.value || '侦察',
+      series: store.selectedSatSeries || selectedType.value || '侦察',
       taskId,
     })
     if (res.code === 200 && res.data?.length) {
@@ -913,6 +932,7 @@ const selectedSatelliteName = computed(() => {
   }
 
   .series-list-box {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -920,6 +940,41 @@ const selectedSatelliteName = computed(() => {
     background: rgba(12, 22, 38, 0.75);
     border: 1px dashed rgba(0, 225, 255, 0.25);
     border-radius: 6px;
+
+    &.is-loading .series-list {
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    .series-loading-mask {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 6px;
+      background: rgba(8, 15, 26, 0.78);
+      pointer-events: all;
+    }
+
+    .series-loading-spinner {
+      width: 22px;
+      height: 22px;
+      border: 2px solid rgba(0, 225, 255, 0.2);
+      border-top-color: #00e1ff;
+      border-radius: 50%;
+      animation: series-panel-spin 0.8s linear infinite;
+    }
+
+    .series-loading-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: #7dd3fc;
+      letter-spacing: 0.5px;
+    }
 
     .series-list-header {
       display: flex;
@@ -1016,8 +1071,30 @@ const selectedSatelliteName = computed(() => {
             font-weight: 600;
           }
         }
+
+        &.disabled {
+          cursor: not-allowed;
+          pointer-events: none;
+          opacity: 0.55;
+
+          &:hover {
+            color: #c4e0ff;
+            border-color: rgba(79, 147, 221, 0.2);
+            background: rgba(18, 36, 62, 0.6);
+
+            .series-status {
+              color: #64748b;
+            }
+          }
+        }
       }
     }
+  }
+}
+
+@keyframes series-panel-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

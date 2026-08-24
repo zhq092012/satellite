@@ -20,11 +20,7 @@
       </div>
 
       <div class="header-center">
-        <!-- 矩阵系列信息与状态统计看板 -->
-        <span class="badge-item" v-if="props.matrixData?.series">
-          <span class="label">卫星系列:</span>
-          <span class="value">{{ props.matrixData.series }}</span>
-        </span>
+        <!-- 状态统计看板 -->
         <span class="badge-item">
           <span class="label">卫星总数:</span>
           <span class="value">{{ filteredSatellites.length }} 颗</span>
@@ -64,17 +60,49 @@
       </div>
     </div>
 
-    <!-- 当前分析卫星醒目展示条 -->
-    <div v-if="selectedSatelliteInfo" class="current-sat-banner">
+    <!-- 当前分析卫星与系列切换 -->
+    <div class="current-sat-banner" :class="{ 'current-sat-banner--empty': !selectedSatelliteInfo }">
       <div class="banner-left">
-        <span class="banner-pulse"></span>
-        <span class="banner-icon">🛰️</span>
-        <div class="banner-text">
-          <span class="banner-label">当前分析卫星</span>
-          <strong class="banner-name">{{ selectedSatelliteInfo.name }}</strong>
+        <template v-if="selectedSatelliteInfo">
+          <span class="banner-pulse"></span>
+          <span class="banner-icon">🛰️</span>
+          <div class="banner-text">
+            <span class="banner-label">当前分析卫星</span>
+            <strong class="banner-name">{{ selectedSatelliteInfo.name }}</strong>
+          </div>
+        </template>
+        <span v-else class="banner-empty-hint">👆 请先在整体态势中选择卫星，或在左侧列表点击卫星节点</span>
+      </div>
+
+      <div class="banner-center">
+        <div class="selection-status">
+          <span class="status-item">
+            <span class="label-text">当前系列</span>
+            <strong class="status-val">{{ currentSeriesText }}</strong>
+          </span>
+          <span class="status-item">
+            <span class="label-text">当前卫星</span>
+            <strong class="status-val">{{ currentSatelliteText }}</strong>
+          </span>
+        </div>
+
+        <el-button v-if="selectedSatNorad != null" size="small" class="clear-sat-btn"
+          @click="handleClearSelectedSatellite">
+          清空所选卫星
+        </el-button>
+
+        <div class="v-divider"></div>
+
+        <div class="series-filter-group">
+          <span class="label-text">卫星系列</span>
+          <el-select v-model="selectedSeries" class="series-select" size="small" placeholder="选择系列"
+            :disabled="seriesOptions.length === 0" @change="handleSeriesChange">
+            <el-option v-for="series in seriesOptions" :key="series" :label="series" :value="series" />
+          </el-select>
         </div>
       </div>
-      <div class="banner-right">
+
+      <div v-if="selectedSatelliteInfo" class="banner-right">
         <span class="banner-chip">NORAD {{ selectedSatelliteInfo.norad }}</span>
         <span class="banner-chip" v-if="selectedSatelliteInfo.satType">{{ selectedSatelliteInfo.satType }}</span>
         <span class="banner-chip">过境窗口 {{ selectedSatelliteInfo.windowCount }} 个</span>
@@ -82,9 +110,6 @@
           {{ selectedSatelliteInfo.struck ? '卫星被干扰' : '正常' }}
         </span>
       </div>
-    </div>
-    <div v-else class="current-sat-banner current-sat-banner--empty">
-      <span>👆 请先在整体态势中选择卫星，或在左侧列表点击卫星节点</span>
     </div>
 
     <!-- 左-中-右 三栏主容器布局 -->
@@ -156,7 +181,10 @@
 
             <!-- 关联接收站过境窗口摘要列表 -->
             <div class="sat-windows-sublist">
-              <div v-for="win in sat.stationWindows" :key="win.receiveId + '-' + win.peakWindow" class="win-sub-item"
+              <div
+                v-for="win in resolveSatelliteStationWindows(sat)"
+                :key="win.receiveId + '-' + win.peakWindow"
+                class="win-sub-item"
                 :class="{
                   'is-win-struck': win.strikeStatus === 1,
                   'is-win-selected': isStationWindowSelected(sat.norad, win),
@@ -174,12 +202,12 @@
       <!-- 2. 中间栏：甘特图 + 底部播放时间轴 -->
       <div class="gantt-center-column">
         <div class="gantt-workspace-center" ref="scrollContainerRef">
-          <div class="gantt-chart-inner" :style="{ width: ganttCanvasWidth + 180 + 'px' }">
+          <div class="gantt-chart-inner" :style="{ width: ganttCanvasWidth + 200 + 'px' }">
             <div class="gantt-timeline-header">
               <div class="left-row-label-header">
                 <span>卫星 / 干扰排道</span>
               </div>
-              <div class="timeline-ticks-container">
+              <div class="timeline-ticks-container" :style="timelineTrackStyle">
                 <div v-for="tick in timelineTicks" :key="tick.timeStr" class="time-tick-item"
                   :class="{ 'is-current-tick': tick.isCurrent }" :style="{ left: tick.leftPx + 'px' }">
                   <span class="tick-line"></span>
@@ -194,14 +222,50 @@
                 'row-sat-struck': ganttRow.satelliteStatus === 1,
                 'is-row-selected': selectedSatNorad === ganttRow.norad,
               }" :ref="(el) => setGanttRowRef(ganttRow.norad, el as Element | null)">
-                <div class="row-label-col">
-                  <div class="sat-main-label">
-                    <span class="icon-sat">🛰️</span>
-                    <span class="sat-title">{{ ganttRow.name }}</span>
+                <div class="row-label-col" @click.stop="handleGanttRowLabelClick(ganttRow)">
+                  <div class="sat-label-block">
+                    <div class="sat-main-label">
+                      <span class="icon-sat">🛰️</span>
+                      <span class="sat-title">{{ ganttRow.name }}</span>
+                    </div>
+                    <div class="sat-meta-row">
+                      <span class="meta-label">卫星</span>
+                      <span
+                        class="status-pill"
+                        :class="ganttRow.satelliteStatus === 1 ? 'is-struck' : 'is-normal'"
+                      >
+                        {{ formatStrikeStatus(ganttRow.satelliteStatus) }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div v-if="getRowActiveTransits(ganttRow).length" class="row-active-transit">
+                    <div
+                      v-for="transit in getRowActiveTransits(ganttRow)"
+                      :key="transit.id"
+                      class="transit-card"
+                      :class="transit.strikeStatus === 1 ? 'transit-card--struck' : 'transit-card--normal'"
+                    >
+                      <div class="transit-card-top">
+                        <span class="transit-station" :title="transit.receiveName">{{ transit.receiveName }}</span>
+                        <span class="meta-label">地面站</span>
+                        <span
+                          class="status-pill status-pill--sm"
+                          :class="transit.strikeStatus === 1 ? 'is-struck' : 'is-normal'"
+                        >
+                          {{ formatStrikeStatus(transit.strikeStatus) }}
+                        </span>
+                      </div>
+                      <div class="transit-time">
+                        <span class="transit-time-val">{{ transit.peakWindowShort }}</span>
+                        <span class="transit-time-sep">~</span>
+                        <span class="transit-time-val">{{ transit.endWindowShort }}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div class="row-timeline-track" :style="{ height: ganttRow.trackHeight + 'px' }">
+                <div class="row-timeline-track" :style="[timelineTrackStyle, { height: ganttRow.trackHeight + 'px' }]">
                   <div v-for="tick in timelineTicks" :key="'grid-' + ganttRow.rowKey + tick.timeStr"
                     class="track-grid-line" :class="{ 'is-current-grid': tick.isCurrent }"
                     :style="{ left: tick.leftPx + 'px' }"></div>
@@ -368,8 +432,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch, nextTick } from 'vue'
-import type { MatrixResult, SatelliteMatrix, StationWindow, Weapon, CommucationMatrix } from '@/api/electronic'
+import { getSatelliteTypeSerials, type MatrixResult, type SatelliteMatrix, type StationWindow, type Weapon, type CommucationMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
+import { collectSatelliteTransmissionLinks, listNormalSatelliteNorads } from '@/utils/satelliteFullChainAnalysis'
 
 defineOptions({
   name: 'SatelliteGantt',
@@ -561,20 +626,97 @@ const currentData = computed<MatrixResult | null>(() => {
   return props.matrixData || store.matrixData || internalMatrixData.value
 })
 
+/** 卫星类型与系列映射（taskId -> 类型 -> 系列列表） */
+const typeSerialsMap = ref<Record<string, string[]>>({})
+
 /**
- * [功能说明]
- * 自主异步拉取后端矩阵数据 (优先使用 store 中已查询的共享矩阵数据)。
+ * 当前任务下可选的卫星系列列表。
+ * 优先按 store 中选中的卫星类型过滤，否则合并全部系列。
  */
-const loadMatrixData = async () => {
-  if (props.matrixData || store.matrixData) return
+const seriesOptions = computed<string[]>(() => {
+  const type = store.selectedSatType
+  if (type && typeSerialsMap.value[type]?.length) {
+    return typeSerialsMap.value[type]
+  }
+  const allSeries = Object.values(typeSerialsMap.value).flat()
+  return Array.from(new Set(allSeries))
+})
+
+/** 与 Store 双向绑定的当前卫星系列 */
+const selectedSeries = computed({
+  get: () => store.selectedSatSeries,
+  set: (val: string) => store.setSelectedSatSeries(val),
+})
+
+/** 顶部展示的当前系列文案 */
+const currentSeriesText = computed(() => store.selectedSatSeries || '未选择')
+
+/**
+ * 顶部展示的当前卫星文案。
+ * 未选中单星时显示系列全部卫星数量。
+ */
+const currentSatelliteText = computed(() => {
+  if (selectedSatNorad.value != null) return resolveSatName(selectedSatNorad.value)
+  const data = currentData.value
+  if (!data) return '未选择'
+  const count = listNormalSatelliteNorads(data).length
+  return count > 0 ? `系列全部 (${count}颗)` : '未选择'
+})
+
+/**
+ * 根据 NORAD 编号解析卫星名称。
+ * @param norad 卫星 NORAD 编号
+ * @returns 卫星名称或占位名称
+ */
+const resolveSatName = (norad: number): string => {
+  const data = currentData.value
+  if (!data) return `Sat-${norad}`
+  const satObj =
+    (data.satelliteMatrixList || []).find((s) => s.norad === norad) ||
+    (data.initMatrixList || []).find((s) => s.norad === norad)
+  return satObj?.name || `Sat-${norad}`
+}
+
+/**
+ * 拉取任务对应的卫星类型与系列映射。
+ * @param taskId 当前激活任务 ID
+ */
+const fetchTypeSerials = async (taskId?: number) => {
+  if (!taskId) {
+    typeSerialsMap.value = {}
+    return
+  }
+  try {
+    const res = await getSatelliteTypeSerials(taskId)
+    if (res.code === 200 && res.data) {
+      typeSerialsMap.value = res.data
+    }
+  } catch (err) {
+    console.error('获取卫星类型与系列映射失败:', err)
+  }
+}
+
+/**
+ * 拉取甘特图矩阵数据。
+ * @param force 为 true 时忽略缓存强制重新请求
+ */
+const fetchMatrixData = async (force = false) => {
+  if (props.matrixData) return
   loading.value = true
   try {
-    const data = await store.fetchReconnaissanceAttackMatrix({
-      taskId: store.activedTask?.id || 0,
-      series: store.selectedSatSeries || '',
-    })
+    const data = await store.fetchReconnaissanceAttackMatrix(
+      {
+        taskId: store.activedTask?.id || 0,
+        series: store.selectedSatSeries || '',
+      },
+      force
+    )
     if (data) {
       internalMatrixData.value = data
+      if (taskTimeBounds.value) {
+        currentPlayTs.value = taskTimeBounds.value.minTs
+      }
+      nextTick(() => applySharedSatelliteSelection(true))
     }
   } catch (err: any) {
     console.error('获取甘特图矩阵数据异常:', err)
@@ -582,6 +724,62 @@ const loadMatrixData = async () => {
     loading.value = false
   }
 }
+
+/**
+ * [功能说明]
+ * 自主异步拉取后端矩阵数据 (优先使用 store 中已查询的共享矩阵数据)。
+ */
+const loadMatrixData = async () => {
+  if (props.matrixData) return
+  if (store.matrixData) return
+  await fetchMatrixData(false)
+}
+
+/**
+ * 切换卫星系列，同步 Store 并重新查询矩阵数据。
+ * @param series 目标卫星系列名称
+ */
+const handleSeriesChange = (series: string) => {
+  if (!series) return
+  store.setSelectedSatSeries(series)
+  store.setSelectedAnalysisNorad(null)
+  selectedSatNorad.value = null
+  selectedBarId.value = null
+  selectedStationKey.value = null
+  stopPlayback()
+  void fetchMatrixData(true)
+}
+
+/**
+ * 清空当前选中卫星，回到系列全部视角。
+ */
+const handleClearSelectedSatellite = () => {
+  selectedSatNorad.value = null
+  selectedBarId.value = null
+  selectedStationKey.value = null
+  store.setSelectedAnalysisNorad(null)
+  stopPlayback()
+  if (taskTimeBounds.value) {
+    currentPlayTs.value = taskTimeBounds.value.minTs
+  }
+}
+
+watch(
+  () => store.activedTask?.id,
+  (taskId) => {
+    void fetchTypeSerials(taskId)
+  },
+  { immediate: true }
+)
+
+watch(seriesOptions, (options) => {
+  if (!options.length) return
+  if (!options.includes(store.selectedSatSeries)) {
+    const nextSeries = options[0]
+    store.setSelectedSatSeries(nextSeries)
+    void fetchMatrixData(true)
+  }
+})
 
 /**
  * [监听器说明]
@@ -597,11 +795,19 @@ watch(
   { immediate: true }
 )
 
-onMounted(() => {
-  if (!props.matrixData && !store.matrixData) {
-    void loadMatrixData()
+watch(
+  () => store.selectedSatSeries,
+  (series, prev) => {
+    if (props.matrixData) return
+    if (series && series !== prev) {
+      selectedSatNorad.value = null
+      selectedBarId.value = null
+      selectedStationKey.value = null
+      stopPlayback()
+      void fetchMatrixData(true)
+    }
   }
-})
+)
 
 /**
  * [功能说明]
@@ -615,7 +821,9 @@ const filteredSatellites = computed<SatelliteMatrix[]>(() => {
 
   return list.filter((sat) => {
     const matchSatName = sat.name.toLowerCase().includes(kw) || String(sat.norad).includes(kw)
-    const matchRec = sat.stationWindows?.some((w) => w.receiveName.toLowerCase().includes(kw))
+    const matchRec =
+      resolveSatelliteStationWindows(sat).some((w) => w.receiveName.toLowerCase().includes(kw)) ||
+      sat.stationWindows?.some((w) => w.receiveName.toLowerCase().includes(kw))
     const matchWeapon =
       sat.weapons?.some((w) => w.name.toLowerCase().includes(kw)) ||
       sat.stationWindows?.some((win) => win.weapons?.some((w) => w.name.toLowerCase().includes(kw)))
@@ -636,7 +844,7 @@ const selectedSatelliteInfo = computed(() => {
     name: sat.name,
     satType: sat.satType || '',
     struck: 'satelliteStatus' in sat ? sat.satelliteStatus === 1 : false,
-    windowCount: 'stationWindows' in sat ? sat.stationWindows?.length || 0 : 0,
+    windowCount: resolveSatelliteStationWindows(sat as SatelliteMatrix).length,
   }
 })
 
@@ -775,6 +983,13 @@ const ganttCanvasWidth = computed<number>(() => {
   return Math.max(tickCount * PIXELS_PER_TICK, 1200)
 })
 
+/** 时间轴轨道固定宽度样式，保证 Header 与各行 playhead 像素坐标一致 */
+const timelineTrackStyle = computed(() => ({
+  width: `${ganttCanvasWidth.value}px`,
+  minWidth: `${ganttCanvasWidth.value}px`,
+  flex: '0 0 auto',
+}))
+
 /**
  * [功能说明]
  * 当前时间轴刻度步长（秒）。
@@ -810,19 +1025,27 @@ const getInterferenceStatusLabel = (satStatus: number, strikeStatus: number): st
   return '正常'
 }
 
+/**
+ * 格式化打击/干扰状态文案
+ *
+ * @param status 状态值（0-正常，1-被打击/被干扰）
+ * @returns 「被打击」或「正常」
+ */
+const formatStrikeStatus = (status?: number | null): string => {
+  return status === 1 ? '被打击' : '正常'
+}
+
 const buildBarLabelLines = (
   satName: string,
   recName: string,
   statusLabel: string,
   peakWindowShort: string,
   endWindowShort: string,
-  delayMin?: number
+  delayMin?: number,
+  relayName?: string
 ): string[] => {
-  const lines = [
-    `${satName} → ${recName}`,
-    statusLabel,
-    `${peakWindowShort} ~ ${endWindowShort}`,
-  ]
+  const route = relayName ? `${satName} → ${relayName} → ${recName}` : `${satName} → ${recName}`
+  const lines = [route, statusLabel, `${peakWindowShort} ~ ${endWindowShort}`]
   if (delayMin !== undefined && delayMin !== null && Number(delayMin) > 0) {
     lines.push(`延时 +${delayMin}分钟`)
   }
@@ -843,7 +1066,7 @@ const tsToPercent = (ts: number): number => {
   return Math.min(Math.max(((ts - minTs) / totalSec) * 100, 0), 100)
 }
 
-const playheadLeftPx = computed(() => tsToLeftPx(currentPlayTs.value))
+const playheadLeftPx = computed(() => tsToLeftPx(snapToGrid(currentPlayTs.value)))
 const playheadPercent = computed(() => tsToPercent(currentPlayTs.value))
 
 const formatPlayTime = (ts: number): string => {
@@ -857,6 +1080,107 @@ const formatPlayTime = (ts: number): string => {
   return `${y}-${mo}-${d} ${h}:${m}:${s}`
 }
 
+/**
+ * 判断当前矩阵是否为侦察卫星矩阵（含 initMatrixList / relayRelation）
+ *
+ * @param matrix 矩阵数据
+ * @returns 是否为侦察矩阵
+ */
+const isReconMatrix = (matrix: MatrixResult | CommucationMatrix | null | undefined): matrix is MatrixResult => {
+  return !!matrix && 'initMatrixList' in matrix
+}
+
+/**
+ * 解析卫星在左侧树与甘特图共用的过境窗口列表（含中继下传）
+ *
+ * @param sat 卫星矩阵项
+ * @returns 左侧树展示的过境窗口摘要
+ */
+const resolveSatelliteStationWindows = (sat: SatelliteMatrix): StationWindow[] => {
+  const matrix = currentData.value
+  if (isReconMatrix(matrix)) {
+    const links = collectSatelliteTransmissionLinks(matrix, sat.norad)
+    if (links.length > 0) {
+      return links.map((link) => ({
+        receiveId: link.receiveId,
+        receiveName: link.receiveName,
+        peakWindow: formatPlayTime(Math.floor(link.transmitStartMs / 1000)),
+        endWindow: formatPlayTime(Math.floor(link.transmitEndMs / 1000)),
+        strikeStatus: link.struck ? 1 : 0,
+        delayMin: link.delayMin,
+        weapons: [],
+      }))
+    }
+  }
+  return sat.stationWindows || []
+}
+
+/**
+ * 从原始 stationWindows / initWindows 构建甘特窗口条目（通讯卫星或无链路解析结果时兜底）
+ *
+ * @param sat 卫星矩阵项
+ * @returns 甘特窗口条目列表
+ */
+const buildWindowEntriesFromRaw = (sat: any) => {
+  const rawWindows = sat.stationWindows || sat.initWindows || []
+  return rawWindows
+    .map((win: any, idx: number) => {
+      const startStr = win.peakWindow || win.startWindow || win.beginWindow || ''
+      const endStr = win.endWindow || ''
+      const start = parseToTimestamp(startStr)
+      const end = parseToTimestamp(endStr)
+      return { win, sat, start, end, idx, startStr, endStr }
+    })
+    .filter((item: any) => item.start && item.end >= item.start)
+}
+
+/**
+ * 将传输链路转换为甘特条窗口条目（含中继下传链路）
+ *
+ * @param sat 卫星矩阵项
+ * @param matrix 侦察矩阵
+ * @returns 甘特窗口条目列表
+ */
+const buildWindowEntriesFromLinks = (sat: SatelliteMatrix, matrix: MatrixResult) => {
+  const links = collectSatelliteTransmissionLinks(matrix, sat.norad)
+  return links
+    .map((link, idx) => {
+      const start = Math.floor(link.transmitStartMs / 1000)
+      const end = Math.floor(link.transmitEndMs / 1000) || start
+      if (!start || end < start) return null
+
+      const relayNode = link.nodes.find((node) => node.layer === 'RELAY')
+      const effectiveSatStatus = link.satelliteStruck || link.relayStruck ? 1 : sat.satelliteStatus || 0
+      const win = {
+        receiveId: link.receiveId,
+        receiveName: link.receiveName,
+        strikeStatus: link.receiveStruck ? 1 : 0,
+        delayMin: link.delayMin,
+        weapons: [] as Weapon[],
+        relayName: relayNode?.name,
+      }
+
+      return {
+        win,
+        sat: { ...sat, satelliteStatus: effectiveSatStatus },
+        start,
+        end,
+        idx,
+        startStr: formatPlayTime(start),
+        endStr: formatPlayTime(end),
+      }
+    })
+    .filter(Boolean) as Array<{
+      win: Record<string, any>
+      sat: any
+      start: number
+      end: number
+      idx: number
+      startStr: string
+      endStr: string
+    }>
+}
+
 const currentPlayTimeText = computed(() => formatPlayTime(currentPlayTs.value))
 
 const snapToGrid = (ts: number): number => {
@@ -864,6 +1188,35 @@ const snapToGrid = (ts: number): number => {
   const step = tickStepSec.value
   const snapped = minTs + Math.round((ts - minTs) / step) * step
   return Math.min(Math.max(snapped, minTs), maxTs)
+}
+
+/**
+ * 计算播放头所在刻度格覆盖的时间区间 [gridStart, gridEnd]
+ *
+ * @param ts 播放头当前秒级时间戳
+ * @returns 刻度格起止时间（闭区间）
+ */
+const getPlayheadGridWindow = (ts: number): { gridStart: number; gridEnd: number } => {
+  const { minTs, maxTs } = timeBounds.value
+  const step = tickStepSec.value
+  if (step <= 0) {
+    return { gridStart: ts, gridEnd: ts }
+  }
+  const gridStart = minTs + Math.floor((ts - minTs) / step) * step
+  const gridEnd = Math.min(gridStart + step, maxTs)
+  return { gridStart, gridEnd }
+}
+
+/**
+ * 判断甘特条是否与播放头当前刻度格存在时间重叠
+ *
+ * @param bar 甘特条
+ * @param ts 播放头时间戳
+ * @returns 是否应视为当前刻度下的活跃链路
+ */
+const isBarOverlappingPlayheadGrid = (bar: ProcessedGanttBar, ts: number): boolean => {
+  const { gridStart, gridEnd } = getPlayheadGridWindow(ts)
+  return bar.startTimestamp <= gridEnd && bar.endTimestamp >= gridStart
 }
 
 /** 定位到事件发生时刻所在格的前一格起点 */
@@ -901,21 +1254,34 @@ const getFirstStationStartTs = (sat: any): number | null => {
 }
 
 /**
+ * 取卫星在甘特图上的第一个窗口条（按开始时间升序）
+ *
+ * @param norad 卫星 NORAD
+ * @returns 最早开始的甘特条，无则 undefined
+ */
+const getFirstGanttBarForSatellite = (norad: number): ProcessedGanttBar | undefined => {
+  const row = processedGanttRows.value.find((item) => item.norad === norad)
+  if (!row?.bars.length) return undefined
+  return [...row.bars].sort(
+    (a, b) => a.startTimestamp - b.startTimestamp || a.endTimestamp - b.endTimestamp
+  )[0]
+}
+
+/**
  * 将播放头同步到指定卫星的第一个过境窗口（优先落在甘特条内部）。
  * @param norad 卫星 NORAD
  * @param sat 可选原始卫星对象，甘特条尚未生成时用于兜底
+ * @returns 对齐到的首个甘特条（若有）
  */
-const seekToSatelliteFirstWindow = (norad: number, sat?: any) => {
-  const row = processedGanttRows.value.find((item) => item.norad === norad)
-  const firstBar = row?.bars.length
-    ? [...row.bars].sort((a, b) => a.startTimestamp - b.startTimestamp || a.endTimestamp - b.endTimestamp)[0]
-    : undefined
+const seekToSatelliteFirstWindow = (norad: number, sat?: any): ProcessedGanttBar | undefined => {
+  const firstBar = getFirstGanttBarForSatellite(norad)
   if (firstBar) {
     seekPlayheadIntoBar(firstBar)
-    return
+    return firstBar
   }
   const firstTs = getFirstStationStartTs(sat)
   if (firstTs != null) currentPlayTs.value = snapToGrid(firstTs)
+  return undefined
 }
 
 /**
@@ -925,7 +1291,7 @@ const seekToSatelliteFirstWindow = (norad: number, sat?: any) => {
 const scrollPlayheadIntoView = (force = false) => {
   const container = scrollContainerRef.value
   if (!container) return
-  const target = 180 + playheadLeftPx.value
+  const target = 200 + playheadLeftPx.value
   const viewLeft = container.scrollLeft
   const viewRight = viewLeft + container.clientWidth
   if (force || target < viewLeft + 100 || target > viewRight - 100) {
@@ -950,7 +1316,8 @@ const syncGanttViewToCurrentSatelliteFirstWindow = () => {
   stopPlayback()
   scrollToSatRow(norad)
   scrollToSatTreeItem(norad)
-  seekToSatelliteFirstWindow(norad, sat)
+  const firstBar = seekToSatelliteFirstWindow(norad, sat)
+  selectedBarId.value = firstBar?.id ?? null
   nextTick(() => scrollPlayheadIntoView(true))
 }
 
@@ -980,12 +1347,17 @@ const seekPlayheadIntoBar = (bar: ProcessedGanttBar) => {
     currentPlayTs.value = clampedStart
     return
   }
-  const gridInWindow = minTs + Math.ceil((clampedStart - minTs) / step) * step
-  if (gridInWindow >= clampedStart && gridInWindow <= clampedEnd) {
-    currentPlayTs.value = Math.min(Math.max(gridInWindow, minTs), maxTs)
+
+  // 优先对齐到条块内部的第一个刻度点
+  const firstGridInBar = minTs + Math.ceil((clampedStart - minTs) / step) * step
+  if (firstGridInBar <= clampedEnd) {
+    currentPlayTs.value = Math.min(Math.max(firstGridInBar, minTs), maxTs)
     return
   }
-  currentPlayTs.value = snapToGrid(clampedStart)
+
+  // 条块落在两刻度之间：对齐到覆盖条块起始时刻的刻度格起点
+  const gridStart = minTs + Math.floor((clampedStart - minTs) / step) * step
+  currentPlayTs.value = Math.min(Math.max(gridStart, minTs), maxTs)
 }
 
 const buildBarsForWindows = (
@@ -1040,7 +1412,8 @@ const buildBarsForWindows = (
       statusLabel,
       peakWindowShort,
       endWindowShort,
-      win.delayMin
+      win.delayMin,
+      win.relayName
     )
     const barTooltip = barLabelLines.join('\n')
     const barHeight = computeBarHeight(barLabelLines, widthPx)
@@ -1113,38 +1486,15 @@ const buildBarsForWindows = (
 }
 
 /**
- * [功能说明]
- * 计算生成顶部时间轴刻度列表。
+ * 获取指定卫星行在当前播放时刻正在过境的甘特条
+ *
+ * @param row 甘特行数据
+ * @returns 当前时刻活跃的甘特条列表
  */
-const timelineTicks = computed<
-  { label: string; timeStr: string; leftPx: number; percent: number; isCurrent: boolean }[]
->(() => {
-  const { minTs, maxTs } = timeBounds.value
-  const totalSec = maxTs - minTs
-  if (totalSec <= 0) return []
-
-  const ticks: { label: string; timeStr: string; leftPx: number; percent: number; isCurrent: boolean }[] =
-    []
-  const stepSec = tickStepSec.value
-  const startTs = Math.ceil(minTs / stepSec) * stepSec
-  const currentSnapped = snapToGrid(currentPlayTs.value)
-
-  for (let ts = startTs; ts <= maxTs; ts += stepSec) {
-    const label = formatTimelineTickLabel(ts, stepSec)
-    const leftPx = tsToLeftPx(ts)
-    const percent = tsToPercent(ts)
-
-    ticks.push({
-      label,
-      timeStr: new Date(ts * 1000).toISOString(),
-      leftPx,
-      percent,
-      isCurrent: ts === currentSnapped,
-    })
-  }
-
-  return ticks
-})
+const getRowActiveTransits = (row: ProcessedGanttRow): ProcessedGanttBar[] => {
+  const ts = currentPlayTs.value
+  return row.bars.filter((bar) => isBarOverlappingPlayheadGrid(bar, ts))
+}
 
 /**
  * [功能说明]
@@ -1156,18 +1506,18 @@ const processedGanttRows = computed<ProcessedGanttRow[]>(() => {
   const totalSec = maxTs - minTs
   const canvasWidth = ganttCanvasWidth.value
   const defaultTargetName = store.battle?.name || '战场目标区域'
+  const matrix = currentData.value
 
   return filteredSatellites.value.map((sat: any) => {
-    const rawWindows = sat.stationWindows || sat.initWindows || []
-    const sortedWindows = rawWindows
-      .map((win: any, idx: number) => {
-        const startStr = win.peakWindow || win.startWindow || win.beginWindow || ''
-        const endStr = win.endWindow || ''
-        const start = parseToTimestamp(startStr)
-        const end = parseToTimestamp(endStr)
-        return { win, sat, start, end, idx, startStr, endStr }
-      })
-      .sort((a: any, b: any) => a.start - b.start)
+    let sortedWindows = isReconMatrix(matrix)
+      ? buildWindowEntriesFromLinks(sat, matrix)
+      : buildWindowEntriesFromRaw(sat)
+
+    if (!sortedWindows.length) {
+      sortedWindows = buildWindowEntriesFromRaw(sat)
+    }
+
+    sortedWindows = [...sortedWindows].sort((a, b) => a.start - b.start)
 
     const { bars, maxLanes, trackHeight } = buildBarsForWindows(sortedWindows, {
       defaultTargetName,
@@ -1191,6 +1541,41 @@ const processedGanttRows = computed<ProcessedGanttRow[]>(() => {
 })
 
 /**
+ * [功能说明]
+ * 计算生成顶部时间轴刻度列表。
+ */
+const timelineTicks = computed<
+  { label: string; timeStr: string; leftPx: number; percent: number; isCurrent: boolean }[]
+>(() => {
+  const { minTs, maxTs } = timeBounds.value
+  const totalSec = maxTs - minTs
+  if (totalSec <= 0) return []
+
+  const ticks: { label: string; timeStr: string; leftPx: number; percent: number; isCurrent: boolean }[] =
+    []
+  const stepSec = tickStepSec.value
+  // 与 snapToGrid / jumpPlayheadByGrid 一致：以任务起点 minTs 为刻度锚点
+  const startTs = minTs
+  const currentSnapped = snapToGrid(currentPlayTs.value)
+
+  for (let ts = startTs; ts <= maxTs; ts += stepSec) {
+    const label = formatTimelineTickLabel(ts, stepSec)
+    const leftPx = tsToLeftPx(ts)
+    const percent = tsToPercent(ts)
+
+    ticks.push({
+      label,
+      timeStr: new Date(ts * 1000).toISOString(),
+      leftPx,
+      percent,
+      isCurrent: ts === currentSnapped,
+    })
+  }
+
+  return ticks
+})
+
+/**
  * 当前时刻标线穿过的所有过境链路
  */
 const barsAtPlayhead = computed<ProcessedGanttBar[]>(() => {
@@ -1198,7 +1583,7 @@ const barsAtPlayhead = computed<ProcessedGanttBar[]>(() => {
   const result: ProcessedGanttBar[] = []
   for (const row of processedGanttRows.value) {
     for (const bar of row.bars) {
-      if (ts >= bar.startTimestamp && ts <= bar.endTimestamp) {
+      if (isBarOverlappingPlayheadGrid(bar, ts)) {
         result.push(bar)
       }
     }
@@ -1223,7 +1608,7 @@ const handleSelectBar = (bar: ProcessedGanttBar) => {
   })
   scrollToSatRow(bar.satNorad)
   scrollToSatTreeItem(bar.satNorad)
-  if (currentPlayTs.value < bar.startTimestamp || currentPlayTs.value > bar.endTimestamp) {
+  if (!isBarOverlappingPlayheadGrid(bar, currentPlayTs.value)) {
     seekPlayheadIntoBar(bar)
   }
 }
@@ -1231,11 +1616,26 @@ const handleSelectBar = (bar: ProcessedGanttBar) => {
 const selectSatelliteRow = (sat: SatelliteMatrix) => {
   selectedSatNorad.value = sat.norad
   store.setSelectedAnalysisNorad(sat.norad)
-  selectedBarId.value = null
   selectedStationKey.value = null
   stopPlayback()
   scrollToSatRow(sat.norad)
-  seekToSatelliteFirstWindow(sat.norad, sat)
+  scrollToSatTreeItem(sat.norad)
+
+  const firstBar = seekToSatelliteFirstWindow(sat.norad, sat)
+  selectedBarId.value = firstBar?.id ?? null
+
+  nextTick(() => scrollPlayheadIntoView(true))
+}
+
+/**
+ * 点击甘特图左侧卫星标签行：高亮当前卫星并跳转到第一个打击/过境窗口
+ *
+ * @param row 甘特图行数据
+ */
+const handleGanttRowLabelClick = (row: ProcessedGanttRow) => {
+  const sat = currentData.value?.satelliteMatrixList?.find((item) => item.norad === row.norad)
+  if (!sat) return
+  selectSatelliteRow(sat)
 }
 
 /**
@@ -1255,15 +1655,18 @@ const applySharedSatelliteSelection = (forceSeekFirstWindow = false) => {
   if (noradChanged) {
     if (currentData.value?.satelliteMatrixList?.some((item) => item.norad === norad)) {
       selectSatelliteRow(sat as SatelliteMatrix)
-      scrollToSatTreeItem(norad)
       return
     }
     selectedSatNorad.value = norad
     scrollToSatRow(norad)
-    seekToSatelliteFirstWindow(norad, sat)
+    const firstBar = seekToSatelliteFirstWindow(norad, sat)
+    selectedBarId.value = firstBar?.id ?? null
+    nextTick(() => scrollPlayheadIntoView(true))
   } else if (forceSeekFirstWindow) {
     scrollToSatRow(norad)
-    seekToSatelliteFirstWindow(norad, sat)
+    const firstBar = seekToSatelliteFirstWindow(norad, sat)
+    selectedBarId.value = firstBar?.id ?? null
+    nextTick(() => scrollPlayheadIntoView(true))
   }
 
   scrollToSatTreeItem(norad)
@@ -1376,14 +1779,10 @@ const getSelectedSatBarsSorted = (): ProcessedGanttBar[] => {
 const resolveCurrentWindowIndex = (bars: ProcessedGanttBar[], ts: number): number => {
   if (!bars.length) return -1
   const selectedIdx = selectedBarId.value ? bars.findIndex((bar) => bar.id === selectedBarId.value) : -1
-  if (
-    selectedIdx >= 0 &&
-    ts >= bars[selectedIdx].startTimestamp &&
-    ts <= bars[selectedIdx].endTimestamp
-  ) {
+  if (selectedIdx >= 0 && isBarOverlappingPlayheadGrid(bars[selectedIdx], ts)) {
     return selectedIdx
   }
-  return bars.findIndex((bar) => ts >= bar.startTimestamp && ts <= bar.endTimestamp)
+  return bars.findIndex((bar) => isBarOverlappingPlayheadGrid(bar, ts))
 }
 
 const resolveAdjacentWindow = (dir: -1 | 1): ProcessedGanttBar | null => {
@@ -1662,6 +2061,92 @@ watch(playheadLeftPx, () => {
       align-items: center;
       gap: 12px;
       min-width: 0;
+      flex: 0 1 280px;
+    }
+
+    .banner-center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      flex: 1;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .banner-empty-hint {
+      font-size: 13px;
+      color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .clear-sat-btn {
+      border: 1px solid rgba(0, 225, 255, 0.28);
+      background: rgba(8, 14, 26, 0.7);
+      color: #94eaff;
+    }
+
+    .clear-sat-btn:hover,
+    .clear-sat-btn:focus {
+      border-color: rgba(0, 225, 255, 0.45);
+      background: rgba(0, 225, 255, 0.12);
+      color: #e0faff;
+    }
+
+    .selection-status {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 225, 255, 0.18);
+      background: rgba(8, 14, 26, 0.7);
+
+      .status-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+
+      .label-text {
+        font-size: 12px;
+        color: #94a3b8;
+      }
+
+      .status-val {
+        font-size: 13px;
+        font-weight: 700;
+        color: #67e8f9;
+        max-width: 160px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    .series-filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .label-text {
+        font-size: 12px;
+        color: #94a3b8;
+        white-space: nowrap;
+      }
+
+      .series-select {
+        width: 150px;
+      }
+    }
+
+    .v-divider {
+      width: 1px;
+      height: 22px;
+      background: rgba(0, 225, 255, 0.2);
+      flex-shrink: 0;
     }
 
     .banner-pulse {
@@ -1708,6 +2193,7 @@ watch(playheadLeftPx, () => {
       gap: 8px;
       flex-wrap: wrap;
       justify-content: flex-end;
+      flex: 0 1 auto;
     }
 
     .banner-chip {
@@ -1740,11 +2226,8 @@ watch(playheadLeftPx, () => {
     }
 
     &--empty {
-      justify-content: center;
       background: rgba(15, 23, 42, 0.9);
       border-bottom-color: #334155;
-      color: #64748b;
-      font-size: 13px;
       box-shadow: none;
     }
   }
@@ -1886,9 +2369,9 @@ watch(playheadLeftPx, () => {
       top: 0;
       bottom: 0;
       width: 2px;
+      margin-left: -1px;
       background: #00e1ff;
       box-shadow: 0 0 10px rgba(0, 225, 255, 0.75);
-      transform: translateX(-50%);
       z-index: 6;
       pointer-events: none;
     }
@@ -2098,8 +2581,10 @@ watch(playheadLeftPx, () => {
           z-index: 10;
 
           .left-row-label-header {
-            width: 180px;
-            min-width: 180px;
+            width: 200px;
+            min-width: 200px;
+            flex: 0 0 200px;
+            box-sizing: border-box;
             background-color: #0f172a;
             border-right: 1px solid #1e293b;
             display: flex;
@@ -2114,9 +2599,9 @@ watch(playheadLeftPx, () => {
           }
 
           .timeline-ticks-container {
-            flex: 1;
             position: relative;
             height: 100%;
+            flex: 0 0 auto;
 
             .time-tick-item {
               position: absolute;
@@ -2164,11 +2649,12 @@ watch(playheadLeftPx, () => {
             }
 
             &.is-row-selected {
-              background-color: rgba(56, 189, 248, 0.1);
+              background-color: rgba(56, 189, 248, 0.12);
               box-shadow: inset 3px 0 0 #38bdf8;
 
               .row-label-col {
                 background-color: #16324a;
+                box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25);
               }
 
               .sat-title {
@@ -2185,35 +2671,157 @@ watch(playheadLeftPx, () => {
             }
 
             .row-label-col {
-              width: 180px;
-              min-width: 180px;
+              width: 200px;
+              min-width: 200px;
+              flex: 0 0 200px;
+              box-sizing: border-box;
               background-color: #0f172a;
               border-right: 1px solid #1e293b;
-              padding: 10px 12px;
+              padding: 8px 10px;
               display: flex;
               flex-direction: column;
               justify-content: center;
+              gap: 8px;
               position: sticky;
               left: 0;
               z-index: 8;
               isolation: isolate;
+              cursor: pointer;
+              transition: background-color 0.2s ease, box-shadow 0.2s ease;
+
+              &:hover {
+                background-color: #131f33;
+              }
+
+              .sat-label-block {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+              }
 
               .sat-main-label {
                 display: flex;
                 align-items: center;
-                gap: 6px;
+                gap: 5px;
+                min-width: 0;
+
+                .icon-sat {
+                  flex-shrink: 0;
+                  font-size: 12px;
+                }
 
                 .sat-title {
                   font-size: 13px;
-                  font-weight: 600;
+                  font-weight: 700;
                   color: #f1f5f9;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  white-space: nowrap;
+                }
+              }
+
+              .sat-meta-row,
+              .transit-card-top {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                flex-wrap: wrap;
+              }
+
+              .meta-label {
+                font-size: 10px;
+                color: #64748b;
+                white-space: nowrap;
+              }
+
+              .status-pill {
+                display: inline-flex;
+                align-items: center;
+                height: 18px;
+                padding: 0 7px;
+                border-radius: 999px;
+                font-size: 10px;
+                font-weight: 600;
+                line-height: 1;
+                letter-spacing: 0.02em;
+
+                &--sm {
+                  height: 16px;
+                  padding: 0 6px;
+                  font-size: 9px;
+                }
+
+                &.is-normal {
+                  color: #6ee7b7;
+                  background: rgba(16, 185, 129, 0.12);
+                }
+
+                &.is-struck {
+                  color: #fca5a5;
+                  background: rgba(239, 68, 68, 0.14);
+                }
+              }
+
+              .row-active-transit {
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+                padding-top: 6px;
+                border-top: 1px dashed rgba(100, 116, 139, 0.25);
+
+                .transit-card {
+                  display: flex;
+                  flex-direction: column;
+                  gap: 4px;
+                  padding: 6px 8px 6px 10px;
+                  border-radius: 5px;
+                  background: rgba(15, 23, 42, 0.65);
+                  border: 1px solid rgba(51, 65, 85, 0.55);
+                  border-left-width: 3px;
+
+                  &--normal {
+                    border-left-color: #10b981;
+                  }
+
+                  &--struck {
+                    border-left-color: #ef4444;
+                    background: rgba(239, 68, 68, 0.06);
+                  }
+                }
+
+                .transit-station {
+                  flex: 1;
+                  min-width: 0;
+                  font-size: 11px;
+                  font-weight: 600;
+                  color: #bae6fd;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  white-space: nowrap;
+                }
+
+                .transit-time {
+                  display: flex;
+                  align-items: center;
+                  gap: 4px;
+                  padding-left: 1px;
+                }
+
+                .transit-time-val {
+                  font-size: 10px;
+                  font-variant-numeric: tabular-nums;
+                  color: #94a3b8;
+                }
+
+                .transit-time-sep {
+                  font-size: 9px;
+                  color: #475569;
                 }
               }
             }
 
             /* Timeline Track 轨道 (支持多排道) */
             .row-timeline-track {
-              flex: 1;
               position: relative;
               min-height: 52px;
 
@@ -2222,11 +2830,13 @@ watch(playheadLeftPx, () => {
                 top: 0;
                 bottom: 0;
                 width: 1px;
+                margin-left: 0;
                 background-color: rgba(51, 65, 85, 0.25);
                 pointer-events: none;
 
                 &.is-current-grid {
                   width: 2px;
+                  margin-left: -1px;
                   background-color: rgba(0, 225, 255, 0.45);
                   box-shadow: 0 0 6px rgba(0, 225, 255, 0.35);
                 }

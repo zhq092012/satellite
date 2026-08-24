@@ -27,6 +27,7 @@
               :task-end="taskTimeRange.end"
               :matrix-data="matrixData"
               :selected-norad="selectedNorad"
+              :force-task-mode="!!selectedTransmissionLinkId"
               :current-time-ms="currentClockMs"
               @time-change="handleTimelineTimeChange"
             />
@@ -38,7 +39,9 @@
           <C2RightAnalysisPanel
             :matrix-data="matrixData"
             :selected-satellite-norad="selectedNorad"
+            :selected-transmission-link-id="selectedTransmissionLinkId"
             @clear-satellite-selection="handleSelectSatellite(null)"
+            @select-transmission-link="handleSelectTransmissionLink"
           />
         </div>
       </div>
@@ -54,6 +57,7 @@ import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPa
 import BattleMissionTimeline from '@/components/BattleSituation/BattleMissionTimeline.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
+import type { SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 
 /** [变量说明] 全局布局 Store */
@@ -67,6 +71,9 @@ const cesiumViewerRef = ref<InstanceType<typeof CesiumViewer> | null>(null)
 
 /** [变量说明] 当前选中的敌方卫星 NORAD 编号 (默认未选中任何卫星为 null，代表静态视图定位战场) */
 const selectedNorad = ref<number | null>(null)
+
+/** 当前选中的传输链路 ID（右侧面板点击链路时高亮并绘制地图连线） */
+const selectedTransmissionLinkId = ref<string | null>(null)
 
 /** 地球时钟当前时刻（毫秒），用于轨道仿真时间轴游标 */
 const currentClockMs = ref<number>(0)
@@ -91,20 +98,20 @@ const handleTimelineTimeChange = (ms: number) => {
  * @param ms 当前时钟毫秒时间戳
  */
 const handleClockTick = (ms: number) => {
-  if (!selectedNorad.value) {
+  if (!selectedNorad.value && !selectedTransmissionLinkId.value) {
     currentClockMs.value = ms
   }
 }
 
 /**
- * 根据是否选中卫星，切换地球时钟模式：
- * - 未选中：TLE 轨道仿真动画
+ * 根据是否选中卫星或传输链路，切换地球时钟模式：
+ * - 均未选中：TLE 轨道仿真动画
  * - 已选中：暂停动画，使用任务时间标尺
  */
 const syncGlobeTimeMode = () => {
   nextTick(() => {
     if (!cesiumViewerRef.value) return
-    if (selectedNorad.value) {
+    if (selectedNorad.value || selectedTransmissionLinkId.value) {
       cesiumViewerRef.value.pauseClockAnimation()
       const clockMs = cesiumViewerRef.value.getClockTimeMs?.()
       if (clockMs) currentClockMs.value = clockMs
@@ -117,32 +124,73 @@ const syncGlobeTimeMode = () => {
 }
 
 /**
- * [函数说明]
- * 根据选择的卫星系列，在第一个 Tab (GIS态势) 触发全局算法矩阵查询，并从矩阵中加载相关资产。
- * 默认不自动选择任何卫星或地面站节点，地图定位战场包围框。
- *
- * @param series 选中的卫星系列名称
+ * 清除传输链路选中态，并恢复地图连线与时间轴播放。
  */
-const fetchMatrixDataBySeries = async (series: string) => {
+const clearTransmissionLinkSelection = () => {
+  selectedTransmissionLinkId.value = null
+  cesiumViewerRef.value?.clearTransmissionLinkOverlay?.()
+  syncGlobeTimeMode()
+}
+
+/**
+ * 选中/取消选中传输链路：在 Cesium 上绘制淡黄色虚线，时间轴跳转到链路起始时刻并暂停；
+ * 取消选中时清除连线并恢复 TLE 轨道仿真播放。
+ * @param link 选中的链路；传 null 表示取消选中
+ */
+const handleSelectTransmissionLink = (link: SatelliteTransmissionLink | null) => {
+  if (!link) {
+    clearTransmissionLinkSelection()
+    return
+  }
+
+  selectedTransmissionLinkId.value = link.id
+  const viewer = cesiumViewerRef.value
+  if (!viewer) return
+
+  viewer.pauseClockAnimation()
+  viewer.initTaskClock?.()
+  viewer.setClockTime(link.transmitStartMs)
+  currentClockMs.value = link.transmitStartMs
+
+  nextTick(() => {
+    viewer.showTransmissionLink?.(link)
+  })
+}
+
+/**
+ * 按当前系列筛选范围加载矩阵：有系列时加载单系列，无系列时合并全部系列。
+ */
+let matrixLoadToken = 0
+
+const loadMatrixForCurrentScope = async () => {
   const taskId = store.activedTask?.id
-  if (!taskId || !series) {
+  if (!taskId) {
     store.clearMatrixData()
     selectedNorad.value = null
     store.setSelectedAnalysisNorad(null)
     return
   }
 
+  const loadToken = ++matrixLoadToken
+
   try {
-    const data = await store.fetchReconnaissanceAttackMatrix({
-      taskId,
-      series,
+    const data = await store.fetchMatrixForCurrentScope()
+    if (loadToken !== matrixLoadToken) return
+
+    selectedNorad.value = null
+    store.setSelectedAnalysisNorad(null)
+    selectedTransmissionLinkId.value = null
+
+    nextTick(() => {
+      if (loadToken !== matrixLoadToken) return
+      cesiumViewerRef.value?.clearTransmissionLinkOverlay?.()
+      markBattleArea()
+      cesiumViewerRef.value?.refreshAfterActivate?.()
+      syncGlobeTimeMode()
     })
-    if (data) {
-      // 默认保持不选择任何卫星 (selectedNorad 为 null)，相机视角直接定位战场
-      selectedNorad.value = null
-      nextTick(() => {
-        markBattleArea()
-      })
+
+    if (!data) {
+      console.warn('当前系列矩阵加载失败，保留已有地图数据')
     }
   } catch (err) {
     console.error('获取算法传输矩阵失败:', err)
@@ -158,6 +206,11 @@ const fetchMatrixDataBySeries = async (series: string) => {
  * @param norad 选中的敌方卫星 NORAD 编号 (取消选择时为 null)
  */
 const handleSelectSatellite = (norad: number | null) => {
+  if (selectedTransmissionLinkId.value) {
+    selectedTransmissionLinkId.value = null
+    cesiumViewerRef.value?.clearTransmissionLinkOverlay?.()
+  }
+
   selectedNorad.value = norad
   store.setSelectedAnalysisNorad(norad)
   const taskId = store.activedTask?.id
@@ -210,16 +263,9 @@ watch(
  * 选择系列后，重新查询对应的算法矩阵，并从已查询出的矩阵中加载地面站、数据中心及天基传输资产。
  */
 watch(
-  () => store.selectedSatSeries,
-  (newSeries) => {
-    if (newSeries) {
-      void fetchMatrixDataBySeries(newSeries)
-    } else {
-    store.clearMatrixData()
-    selectedNorad.value = null
-    store.setSelectedAnalysisNorad(null)
-    syncGlobeTimeMode()
-    }
+  () => [store.selectedSatSeries, store.selectedSatType] as const,
+  () => {
+    void loadMatrixForCurrentScope()
   },
   { immediate: true }
 )
@@ -236,11 +282,7 @@ function markBattleArea() {
 
 onMounted(() => {
   nextTick(() => {
-    // 组件开始加载时仅标记战场边界网格，不全量加载全库卫星资产，保持地图洁净
     markBattleArea()
-    if (store.selectedSatSeries) {
-      void fetchMatrixDataBySeries(store.selectedSatSeries)
-    }
     syncGlobeTimeMode()
   })
 })
@@ -259,15 +301,15 @@ onActivated(() => {
       syncGlobeTimeMode()
     }
     cesiumViewerRef.value?.refreshAfterActivate?.()
-    cesiumViewerRef.value?.setOurWeaponsVisible?.(store.showOurWeapons)
-    if (store.selectedSatSeries && store.matrixData) {
+    cesiumViewerRef.value?.setOurWeaponsVisible?.(true)
+    if (store.matrixData) {
       if (selectedNorad.value) {
         scheduleFlyToSelectedSatellite(selectedNorad.value)
       } else {
         cesiumViewerRef.value?.markBattle()
       }
-    } else if (store.selectedSatSeries) {
-      void fetchMatrixDataBySeries(store.selectedSatSeries)
+    } else {
+      void loadMatrixForCurrentScope()
     }
     syncGlobeTimeMode()
   })
@@ -284,9 +326,7 @@ watch(
     if (!taskId || taskId === prevTaskId) return
     syncGlobeTimeMode()
     markBattleArea()
-    if (store.selectedSatSeries) {
-      await fetchMatrixDataBySeries(store.selectedSatSeries)
-    }
+    void loadMatrixForCurrentScope()
   }
 )
 </script>

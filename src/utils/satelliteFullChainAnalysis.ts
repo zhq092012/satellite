@@ -446,9 +446,29 @@ export const getSatelliteRelatedEdgeIds = (matrix: MatrixResult, norad: number):
   return ids
 }
 
-const isRelaySatellite = (matrix: MatrixResult, norad: number, satType?: string): boolean => {
+/**
+ * 判断指定 NORAD 是否为中继卫星。
+ * @param matrix 算法矩阵数据
+ * @param norad 卫星 NORAD 编号
+ * @param satType 可选的卫星类型描述
+ * @returns 是否为中继卫星
+ */
+export const isRelaySatellite = (matrix: MatrixResult, norad: number, satType?: string): boolean => {
   if ((satType || '').includes('中继')) return true
   return (matrix.relayRelation?.relayList || []).includes(norad)
+}
+
+/**
+ * 列出经指定中继卫星下传的全部上游观测卫星 NORAD。
+ * @param matrix 算法矩阵数据
+ * @param relayNorad 中继卫星 NORAD 编号
+ * @returns 上游观测卫星 NORAD 列表
+ */
+export const listSourceSatelliteNoradsForRelay = (matrix: MatrixResult, relayNorad: number): number[] => {
+  return (matrix.relayRelation?.relations || [])
+    .filter((rel) => Number(rel.to) === relayNorad || String(rel.to) === String(relayNorad))
+    .map((rel) => Number(rel.from))
+    .filter((norad) => Number.isFinite(norad) && norad > 0)
 }
 
 /** 普通侦察卫星 NORAD 列表（不含中继） */
@@ -918,6 +938,42 @@ const resolveWeaponsForWindow = (
 }
 
 /**
+ * 收集中继卫星作为传输枢纽的全部链路（观测星 → 中继 → 地面站 → 数据中心）。
+ *
+ * @param matrix 算法矩阵数据
+ * @param relayNorad 中继卫星 NORAD 编号
+ * @returns 按传输开始时间升序排列的链路列表
+ */
+export const collectRelaySatelliteTransmissionLinks = (
+  matrix: MatrixResult | null,
+  relayNorad: number
+): SatelliteTransmissionLink[] => {
+  if (!matrix || !relayNorad) return []
+
+  const sourceNorads = listSourceSatelliteNoradsForRelay(matrix, relayNorad)
+  const links: SatelliteTransmissionLink[] = []
+  const seen = new Set<string>()
+
+  sourceNorads.forEach((sourceNorad) => {
+    collectSatelliteTransmissionLinks(matrix, sourceNorad).forEach((link) => {
+      const usesThisRelay = link.nodes.some(
+        (node) => node.layer === 'RELAY' && Number(node.id) === relayNorad
+      )
+      if (!usesThisRelay) return
+      const key = chainPathKey(link.nodes)
+      if (seen.has(key)) return
+      seen.add(key)
+      links.push(link)
+    })
+  })
+
+  return links.sort((a, b) => {
+    if (a.transmitStartMs !== b.transmitStartMs) return a.transmitStartMs - b.transmitStartMs
+    return a.receiveName.localeCompare(b.receiveName, 'zh-CN')
+  })
+}
+
+/**
  * 收集选中卫星的全部传输链路：每条链路包含路径、传输时间、打击武器与延迟
  *
  * @param matrix 算法矩阵数据
@@ -929,6 +985,10 @@ export const collectSatelliteTransmissionLinks = (
   norad: number
 ): SatelliteTransmissionLink[] => {
   if (!matrix || !norad) return []
+
+  if (isRelaySatellite(matrix, norad)) {
+    return collectRelaySatelliteTransmissionLinks(matrix, norad)
+  }
 
   const initSat = matrix.initMatrixList?.find((s) => s.norad === norad)
   const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
@@ -1149,7 +1209,10 @@ export const findTransmissionLinkById = (
 ): SatelliteTransmissionLink | null => {
   if (!matrix || !linkId) return null
   if (norad != null) {
-    return collectSatelliteTransmissionLinks(matrix, norad).find((item) => item.id === linkId) ?? null
+    const links = isRelaySatellite(matrix, norad)
+      ? collectRelaySatelliteTransmissionLinks(matrix, norad)
+      : collectSatelliteTransmissionLinks(matrix, norad)
+    return links.find((item) => item.id === linkId) ?? null
   }
   return collectSeriesTransmissionLinks(matrix).find((item) => item.id === linkId) ?? null
 }
@@ -1183,6 +1246,154 @@ export const collectNetworkChainStats = (matrix: MatrixResult | null): NetworkCh
     remainingChains: Array.from(remaining.values()).sort(
       (a, b) => (a.finishTimestamp || 0) - (b.finishTimestamp || 0)
     ),
+  }
+}
+
+/** 整体态势右侧面板使用的矩阵概览统计 */
+export interface MatrixOverviewStats {
+  /** 卫星总数（含中继） */
+  satelliteCount: number
+  /** 地面接收站总数 */
+  receiveCount: number
+  /** 数据中心总数 */
+  stationCount: number
+  /** 武器总数（去重） */
+  weaponCount: number
+  /** 打击前可能链路总数 */
+  possibleLinkCount: number
+  /** 当前统计范围文案 */
+  scopeLabel: string
+}
+
+/**
+ * 按唯一键合并数组项，后出现的项覆盖先出现的项。
+ * @param items 待合并数组
+ * @param keyFn 唯一键提取函数
+ */
+const mergeUniqueBy = <T,>(items: T[], keyFn: (item: T) => string): T[] => {
+  const map = new Map<string, T>()
+  items.forEach((item) => map.set(keyFn(item), item))
+  return Array.from(map.values())
+}
+
+/**
+ * 合并多个系列矩阵为单一矩阵，供「全部系列」视图使用。
+ * @param matrices 各系列矩阵结果
+ * @returns 合并后的矩阵；无有效输入时返回 null
+ */
+export const mergeMatrixResults = (matrices: MatrixResult[]): MatrixResult | null => {
+  const valid = matrices.filter(Boolean)
+  if (!valid.length) return null
+  if (valid.length === 1) return valid[0]
+
+  const mergeRelationList = (lists: StationRelationList[]): StationRelationList => {
+    const receiveObjList = mergeUniqueBy(
+      lists.flatMap((list) => list.receiveObjList || []),
+      (item) => item.receiveId
+    )
+    const stationObjList = mergeUniqueBy(
+      lists.flatMap((list) => list.stationObjList || []),
+      (item) => item.stationId
+    )
+    const relationKeys = new Set<string>()
+    const relations = lists
+      .flatMap((list) => list.relations || [])
+      .filter((rel) => {
+        const key = `${rel.from}->${rel.to}`
+        if (relationKeys.has(key)) return false
+        relationKeys.add(key)
+        return true
+      })
+    return { receiveObjList, stationObjList, relations }
+  }
+
+  type RelayRelation = NonNullable<MatrixResult['relayRelation']>
+
+  const mergeRelayRelations = (relations: (RelayRelation | undefined)[]): RelayRelation | undefined => {
+    const validRelay = relations.filter(Boolean) as RelayRelation[]
+    if (!validRelay.length) return undefined
+    return {
+      relayList: Array.from(new Set(validRelay.flatMap((item) => item.relayList || []))),
+      satelliteList: Array.from(new Set(validRelay.flatMap((item) => item.satelliteList || []))),
+      relations: mergeUniqueBy(
+        validRelay.flatMap((item) => item.relations || []),
+        (item) => `${item.from}-${item.to}`
+      ),
+    }
+  }
+
+  return {
+    attackPlanList: valid.flatMap((matrix) => matrix.attackPlanList || []),
+    battleMatrixList: valid.flatMap((matrix) => matrix.battleMatrixList || []),
+    initMatrixList: mergeUniqueBy(valid.flatMap((matrix) => matrix.initMatrixList || []), (item) =>
+      String(item.norad)
+    ),
+    initRelationList: mergeRelationList(
+      valid.map((matrix) => matrix.initRelationList || { receiveObjList: [], stationObjList: [], relations: [] })
+    ),
+    satelliteMatrixList: mergeUniqueBy(
+      valid.flatMap((matrix) => matrix.satelliteMatrixList || []),
+      (item) => String(item.norad)
+    ),
+    stationRelationList: mergeRelationList(
+      valid.map((matrix) => matrix.stationRelationList || { receiveObjList: [], stationObjList: [], relations: [] })
+    ),
+    relayRelation: mergeRelayRelations(valid.map((matrix) => matrix.relayRelation)),
+    series: valid.map((matrix) => matrix.series).filter(Boolean).join(' / ') || '全部系列',
+    threatSats: mergeUniqueBy(valid.flatMap((matrix) => matrix.threatSats || []), (item) => String(item.norad)),
+    timeEffects: mergeUniqueBy(valid.flatMap((matrix) => matrix.timeEffects || []), (item) => String(item.norad)),
+  }
+}
+
+/**
+ * 汇总矩阵中的卫星、地面站、数据中心、武器与可能链路数量。
+ * @param matrix 算法矩阵数据
+ * @param scopeLabel 统计范围展示文案
+ * @returns 概览统计结果
+ */
+export const collectMatrixOverviewStats = (
+  matrix: MatrixResult | null,
+  scopeLabel?: string
+): MatrixOverviewStats => {
+  if (!matrix) {
+    return {
+      satelliteCount: 0,
+      receiveCount: 0,
+      stationCount: 0,
+      weaponCount: 0,
+      possibleLinkCount: 0,
+      scopeLabel: scopeLabel || '未加载',
+    }
+  }
+
+  const satelliteIds = new Set<number>()
+  ;(matrix.initMatrixList || []).forEach((sat) => satelliteIds.add(sat.norad))
+  ;(matrix.satelliteMatrixList || []).forEach((sat) => satelliteIds.add(sat.norad))
+
+  const relationData =
+    matrix.initRelationList?.receiveObjList?.length || matrix.initRelationList?.stationObjList?.length
+      ? matrix.initRelationList
+      : matrix.stationRelationList
+
+  const weaponNames = new Set<string>()
+  ;(matrix.attackPlanList || []).forEach((plan) => {
+    if (plan.weaponName) weaponNames.add(plan.weaponName)
+  })
+  ;(matrix.satelliteMatrixList || []).forEach((sat) => {
+    ;(sat.weapons || []).forEach((weapon: Weapon) => {
+      if (weapon.name) weaponNames.add(weapon.name)
+    })
+  })
+
+  const chainStats = collectNetworkChainStats(matrix)
+
+  return {
+    satelliteCount: satelliteIds.size,
+    receiveCount: relationData?.receiveObjList?.length || 0,
+    stationCount: relationData?.stationObjList?.length || 0,
+    weaponCount: weaponNames.size,
+    possibleLinkCount: chainStats.totalCount,
+    scopeLabel: scopeLabel || matrix.series || '全部系列',
   }
 }
 

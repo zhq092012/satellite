@@ -1066,6 +1066,7 @@ import {
   type SatelliteProfileIntelligence,
   getSatelliteProfileNewsList,
 } from '@/api/profile/satellite-profile-api'
+import type { SatelliteNode, SatelliteRelation } from '@/types/dashboard'
 
 const props = withDefaults(
   defineProps<{

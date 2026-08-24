@@ -101,6 +101,18 @@ const routes: Array<RouteRecordRaw> = [
             },
           },
           {
+            path: 'satellites',
+            name: 'SatelliteManage',
+            component: () => import('@/views/satellites/SatelliteList.vue'),
+            meta: {
+              title: '卫星管理',
+              icon: 'icon-situation',
+              showInMenu: true,
+              requiresAuth: true,
+              roles: ['admin'],
+            },
+          },
+          {
             path: 'weapons',
             name: 'WeaponManage',
             component: () => import('@/views/weapons/WeaponList.vue'),

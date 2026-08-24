@@ -49,7 +49,7 @@
 
     <!-- 中间主视图与拓扑画布区域 -->
     <div class="cema-workspace">
-      <div class="topo-main-body">
+      <div v-if="hasSelectedSeries" class="topo-main-body">
         <div class="topo-side topo-side--left">
           <TopoLeftPanel :matrix-data="matrixData" :selected-norad="selectedNorad" :selected-link-id="selectedLinkId"
             @select-link="handleSelectLink" />
@@ -119,6 +119,12 @@
             :selected-node-id="selectedPanelNodeId" :selected-node-layer="selectedPanelNodeLayer" />
         </div>
       </div>
+
+      <div v-else class="topo-empty-state">
+        <span class="empty-icon">🕸️</span>
+        <p class="empty-title">请先选择卫星系列</p>
+        <p class="empty-sub">未选择系列时不展示拓扑与链路数据，请在上方下拉框中选择系列后开始分析</p>
+      </div>
     </div>
   </div>
 </template>
@@ -132,7 +138,7 @@ import type { FuncType } from '@/types/electronic'
 import TopoLeftPanel from '@/components/electronic/TopoLeftPanel.vue'
 import TopoRightPanel from '@/components/electronic/TopoRightPanel.vue'
 import BattleMissionTimeline from '@/components/BattleSituation/BattleMissionTimeline.vue'
-import { type TimelineChainMarkerType, collectSatelliteTransmissionLinks, collectSeriesTransmissionLinks, listNormalSatelliteNorads, type ChainNode, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
+import { type TimelineChainMarkerType, collectRelaySatelliteTransmissionLinks, collectSatelliteTransmissionLinks, collectSeriesTransmissionLinks, isRelaySatellite, listNormalSatelliteNorads, listSourceSatelliteNoradsForRelay, type ChainNode, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 
 defineOptions({
   name: 'ElectronicWarfareG6',
@@ -219,6 +225,9 @@ const resolveSatName = (norad: number | null): string => {
 }
 
 const currentSeriesText = computed(() => store.selectedSatSeries || '未选择')
+
+/** 是否已选择卫星系列；未选择时不展示拓扑内容 */
+const hasSelectedSeries = computed(() => !!store.selectedSatSeries)
 const currentSatelliteText = computed(() => {
   if (selectedNorad.value != null) return resolveSatName(selectedNorad.value)
   const data = matrixData.value
@@ -406,14 +415,10 @@ const fetchTypeSerials = async (taskId?: number) => {
  * 切换卫星系列，同步 Store 并重新查询矩阵数据
  */
 const handleSeriesChange = (series: string) => {
-  if (!series) return
+  if (!series || store.selectedSatSeries === series) return
   store.setSelectedSatSeries(series)
   store.setSelectedAnalysisNorad(null)
-  selectedNorad.value = null
-  selectedPanelNodeId.value = null
-  selectedPanelNodeLayer.value = null
-  selectedNodeInfo.value = null
-  void fetchMatrixData(true)
+  resetTopoSelectionForSeriesChange()
 }
 
 watch(
@@ -461,11 +466,14 @@ watch(selectedTimelinePoint, () => {
 })
 
 watch(seriesOptions, (options) => {
-  if (!options.length) return
-  if (!options.includes(store.selectedSatSeries)) {
-    const nextSeries = options[0]
-    store.setSelectedSatSeries(nextSeries)
-    void fetchMatrixData(true)
+  if (!options.length) {
+    if (store.selectedSatSeries) {
+      store.setSelectedSatSeries('')
+    }
+    return
+  }
+  if (store.selectedSatSeries && !options.includes(store.selectedSatSeries)) {
+    store.setSelectedSatSeries('')
   }
 })
 
@@ -576,6 +584,21 @@ const ensureCurrentTimestampValid = () => {
 const nodeLayoutCache = new Map<string, number>()
 let graphTopologyKey = ''
 
+/**
+ * 销毁 G6 实例并清空布局缓存，系列/矩阵切换时必须完整重建而非仅 changeData
+ */
+const destroyGraphInstance = () => {
+  graphTopologyKey = ''
+  nodeLayoutCache.clear()
+  if (graph && !graph.get('destroyed')) {
+    graph.destroy()
+  }
+  graph = null
+  if (g6Container.value) {
+    g6Container.value.innerHTML = ''
+  }
+}
+
 const getGraphTopologyKey = () =>
   `${store.selectedSatSeries}|${matrixData.value?.series ?? ''}|${selectedNorad.value ?? ''}|${selectedLinkId.value ?? ''}|${getGraphStageSize().width}|${getGraphStageSize().height}`
 
@@ -605,7 +628,7 @@ const refreshGraphForTime = () => {
   const { width, height } = getGraphStageSize()
   if (!width || !height || width <= 0 || height <= 0) return
 
-  if (!g6Container.value) return
+  if (!g6Container.value || !matrixData.value) return
 
   const topoKey = getGraphTopologyKey()
   const structureChanged = topoKey !== graphTopologyKey
@@ -623,11 +646,10 @@ const refreshGraphForTime = () => {
   resetGraphViewport()
 
   if (structureChanged) {
+    destroyGraphInstance()
     graphTopologyKey = topoKey
     saveNodePositionsToCache(graphData.nodes)
-    graph.changeData(graphData)
-    resetGraphViewport()
-    updateGraphHighlightState()
+    initOrUpdateGraph()
     return
   }
 
@@ -665,6 +687,26 @@ const refreshGraphForTime = () => {
   })
 
   updateGraphHighlightState()
+}
+
+/**
+ * 在 DOM 就绪后刷新 G6 拓扑（容器尺寸为 0 时自动重试，避免切换系列后画布空白）
+ * @param attempt 当前重试次数
+ */
+const scheduleGraphRefresh = (attempt = 0) => {
+  nextTick(() => {
+    const { width, height } = getGraphStageSize()
+    if ((!width || !height) && attempt < 24) {
+      window.setTimeout(() => scheduleGraphRefresh(attempt + 1), 50)
+      return
+    }
+    if (attempt === 0) {
+      destroyGraphInstance()
+    }
+    initTimelineBounds()
+    ensureCurrentTimestampValid()
+    refreshGraphForTime()
+  })
 }
 
 const setCurrentTimestamp = (ts: number, refreshGraph = true) => {
@@ -882,71 +924,109 @@ const applySharedSatelliteSelection = () => {
 }
 
 /**
- * [功能说明]
- * 调用后端 API 获取算法矩阵数据并更新 store (按 store 中的 selectedSatSeries 检索)
- * @param force 是否强制重新向 API 查询数据
+ * 清空拓扑工作区状态（未选择系列时调用）
+ */
+const clearTopoWorkspace = () => {
+  matrixData.value = null
+  selectedNorad.value = null
+  selectedLinkId.value = null
+  selectedReceiveId.value = null
+  selectedPanelNodeId.value = null
+  selectedPanelNodeLayer.value = null
+  selectedTimelinePoint.value = null
+  selectedNodeInfo.value = null
+  destroyGraphInstance()
+}
+
+/**
+ * 矩阵 scope 变更后同步本地数据并强制重建拓扑
+ */
+const syncMatrixFromStoreAndRebuild = () => {
+  if (!store.selectedSatSeries) {
+    clearTopoWorkspace()
+    return
+  }
+  matrixData.value = store.matrixData
+  if (!matrixData.value) return
+  applySharedSatelliteSelection()
+  scheduleGraphRefresh()
+}
+
+/**
+ * 拉取当前系列矩阵并刷新 G6 拓扑图
+ * @param force 是否强制重新请求
  */
 const fetchMatrixData = async (force = false) => {
+  if (!store.selectedSatSeries) {
+    clearTopoWorkspace()
+    loading.value = false
+    return
+  }
+
   loading.value = true
   try {
-    const data = await store.fetchReconnaissanceAttackMatrix(
-      {
-        taskId: store.activedTask?.id || 0,
-        series: store.selectedSatSeries || '',
-      },
-      force
-    )
-
-    if (data) {
-      matrixData.value = data
+    await store.fetchMatrixForCurrentScope(force)
+    matrixData.value = store.matrixData
+    if (matrixData.value) {
       applySharedSatelliteSelection()
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.warn('调用后端算法矩阵接口提示:', err)
   } finally {
     loading.value = false
-    nextTick(() => {
-      graphTopologyKey = ''
-      nodeLayoutCache.clear()
-      initTimelineBounds()
-      ensureCurrentTimestampValid()
-      refreshGraphForTime()
-    })
+    if (matrixData.value) {
+      scheduleGraphRefresh()
+    }
   }
 }
 
 /**
+ * 系列切换时重置拓扑选中态
+ */
+const resetTopoSelectionForSeriesChange = () => {
+  selectedNorad.value = null
+  selectedLinkId.value = null
+  selectedReceiveId.value = null
+  selectedPanelNodeId.value = null
+  selectedPanelNodeLayer.value = null
+  selectedNodeInfo.value = null
+  selectedTimelinePoint.value = null
+}
+
+/**
  * [监听器说明]
- * 监听 store 中共享的矩阵数据、卫星系列、激活任务改变，自动同步矩阵数据并更新图谱
+ * 矩阵 queryKey 变化表示 scope 数据已更新，同步并重建 G6（避免 matrixData 引用未变导致 watch 不触发）
  */
 watch(
-  [() => store.matrixData, () => store.selectedSatSeries, () => store.activedTask?.id],
-  ([newStoreMatrix]) => {
-    if (newStoreMatrix) {
-      matrixData.value = newStoreMatrix
-      applySharedSatelliteSelection()
-      nextTick(() => {
-        graphTopologyKey = ''
-        nodeLayoutCache.clear()
-        initTimelineBounds()
-        ensureCurrentTimestampValid()
-        refreshGraphForTime()
-      })
-    } else {
-      void fetchMatrixData()
+  () => store.matrixQueryKey,
+  (queryKey) => {
+    if (!queryKey || !store.selectedSatSeries) return
+    syncMatrixFromStoreAndRebuild()
+  }
+)
+
+watch(
+  () => store.selectedSatSeries,
+  (series, prev) => {
+    if (!series) {
+      clearTopoWorkspace()
+      return
+    }
+    if (series !== prev) {
+      resetTopoSelectionForSeriesChange()
+      matrixData.value = null
+      destroyGraphInstance()
+      void fetchMatrixData(true)
     }
   },
   { immediate: true }
 )
 
 watch(
-  () => store.selectedSatSeries,
-  (series, prev) => {
-    if (series && series !== prev) {
-      selectedNorad.value = null
-      selectedPanelNodeId.value = null
-      selectedPanelNodeLayer.value = null
-      selectedNodeInfo.value = null
+  () => store.activedTask?.id,
+  (taskId, prevTaskId) => {
+    if (!taskId || taskId === prevTaskId) return
+    if (store.selectedSatSeries) {
       void fetchMatrixData(true)
     }
   }
@@ -1384,6 +1464,7 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
 
   const satOrderMap = new Map<number, { norad: number; name: string; earliestMs: number; struck: boolean }>()
   norads.forEach((norad) => {
+    if (isRelaySatellite(data, norad)) return
     const initSat = data.initMatrixList?.find((s) => s.norad === norad)
     const postSat = data.satelliteMatrixList?.find((s) => s.norad === norad)
     satOrderMap.set(norad, {
@@ -1577,6 +1658,22 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
  */
 const buildFocusedSatelliteGraph = (norad: number) => {
   const data = matrixData.value!
+  if (isRelaySatellite(data, norad)) {
+    const links = collectRelaySatelliteTransmissionLinks(data, norad)
+    const sourceNoradsFromLinks = Array.from(
+      new Set(
+        links
+          .map((link) => link.nodes.find((node) => node.layer === 'SAT')?.id)
+          .filter((id): id is string => !!id)
+          .map((id) => Number(id))
+          .filter((sourceNorad) => Number.isFinite(sourceNorad) && sourceNorad !== norad)
+      )
+    )
+    const sourceNorads = sourceNoradsFromLinks.length
+      ? sourceNoradsFromLinks
+      : listSourceSatelliteNoradsForRelay(data, norad)
+    return buildReconGraphFromLinks(sourceNorads, links)
+  }
   return buildReconGraphFromLinks([norad], collectSatelliteTransmissionLinks(data, norad))
 }
 
@@ -1751,7 +1848,7 @@ const buildG6GraphData = () => {
  * - 若 graph 已存在，则调用 changeSize 动态调整画布尺寸并重新装载数据 (changeData)。
  */
 const initOrUpdateGraph = () => {
-  if (!g6Container.value) return
+  if (!g6Container.value || !matrixData.value) return
 
   syncGraphStageHeight()
   ensureCurrentTimestampValid()
@@ -1848,9 +1945,9 @@ const initOrUpdateGraph = () => {
       handleSelectLink(selectedLinkId.value === linkId ? null : linkId)
     })
   } else {
-    // 拓扑图已有实例：重新计算画布大小并替换渲染数据
     graph.changeSize(width, height)
     graph.changeData(data)
+    graph.render()
     resetGraphViewport()
     updateGraphHighlightState()
   }
@@ -2033,7 +2130,6 @@ const handleResize = () => {
 
 onMounted(() => {
   syncTopoSelectionFromStore()
-  fetchMatrixData()
   window.addEventListener('resize', handleResize)
 
   nextTick(() => {
@@ -2056,11 +2152,15 @@ onMounted(() => {
  */
 onActivated(() => {
   syncTopoSelectionFromStore()
-  nextTick(() => {
-    setTimeout(() => {
-      initOrUpdateGraph()
-    }, 50)
-  })
+  if (!store.selectedSatSeries) {
+    clearTopoWorkspace()
+    return
+  }
+  if (!store.matrixData) {
+    void fetchMatrixData(true)
+    return
+  }
+  syncMatrixFromStoreAndRebuild()
 })
 
 onUnmounted(() => {
@@ -2211,6 +2311,37 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   background: radial-gradient(circle at 50% 50%, #0a1326 0%, #050811 100%);
+}
+
+.topo-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 24px;
+  text-align: center;
+
+  .empty-icon {
+    font-size: 42px;
+    opacity: 0.85;
+  }
+
+  .empty-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #e2efff;
+  }
+
+  .empty-sub {
+    margin: 0;
+    max-width: 420px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #94a3b8;
+  }
 }
 
 .topo-summary-bar {

@@ -210,6 +210,15 @@ const adminMenus = computed(() => {
           children: [],
         },
         {
+          path: '/system/satellites',
+          meta: {
+            title: '卫星管理',
+            icon: 'icon-situation',
+            showInMenu: true,
+          },
+          children: [],
+        },
+        {
           path: '/system/weapons',
           meta: {
             title: '武器管理',

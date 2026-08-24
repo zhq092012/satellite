@@ -1,11 +1,6 @@
 <template>
   <div ref="cesiumContainer" class="cesium-container">
     <div ref="creditEl" class="credit"></div>
-    <!-- 我方武器图层开关 -->
-    <div class="map-layer-controls">
-      <el-switch v-model="showOurWeapons" active-color="#ef6b73" inactive-color="#4b5563" active-text="我方武器"
-        size="small" @change="handleOurWeaponsToggle" />
-    </div>
     <div v-if="satelliteRenderBusy" class="render-loading">
       <div class="render-loading__panel">
         <div class="render-loading__spinner"></div>
@@ -17,6 +12,7 @@
 <script setup lang="ts">
 import { getAllWeapons, getSatelliteDetail, getSatelliteTLEData, getTLEDataByTaskId } from '@/api/dashboard'
 import type { MatrixResult } from '@/api/electronic'
+import type { ChainNode, SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 import { useElectronicCesiumBridge, type InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { SatelliteData, Weapon } from '@/types/dashboard'
@@ -318,6 +314,10 @@ let currentRenderTaskId: number | null = null
 
 // 存储电子信息网络基础设施实体 ID (地面站、中心云站)
 const electronicNodeEntityIds = new Set<string>()
+/** 态势分析选中的传输链路边实体 ID 集合 */
+const transmissionLinkEntityIds = new Set<string>()
+/** 传输链路高亮线颜色：淡黄色虚线 */
+const TRANSMISSION_LINK_LINE_COLOR = Cesium.Color.fromCssColorString('#F5E6A3').withAlpha(0.92)
 
 const infraShapeImageCache = new Map<string, string>()
 
@@ -486,6 +486,8 @@ watch(
  */
 const clearElectronicInfrastructureNodes = () => {
   if (!viewer || viewer.isDestroyed()) return
+
+  clearTransmissionLinkOverlay()
 
   // 1. 根据保存的电子节点 Entity ID 集合逐个移除 Cesium 实体
   electronicNodeEntityIds.forEach((entityId) => {
@@ -681,10 +683,87 @@ const renderElectronicInfrastructureNodes = () => {
   viewer.scene.requestRender()
 }
 
-const showOurWeapons = computed({
-  get: () => store.showOurWeapons,
-  set: (value: boolean) => store.setShowOurWeapons(value),
-})
+/**
+ * 清除态势分析选中的传输链路连线。
+ */
+const clearTransmissionLinkOverlay = () => {
+  if (!viewer || viewer.isDestroyed()) return
+  transmissionLinkEntityIds.forEach((entityId) => {
+    const entity = viewer.entities.getById(entityId)
+    if (entity) viewer.entities.remove(entity)
+  })
+  transmissionLinkEntityIds.clear()
+  viewer.scene.requestRender()
+}
+
+/**
+ * 解析传输链路节点在 Cesium 中的三维坐标。
+ * @param node 链路节点
+ * @returns 三维坐标，无法解析时返回 null
+ */
+const resolveChainNodePosition = (node: ChainNode): Cesium.Cartesian3 | null => {
+  if (node.layer === 'SAT' || node.layer === 'RELAY') {
+    const norad = Number(node.id)
+    if (!Number.isFinite(norad)) return null
+    return getSatellitePositionInCesium(norad)
+  }
+
+  if (node.layer === 'RECEIVE') {
+    const matched = infrastructureNodes.value.find(
+      (item) => item.type === 'RECEIVE' && (item.id === node.id || item.name === node.name)
+    )
+    if (matched) {
+      return Cesium.Cartesian3.fromDegrees(matched.longitude, matched.latitude, matched.altitude)
+    }
+  }
+
+  if (node.layer === 'STATION') {
+    const matched = infrastructureNodes.value.find(
+      (item) => item.type === 'STATION' && (item.id === node.id || item.name === node.name)
+    )
+    if (matched) {
+      return Cesium.Cartesian3.fromDegrees(matched.longitude, matched.latitude, matched.altitude)
+    }
+  }
+
+  return null
+}
+
+/**
+ * 在地图上绘制选中传输链路的淡黄色虚线连接。
+ * @param link 传输链路；传 null 时清除连线
+ */
+const showTransmissionLink = (link: SatelliteTransmissionLink | null) => {
+  clearTransmissionLinkOverlay()
+  if (!link || !viewer || viewer.isDestroyed()) return
+
+  const positions: Cesium.Cartesian3[] = []
+  link.nodes.forEach((node) => {
+    const pos = resolveChainNodePosition(node)
+    if (pos) positions.push(pos)
+  })
+
+  if (positions.length < 2) return
+
+  for (let i = 0; i < positions.length - 1; i++) {
+    const entityId = `transmission-link-${link.id}-${i}`
+    viewer.entities.add({
+      id: entityId,
+      polyline: {
+        positions: [positions[i], positions[i + 1]],
+        width: 3,
+        material: new Cesium.PolylineDashMaterialProperty({
+          color: TRANSMISSION_LINK_LINE_COLOR,
+          dashLength: 18,
+        }),
+        arcType: Cesium.ArcType.NONE,
+      },
+    })
+    transmissionLinkEntityIds.add(entityId)
+  }
+
+  viewer.scene.requestRender()
+}
 
 // [变量用途]
 // 保存通过 getAllWeapons 查询得到的全量我方武器数据。
@@ -714,6 +793,27 @@ const OUR_WEAPON_DEFAULT_LABEL_COLOR = Cesium.Color.fromCssColorString('#ff9e9e'
 const OUR_WEAPON_BILLBOARD_SIZE = 22
 /** 武器标签最大可见距离（米），超过后不再显示 */
 const OUR_WEAPON_LABEL_MAX_DISTANCE = 60000000
+
+const updateOurWeaponsVisibility = (visible = true) => {
+  redWeaponEntities.value.forEach((entity) => {
+    entity.show = visible
+  })
+  viewer?.scene.requestRender()
+}
+
+/**
+ * 兼容旧调用：我方武器图层始终显示，忽略关闭请求。
+ * @param visible 是否显示我方武器（仅 true 生效）
+ */
+const handleOurWeaponsToggle = (visible: boolean | string | number) => {
+  const show = Boolean(visible)
+  if (!show) return
+  store.setShowOurWeapons(true)
+  updateOurWeaponsVisibility(true)
+  if (store.selectedOurWeapon) {
+    highlightOurWeaponOnMap(store.selectedOurWeapon)
+  }
+}
 
 /**
  * 根据武器信息查找地图上对应的 Cesium 实体
@@ -843,36 +943,6 @@ watch(
 
 /**
  * [功能]
- * 根据开关状态更新我方武器实体在地图上的显隐
- *
- * @param visible 是否显示我方武器
- */
-const updateOurWeaponsVisibility = (visible: boolean) => {
-  redWeaponEntities.value.forEach((entity) => {
-    entity.show = visible
-  })
-  viewer?.scene.requestRender()
-}
-
-/**
- * [功能]
- * 地图开关切换我方武器图层显隐
- *
- * @param visible 是否显示我方武器
- */
-const handleOurWeaponsToggle = (visible: boolean | string | number) => {
-  const show = Boolean(visible)
-  store.setShowOurWeapons(show)
-  updateOurWeaponsVisibility(show)
-  if (!show) {
-    resetOurWeaponHighlight()
-  } else if (store.selectedOurWeapon) {
-    highlightOurWeaponOnMap(store.selectedOurWeapon)
-  }
-}
-
-/**
- * [功能]
  * 查询我方所有武器资源列表并将其绘制到 Cesium 地球球面上
  *
  * [数据来源]
@@ -882,7 +952,7 @@ const handleOurWeaponsToggle = (visible: boolean | string | number) => {
  * - 使用倒立三角形 Billboard 标记武器部署位置，尺寸与敌方地面站图标一致
  * - 在实体上绑定 Label 与 Ellipse（武器作用半径/防线）
  * - 标签在相机距离过远时自动隐藏
- * - 初始显隐受 store.showOurWeapons 状态控制
+ * - 我方武器图层始终显示
  */
 const loadAndRenderRedWeapons = async () => {
   if (!viewer) return
@@ -931,7 +1001,7 @@ const renderRedWeaponsOnCesium = () => {
       id: weaponId,
       name: weapon.name,
       position: new Cesium.ConstantPositionProperty(position),
-      show: store.showOurWeapons,
+      show: true,
       billboard: {
         image: getOurWeaponShapeImage(),
         color: weaponColor,
@@ -985,7 +1055,7 @@ const renderRedWeaponsOnCesium = () => {
   })
 
   redWeaponEntities.value = newEntities
-  updateOurWeaponsVisibility(store.showOurWeapons)
+  updateOurWeaponsVisibility(true)
   if (store.selectedOurWeapon) {
     highlightOurWeaponOnMap(store.selectedOurWeapon)
   }
@@ -1689,8 +1759,8 @@ const highlightSatellite = (sate: { norad_id: string }) => {
 
 watch(
   () => store.showOurWeapons,
-  (visible) => {
-    updateOurWeaponsVisibility(visible)
+  () => {
+    updateOurWeaponsVisibility(true)
   }
 )
 
@@ -1717,6 +1787,7 @@ watch(
 onMounted(async () => {
   await initViewer()
   if (viewer) {
+    store.setShowOurWeapons(true)
     void loadAndRenderRedWeapons()
   }
   startContainerSizeObserver()
@@ -1845,6 +1916,8 @@ defineExpose({
   refreshAfterActivate,
   setOurWeaponsVisible: (visible: boolean) => handleOurWeaponsToggle(visible),
   flyToOurWeapon,
+  showTransmissionLink,
+  clearTransmissionLinkOverlay,
 })
 </script>
 <style lang="scss" scoped>
@@ -1873,27 +1946,6 @@ defineExpose({
 
   .credit {
     display: none;
-  }
-
-  .map-layer-controls {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    z-index: 2000;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    border-radius: 6px;
-    background: rgba(8, 14, 26, 0.88);
-    border: 1px solid rgba(239, 107, 115, 0.35);
-    backdrop-filter: blur(6px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-
-    :deep(.el-switch__label) {
-      color: #e2e8f0;
-      font-size: 12px;
-    }
   }
 
   .render-loading {
