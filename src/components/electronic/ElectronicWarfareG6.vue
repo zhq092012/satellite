@@ -103,7 +103,7 @@
             </div>
 
             <div class="mission-timeline-wrap">
-              <BattleMissionTimeline v-if="taskTimeRange" :task-start="taskTimeRange.start"
+              <ElectronicMissionTimeline v-if="taskTimeRange" :task-start="taskTimeRange.start"
                 :task-end="taskTimeRange.end" :matrix-data="matrixData" :selected-norad="selectedNorad"
                 :selected-marker-ms="selectedTimelinePoint?.ms ?? null"
                 :selected-marker-type="selectedTimelinePoint?.type ?? null"
@@ -137,7 +137,7 @@ import { getSatelliteTypeSerials, type MatrixResult, type Weapon } from '@/api/e
 import type { FuncType } from '@/types/electronic'
 import TopoLeftPanel from '@/components/electronic/TopoLeftPanel.vue'
 import TopoRightPanel from '@/components/electronic/TopoRightPanel.vue'
-import BattleMissionTimeline from '@/components/BattleSituation/BattleMissionTimeline.vue'
+import ElectronicMissionTimeline from '@/components/electronic/ElectronicMissionTimeline.vue'
 import { type TimelineChainMarkerType, collectRelaySatelliteTransmissionLinks, collectSatelliteTransmissionLinks, collectSeriesTransmissionLinks, isRelaySatellite, listNormalSatelliteNorads, listSourceSatelliteNoradsForRelay, type ChainNode, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 
 defineOptions({

@@ -16,7 +16,30 @@ declare global {
 export { } // 确保文件被视为模块
 declare module 'cesium' {
   interface Timeline {
-    makeLabel(julianDate: Cesium.JulianDate): string
+    makeLabel(julianDate: JulianDate): string
+  }
+
+  export class EllipsoidalOccluder {
+    constructor(ellipsoid: Ellipsoid, cameraPosition?: Cartesian3)
+    readonly ellipsoid: Ellipsoid
+    cameraPosition: Cartesian3
+    isPointVisible(occludee: Cartesian3): boolean
+    isScaledSpacePointVisible(occludeeScaledSpacePosition: Cartesian3): boolean
+    isScaledSpacePointVisiblePossiblyUnderEllipsoid(
+      occludeeScaledSpacePosition: Cartesian3,
+      minimumHeight?: number
+    ): boolean
+    computeHorizonCullingPoint(
+      directionToPoint: Cartesian3,
+      positions: Cartesian3[],
+      result?: Cartesian3
+    ): Cartesian3
+    computeHorizonCullingPointPossiblyUnderEllipsoid(
+      directionToPoint: Cartesian3,
+      positions: Cartesian3[],
+      minimumHeight?: number,
+      result?: Cartesian3
+    ): Cartesian3
   }
 }
 // 获取数组对象类型工具类型

@@ -609,8 +609,8 @@ const renderElectronicInfrastructureNodes = () => {
       viewer.entities.add({
         id: entityId,
         position,
-        show: visibleOnFront as unknown as Cesium.Property,
         billboard: {
+          show: visibleOnFront as unknown as Cesium.Property,
           image: getInfraShapeImage(isReceive ? 'triangle' : 'square'),
           color: new Cesium.CallbackProperty(() => resolveColor(), false) as unknown as Cesium.Property,
           width: isReceive ? 22 : 20,
@@ -619,6 +619,7 @@ const renderElectronicInfrastructureNodes = () => {
           heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         },
         label: {
+          show: visibleOnFront as unknown as Cesium.Property,
           text: labelText,
           font: 'bold 13px sans-serif',
           fillColor: new Cesium.CallbackProperty(() => resolveColor(), false) as unknown as Cesium.Property,
@@ -655,9 +656,9 @@ const renderElectronicInfrastructureNodes = () => {
 
     viewer.entities.add({
       id: satEntityId,
-      show: satVisibleOnFront as unknown as Cesium.Property,
       position: new Cesium.CallbackProperty(resolveSatPosition, false) as unknown as Cesium.PositionProperty,
       point: {
+        show: satVisibleOnFront as unknown as Cesium.Property,
         pixelSize: isRelay ? 16 : 13,
         color: satColor,
         outlineColor: isRelay ? Cesium.Color.GOLD : Cesium.Color.WHITE,
@@ -665,6 +666,7 @@ const renderElectronicInfrastructureNodes = () => {
         disableDepthTestDistance: 0,
       },
       label: {
+        show: satVisibleOnFront as unknown as Cesium.Property,
         text: buildSatelliteLabelText(sat.norad, sat.name),
         font: 'bold 12px sans-serif',
         fillColor: satColor,
@@ -1198,7 +1200,7 @@ const syncOrbitAnimationMode = () => {
     setClockPlaying(false)
     return
   }
-  viewer.clock.clockRange = Cesium.ClockRange.LOOP
+  viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP
   setClockPlaying(true, ORBIT_PLAYBACK_MULTIPLIER)
 }
 
@@ -1252,10 +1254,11 @@ const setClockTime = (ms: number) => {
 /**
  * 控制 Cesium 时钟播放/暂停
  */
-const setClockPlaying = (playing: boolean, multiplier = 1) => {
+const setClockPlaying = (playing: boolean, multiplier?: number) => {
   if (!viewer || viewer.isDestroyed()) return
-  playbackSpeed.value = multiplier
-  viewer.clock.multiplier = multiplier
+  const mult = multiplier ?? playbackSpeed.value ?? (props.selectedNorad ? 1 : ORBIT_PLAYBACK_MULTIPLIER)
+  playbackSpeed.value = mult
+  viewer.clock.multiplier = mult
   viewer.clock.shouldAnimate = playing
   viewer.scene.requestRender()
 }
@@ -1533,7 +1536,7 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
           show: true,
         },
         label: {
-          text: buildSatelliteLabelText(noradId, satel.name_en || satel.name),
+          text: buildSatelliteLabelText(noradId, satel.name_en),
           font: 'bold 12px sans-serif',
           fillColor: Cesium.Color.CYAN,
           outlineColor: Cesium.Color.BLACK,

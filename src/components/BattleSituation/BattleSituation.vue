@@ -21,7 +21,7 @@
               :selected-norad="selectedNorad"
               @clock-tick="handleClockTick"
             />
-            <BattleMissionTimeline
+            <BattleGlobeTimeline
               v-if="taskTimeRange"
               :task-start="taskTimeRange.start"
               :task-end="taskTimeRange.end"
@@ -29,7 +29,9 @@
               :selected-norad="selectedNorad"
               :force-task-mode="!!selectedTransmissionLinkId"
               :current-time-ms="currentClockMs"
+              :is-playing="isClockPlaying"
               @time-change="handleTimelineTimeChange"
+              @toggle-play="handleTogglePlay"
             />
           </div>
         </div>
@@ -54,7 +56,7 @@ import { computed, nextTick, onActivated, onMounted, ref, watch } from 'vue'
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
-import BattleMissionTimeline from '@/components/BattleSituation/BattleMissionTimeline.vue'
+import BattleGlobeTimeline from '@/components/BattleSituation/BattleGlobeTimeline.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
 import type { SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
@@ -78,6 +80,9 @@ const selectedTransmissionLinkId = ref<string | null>(null)
 /** 地球时钟当前时刻（毫秒），用于轨道仿真时间轴游标 */
 const currentClockMs = ref<number>(0)
 
+/** 地球时钟当前播放/暂停状态 */
+const isClockPlaying = ref<boolean>(true)
+
 /** [计算属性说明] 全局共享的侦察/打击算法矩阵结果 */
 const matrixData = computed<MatrixResult | null>(() => store.matrixData)
 
@@ -91,6 +96,28 @@ const taskTimeRange = computed(() => {
 const handleTimelineTimeChange = (ms: number) => {
   cesiumViewerRef.value?.setClockTime(ms)
   currentClockMs.value = ms
+}
+
+/**
+ * 切换 Cesium 轨道仿真播放/暂停
+ */
+const handleTogglePlay = (playing?: boolean) => {
+  const nextState = typeof playing === 'boolean' ? playing : !isClockPlaying.value
+  isClockPlaying.value = nextState
+  const viewer = cesiumViewerRef.value
+  if (!viewer) return
+
+  if (nextState) {
+    const endMs = taskTimeRange.value ? new Date(taskTimeRange.value.end.replace(/-/g, '/')).getTime() : 0
+    const startMs = taskTimeRange.value ? new Date(taskTimeRange.value.start.replace(/-/g, '/')).getTime() : 0
+    if (endMs && currentClockMs.value >= endMs - 1000 && startMs) {
+      viewer.setClockTime(startMs)
+      currentClockMs.value = startMs
+    }
+    viewer.setClockPlaying(true, 120)
+  } else {
+    viewer.setClockPlaying(false)
+  }
 }
 
 /**
@@ -113,10 +140,12 @@ const syncGlobeTimeMode = () => {
     if (!cesiumViewerRef.value) return
     if (selectedNorad.value || selectedTransmissionLinkId.value) {
       cesiumViewerRef.value.pauseClockAnimation()
+      isClockPlaying.value = false
       const clockMs = cesiumViewerRef.value.getClockTimeMs?.()
       if (clockMs) currentClockMs.value = clockMs
     } else {
       cesiumViewerRef.value.startTleOrbitAnimation?.()
+      isClockPlaying.value = true
       const clockMs = cesiumViewerRef.value.getClockTimeMs?.()
       if (clockMs) currentClockMs.value = clockMs
     }
