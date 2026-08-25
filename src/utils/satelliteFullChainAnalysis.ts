@@ -104,10 +104,18 @@ const formatTimestampMs = (ts: number): string => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-const getWindowStartStr = (win: Record<string, string | undefined>): string =>
-  win.peakWindow || win.startWindow || win.beginWindow || ''
+export type WindowTimeLike = {
+  peakWindow?: string
+  startWindow?: string
+  beginWindow?: string
+  endWindow?: string
+}
 
-const getWindowEndStr = (win: Record<string, string | undefined>): string => win.endWindow || ''
+const getWindowStartStr = (win?: WindowTimeLike | Record<string, any> | null): string =>
+  win ? (win as WindowTimeLike).peakWindow || (win as WindowTimeLike).startWindow || (win as WindowTimeLike).beginWindow || '' : ''
+
+const getWindowEndStr = (win?: WindowTimeLike | Record<string, any> | null): string =>
+  (win as WindowTimeLike)?.endWindow || ''
 
 const windowsOverlapMs = (startA: string, endA: string, startB: string, endB: string): boolean => {
   const aStart = parseTimeToMs(startA)
@@ -508,7 +516,7 @@ export const collectJamStrikeEdgeIdsAtTime = (
 
   ;(postSat?.stationWindows || []).forEach((win) => {
     if (win.strikeStatus !== 1) return
-    const start = parseTimeToMs(getWindowStartStr(win as Record<string, string>))
+    const start = parseTimeToMs(getWindowStartStr(win))
     const end = parseTimeToMs(win.endWindow || '')
     if (!start || atMs < start || atMs > (end || start)) return
     const recId = win.receiveId
@@ -704,13 +712,13 @@ export const resolveStationPassChain = (
   )
   const win =
     matched.find((item) => {
-      const start = parseTimeToMs(getWindowStartStr(item as Record<string, string>))
-      const end = parseTimeToMs(getWindowEndStr(item as Record<string, string>) || '') || start
+      const start = parseTimeToMs(getWindowStartStr(item))
+      const end = parseTimeToMs(getWindowEndStr(item) || '') || start
       if (!start) return false
       return atMs >= start && atMs <= end
     }) ||
     matched.find((item) => {
-      const start = parseTimeToMs(getWindowStartStr(item as Record<string, string>))
+      const start = parseTimeToMs(getWindowStartStr(item))
       return !!start && Math.abs(start - atMs) <= 2000
     }) ||
     matched[0]
@@ -720,8 +728,8 @@ export const resolveStationPassChain = (
   const receiveId = win.receiveId || receiveKey
   const receiveName = win.receiveName || receiveId
   const finishTs =
-    parseTimeToMs(getWindowEndStr(win as Record<string, string>) || '') ||
-    parseTimeToMs(getWindowStartStr(win as Record<string, string>)) ||
+    parseTimeToMs(getWindowEndStr(win) || '') ||
+    parseTimeToMs(getWindowStartStr(win)) ||
     atMs
 
   const relationData = getRelationData(matrix, false)
@@ -737,8 +745,8 @@ export const resolveStationPassChain = (
   const relayPostSat = relayNorad
     ? matrix.satelliteMatrixList?.find((s) => s.norad === relayNorad)
     : undefined
-  const groundStart = getWindowStartStr(win as Record<string, string>)
-  const groundEnd = getWindowEndStr(win as Record<string, string>)
+  const groundStart = getWindowStartStr(win)
+  const groundEnd = getWindowEndStr(win)
   let relayWindow = (relayRel?.visibilityWindows || []).find((vis) =>
     windowsOverlapMs(vis.beginWindow, vis.endWindow, groundStart, groundEnd)
   )
