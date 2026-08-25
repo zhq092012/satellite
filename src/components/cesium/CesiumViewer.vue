@@ -116,9 +116,6 @@ const syncViewerRenderLoopWithContainer = () => {
   if (!canRender) return
     ; (viewer as any).resize?.()
   flushPendingInfrastructureRender()
-  if (!viewer.isDestroyed()) {
-    viewer.scene.requestRender()
-  }
 }
 
 /**
@@ -197,11 +194,6 @@ const initViewer = async () => {
 
       // 禁止相机跑到地面以下
       viewer.scene.globe.depthTestAgainstTerrain = false
-
-      // 只在有变化时渲染，提高切换路由/隐藏时性能
-      viewer.scene.requestRenderMode = true
-      // 设置每帧最大渲染时间，避免单帧过长导致界面卡顿（根据实际情况调整，单位：秒）
-      viewer.scene.maximumRenderTimeChange = 0.1
 
       initTaskClock()
       syncOrbitAnimationMode()
@@ -478,9 +470,6 @@ watch(
     if (newNode) {
       flyToInfrastructureNode(newNode)
     }
-    if (viewer && !viewer.isDestroyed()) {
-      viewer.scene.requestRender()
-    }
   }
 )
 
@@ -568,8 +557,9 @@ const renderElectronicInfrastructureNodes = () => {
           color: new Cesium.CallbackProperty(() => resolveColor(), false) as unknown as Cesium.Property,
           width: isReceive ? 22 : 20,
           height: isReceive ? 22 : 20,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           disableDepthTestDistance: 0,
-          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          heightReference: Cesium.HeightReference.NONE,
         },
         label: {
           text: labelText,
@@ -580,8 +570,9 @@ const renderElectronicInfrastructureNodes = () => {
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           showBackground: true,
           backgroundColor: new Cesium.Color(0, 0, 0, 0.3),
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, -28),
-          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          heightReference: Cesium.HeightReference.NONE,
         },
       })
       electronicNodeEntityIds.add(entityId)
@@ -628,7 +619,6 @@ const renderElectronicInfrastructureNodes = () => {
     electronicNodeEntityIds.add(satEntityId)
   })
 
-  viewer.scene.requestRender()
 }
 
 /**
@@ -641,7 +631,6 @@ const clearTransmissionLinkOverlay = () => {
     if (entity) viewer.entities.remove(entity)
   })
   transmissionLinkEntityIds.clear()
-  viewer.scene.requestRender()
 }
 
 /**
@@ -710,7 +699,6 @@ const showTransmissionLink = (link: SatelliteTransmissionLink | null) => {
     transmissionLinkEntityIds.add(entityId)
   }
 
-  viewer.scene.requestRender()
 }
 
 // [变量用途]
@@ -819,8 +807,6 @@ const resetOurWeaponHighlight = () => {
       entity.ellipse.outlineColor = new Cesium.ConstantProperty(cached.ellipseOutlineColor)
     }
   })
-
-  viewer.scene.requestRender()
 }
 
 /**
@@ -870,8 +856,6 @@ const highlightOurWeaponOnMap = (weapon: {
       height: 0,
     },
   })
-
-  viewer.scene.requestRender()
 }
 
 
@@ -1076,7 +1060,6 @@ const scheduleInfrastructureRender = () => {
   if (!props.matrixData) {
     pendingInfrastructureRender = false
     clearElectronicInfrastructureNodes()
-    viewer.scene.requestRender()
     return
   }
   if (!hasValidContainerSize(cesiumContainer.value || null)) {
@@ -1118,7 +1101,6 @@ const ensureClockTickListener = () => {
     if (clock.shouldAnimate) {
       emit('clock-tick', Cesium.JulianDate.toDate(clock.currentTime).getTime())
     }
-    viewer.scene.requestRender()
   })
 }
 
@@ -1170,7 +1152,6 @@ const initTaskClock = () => {
   viewer.clock.clockRange = Cesium.ClockRange.CLAMPED
   viewer.clock.multiplier = playbackSpeed.value
   viewer.clock.shouldAnimate = false
-  viewer.scene.requestRender()
 }
 
 /**
@@ -1181,7 +1162,6 @@ const setClockTime = (ms: number) => {
   const date = new Date(ms)
   if (Number.isNaN(date.getTime())) return
   viewer.clock.currentTime = Cesium.JulianDate.fromDate(date)
-  viewer.scene.requestRender()
 }
 
 /**
@@ -1193,7 +1173,7 @@ const setClockPlaying = (playing: boolean, multiplier?: number) => {
   playbackSpeed.value = mult
   viewer.clock.multiplier = mult
   viewer.clock.shouldAnimate = playing
-  viewer.scene.requestRender()
+ 
 }
 
 watch(
@@ -1493,8 +1473,6 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
       satelliteEntities.set(noradId, entity)
     }
 
-    // 在 requestRenderMode 下需要显式请求渲染
-    currentViewer.scene.requestRender()
   }
 }
 
@@ -1629,8 +1607,6 @@ const highlightSatellite = (sate: { norad_id: string }) => {
   viewer.flyTo(entity, {
     duration: 1.5,
   })
-
-  viewer.scene.requestRender()
 }
 
 

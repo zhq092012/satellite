@@ -64,7 +64,7 @@ interface State {
 }
 
 /** 综合打击方案可选用途类型（与 StrikePlanGenerator 选项一致） */
-export const ZHCH_USAGE_TYPE_OPTIONS = ['打击军用', '打击民用', '打击军用民用'] as const
+export const ZHCH_USAGE_TYPE_OPTIONS = ['军用', '民用', '军用民用'] as const
 
 /** 同一 scope 的矩阵拉取 in-flight 去重，避免多组件并发请求互相覆盖 */
 let matrixScopeInflight: Promise<MatrixResult | null> | null = null
@@ -106,7 +106,7 @@ export const useLayoutStore = defineStore('layout-store', {
       zhchPlanMap: {},
       zhchPlanTaskId: null,
       zhchPlanLoading: false,
-      selectedZhchUsageTypes: ['打击军用'],
+      selectedZhchUsageTypes: ['军用'],
       showOurWeapons: true,
       selectedOurWeapon: null,
     }

@@ -166,7 +166,7 @@ interface UsageTypeOption {
 
 /** 可选用途类型：全部打击军用 / 全部打击民用 / 打击军用民用 */
 const usageTypeOptions: UsageTypeOption[] = ZHCH_USAGE_TYPE_OPTIONS.map((value) => ({
-  label: value,
+  label:'打击'+ value,
   value,
 }))
 
