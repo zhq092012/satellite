@@ -392,7 +392,11 @@ const getOurWeaponShapeImage = (): string => {
   infraShapeImageCache.set(cacheKey, dataUrl)
   return dataUrl
 }
-
+/**
+ * 判断地面基础设施节点是否被选中
+ * @param node 地面基础设施节点
+ * @returns boolean
+ */
 const isInfrastructureSelected = (node: InfrastructureLocation): boolean => {
   const selected = store.selectedInfrastructureNode
   return !!selected && selected.id === node.id && selected.type === node.type
@@ -511,27 +515,7 @@ const clearElectronicInfrastructureNodes = () => {
   resetHighlightSatellites()
 }
 
-/**
- * [功能]
- * 判断空间点是否位于当前相机可见的地球正面（背面被地球本体遮挡则不可见）
- *
- * [处理规则]
- * - Billboard/Label 即使开启深度测试，仍可能画在地球 overlay 通道上，必须再用椭球遮挡器裁掉背面
- */
-let earthOccluder: Cesium.EllipsoidalOccluder | null = null
 
-const isOnVisibleEarthHemisphere = (position: Cesium.Cartesian3) => {
-  if (!viewer || viewer.isDestroyed()) return false
-  if (!earthOccluder) {
-    earthOccluder = new Cesium.EllipsoidalOccluder(Cesium.Ellipsoid.WGS84, viewer.camera.positionWC)
-  } else {
-    earthOccluder.cameraPosition = viewer.camera.positionWC
-  }
-  return earthOccluder.isPointVisible(position)
-}
-
-const createEarthFrontShowProperty = (position: Cesium.Cartesian3) =>
-  new Cesium.CallbackProperty(() => isOnVisibleEarthHemisphere(position), false)
 
 /**
  * [功能]
@@ -549,19 +533,7 @@ const buildSatelliteLabelText = (noradId: number, fallbackName?: string) => {
   return `[敌方${isRelay ? '数据中继卫星' : '过境卫星'}]\n${name}`
 }
 
-/**
- * [功能]
- * 当矩阵卫星节点已存在时，隐藏同 NORAD 的 TLE 轨道实体标签，避免重叠空框
- *
- * @param noradId 卫星 NORAD 编号
- */
-const hideDuplicateSatelliteLabel = (noradId: number) => {
-  if (!viewer || viewer.isDestroyed()) return
-  const duplicate = viewer.entities.getById(`satellite-${noradId}`)
-  if (duplicate?.label) {
-    duplicate.label.show = new Cesium.ConstantProperty(false)
-  }
-}
+
 
 /**
  * [功能]
@@ -587,30 +559,11 @@ const renderElectronicInfrastructureNodes = () => {
       const labelText = `[敌方${isReceive ? '地面接收站' : '数据中心'}]\n${node.name}`
       const resolveColor = () => (isInfrastructureSelected(node) ? highlightColor : baseColor)
 
-      const visibleOnFront = createEarthFrontShowProperty(position)
-
-      viewer.entities.add({
-        id: `${entityId}-ring`,
-        position,
-        ellipse: {
-          show: visibleOnFront as unknown as Cesium.Property,
-          semiMinorAxis: isReceive ? 80000 : 120000,
-          semiMajorAxis: isReceive ? 80000 : 120000,
-          material: new Cesium.ColorMaterialProperty(
-            new Cesium.CallbackProperty(() => resolveColor().withAlpha(0.28), false)
-          ),
-          outline: true,
-          outlineColor: new Cesium.CallbackProperty(() => resolveColor(), false) as unknown as Cesium.Property,
-          height: 0,
-        },
-      })
-      electronicNodeEntityIds.add(`${entityId}-ring`)
 
       viewer.entities.add({
         id: entityId,
         position,
         billboard: {
-          show: visibleOnFront as unknown as Cesium.Property,
           image: getInfraShapeImage(isReceive ? 'triangle' : 'square'),
           color: new Cesium.CallbackProperty(() => resolveColor(), false) as unknown as Cesium.Property,
           width: isReceive ? 22 : 20,
@@ -619,7 +572,6 @@ const renderElectronicInfrastructureNodes = () => {
           heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         },
         label: {
-          show: visibleOnFront as unknown as Cesium.Property,
           text: labelText,
           font: 'bold 13px sans-serif',
           fillColor: new Cesium.CallbackProperty(() => resolveColor(), false) as unknown as Cesium.Property,
@@ -649,16 +601,12 @@ const renderElectronicInfrastructureNodes = () => {
     const satColor = isRelay ? Cesium.Color.PURPLE : Cesium.Color.CYAN
 
     const resolveSatPosition = () => getSatellitePositionInCesium(sat.norad) || initialPos
-    const satVisibleOnFront = new Cesium.CallbackProperty(() => {
-      const pos = resolveSatPosition()
-      return pos ? isOnVisibleEarthHemisphere(pos) : false
-    }, false)
+   
 
     viewer.entities.add({
       id: satEntityId,
       position: new Cesium.CallbackProperty(resolveSatPosition, false) as unknown as Cesium.PositionProperty,
       point: {
-        show: satVisibleOnFront as unknown as Cesium.Property,
         pixelSize: isRelay ? 16 : 13,
         color: satColor,
         outlineColor: isRelay ? Cesium.Color.GOLD : Cesium.Color.WHITE,
@@ -666,7 +614,6 @@ const renderElectronicInfrastructureNodes = () => {
         disableDepthTestDistance: 0,
       },
       label: {
-        show: satVisibleOnFront as unknown as Cesium.Property,
         text: buildSatelliteLabelText(sat.norad, sat.name),
         font: 'bold 12px sans-serif',
         fillColor: satColor,
@@ -679,7 +626,6 @@ const renderElectronicInfrastructureNodes = () => {
       },
     })
     electronicNodeEntityIds.add(satEntityId)
-    hideDuplicateSatelliteLabel(sat.norad)
   })
 
   viewer.scene.requestRender()
@@ -928,20 +874,7 @@ const highlightOurWeaponOnMap = (weapon: {
   viewer.scene.requestRender()
 }
 
-watch(
-  () => store.selectedOurWeapon,
-  (weapon) => {
-    if (weapon) {
-      flyToOurWeapon(weapon)
-      highlightOurWeaponOnMap(weapon)
-    } else {
-      resetOurWeaponHighlight()
-    }
-    if (viewer && !viewer.isDestroyed()) {
-      viewer.scene.requestRender()
-    }
-  }
-)
+
 
 /**
  * [功能]
@@ -1526,14 +1459,14 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
           new Cesium.TimeInterval({ start: currentViewer.clock.startTime, stop: currentViewer.clock.stopTime }),
         ]),
         position: positionProperty,
-        show: true,
+     
         point: {
           pixelSize: 8,
           color: Cesium.Color.BLUE,
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: 2,
           heightReference: Cesium.HeightReference.NONE,
-          show: true,
+     
         },
         label: {
           text: buildSatelliteLabelText(noradId, satel.name_en),
@@ -1545,7 +1478,6 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
           pixelOffset: new Cesium.Cartesian2(0, -28),
           showBackground: true,
           backgroundColor: new Cesium.Color(0, 0, 0, 0.45),
-          show: !viewer.entities.getById(`sat-node-${noradId}`),
         },
         path: {
           show: false,
@@ -1656,54 +1588,10 @@ const highlightSatellite = (sate: { norad_id: string }) => {
   const norad = Number(sate.norad_id)
   if (!Number.isFinite(norad)) return
 
-  // 1. 确保该卫星在 viewer.entities 中有对应的 3D Entity 节点
+  // 1. 查找对应的 3D Entity 节点，若不存在则直接返回
   const entityId = `sat-node-${norad}`
-  let entity = viewer.entities.getById(entityId) || viewer.entities.getById(`satellite-${sate.norad_id}`)
-  const satPos = getSatellitePositionInCesium(norad)
-
-  if (!entity && satPos) {
-    const matrixSats = props.matrixData?.initMatrixList || []
-    const satInfo = matrixSats.find((s) => s.norad === norad)
-    const isRelay = norad === 22314 || (satInfo?.satType || '').includes('中继')
-    const posProp = satellitePositionPropertyCache.get(norad) || (satInfo ? ensureOrbitData(norad, satInfo) : undefined)
-
-    entity = viewer.entities.add({
-      id: entityId,
-      position: (posProp ||
-        new Cesium.CallbackProperty(
-          () => getSatellitePositionInCesium(norad) || satPos,
-          false
-        )) as unknown as Cesium.PositionProperty,
-      point: {
-        pixelSize: 18,
-        color: Cesium.Color.GOLD,
-        outlineColor: Cesium.Color.YELLOW,
-        outlineWidth: 4,
-      },
-      label: {
-        text: buildSatelliteLabelText(norad, satInfo?.name),
-        font: 'bold 13px sans-serif',
-        fillColor: Cesium.Color.CYAN,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        showBackground: true,
-        backgroundColor: new Cesium.Color(0, 0, 0, 0.75),
-        pixelOffset: new Cesium.Cartesian2(0, -30),
-      },
-      path: {
-        show: new Cesium.CallbackProperty(() => true, false),
-        leadTime: 90 * 60,
-        trailTime: 0,
-        width: 4,
-        material: new Cesium.PolylineGlowMaterialProperty({
-          glowPower: 0.2,
-          color: Cesium.Color.YELLOW,
-        }),
-      },
-    })
-    electronicNodeEntityIds.add(entityId)
-  }
+  const entity = viewer.entities.getById(entityId) || viewer.entities.getById(`satellite-${sate.norad_id}`)
+  if (!entity) return
 
   // 避免重叠标签产生双重颜色重影：若 sat-node-${norad} 与 satellite-${norad} 同时存在，隐藏备用实体的标签
   const satNodeEnt = viewer.entities.getById(`sat-node-${norad}`)
@@ -1714,58 +1602,38 @@ const highlightSatellite = (sate: { norad_id: string }) => {
     }
   }
 
-  // 2. Entity 模式节点高亮与自带 path 加粗
-  if (entity) {
-    viewer.selectedEntity = entity
-    if (entity.point) {
-      entity.point.outlineColor = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
-      entity.point.outlineWidth = new Cesium.ConstantProperty(4)
-      entity.point.pixelSize = new Cesium.ConstantProperty(18)
-      entity.point.color = new Cesium.ConstantProperty(Cesium.Color.GOLD)
-    }
-    if (entity.label) {
-      entity.label.show = new Cesium.ConstantProperty(true)
-      entity.label.fillColor = new Cesium.ConstantProperty(Cesium.Color.CYAN)
-    }
+  // 2. Entity 模式节点高亮
+  viewer.selectedEntity = entity
+  if (entity.point) {
+    entity.point.outlineColor = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
+    entity.point.outlineWidth = new Cesium.ConstantProperty(4)
+    entity.point.pixelSize = new Cesium.ConstantProperty(18)
+    entity.point.color = new Cesium.ConstantProperty(Cesium.Color.GOLD)
+  }
 
-    // 针对 48643 等矩阵卫星，确保解析轨道采样数据并生成 3D 发光轨迹线
-    const satInfo = (props.matrixData?.initMatrixList || []).find((s) => s.norad === norad)
-    if (satInfo) {
-      const posProp = ensureOrbitData(norad, satInfo)
-      if (posProp) {
-        entity.position = posProp
-      }
-    }
 
-    if (entity.path) {
-      entity.path.show = new CallbackProperty(() => false, false)
+  // 针对矩阵卫星，确保解析轨道采样数据
+  const satInfo = (props.matrixData?.initMatrixList || []).find((s) => s.norad === norad)
+  if (satInfo) {
+    const posProp = ensureOrbitData(norad, satInfo)
+    if (posProp) {
+      entity.position = posProp
     }
+  }
+
+  if (entity.path) {
+    entity.path.show = new CallbackProperty(() => false, false)
   }
 
   // 3. 相机视角平滑飞赴定位至目标卫星
-  const cameraOffset = new Cesium.HeadingPitchRange(Cesium.Math.toRadians(0), Cesium.Math.toRadians(-45), 2500000)
-  if (entity) {
-    viewer.flyTo(entity, {
-      duration: 1.5,
-      offset: cameraOffset,
-    })
-  } else if (satPos) {
-    const boundingSphere = new Cesium.BoundingSphere(satPos, 0)
-    viewer.camera.flyToBoundingSphere(boundingSphere, {
-      duration: 1.5,
-      offset: cameraOffset,
-    })
-  }
+  viewer.flyTo(entity, {
+    duration: 1.5,
+  })
 
   viewer.scene.requestRender()
 }
 
-watch(
-  () => store.showOurWeapons,
-  () => {
-    updateOurWeaponsVisibility(true)
-  }
-)
+
 
 // 监听 selectedNorad 属性，联动更新时钟模式（相机飞赴由父组件在时间轴同步后触发）
 watch(
@@ -1837,7 +1705,7 @@ onBeforeUnmount(() => {
 
   satelliteRenderToken += 1
   satelliteRenderBusy.value = false
-  earthOccluder = null
+
   clearElectronicInfrastructureNodes()
   satelliteEntities.clear()
   satelliteOrbitData.clear()
