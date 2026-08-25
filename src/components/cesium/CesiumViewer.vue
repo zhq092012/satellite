@@ -308,6 +308,8 @@ let currentRenderTaskId: number | null = null
 const electronicNodeEntityIds = new Set<string>()
 /** 态势分析选中的传输链路边实体 ID 集合 */
 const transmissionLinkEntityIds = new Set<string>()
+/** 当前选中的传输链路包含的节点匹配 Key（用于高亮该链路上的天基/地面实体） */
+const selectedTransmissionLinkNodeKeys = ref<Set<string>>(new Set())
 /** 传输链路高亮线颜色：淡黄色虚线 */
 const TRANSMISSION_LINK_LINE_COLOR = Cesium.Color.fromCssColorString('#F5E6A3').withAlpha(0.92)
 
@@ -546,7 +548,17 @@ const renderElectronicInfrastructureNodes = () => {
       const baseColor = isReceive ? Cesium.Color.CYAN : Cesium.Color.DODGERBLUE
       const highlightColor = Cesium.Color.YELLOW
       const labelText = `[敌方${isReceive ? '地面接收站' : '数据中心'}]\n${node.name}`
-      const resolveColor = () => (isInfrastructureSelected(node) ? highlightColor : baseColor)
+      const isNodeHighlighted = () => {
+        if (isInfrastructureSelected(node)) return true
+        const keys = selectedTransmissionLinkNodeKeys.value
+        return (
+          keys.has(`${node.type}-${node.id}`) ||
+          keys.has(`${node.type}-${node.name}`) ||
+          keys.has(String(node.id)) ||
+          keys.has(node.name)
+        )
+      }
+      const resolveColor = () => (isNodeHighlighted() ? highlightColor : baseColor)
 
 
       viewer.entities.add({
@@ -592,22 +604,36 @@ const renderElectronicInfrastructureNodes = () => {
     const satColor = isRelay ? Cesium.Color.PURPLE : Cesium.Color.CYAN
 
     const resolveSatPosition = () => getSatellitePositionInCesium(sat.norad) || initialPos
-   
+    const isSatHighlighted = () => {
+      const keys = selectedTransmissionLinkNodeKeys.value
+      return (
+        keys.has(`SAT-${sat.norad}`) ||
+        keys.has(`RELAY-${sat.norad}`) ||
+        keys.has(String(sat.norad)) ||
+        keys.has(sat.name)
+      )
+    }
+    const resolveSatPointColor = () => (isSatHighlighted() ? Cesium.Color.GOLD : satColor)
+    const resolveSatOutlineColor = () =>
+      isSatHighlighted() ? Cesium.Color.YELLOW : isRelay ? Cesium.Color.GOLD : Cesium.Color.WHITE
+    const resolveSatOutlineWidth = () => (isSatHighlighted() ? 4 : 2.5)
+    const resolveSatPixelSize = () => (isSatHighlighted() ? 18 : isRelay ? 16 : 13)
+    const resolveSatLabelColor = () => (isSatHighlighted() ? Cesium.Color.YELLOW : satColor)
 
     viewer.entities.add({
       id: satEntityId,
       position: new Cesium.CallbackProperty(resolveSatPosition, false) as unknown as Cesium.PositionProperty,
       point: {
-        pixelSize: isRelay ? 16 : 13,
-        color: satColor,
-        outlineColor: isRelay ? Cesium.Color.GOLD : Cesium.Color.WHITE,
-        outlineWidth: 2.5,
+        pixelSize: new Cesium.CallbackProperty(resolveSatPixelSize, false) as unknown as Cesium.Property,
+        color: new Cesium.CallbackProperty(resolveSatPointColor, false) as unknown as Cesium.Property,
+        outlineColor: new Cesium.CallbackProperty(resolveSatOutlineColor, false) as unknown as Cesium.Property,
+        outlineWidth: new Cesium.CallbackProperty(resolveSatOutlineWidth, false) as unknown as Cesium.Property,
         disableDepthTestDistance: 0,
       },
       label: {
         text: buildSatelliteLabelText(sat.norad, sat.name),
         font: 'bold 12px sans-serif',
-        fillColor: satColor,
+        fillColor: new Cesium.CallbackProperty(resolveSatLabelColor, false) as unknown as Cesium.Property,
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
@@ -622,9 +648,10 @@ const renderElectronicInfrastructureNodes = () => {
 }
 
 /**
- * 清除态势分析选中的传输链路连线。
+ * 清除态势分析选中的传输链路连线及节点高亮。
  */
 const clearTransmissionLinkOverlay = () => {
+  selectedTransmissionLinkNodeKeys.value.clear()
   if (!viewer || viewer.isDestroyed()) return
   transmissionLinkEntityIds.forEach((entityId) => {
     const entity = viewer.entities.getById(entityId)
@@ -667,13 +694,33 @@ const resolveChainNodePosition = (node: ChainNode): Cesium.Cartesian3 | null => 
 }
 
 /**
- * 在地图上绘制选中传输链路的淡黄色虚线连接。
- * @param link 传输链路；传 null 时清除连线
+ * 在地图上绘制选中传输链路的淡黄色虚线连接并高亮其沿途实体。
+ * @param link 传输链路；传 null 时清除连线与高亮
  */
 const showTransmissionLink = (link: SatelliteTransmissionLink | null) => {
   clearTransmissionLinkOverlay()
   if (!link || !viewer || viewer.isDestroyed()) return
 
+  // 1. 记录链路节点标识，触发 CallbackProperty 高亮相应实体
+  const nextKeys = new Set<string>()
+  link.nodes.forEach((node) => {
+    nextKeys.add(`${node.layer}-${node.id}`)
+    nextKeys.add(`${node.layer}-${node.name}`)
+    nextKeys.add(String(node.id))
+    nextKeys.add(node.name)
+    if (node.layer === 'RECEIVE' || node.layer === 'STATION') {
+      const matched = infrastructureNodes.value.find(
+        (item) => item.type === node.layer && (item.id === node.id || item.name === node.name)
+      )
+      if (matched) {
+        nextKeys.add(`${matched.type}-${matched.id}`)
+        nextKeys.add(`${matched.type}-${matched.name}`)
+      }
+    }
+  })
+  selectedTransmissionLinkNodeKeys.value = nextKeys
+
+  // 2. 在地图上绘制虚线连接
   const positions: Cesium.Cartesian3[] = []
   link.nodes.forEach((node) => {
     const pos = resolveChainNodePosition(node)
