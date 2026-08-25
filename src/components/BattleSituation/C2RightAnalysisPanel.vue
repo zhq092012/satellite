@@ -22,28 +22,64 @@
         </div>
 
         <div class="stats-strip">
-          <div class="stats-strip-item stats-strip-item--sat">
-            <strong class="stats-strip-value">{{ overviewStats.satelliteCount }}</strong>
-            <span class="stats-strip-label">卫星</span>
-            <span class="stats-strip-unit">颗</span>
+          <div
+            class="stats-strip-item stats-strip-item--sat"
+            role="button"
+            tabindex="0"
+            title="点击跳转到卫星管理"
+            @click="goToSatellites"
+            @keydown.enter.prevent="goToSatellites"
+          >
+            <strong class="stats-strip-label">卫星</strong>
+            <div class="stats-strip-bottom">
+              <span class="stats-strip-value">{{ overviewStats.satelliteCount }}</span>
+              <span class="stats-strip-unit">颗</span>
+            </div>
           </div>
           <div class="stats-strip-divider"></div>
-          <div class="stats-strip-item stats-strip-item--receive">
-            <strong class="stats-strip-value">{{ overviewStats.receiveCount }}</strong>
-            <span class="stats-strip-label">地面站</span>
-            <span class="stats-strip-unit">个</span>
+          <div
+            class="stats-strip-item stats-strip-item--receive"
+            role="button"
+            tabindex="0"
+            title="点击跳转到基站管理"
+            @click="goToBaseStations"
+            @keydown.enter.prevent="goToBaseStations"
+          >
+            <strong class="stats-strip-label">地面站</strong>
+            <div class="stats-strip-bottom">
+              <span class="stats-strip-value">{{ overviewStats.receiveCount }}</span>
+              <span class="stats-strip-unit">个</span>
+            </div>
           </div>
           <div class="stats-strip-divider"></div>
-          <div class="stats-strip-item stats-strip-item--station">
-            <strong class="stats-strip-value">{{ overviewStats.stationCount }}</strong>
-            <span class="stats-strip-label">数据中心</span>
-            <span class="stats-strip-unit">个</span>
+          <div
+            class="stats-strip-item stats-strip-item--station"
+            role="button"
+            tabindex="0"
+            title="点击跳转到基站管理"
+            @click="goToBaseStations"
+            @keydown.enter.prevent="goToBaseStations"
+          >
+            <strong class="stats-strip-label">数据中心</strong>
+            <div class="stats-strip-bottom">
+              <span class="stats-strip-value">{{ overviewStats.stationCount }}</span>
+              <span class="stats-strip-unit">个</span>
+            </div>
           </div>
           <div class="stats-strip-divider"></div>
-          <div class="stats-strip-item stats-strip-item--weapon">
-            <strong class="stats-strip-value">{{ ourWeaponCount }}</strong>
-            <span class="stats-strip-label">我方武器</span>
-            <span class="stats-strip-unit">件</span>
+          <div
+            class="stats-strip-item stats-strip-item--weapon"
+            role="button"
+            tabindex="0"
+            title="点击跳转到武器管理"
+            @click="goToWeapons"
+            @keydown.enter.prevent="goToWeapons"
+          >
+            <strong class="stats-strip-label">我方武器</strong>
+            <div class="stats-strip-bottom">
+              <span class="stats-strip-value">{{ ourWeaponCount }}</span>
+              <span class="stats-strip-unit">件</span>
+            </div>
           </div>
         </div>
 
@@ -111,6 +147,7 @@
  * 上方展示卫星/地面站/数据中心/我方武器统计，下方列出全部可能传输链路。
  */
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { type MatrixResult } from '@/api/electronic'
 import { getAllWeapons } from '@/api/dashboard'
 import { useLayoutStore } from '@/store/modules/layout'
@@ -122,7 +159,23 @@ import {
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
 
+const router = useRouter()
 const store = useLayoutStore()
+
+/**
+ * 快捷跳转页面
+ */
+const goToSatellites = () => {
+  router.push('/system/satellites')
+}
+
+const goToBaseStations = () => {
+  router.push('/system/basestations')
+}
+
+const goToWeapons = () => {
+  router.push('/system/weapons')
+}
 
 const props = defineProps<{
   /** 算法矩阵数据 */
@@ -329,19 +382,53 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
-  padding: 4px 2px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
 
-  .stats-strip-value {
-    font-size: 22px;
-    line-height: 1;
-    color: #f8fafc;
+  &:hover {
+    background: rgba(0, 225, 255, 0.08);
+    box-shadow: 0 0 10px rgba(0, 225, 255, 0.15);
+    transform: translateY(-1px);
+
+    .stats-strip-label {
+      color: #ffffff;
+    }
+  }
+
+  &:active {
+    transform: translateY(0);
+    background: rgba(0, 225, 255, 0.15);
+  }
+
+  &:focus-visible {
+    outline: 1px solid rgba(0, 225, 255, 0.6);
+    background: rgba(0, 225, 255, 0.08);
   }
 
   .stats-strip-label {
-    font-size: 11px;
-    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 700;
+    color: #cbd5e1;
+    letter-spacing: 0.5px;
+    transition: color 0.2s ease;
+  }
+
+  .stats-strip-bottom {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+  }
+
+  .stats-strip-value {
+    font-size: 20px;
+    line-height: 1;
+    color: #f8fafc;
+    font-weight: 700;
   }
 
   .stats-strip-unit {

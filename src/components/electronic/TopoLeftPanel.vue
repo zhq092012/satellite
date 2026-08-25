@@ -15,9 +15,8 @@
     </div>
 
     <template v-else-if="linkItems.length">
-      <div class="sat-hint">
-        <span>🛰️ {{ contextTitle }}</span>
-        <span class="norad-tag">{{ contextSubLabel }}</span>
+      <div v-if="selectedNorad" class="sat-hint">
+        <span class="norad-tag">NORAD {{ selectedNorad }}</span>
       </div>
 
       <el-scrollbar class="link-scroll">
@@ -72,8 +71,6 @@ import type { MatrixResult } from '@/api/electronic'
 import {
   collectSatelliteTransmissionLinks,
   collectSeriesTransmissionLinks,
-  getSatelliteDisplayInfo,
-  listNormalSatelliteNorads,
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
 
@@ -117,28 +114,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select-link', linkId: string | null): void
 }>()
-
-/** 当前卫星显示名称 */
-const satelliteName = computed(() => {
-  if (!props.selectedNorad) return '未选择'
-  return getSatelliteDisplayInfo(props.matrixData, props.selectedNorad)?.name || `Sat-${props.selectedNorad}`
-})
-
-/** 系列内普通卫星数量 */
-const seriesSatelliteCount = computed(() => {
-  if (!props.matrixData) return 0
-  return listNormalSatelliteNorads(props.matrixData).length
-})
-
-/** 链路清单上下文标题（单星 / 全系列） */
-const contextTitle = computed(() =>
-  props.selectedNorad ? satelliteName.value : '系列全部卫星'
-)
-
-/** 链路清单上下文副标题 */
-const contextSubLabel = computed(() =>
-  props.selectedNorad ? `NORAD ${props.selectedNorad}` : `共 ${seriesSatelliteCount.value} 颗`
-)
 
 /**
  * 将链路节点层级映射为样式类名
@@ -243,7 +218,6 @@ watch(
   }
 
   .count-tag {
-    margin-left: auto;
     font-size: 11px;
     padding: 1px 8px;
     border-radius: 10px;
