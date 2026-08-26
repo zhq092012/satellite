@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
 import * as Cesium from 'cesium'
-import { getReconnaissanceAttackMatrix, getSatelliteThreatInfoByType, getSatelliteTypeSerials, type MatrixResult, type ZhchPlanResp } from '@/api/electronic'
+import {
+  getReconnaissanceAttackMatrix,
+  getSatelliteThreatInfoByType,
+  getSatelliteTypeSerials,
+  type MatrixResult,
+  type ZhchPlanResp,
+} from '@/api/electronic'
 import { mergeMatrixResults } from '@/utils/satelliteFullChainAnalysis'
 import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
@@ -113,7 +119,15 @@ export const useLayoutStore = defineStore('layout-store', {
   },
   getters: {
     // 从 battle.area 中解析 lonlats 并计算战场区域边界包围盒
-    battleAreaBounds(state): { min_lat: number; max_lat: number; min_lng: number; max_lng: number; lonlats: { lon: number; lat: number }[] } | null {
+    battleAreaBounds(
+      state
+    ): {
+      min_lat: number
+      max_lat: number
+      min_lng: number
+      max_lng: number
+      lonlats: { lon: number; lat: number }[]
+    } | null {
       if (!state.battle?.area) return null
       try {
         let areaData = typeof state.battle.area === 'string' ? JSON.parse(state.battle.area) : state.battle.area
@@ -384,10 +398,7 @@ export const useLayoutStore = defineStore('layout-store', {
       matrixScopeInflight = (async () => {
         try {
           if (this.selectedSatSeries) {
-            return await this.fetchReconnaissanceAttackMatrix(
-              { taskId, series: this.selectedSatSeries },
-              true
-            )
+            return await this.fetchReconnaissanceAttackMatrix({ taskId, series: this.selectedSatSeries }, true)
           }
 
           const { token, scopeKey, queryKey: activeQueryKey, taskId: activeTaskId } = this.beginMatrixFetch()
@@ -407,20 +418,21 @@ export const useLayoutStore = defineStore('layout-store', {
               return this.matrixData
             }
 
-            const matrixList: MatrixResult[] = []
-            for (const series of allSeries) {
-              if (!this.isMatrixFetchCurrent(token)) {
-                return this.matrixData
-              }
-              try {
-                const res = await getReconnaissanceAttackMatrix({ taskId, series })
-                if (res?.code === 200 && res.data) {
-                  matrixList.push(res.data)
+            const matrixResults = await Promise.all(
+              allSeries.map(async (series) => {
+                try {
+                  const res = await getReconnaissanceAttackMatrix({ taskId, series })
+                  return res?.code === 200 && res.data ? res.data : null
+                } catch (err) {
+                  console.error(`获取系列 ${series} 矩阵失败:`, err)
+                  return null
                 }
-              } catch (err) {
-                console.error(`获取系列 ${series} 矩阵失败:`, err)
-              }
+              })
+            )
+            if (!this.isMatrixFetchCurrent(token)) {
+              return this.matrixData
             }
+            const matrixList = matrixResults.filter((matrix): matrix is MatrixResult => matrix !== null)
 
             const merged = mergeMatrixResults(matrixList)
             return this.applyMatrixResult(token, scopeKey, activeTaskId, activeQueryKey, merged)
@@ -545,9 +557,7 @@ export const useLayoutStore = defineStore('layout-store', {
       if (!targetTypes.length) return false
 
       this.sanitizeZhchUsageTypes()
-      const validTypes = targetTypes.filter((t) =>
-        (ZHCH_USAGE_TYPE_OPTIONS as readonly string[]).includes(t)
-      )
+      const validTypes = targetTypes.filter((t) => (ZHCH_USAGE_TYPE_OPTIONS as readonly string[]).includes(t))
       if (!validTypes.length) return false
 
       if (this.zhchPlanTaskId !== taskId) {
@@ -585,6 +595,14 @@ export const useLayoutStore = defineStore('layout-store', {
   },
   persist: {
     storage: localStorage,
-    pick: ['activedTask', 'battle', 'showBattleList', 'allSatelliteOfTask', 'satelliteTotal', 'selectedSatType', 'selectedSatSeries'],
+    pick: [
+      'activedTask',
+      'battle',
+      'showBattleList',
+      'allSatelliteOfTask',
+      'satelliteTotal',
+      'selectedSatType',
+      'selectedSatSeries',
+    ],
   },
 })
