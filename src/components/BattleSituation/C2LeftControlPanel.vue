@@ -21,11 +21,7 @@
       </div>
 
       <!-- 卫星系列列表 (排成一列 list，全部类型或指定类型下均可展示) -->
-      <div
-        v-if="seriesOptions.length > 0"
-        class="series-list-box"
-        :class="{ 'is-loading': seriesPanelLoading }"
-      >
+      <div v-if="seriesOptions.length > 0" class="series-list-box" :class="{ 'is-loading': seriesPanelLoading }">
         <div v-if="seriesPanelLoading" class="series-loading-mask">
           <span class="series-loading-spinner" aria-hidden="true" />
           <span class="series-loading-text">正在加载系列数据...</span>
@@ -37,22 +33,14 @@
           </span>
         </div>
         <div class="series-list">
-          <div
-            class="series-item"
-            :class="{ active: !selectedSeries, disabled: seriesPanelLoading }"
-            @click="selectSeries('')"
-          >
+          <div class="series-item" :class="{ active: !selectedSeries, disabled: seriesPanelLoading }"
+            @click="selectSeries('')">
             <span class="series-icon">🌐</span>
             <span class="series-name">全部系列</span>
             <span class="series-status">{{ !selectedSeries ? '✓ 已筛选' : '点击筛选' }}</span>
           </div>
-          <div
-            v-for="series in seriesOptions"
-            :key="series"
-            class="series-item"
-            :class="{ active: selectedSeries === series, disabled: seriesPanelLoading }"
-            @click="selectSeries(series)"
-          >
+          <div v-for="series in seriesOptions" :key="series" class="series-item"
+            :class="{ active: selectedSeries === series, disabled: seriesPanelLoading }" @click="selectSeries(series)">
             <span class="series-icon">🏷️</span>
             <span class="series-name">{{ series }}</span>
             <span class="series-status">{{ selectedSeries === series ? '✓ 已筛选' : '点击筛选' }}</span>
@@ -71,12 +59,8 @@
           <span v-if="selectedSatelliteName" class="current-sat" :title="selectedSatelliteName">
             当前选择：{{ selectedSatelliteName }}
           </span>
-          <button
-            v-if="selectedNorad != null"
-            type="button"
-            class="clear-sat-btn"
-            @click.stop="emit('select-satellite', null)"
-          >
+          <button v-if="selectedNorad != null" type="button" class="clear-sat-btn"
+            @click.stop="emit('select-satellite', null)">
             清空所选
           </button>
         </div>
@@ -111,8 +95,7 @@
               链路时长 {{ sat.timeEffect ? formatDuration(sat.timeEffect.duration) : '--' }}
             </span>
           </div>
-          <div class="card-station">接收站 {{ sat.timeEffect?.receiveName || '--' }}</div>
-          <div class="card-time-row">
+          <div class="card-time-row" v-if="sortMode === 'transTime'">
             <span>开始 {{ sat.timeEffect ? formatTransTime(sat.timeEffect.beginTime) : '--' }}</span>
             <span>结束 {{ sat.timeEffect ? formatTransTime(sat.timeEffect.endTime) : '--' }}</span>
           </div>
@@ -224,10 +207,9 @@
  * - 触发视角切换与控制事件
  */
 import { ref, computed, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 import {
   getSatelliteTypeSerials,
-  getSatelliteThreatInfo,
   type MatrixResult,
   type SatelliteMatrix,
   type InitMatrix,
@@ -254,6 +236,8 @@ const emit = defineEmits<{
 
 /** 布局 Store，用于读取当前任务及持久化卫星筛选状态。 */
 const store = useLayoutStore()
+/** 路由实例，用于跳转至卫星威胁分析页。 */
+const router = useRouter()
 
 /** 从接口获取的卫星类型与对应系列映射。 */
 const typeSerialsMap = ref<Record<string, string[]>>({})
@@ -541,34 +525,14 @@ const getThreatLevelClass = (score: number): string => {
  * @param sat 待查看详情的卫星
  */
 const openThreatDetail = async (sat: SatListItem) => {
-  /** 当前任务 ID，用于请求卫星威胁度详情。 */
-  const taskId = store.activedTask?.id
-  if (!taskId) {
-    ElMessage.warning('请先选择任务')
-    return
-  }
-
-  threatDialogSat.value = { norad: sat.norad, name: sat.name }
-  threatDialogVisible.value = true
-  threatLoading.value = true
-  threatInfo.value = null
-
-  try {
-    /** 卫星威胁度详情接口响应。 */
-    const res = await getSatelliteThreatInfo({
-      norad: sat.norad,
-      series: store.selectedSatSeries || selectedType.value || '侦察',
-      taskId,
-    })
-    if (res.code === 200 && res.data?.length) {
-      threatInfo.value = res.data[0]
-    }
-  } catch (err) {
-    console.error('获取卫星威胁度详情失败:', err)
-    ElMessage.error('获取威胁度详情失败')
-  } finally {
-    threatLoading.value = false
-  }
+  emit('select-satellite', sat.norad)
+  await router.push({
+    name: 'SatelliteThreat',
+    query: {
+      norad: String(sat.norad),
+      autoAnalyze: '1',
+    },
+  })
 }
 /**
  * [函数说明]
