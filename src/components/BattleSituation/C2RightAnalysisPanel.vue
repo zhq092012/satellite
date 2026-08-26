@@ -22,14 +22,8 @@
         </div>
 
         <div class="stats-strip">
-          <div
-            class="stats-strip-item stats-strip-item--sat"
-            role="button"
-            tabindex="0"
-            title="点击跳转到卫星管理"
-            @click="goToSatellites"
-            @keydown.enter.prevent="goToSatellites"
-          >
+          <div class="stats-strip-item stats-strip-item--sat" role="button" tabindex="0" title="点击跳转到卫星管理"
+            @click="goToSatellites" @keydown.enter.prevent="goToSatellites">
             <strong class="stats-strip-label">卫星</strong>
             <div class="stats-strip-bottom">
               <span class="stats-strip-value">{{ overviewStats.satelliteCount }}</span>
@@ -37,14 +31,8 @@
             </div>
           </div>
           <div class="stats-strip-divider"></div>
-          <div
-            class="stats-strip-item stats-strip-item--receive"
-            role="button"
-            tabindex="0"
-            title="点击跳转到基站管理"
-            @click="goToBaseStations"
-            @keydown.enter.prevent="goToBaseStations"
-          >
+          <div class="stats-strip-item stats-strip-item--receive" role="button" tabindex="0" title="点击跳转到基站管理"
+            @click="goToBaseStations" @keydown.enter.prevent="goToBaseStations">
             <strong class="stats-strip-label">地面站</strong>
             <div class="stats-strip-bottom">
               <span class="stats-strip-value">{{ overviewStats.receiveCount }}</span>
@@ -52,14 +40,8 @@
             </div>
           </div>
           <div class="stats-strip-divider"></div>
-          <div
-            class="stats-strip-item stats-strip-item--station"
-            role="button"
-            tabindex="0"
-            title="点击跳转到基站管理"
-            @click="goToBaseStations"
-            @keydown.enter.prevent="goToBaseStations"
-          >
+          <div class="stats-strip-item stats-strip-item--station" role="button" tabindex="0" title="点击跳转到基站管理"
+            @click="goToBaseStations" @keydown.enter.prevent="goToBaseStations">
             <strong class="stats-strip-label">数据中心</strong>
             <div class="stats-strip-bottom">
               <span class="stats-strip-value">{{ overviewStats.stationCount }}</span>
@@ -67,14 +49,8 @@
             </div>
           </div>
           <div class="stats-strip-divider"></div>
-          <div
-            class="stats-strip-item stats-strip-item--weapon"
-            role="button"
-            tabindex="0"
-            title="点击跳转到武器管理"
-            @click="goToWeapons"
-            @keydown.enter.prevent="goToWeapons"
-          >
+          <div class="stats-strip-item stats-strip-item--weapon" role="button" tabindex="0" title="点击跳转到武器管理"
+            @click="goToWeapons" @keydown.enter.prevent="goToWeapons">
             <strong class="stats-strip-label">我方武器</strong>
             <div class="stats-strip-bottom">
               <span class="stats-strip-value">{{ ourWeaponCount }}</span>
@@ -95,19 +71,11 @@
           </div>
 
           <div v-if="transmissionLinks.length" class="transmission-link-list">
-            <div
-              v-for="(link, idx) in transmissionLinks"
-              :key="link.id"
-              class="transmission-link-card"
-              :class="{
-                active: selectedTransmissionLinkId === link.id,
-                blocked: link.blocked,
-              }"
-              role="button"
-              tabindex="0"
-              @click="handleLinkCardClick(link)"
-              @keydown.enter.prevent="handleLinkCardClick(link)"
-            >
+            <div v-for="(link, idx) in transmissionLinks" :key="link.id" class="transmission-link-card" :class="{
+              active: selectedTransmissionLinkId === link.id,
+              blocked: link.blocked,
+            }" role="button" tabindex="0" @click="handleLinkCardClick(link)"
+              @keydown.enter.prevent="handleLinkCardClick(link)">
               <div class="link-card-header">
                 <span class="link-index">链路 {{ idx + 1 }}</span>
               </div>

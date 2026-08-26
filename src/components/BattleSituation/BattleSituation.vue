@@ -5,46 +5,29 @@
       <div class="battle-grid">
         <!-- C2 敌方网络与资产拓扑左侧边栏 -->
         <div class="battle-grid__side battle-grid__side--left">
-          <C2LeftControlPanel
-            :matrix-data="matrixData"
-            :selected-norad="selectedNorad"
-            @select-satellite="handleSelectSatellite"
-          />
+          <C2LeftControlPanel :matrix-data="matrixData" :selected-norad="selectedNorad"
+            @select-satellite="handleSelectSatellite" />
         </div>
 
         <!-- 中间 3D Cesium 地球 -->
         <div class="battle-grid__center">
           <div class="battle-grid__earth">
-            <CesiumViewer
-              ref="cesiumViewerRef"
-              :matrix-data="matrixData"
-              :selected-norad="selectedNorad"
-              @clock-tick="handleClockTick"
-            />
-            <BattleGlobeTimeline
-              v-if="taskTimeRange"
-              :task-start="taskTimeRange.start"
-              :task-end="taskTimeRange.end"
-              :matrix-data="matrixData"
-              :selected-norad="selectedNorad"
-              :force-task-mode="!!selectedTransmissionLinkId"
-              :current-time-ms="currentClockMs"
-              :is-playing="isClockPlaying"
-              @time-change="handleTimelineTimeChange"
-              @toggle-play="handleTogglePlay"
-            />
+            <CesiumViewer ref="cesiumViewerRef" :matrix-data="matrixData" :selected-norad="selectedNorad"
+              @clock-tick="handleClockTick" />
+            <BattleGlobeTimeline v-if="taskTimeRange" :task-start="taskTimeRange.start" :task-end="taskTimeRange.end"
+              :matrix-data="matrixData" :selected-norad="selectedNorad" :force-task-mode="!!selectedTransmissionLinkId"
+              :current-time-ms="currentClockMs" :is-playing="isClockPlaying" :playback-speed="orbitPlaybackSpeed"
+              @time-change="handleTimelineTimeChange" @toggle-play="handleTogglePlay"
+              @speed-change="handleSpeedChange" />
           </div>
         </div>
 
         <!-- C2 敌方数据传输与链路效能右侧边栏 -->
         <div class="battle-grid__side battle-grid__side--right">
-          <C2RightAnalysisPanel
-            :matrix-data="matrixData"
-            :selected-satellite-norad="selectedNorad"
+          <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad"
             :selected-transmission-link-id="selectedTransmissionLinkId"
             @clear-satellite-selection="handleSelectSatellite(null)"
-            @select-transmission-link="handleSelectTransmissionLink"
-          />
+            @select-transmission-link="handleSelectTransmissionLink" />
         </div>
       </div>
     </main>
@@ -59,7 +42,7 @@ import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPa
 import BattleGlobeTimeline from '@/components/BattleSituation/BattleGlobeTimeline.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
-import type { SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
+import { collectSeriesTransmissionLinks, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 
 /** [变量说明] 全局布局 Store */
@@ -76,12 +59,18 @@ const selectedNorad = ref<number | null>(null)
 
 /** 当前选中的传输链路 ID（右侧面板点击链路时高亮并绘制地图连线） */
 const selectedTransmissionLinkId = ref<string | null>(null)
+/** 当前手动选中的传输链路，用于播放后按时间窗口恢复高亮。 */
+const selectedTransmissionLink = ref<SatelliteTransmissionLink | null>(null)
+/** 当前自动高亮的链路 ID，避免时钟每个 tick 重建相同连线。 */
+const highlightedTransmissionLinkId = ref<string | null>(null)
 
 /** 地球时钟当前时刻（毫秒），用于轨道仿真时间轴游标 */
 const currentClockMs = ref<number>(0)
 
 /** 地球时钟当前播放/暂停状态 */
 const isClockPlaying = ref<boolean>(true)
+/** TLE轨道仿真播放倍率，单位为仿真秒/现实秒。 */
+const orbitPlaybackSpeed = ref(120)
 
 /** [计算属性说明] 全局共享的侦察/打击算法矩阵结果 */
 const matrixData = computed<MatrixResult | null>(() => store.matrixData)
@@ -96,6 +85,43 @@ const taskTimeRange = computed(() => {
 const handleTimelineTimeChange = (ms: number) => {
   cesiumViewerRef.value?.setClockTime(ms)
   currentClockMs.value = ms
+  syncTransmissionLinkHighlight(ms)
+}
+
+/**
+ * 根据当前时刻更新传输链路高亮。
+ * 手动选中链路且处于暂停状态时保持该链路高亮；播放后仅在链路时间窗口内高亮。
+ */
+const syncTransmissionLinkHighlight = (ms: number) => {
+  const viewer = cesiumViewerRef.value
+  if (!viewer || !matrixData.value) return
+
+  const manualLink = selectedTransmissionLink.value
+  if (manualLink && !isClockPlaying.value) {
+    if (highlightedTransmissionLinkId.value !== manualLink.id) {
+      viewer.showTransmissionLink?.(manualLink)
+      highlightedTransmissionLinkId.value = manualLink.id
+    }
+    return
+  }
+
+  const link = manualLink && ms >= manualLink.transmitStartMs && ms <= manualLink.transmitEndMs
+    ? manualLink
+    : manualLink
+      ? null
+      : collectSeriesTransmissionLinks(matrixData.value).find(
+        (item) => ms >= item.transmitStartMs && ms <= item.transmitEndMs
+      ) || null
+
+  if (link) {
+    if (highlightedTransmissionLinkId.value !== link.id) {
+      viewer.showTransmissionLink?.(link)
+      highlightedTransmissionLinkId.value = link.id
+    }
+  } else if (highlightedTransmissionLinkId.value !== null) {
+    viewer.clearTransmissionLinkOverlay?.()
+    highlightedTransmissionLinkId.value = null
+  }
 }
 
 /**
@@ -107,6 +133,11 @@ const handleTogglePlay = (playing?: boolean) => {
   const viewer = cesiumViewerRef.value
   if (!viewer) return
 
+  if (nextState && selectedTransmissionLink.value) {
+    viewer.clearTransmissionLinkOverlay?.()
+    highlightedTransmissionLinkId.value = null
+  }
+
   if (nextState) {
     const endMs = taskTimeRange.value ? new Date(taskTimeRange.value.end.replace(/-/g, '/')).getTime() : 0
     const startMs = taskTimeRange.value ? new Date(taskTimeRange.value.start.replace(/-/g, '/')).getTime() : 0
@@ -114,10 +145,16 @@ const handleTogglePlay = (playing?: boolean) => {
       viewer.setClockTime(startMs)
       currentClockMs.value = startMs
     }
-    viewer.setClockPlaying(true, 120)
+    viewer.setClockPlaying(true, orbitPlaybackSpeed.value)
   } else {
     viewer.setClockPlaying(false)
   }
+}
+
+/** 更新TLE轨道仿真播放倍率，并立即作用于当前时钟。 */
+const handleSpeedChange = (speed: number) => {
+  orbitPlaybackSpeed.value = speed
+  cesiumViewerRef.value?.setClockPlaying(isClockPlaying.value, speed)
 }
 
 /**
@@ -125,8 +162,9 @@ const handleTogglePlay = (playing?: boolean) => {
  * @param ms 当前时钟毫秒时间戳
  */
 const handleClockTick = (ms: number) => {
-  if (!selectedNorad.value && !selectedTransmissionLinkId.value) {
+  if (!selectedNorad.value) {
     currentClockMs.value = ms
+    syncTransmissionLinkHighlight(ms)
   }
 }
 
@@ -145,6 +183,7 @@ const syncGlobeTimeMode = () => {
       if (clockMs) currentClockMs.value = clockMs
     } else {
       cesiumViewerRef.value.startTleOrbitAnimation?.()
+      cesiumViewerRef.value.setClockPlaying?.(true, orbitPlaybackSpeed.value)
       isClockPlaying.value = true
       const clockMs = cesiumViewerRef.value.getClockTimeMs?.()
       if (clockMs) currentClockMs.value = clockMs
@@ -157,6 +196,8 @@ const syncGlobeTimeMode = () => {
  */
 const clearTransmissionLinkSelection = () => {
   selectedTransmissionLinkId.value = null
+  selectedTransmissionLink.value = null
+  highlightedTransmissionLinkId.value = null
   cesiumViewerRef.value?.clearTransmissionLinkOverlay?.()
   syncGlobeTimeMode()
 }
@@ -173,6 +214,8 @@ const handleSelectTransmissionLink = (link: SatelliteTransmissionLink | null) =>
   }
 
   selectedTransmissionLinkId.value = link.id
+  selectedTransmissionLink.value = link
+  isClockPlaying.value = false
   const viewer = cesiumViewerRef.value
   if (!viewer) return
 
@@ -183,6 +226,7 @@ const handleSelectTransmissionLink = (link: SatelliteTransmissionLink | null) =>
 
   nextTick(() => {
     viewer.showTransmissionLink?.(link)
+    highlightedTransmissionLinkId.value = link.id
   })
 }
 
@@ -209,6 +253,8 @@ const loadMatrixForCurrentScope = async () => {
     selectedNorad.value = null
     store.setSelectedAnalysisNorad(null)
     selectedTransmissionLinkId.value = null
+    selectedTransmissionLink.value = null
+    highlightedTransmissionLinkId.value = null
 
     nextTick(() => {
       if (loadToken !== matrixLoadToken) return
@@ -237,6 +283,8 @@ const loadMatrixForCurrentScope = async () => {
 const handleSelectSatellite = (norad: number | null) => {
   if (selectedTransmissionLinkId.value) {
     selectedTransmissionLinkId.value = null
+    selectedTransmissionLink.value = null
+    highlightedTransmissionLinkId.value = null
     cesiumViewerRef.value?.clearTransmissionLinkOverlay?.()
   }
 

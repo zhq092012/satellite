@@ -4,14 +4,9 @@
       <div class="header-left">
         <span class="header-title">{{ isSatelliteSelected ? '任务时间标尺' : 'TLE 轨道仿真时间尺' }}</span>
         <!-- 播放/暂停控制按钮（专属于态势地球场景） -->
-        <button
-          v-if="!isSatelliteSelected"
-          type="button"
-          class="play-pause-btn"
-          :class="{ 'is-paused': !currentIsPlaying }"
-          :title="currentIsPlaying ? '暂停地球轨道仿真' : '播放地球轨道仿真'"
-          @click="togglePlayPause"
-        >
+        <button v-if="!isSatelliteSelected" type="button" class="play-pause-btn"
+          :class="{ 'is-paused': !currentIsPlaying }" :title="currentIsPlaying ? '暂停地球轨道仿真' : '播放地球轨道仿真'"
+          @click="togglePlayPause">
           <span class="btn-icon">
             <svg v-if="currentIsPlaying" viewBox="0 0 24 24" class="svg-icon">
               <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor" />
@@ -22,6 +17,13 @@
           </span>
           <span class="btn-text">{{ currentIsPlaying ? '暂停' : '播放' }}</span>
         </button>
+        <label v-if="!isSatelliteSelected" class="speed-control">
+          <span class="speed-label">速度</span>
+          <select class="speed-select" :value="currentPlaybackSpeed" aria-label="选择轨道仿真播放速度"
+            @change="handleSpeedChange">
+            <option v-for="speed in playbackSpeedOptions" :key="speed" :value="speed">{{ speed }}x</option>
+          </select>
+        </label>
       </div>
 
       <!-- 当前时钟或选中时刻 -->
@@ -38,13 +40,8 @@
     <div class="ruler-panel" ref="trackRef" @click="handleTrackClick">
       <!-- 标尺刻度 -->
       <div class="ruler-scale">
-        <div
-          v-for="tick in rulerTicks"
-          :key="tick.label"
-          class="ruler-tick"
-          :class="{ major: tick.major, ['align-' + tick.align]: true }"
-          :style="{ left: tick.percent + '%' }"
-        >
+        <div v-for="tick in rulerTicks" :key="tick.label" class="ruler-tick"
+          :class="{ major: tick.major, ['align-' + tick.align]: true }" :style="{ left: tick.percent + '%' }">
           <span class="tick-line"></span>
           <span v-if="tick.major" class="tick-label">{{ tick.label }}</span>
         </div>
@@ -54,12 +51,8 @@
       <!-- 选中卫星时：展示该卫星的所有过境通信窗口（全部为绿色） -->
       <div v-if="isSatelliteSelected" class="timeline-track timeline-track--satellite">
         <div class="track-base"></div>
-        <div
-          v-for="(seg, idx) in passSegments"
-          :key="'pass-' + idx"
-          class="track-segment segment-normal"
-          :style="segmentStyle(seg.startMs, seg.endMs)"
-        ></div>
+        <div v-for="(seg, idx) in passSegments" :key="'pass-' + idx" class="track-segment segment-normal"
+          :style="segmentStyle(seg.startMs, seg.endMs)"></div>
       </div>
       <!-- 选中传输链路但未选卫星时 -->
       <div v-else-if="forceTaskMode" class="timeline-track timeline-track--task-focus">
@@ -71,34 +64,23 @@
       </div>
 
       <!-- 轨道仿真游标（未选卫星时跟随时钟连续推进） -->
-      <div
-        v-if="!isSatelliteSelected && playheadPercent != null"
-        class="orbit-playhead"
-        :style="{ left: playheadPercent + '%' }"
-      >
+      <div v-if="!isSatelliteSelected && playheadPercent != null" class="orbit-playhead"
+        :style="{ left: playheadPercent + '%' }">
         <span class="orbit-playhead-line"></span>
         <span class="orbit-playhead-dot"></span>
       </div>
 
       <!-- 选中单颗卫星或传输链路时的当前时刻游标 -->
-      <div
-        v-if="isSatelliteSelected && playheadPercent != null"
-        class="task-playhead"
-        :style="{ left: playheadPercent + '%' }"
-      >
+      <div v-if="isSatelliteSelected && playheadPercent != null" class="task-playhead"
+        :style="{ left: playheadPercent + '%' }">
         <span class="task-playhead-line"></span>
         <span class="task-playhead-dot"></span>
       </div>
 
       <!-- 选中卫星时的过境站点节点标记（全绿色） -->
       <div v-if="isSatelliteSelected" class="ruler-markers">
-        <el-tooltip
-          v-for="item in passMarkers"
-          :key="item.key"
-          placement="top"
-          :show-after="120"
-          popper-class="globe-timeline-tooltip"
-        >
+        <el-tooltip v-for="item in passMarkers" :key="item.key" placement="top" :show-after="120"
+          popper-class="globe-timeline-tooltip">
           <template #content>
             <div class="tooltip-card">
               <div class="tooltip-header">
@@ -111,13 +93,9 @@
               </div>
             </div>
           </template>
-          <button
-            type="button"
-            class="ruler-tick-btn tick-normal"
+          <button type="button" class="ruler-tick-btn tick-normal"
             :class="['align-' + item.align, { 'is-selected': isMarkerSelected(item) }]"
-            :style="{ left: item.percent + '%', bottom: item.lane * 10 + 'px' }"
-            @click.stop="handleMarkerClick(item)"
-          >
+            :style="{ left: item.percent + '%', bottom: item.lane * 10 + 'px' }" @click.stop="handleMarkerClick(item)">
             <span class="tick-square"></span>
           </button>
         </el-tooltip>
@@ -154,6 +132,8 @@ const props = defineProps<{
   currentTimeMs?: number | null
   /** 当前播放状态（专用于整体态势地球） */
   isPlaying?: boolean
+  /** TLE轨道仿真播放倍率 */
+  playbackSpeed?: number
 }>()
 
 /** 时间轴向父组件触发的事件 */
@@ -162,6 +142,8 @@ const emit = defineEmits<{
   (e: 'time-change', ms: number): void
   /** 通知父组件切换播放/暂停状态 */
   (e: 'toggle-play', playing: boolean): void
+  /** 通知父组件切换轨道仿真播放速度 */
+  (e: 'speed-change', speed: number): void
   /** 通知父组件点击了过境标记 */
   (e: 'marker-click', payload: { ms: number; label: string; receiveId?: string }): void
 }>()
@@ -172,11 +154,20 @@ const trackRef = ref<HTMLElement | null>(null)
 /** 内部维护的播放状态 */
 const internalPlaying = ref(true)
 const currentIsPlaying = computed(() => (props.isPlaying !== undefined ? props.isPlaying : internalPlaying.value))
+const playbackSpeedOptions = [1, 10, 30, 60, 120, 300, 600]
+const currentPlaybackSpeed = computed(() => props.playbackSpeed ?? 120)
 
 const togglePlayPause = () => {
   const next = !currentIsPlaying.value
   internalPlaying.value = next
   emit('toggle-play', next)
+}
+
+const handleSpeedChange = (event: Event) => {
+  const speed = Number((event.target as HTMLSelectElement).value)
+  if (Number.isFinite(speed) && speed > 0) {
+    emit('speed-change', speed)
+  }
 }
 
 /** 将任务时间字符串解析为毫秒时间戳 */
@@ -473,6 +464,38 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
         border-color: rgba(234, 179, 8, 0.75);
         box-shadow: 0 0 10px rgba(234, 179, 8, 0.5);
       }
+    }
+  }
+
+  .speed-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    color: #9ec5ed;
+    font-size: 11px;
+    user-select: none;
+  }
+
+  .speed-select {
+    height: 22px;
+    padding: 0 5px;
+    color: #67e8f9;
+    background: rgba(0, 225, 255, 0.1);
+    border: 1px solid rgba(0, 225, 255, 0.35);
+    border-radius: 4px;
+    outline: none;
+    cursor: pointer;
+
+    &:focus,
+    &:hover {
+      border-color: rgba(0, 225, 255, 0.65);
+      box-shadow: 0 0 8px rgba(0, 225, 255, 0.25);
+    }
+
+    option {
+      color: #dbeafe;
+      background: #0b1b30;
     }
   }
 

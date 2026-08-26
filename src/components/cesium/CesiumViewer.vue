@@ -665,11 +665,11 @@ const clearTransmissionLinkOverlay = () => {
  * @param node 链路节点
  * @returns 三维坐标，无法解析时返回 null
  */
-const resolveChainNodePosition = (node: ChainNode): Cesium.Cartesian3 | null => {
+const resolveChainNodePosition = (node: ChainNode, time?: Cesium.JulianDate): Cesium.Cartesian3 | null => {
   if (node.layer === 'SAT' || node.layer === 'RELAY') {
     const norad = Number(node.id)
     if (!Number.isFinite(norad)) return null
-    return getSatellitePositionInCesium(norad)
+    return getSatellitePositionInCesium(norad, time)
   }
 
   if (node.layer === 'RECEIVE') {
@@ -720,21 +720,23 @@ const showTransmissionLink = (link: SatelliteTransmissionLink | null) => {
   })
   selectedTransmissionLinkNodeKeys.value = nextKeys
 
-  // 2. 在地图上绘制虚线连接
-  const positions: Cesium.Cartesian3[] = []
-  link.nodes.forEach((node) => {
-    const pos = resolveChainNodePosition(node)
-    if (pos) positions.push(pos)
-  })
+  // 2. 在地图上绘制虚线连接，卫星端点通过 CallbackProperty 随时间实时更新
+  for (let i = 0; i < link.nodes.length - 1; i++) {
+    const startNode = link.nodes[i]
+    const endNode = link.nodes[i + 1]
+    const initialStart = resolveChainNodePosition(startNode)
+    const initialEnd = resolveChainNodePosition(endNode)
+    if (!initialStart || !initialEnd) continue
 
-  if (positions.length < 2) return
-
-  for (let i = 0; i < positions.length - 1; i++) {
     const entityId = `transmission-link-${link.id}-${i}`
     viewer.entities.add({
       id: entityId,
       polyline: {
-        positions: [positions[i], positions[i + 1]],
+        positions: new Cesium.CallbackProperty((time) => {
+          const start = resolveChainNodePosition(startNode, time)
+          const end = resolveChainNodePosition(endNode, time)
+          return start && end ? [start, end] : []
+        }, false),
         width: 3,
         material: new Cesium.PolylineDashMaterialProperty({
           color: TRANSMISSION_LINK_LINE_COLOR,
@@ -1043,7 +1045,10 @@ const positionCalculatingSet = new Set<number>()
  * @param norad 卫星 NORAD 编号
  * @returns Cesium.Cartesian3 坐标对象或 null
  */
-const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null => {
+const getSatellitePositionInCesium = (
+  norad: number,
+  time?: Cesium.JulianDate
+): Cesium.Cartesian3 | null => {
   if (!norad || positionCalculatingSet.has(norad)) {
     return null
   }
@@ -1068,7 +1073,7 @@ const getSatellitePositionInCesium = (norad: number): Cesium.Cartesian3 | null =
       try {
         const satrec = satellitejs.twoline2satrec(line1, line2)
         if (satrec) {
-          const now = viewer.clock.currentTime
+          const now = time || viewer.clock.currentTime
           const date = Cesium.JulianDate.toDate(now)
           const posVel = satellitejs.propagate(satrec, date)
           if (posVel && posVel.position) {
