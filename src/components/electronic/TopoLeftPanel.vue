@@ -21,7 +21,10 @@
 
       <el-scrollbar class="link-scroll">
         <div v-for="item in linkItems" :key="item.id" :ref="(el) => setLinkCardRef(item.id, el as HTMLElement | null)"
-          class="link-card" :class="{ active: selectedLinkId === item.id, struck: item.struck, ok: !item.struck }"
+          class="link-card" :class="[
+            { active: selectedLinkId === item.id, struck: item.struck, ok: !item.struck },
+            item.rank ? `rank-card--${item.rank}` : ''
+          ]"
           @click="handleSelect(item)">
           <div class="link-card-top">
             <div class="link-path">
@@ -34,16 +37,24 @@
               </template>
             </div>
             <div class="link-card-badges">
+              <span v-if="item.rank && item.rank <= 3" class="rank-mini-tag" :class="`rank-mini-tag--${item.rank}`">
+                {{ getRankMedal(item.rank) }} TOP {{ item.rank }}
+              </span>
               <span class="status-badge" :class="item.struck ? 'struck' : 'ok'">
                 {{ item.struck ? '被打击' : '正常' }}
               </span>
             </div>
           </div>
           <div class="link-meta">
-            <span class="meta-line meta-line--time">
-              <span class="meta-key">传输</span>
-              <span class="meta-val">{{ item.transmitTime }}</span>
-            </span>
+            <div class="meta-row-two-col">
+              <span class="meta-line meta-line--time">
+                <span class="meta-key">传输</span>
+                <span class="meta-val">{{ item.transmitTime }}</span>
+              </span>
+              <span v-if="item.totalScore != null" class="score-mini-pill" title="基于威胁度、时效、孤立度与中继计算的优先级得分">
+                评分 {{ item.totalScore }}分
+              </span>
+            </div>
             <span v-if="item.struck" class="meta-line meta-line--strike-target">
               <span class="meta-key">打击</span>
               <span class="meta-val">{{ item.strikeTargetLabel }}</span>
@@ -71,6 +82,7 @@ import type { MatrixResult } from '@/api/electronic'
 import {
   collectSatelliteTransmissionLinks,
   collectSeriesTransmissionLinks,
+  rankTransmissionLinksByPriority,
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
 
@@ -100,6 +112,10 @@ interface LinkListItem {
   weaponNames: string
   /** 延迟分钟数 */
   delayMin: number
+  /** 优先级名次 */
+  rank?: number
+  /** 优先级评分 */
+  totalScore?: number
 }
 
 const props = defineProps<{
@@ -115,6 +131,13 @@ const emit = defineEmits<{
   (e: 'select-link', linkId: string | null): void
 }>()
 
+const getRankMedal = (rank: number): string => {
+  if (rank === 1) return '🥇'
+  if (rank === 2) return '🥈'
+  if (rank === 3) return '🥉'
+  return ''
+}
+
 /**
  * 将链路节点层级映射为样式类名
  * @param layer 原始层级标识
@@ -127,32 +150,34 @@ const mapNodeLayer = (layer: string): LinkNodeItem['layer'] => {
   return 'sat'
 }
 
-/**
- * 将传输链路转换为列表项
- * @param link 原始链路数据
- * @returns 列表展示项
- */
-const toLinkListItem = (link: SatelliteTransmissionLink): LinkListItem => ({
-  id: link.id,
-  nodes: link.nodes.map((n) => ({
-    name: n.name,
-    layer: mapNodeLayer(n.layer),
-    icon: n.icon,
-  })),
-  transmitTime: link.transmitTime,
-  struck: link.struck,
-  strikeTargetLabel: link.strikeTargetLabel,
-  weaponNames: link.weaponNames,
-  delayMin: link.delayMin,
-})
-
-/** 当前展示的全部传输链路（单星或全系列，按过站时间升序） */
+/** 当前展示的全部传输链路（单星或全系列，包含优先级排名与评分） */
 const linkItems = computed<LinkListItem[]>(() => {
   if (!props.matrixData) return []
-  const links = props.selectedNorad
+  const rawLinks = props.selectedNorad
     ? collectSatelliteTransmissionLinks(props.matrixData, props.selectedNorad)
     : collectSeriesTransmissionLinks(props.matrixData)
-  return links.map(toLinkListItem)
+
+  const ranked = rankTransmissionLinksByPriority(props.matrixData, rawLinks)
+  const rankMap = new Map(ranked.map((r) => [r.link.id, r.priority]))
+
+  return rawLinks.map((link) => {
+    const priority = rankMap.get(link.id)
+    return {
+      id: link.id,
+      nodes: link.nodes.map((n) => ({
+        name: n.name,
+        layer: mapNodeLayer(n.layer),
+        icon: n.icon,
+      })),
+      transmitTime: link.transmitTime,
+      struck: link.struck,
+      strikeTargetLabel: link.strikeTargetLabel,
+      weaponNames: link.weaponNames,
+      delayMin: link.delayMin,
+      rank: priority?.rank,
+      totalScore: priority?.totalScore,
+    }
+  })
 })
 
 /**
@@ -388,6 +413,29 @@ watch(
     gap: 4px;
   }
 
+  .meta-row-two-col {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+
+    .meta-line--time {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .score-mini-pill {
+      font-size: 10px;
+      font-weight: 700;
+      color: #40f2ff;
+      background: rgba(0, 225, 255, 0.12);
+      border: 1px solid rgba(0, 225, 255, 0.25);
+      padding: 0 5px;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+  }
+
   .meta-line {
     display: flex;
     align-items: flex-start;
@@ -424,6 +472,56 @@ watch(
       color: #94a3b8;
       font-style: italic;
     }
+  }
+
+  &.rank-card--1 {
+    border-left-color: #eab308;
+    &.active {
+      border-color: #facc15;
+      box-shadow: 0 0 12px rgba(234, 179, 8, 0.3);
+    }
+  }
+
+  &.rank-card--2 {
+    border-left-color: #38bdf8;
+    &.active {
+      border-color: #38bdf8;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+    }
+  }
+
+  &.rank-card--3 {
+    border-left-color: #fb923c;
+    &.active {
+      border-color: #fb923c;
+      box-shadow: 0 0 12px rgba(251, 146, 60, 0.3);
+    }
+  }
+}
+
+.rank-mini-tag {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+
+  &--1 {
+    background: rgba(234, 179, 8, 0.22);
+    color: #fef08a;
+    border: 1px solid rgba(234, 179, 8, 0.5);
+  }
+
+  &--2 {
+    background: rgba(56, 189, 248, 0.22);
+    color: #bae6fd;
+    border: 1px solid rgba(56, 189, 248, 0.5);
+  }
+
+  &--3 {
+    background: rgba(249, 115, 22, 0.22);
+    color: #fed7aa;
+    border: 1px solid rgba(249, 115, 22, 0.5);
   }
 }
 

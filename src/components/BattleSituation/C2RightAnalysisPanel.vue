@@ -71,13 +71,21 @@
           </div>
 
           <div v-if="transmissionLinks.length" class="transmission-link-list">
-            <div v-for="(link, idx) in transmissionLinks" :key="link.id" class="transmission-link-card" :class="{
-              active: selectedTransmissionLinkId === link.id,
-              blocked: link.blocked,
-            }" role="button" tabindex="0" @click="handleLinkCardClick(link)"
+            <div v-for="(link, idx) in transmissionLinks" :key="link.id" class="transmission-link-card" :class="[
+              {
+                active: selectedTransmissionLinkId === link.id,
+                blocked: link.blocked,
+              },
+              getLinkPriority(link.id)?.rank ? `priority-rank-${getLinkPriority(link.id)?.rank}` : ''
+            ]" role="button" tabindex="0" @click="handleLinkCardClick(link)"
               @keydown.enter.prevent="handleLinkCardClick(link)">
               <div class="link-card-header">
-                <span class="link-index">链路 {{ idx + 1 }}</span>
+                <div class="link-title-left">
+                  <span class="link-index">链路 {{ idx + 1 }}</span>
+                  <span v-if="getLinkPriority(link.id)?.rank && getLinkPriority(link.id)!.rank <= 3" class="rank-badge" :class="`rank-badge--${getLinkPriority(link.id)!.rank}`">
+                    {{ getRankMedal(getLinkPriority(link.id)!.rank) }} TOP {{ getLinkPriority(link.id)!.rank }} ({{ getLinkPriority(link.id)!.totalScore }}分)
+                  </span>
+                </div>
                 <div class="link-metrics-row">
                   <div class="link-metric-card">
                     <span class="link-metric-label">链路时长</span>
@@ -99,6 +107,11 @@
                   </div>
                   <span v-if="nodeIdx < link.nodes.length - 1" class="flow-arrow">→</span>
                 </template>
+              </div>
+
+              <div v-if="getLinkPriority(link.id)?.rank && getLinkPriority(link.id)!.rank <= 3" class="priority-reason-tip">
+                <span class="reason-icon">💡</span>
+                <span class="reason-text">{{ getLinkPriority(link.id)!.reason }}</span>
               </div>
 
               <div v-if="link.blocked" class="link-blocked-tip">{{ link.blockedReason }}</div>
@@ -133,8 +146,10 @@ import {
   collectMatrixOverviewStats,
   collectSatelliteTransmissionLinks,
   collectSeriesTransmissionLinks,
+  rankTransmissionLinksByPriority,
   type ChainNode,
   type SatelliteTransmissionLink,
+  type LinkPriorityMetrics,
 } from '@/utils/satelliteFullChainAnalysis'
 
 const router = useRouter()
@@ -230,6 +245,27 @@ const transmissionLinks = computed<SatelliteTransmissionLink[]>(() => {
 
   return collectSeriesTransmissionLinks(matrix)
 })
+
+/**
+ * 计算当前传输链路的多维优先级评估结果
+ */
+const prioritizedLinkMap = computed(() => {
+  const matrix = activeMatrix.value
+  if (!matrix || !transmissionLinks.value.length) return new Map<string, LinkPriorityMetrics>()
+  const ranked = rankTransmissionLinksByPriority(matrix, transmissionLinks.value)
+  return new Map(ranked.map((item) => [item.link.id, item.priority]))
+})
+
+const getLinkPriority = (linkId: string): LinkPriorityMetrics | undefined => {
+  return prioritizedLinkMap.value.get(linkId)
+}
+
+const getRankMedal = (rank: number): string => {
+  if (rank === 1) return '🥇'
+  if (rank === 2) return '🥈'
+  if (rank === 3) return '🥉'
+  return ''
+}
 
 /**
  * 解析链路层的显示标签
@@ -523,18 +559,80 @@ onMounted(() => {
     border-style: dashed;
   }
 
+  &.priority-rank-1 {
+    border-left: 3px solid #eab308;
+  }
+
+  &.priority-rank-2 {
+    border-left: 3px solid #38bdf8;
+  }
+
+  &.priority-rank-3 {
+    border-left: 3px solid #fb923c;
+  }
+
   .link-card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
 
+    .link-title-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
 
     .link-index {
       font-size: 14px;
       flex-shrink: 0;
       font-weight: 700;
       color: #7dd3fc;
+    }
+
+    .rank-badge {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 1px 6px;
+      border-radius: 4px;
+
+      &--1 {
+        background: rgba(234, 179, 8, 0.25);
+        color: #fef08a;
+        border: 1px solid rgba(234, 179, 8, 0.6);
+      }
+
+      &--2 {
+        background: rgba(56, 189, 248, 0.25);
+        color: #bae6fd;
+        border: 1px solid rgba(56, 189, 248, 0.6);
+      }
+
+      &--3 {
+        background: rgba(249, 115, 22, 0.25);
+        color: #fed7aa;
+        border: 1px solid rgba(249, 115, 22, 0.6);
+      }
+    }
+  }
+
+  .priority-reason-tip {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    background: rgba(0, 225, 255, 0.08);
+    border: 1px solid rgba(0, 225, 255, 0.2);
+    font-size: 11px;
+    color: #bae6fd;
+    line-height: 1.4;
+
+    .reason-icon {
+      font-size: 11px;
+      flex-shrink: 0;
+      margin-top: 1px;
     }
   }
 }

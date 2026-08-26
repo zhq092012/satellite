@@ -128,8 +128,8 @@ const windowsOverlapMs = (startA: string, endA: string, startB: string, endB: st
 
 const buildSatNameMap = (matrix: MatrixResult): Map<number, string> => {
   const map = new Map<number, string>()
-  ;(matrix.initMatrixList || []).forEach((s) => map.set(s.norad, s.name))
-  ;(matrix.satelliteMatrixList || []).forEach((s) => map.set(s.norad, s.name))
+    ; (matrix.initMatrixList || []).forEach((s) => map.set(s.norad, s.name))
+    ; (matrix.satelliteMatrixList || []).forEach((s) => map.set(s.norad, s.name))
   return map
 }
 
@@ -153,27 +153,27 @@ const buildReceiveToStations = (
   const stationMap = new Map((relationData.stationObjList || []).map((s) => [s.stationId, s.stationName || s.stationId]))
 
   const map = new Map<string, { stationId: string; stationName: string }[]>()
-  ;(relationData.relations || []).forEach((rel) => {
-    if (blockedReceive.has(rel.from) || blockedStation.has(rel.to)) return
-    const list = map.get(rel.from) || []
-    list.push({
-      stationId: rel.to,
-      stationName: stationMap.get(rel.to) || rel.to,
+    ; (relationData.relations || []).forEach((rel) => {
+      if (blockedReceive.has(rel.from) || blockedStation.has(rel.to)) return
+      const list = map.get(rel.from) || []
+      list.push({
+        stationId: rel.to,
+        stationName: stationMap.get(rel.to) || rel.to,
+      })
+      map.set(rel.from, list)
     })
-    map.set(rel.from, list)
-  })
   return map
 }
 
 const mergeSatelliteTransitWindows = (initWindows: Record<string, any>[] = [], stationWindows: Record<string, any>[] = []) => {
   const map = new Map<string, Record<string, any>>()
-  ;[...initWindows, ...stationWindows].forEach((win) => {
-    const key = `${win.receiveId || win.receiveName || ''}-${getWindowStartStr(win)}-${getWindowEndStr(win)}`
-    const existing = map.get(key)
-    if (!existing || (Number(win.strikeStatus) === 1 && Number(existing.strikeStatus) !== 1)) {
-      map.set(key, win)
-    }
-  })
+    ;[...initWindows, ...stationWindows].forEach((win) => {
+      const key = `${win.receiveId || win.receiveName || ''}-${getWindowStartStr(win)}-${getWindowEndStr(win)}`
+      const existing = map.get(key)
+      if (!existing || (Number(win.strikeStatus) === 1 && Number(existing.strikeStatus) !== 1)) {
+        map.set(key, win)
+      }
+    })
   return Array.from(map.values())
 }
 
@@ -267,7 +267,7 @@ const appendRelayDownlinkCandidates = (
     if (!groundStartTs || !groundEndTs) return
 
     stationLinks.forEach(({ stationId, stationName }) => {
-      ;(ctx.relayRel.visibilityWindows || []).forEach((vis) => {
+      ; (ctx.relayRel.visibilityWindows || []).forEach((vis) => {
         if (!windowsOverlapMs(vis.beginWindow, vis.endWindow, groundStart, groundEnd)) return
         const relayEndTs = parseTimeToMs(vis.endWindow || vis.beginWindow)
         if (!relayEndTs) return
@@ -350,7 +350,7 @@ const enumerateChainCandidates = (
 
       // 中继路径：卫星 → 中继 → 地面站 → 数据中心
       if (relayRel && relayNorad) {
-        ;(relayRel.visibilityWindows || []).forEach((vis) => {
+        ; (relayRel.visibilityWindows || []).forEach((vis) => {
           if (!windowsOverlapMs(vis.beginWindow, vis.endWindow, groundStart, groundEnd)) return
           const relayEndTs = parseTimeToMs(vis.endWindow || vis.beginWindow)
           if (!relayEndTs) return
@@ -439,7 +439,7 @@ export const getSatelliteRelatedEdgeIds = (matrix: MatrixResult, norad: number):
 
   const relationLists = [matrix.initRelationList, matrix.stationRelationList].filter(Boolean)
   relationLists.forEach((relData) => {
-    ;(relData?.relations || []).forEach((rel) => {
+    ; (relData?.relations || []).forEach((rel) => {
       if (receiveIds.has(rel.from)) {
         ids.add(`edge-${rel.from}-${rel.to}`)
       }
@@ -482,12 +482,12 @@ export const listSourceSatelliteNoradsForRelay = (matrix: MatrixResult, relayNor
 /** 普通侦察卫星 NORAD 列表（不含中继） */
 export const listNormalSatelliteNorads = (matrix: MatrixResult): number[] => {
   const norads = new Set<number>()
-  ;(matrix.initMatrixList || []).forEach((s) => {
-    if (!isRelaySatellite(matrix, s.norad, s.satType)) norads.add(s.norad)
-  })
-  ;(matrix.satelliteMatrixList || []).forEach((s) => {
-    if (!isRelaySatellite(matrix, s.norad, s.satType)) norads.add(s.norad)
-  })
+    ; (matrix.initMatrixList || []).forEach((s) => {
+      if (!isRelaySatellite(matrix, s.norad, s.satType)) norads.add(s.norad)
+    })
+    ; (matrix.satelliteMatrixList || []).forEach((s) => {
+      if (!isRelaySatellite(matrix, s.norad, s.satType)) norads.add(s.norad)
+    })
   return Array.from(norads)
 }
 
@@ -514,21 +514,21 @@ export const collectJamStrikeEdgeIdsAtTime = (
   const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
   const receiveIds = new Set<string>()
 
-  ;(postSat?.stationWindows || []).forEach((win) => {
-    if (win.strikeStatus !== 1) return
-    const start = parseTimeToMs(getWindowStartStr(win))
-    const end = parseTimeToMs(win.endWindow || '')
-    if (!start || atMs < start || atMs > (end || start)) return
-    const recId = win.receiveId
-    if (!recId) return
-    receiveIds.add(recId)
-    ids.add(`edge-${satId}-${recId}`)
-    ids.add(`edge-sat-${norad}-${recId}`)
-  })
+    ; (postSat?.stationWindows || []).forEach((win) => {
+      if (win.strikeStatus !== 1) return
+      const start = parseTimeToMs(getWindowStartStr(win))
+      const end = parseTimeToMs(win.endWindow || '')
+      if (!start || atMs < start || atMs > (end || start)) return
+      const recId = win.receiveId
+      if (!recId) return
+      receiveIds.add(recId)
+      ids.add(`edge-${satId}-${recId}`)
+      ids.add(`edge-sat-${norad}-${recId}`)
+    })
 
   const relationLists = [matrix.initRelationList, matrix.stationRelationList].filter(Boolean)
   relationLists.forEach((relData) => {
-    ;(relData?.relations || []).forEach((rel) => {
+    ; (relData?.relations || []).forEach((rel) => {
       if (receiveIds.has(rel.from)) {
         ids.add(`edge-${rel.from}-${rel.to}`)
       }
@@ -886,51 +886,51 @@ const resolveWeaponsForWindow = (
   const weaponMap = new Map<string, string | undefined>()
 
   if (windowStruck) {
-    ;(win.weapons || []).forEach((w: Weapon) => weaponMap.set(w.name, w.type))
+    ; (win.weapons || []).forEach((w: Weapon) => weaponMap.set(w.name, w.type))
     const receiveId = win.receiveId as string | undefined
     const receiveName = win.receiveName as string | undefined
-    ;(matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string }) => {
-      const matchedById = !!plan.targetId && !!receiveId && plan.targetId === receiveId
-      const matchedByName =
-        !!plan.target && (!!receiveName ? plan.target === receiveName : plan.target === receiveId)
-      if (matchedById || matchedByName) {
-        weaponMap.set(plan.weaponName, plan.weaponType)
-      }
-    })
+      ; (matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string }) => {
+        const matchedById = !!plan.targetId && !!receiveId && plan.targetId === receiveId
+        const matchedByName =
+          !!plan.target && (!!receiveName ? plan.target === receiveName : plan.target === receiveId)
+        if (matchedById || matchedByName) {
+          weaponMap.set(plan.weaponName, plan.weaponType)
+        }
+      })
   }
 
   if (satStruck) {
-    ;(postSat?.weapons || []).forEach((w: Weapon) => {
+    ; (postSat?.weapons || []).forEach((w: Weapon) => {
       if (!weaponMap.has(w.name)) weaponMap.set(w.name, w.type)
     })
     const satNorad = postSat?.norad
     const satName = postSat?.name
-    ;(matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string; targetType?: string }) => {
-      const matchedByNorad = !!plan.targetId && !!satNorad && String(plan.targetId) === String(satNorad)
-      const matchedByName = !!plan.target && !!satName && plan.target === satName
-      const targetIsSatellite =
-        !plan.targetType || plan.targetType.includes('卫星') || plan.targetType.toUpperCase() === 'SAT'
-      if ((matchedByNorad || matchedByName) && (targetIsSatellite || matchedByNorad)) {
-        weaponMap.set(plan.weaponName, plan.weaponType)
-      }
-    })
+      ; (matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string; targetType?: string }) => {
+        const matchedByNorad = !!plan.targetId && !!satNorad && String(plan.targetId) === String(satNorad)
+        const matchedByName = !!plan.target && !!satName && plan.target === satName
+        const targetIsSatellite =
+          !plan.targetType || plan.targetType.includes('卫星') || plan.targetType.toUpperCase() === 'SAT'
+        if ((matchedByNorad || matchedByName) && (targetIsSatellite || matchedByNorad)) {
+          weaponMap.set(plan.weaponName, plan.weaponType)
+        }
+      })
   }
 
   if (relayStruck) {
-    ;(relayPostSat?.weapons || []).forEach((w: Weapon) => {
+    ; (relayPostSat?.weapons || []).forEach((w: Weapon) => {
       if (!weaponMap.has(w.name)) weaponMap.set(w.name, w.type)
     })
     const relayNorad = relayPostSat?.norad
     const relayName = relayPostSat?.name
-    ;(matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string; targetType?: string }) => {
-      const matchedByNorad = !!plan.targetId && !!relayNorad && String(plan.targetId) === String(relayNorad)
-      const matchedByName = !!plan.target && !!relayName && plan.target === relayName
-      const targetIsRelay =
-        !plan.targetType || plan.targetType.includes('中继') || plan.targetType.toUpperCase() === 'RELAY'
-      if ((matchedByNorad || matchedByName) && (targetIsRelay || matchedByNorad)) {
-        weaponMap.set(plan.weaponName, plan.weaponType)
-      }
-    })
+      ; (matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string; targetType?: string }) => {
+        const matchedByNorad = !!plan.targetId && !!relayNorad && String(plan.targetId) === String(relayNorad)
+        const matchedByName = !!plan.target && !!relayName && plan.target === relayName
+        const targetIsRelay =
+          !plan.targetType || plan.targetType.includes('中继') || plan.targetType.toUpperCase() === 'RELAY'
+        if ((matchedByNorad || matchedByName) && (targetIsRelay || matchedByNorad)) {
+          weaponMap.set(plan.weaponName, plan.weaponType)
+        }
+      })
   }
 
   if (struck && !weaponMap.size) {
@@ -1375,8 +1375,8 @@ export const collectMatrixOverviewStats = (
   }
 
   const satelliteIds = new Set<number>()
-  ;(matrix.initMatrixList || []).forEach((sat) => satelliteIds.add(sat.norad))
-  ;(matrix.satelliteMatrixList || []).forEach((sat) => satelliteIds.add(sat.norad))
+    ; (matrix.initMatrixList || []).forEach((sat) => satelliteIds.add(sat.norad))
+    ; (matrix.satelliteMatrixList || []).forEach((sat) => satelliteIds.add(sat.norad))
 
   const relationData =
     matrix.initRelationList?.receiveObjList?.length || matrix.initRelationList?.stationObjList?.length
@@ -1384,14 +1384,14 @@ export const collectMatrixOverviewStats = (
       : matrix.stationRelationList
 
   const weaponNames = new Set<string>()
-  ;(matrix.attackPlanList || []).forEach((plan) => {
-    if (plan.weaponName) weaponNames.add(plan.weaponName)
-  })
-  ;(matrix.satelliteMatrixList || []).forEach((sat) => {
-    ;(sat.weapons || []).forEach((weapon: Weapon) => {
-      if (weapon.name) weaponNames.add(weapon.name)
+    ; (matrix.attackPlanList || []).forEach((plan) => {
+      if (plan.weaponName) weaponNames.add(plan.weaponName)
     })
-  })
+    ; (matrix.satelliteMatrixList || []).forEach((sat) => {
+      ; (sat.weapons || []).forEach((weapon: Weapon) => {
+        if (weapon.name) weaponNames.add(weapon.name)
+      })
+    })
 
   const chainStats = collectNetworkChainStats(matrix)
 
@@ -1459,18 +1459,18 @@ export const collectSatelliteJamWeapons = (
 
   struckWindows.forEach((win) => {
     const targetName = win.receiveName || win.receiveId
-    ;(win.weapons || []).forEach((w: Weapon) => {
-      addWeapon(w.name, w.type, targetName, '接收站', 'window')
-    })
+      ; (win.weapons || []).forEach((w: Weapon) => {
+        addWeapon(w.name, w.type, targetName, '接收站', 'window')
+      })
   })
 
   if (postSat?.satelliteStatus === 1 && !receiveKey) {
-    ;(postSat.weapons || []).forEach((w: Weapon) => {
+    ; (postSat.weapons || []).forEach((w: Weapon) => {
       addWeapon(w.name, w.type, satName, '卫星', 'satellite')
     })
   }
 
-  ;(matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string }) => {
+  ; (matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string }) => {
     const matchedById = !!plan.targetId && struckReceiveIds.has(plan.targetId)
     const matchedByName = !!plan.target && struckReceiveNames.has(plan.target)
     if (!matchedById && !matchedByName) return
@@ -1521,3 +1521,292 @@ export const getSatelliteDisplayInfo = (
     satType: postSat?.satType || initSat?.satType || '天基节点',
   }
 }
+
+/**
+ * 传输链路优先级指标与归一化分解
+ */
+export interface LinkPriorityMetrics {
+  /** 卫星威胁度原始得分 (0-100) */
+  threatScoreRaw: number
+  /** 卫星威胁度归一化得分 [0, 1] */
+  threatScoreNorm: number
+  /** 传输开始时间戳 (毫秒) */
+  transmitStartMs: number
+  /** 传输开始时效归一化得分 [0, 1] (越早越接近 1.0) */
+  earlyTimeNorm: number
+  /** 该卫星在当前范围内的传输链路总数 */
+  satelliteLinkCount: number
+  /** 孤立度 / 无可复用链路归一化得分 [0, 1] (链路越少越孤立，得分越接近 1.0) */
+  isolationNorm: number
+  /** 是否途经中继卫星 */
+  isRelay: boolean
+  /** 中继优先归一化得分 [0, 1] (中继为 1.0，普通为 0.2) */
+  relayNorm: number
+  /** 加权综合优先级总分 (0-100) */
+  totalScore: number
+  /** 排序名次 (1, 2, 3...) */
+  rank: number
+  /** 详细推荐原因 */
+  reason: string
+  /** 原因分项结构 */
+  reasonDetails: {
+    threatText: string
+    timeText: string
+    isolationText: string
+    relayText: string
+  }
+  /** 原因亮点标签 */
+  reasonTags: string[]
+}
+
+/**
+ * 包含优先级评分的传输链路对象
+ */
+export interface PrioritizedTransmissionLink {
+  link: SatelliteTransmissionLink
+  priority: LinkPriorityMetrics
+}
+
+/**
+ * 链路优先级多维评价权重
+ */
+export interface PriorityWeights {
+  /** 卫星威胁度权重，默认 0.35 */
+  threat: number
+  /** 最早传输时效权重，默认 0.25 */
+  earlyTime: number
+  /** 孤立度/无复用权重，默认 0.25 */
+  isolation: number
+  /** 中继优先权重，默认 0.15 */
+  relay: number
+}
+
+/**
+ * 默认多维指标权重配置
+ * 1. 卫星威胁度最高: 35%
+ * 2. 最早开始传输: 25%
+ * 3. 优先孤立链路，没有可复用链路: 25%
+ * 4. 优先中继卫星，其次普通卫星: 15%
+ */
+export const DEFAULT_PRIORITY_WEIGHTS: PriorityWeights = {
+  threat: 0.35,
+  earlyTime: 0.25,
+  isolation: 0.25,
+  relay: 0.15,
+}
+
+/**
+ * 依据四维指标计算传输链路优先级并归一化：
+ * 1. 卫星威胁度最高 (权重 35%)
+ * 2. 最早开始传输 (权重 25%)
+ * 3. 优先孤立链路，没有可复用链路 (权重 25%)
+ * 4. 优先中继卫星，其次普通卫星 (权重 15%)
+ *
+ * @param matrix 算法矩阵数据
+ * @param links 待评估的传输链路列表 (可为全系列或单星链路)
+ * @param weights 可选的自定义权重配置
+ * @returns 按优先级降序排列的链路列表，包含完整指标分解与原因说明
+ */
+export const rankTransmissionLinksByPriority = (
+  matrix: MatrixResult | null,
+  links: SatelliteTransmissionLink[],
+  weights: PriorityWeights = DEFAULT_PRIORITY_WEIGHTS
+): PrioritizedTransmissionLink[] => {
+  if (!matrix || !links.length) return []
+
+  // 1. 构建 NORAD -> 威胁度映射
+  const threatMap = new Map<number, number>()
+    ; (matrix.threatSats || []).forEach((item) => {
+      const raw = Number(item.threatScore)
+      if (Number.isFinite(raw)) {
+        threatMap.set(item.norad, raw <= 1 ? raw * 100 : raw)
+      }
+    })
+
+  // 2. 统计每颗源卫星拥有的链路总数 (用于计算孤立度/无复用度)
+  const satLinkCountMap = new Map<number, number>()
+  links.forEach((link) => {
+    const satNode = link.nodes.find((n) => n.layer === 'SAT')
+    const norad = satNode ? Number(satNode.id) : null
+    if (norad != null && Number.isFinite(norad)) {
+      satLinkCountMap.set(norad, (satLinkCountMap.get(norad) || 0) + 1)
+    }
+  })
+
+  // 3. 提取所有链路的原始特征值
+  interface RawLinkFeatures {
+    link: SatelliteTransmissionLink
+    satNorad: number | null
+    satName: string
+    threatRaw: number
+    startMs: number
+    linkCount: number
+    isRelay: boolean
+  }
+
+  const featureList: RawLinkFeatures[] = links.map((link) => {
+    const satNode = link.nodes.find((n) => n.layer === 'SAT')
+    const satNorad = satNode ? Number(satNode.id) : null
+    const satName = satNode ? satNode.name : `Sat-${satNorad || ''}`
+    const threatRaw = (satNorad != null ? threatMap.get(satNorad) : null) ?? 50
+    const startMs = link.transmitStartMs || parseTimeToMs(link.transmitTime.split('~')[0]?.trim())
+    const linkCount = (satNorad != null ? satLinkCountMap.get(satNorad) : null) ?? 1
+    const isRelay = link.nodes.some((n) => n.layer === 'RELAY')
+
+    return {
+      link,
+      satNorad,
+      satName,
+      threatRaw,
+      startMs,
+      linkCount,
+      isRelay,
+    }
+  })
+
+  // 4. 计算极值以进行归一化
+  let minThreat = Infinity, maxThreat = -Infinity
+  let minStart = Infinity, maxStart = -Infinity
+  let minLinkCount = Infinity, maxLinkCount = -Infinity
+
+  featureList.forEach((f) => {
+    if (f.threatRaw < minThreat) minThreat = f.threatRaw
+    if (f.threatRaw > maxThreat) maxThreat = f.threatRaw
+
+    if (f.startMs < minStart) minStart = f.startMs
+    if (f.startMs > maxStart) maxStart = f.startMs
+
+    if (f.linkCount < minLinkCount) minLinkCount = f.linkCount
+    if (f.linkCount > maxLinkCount) maxLinkCount = f.linkCount
+  })
+
+  if (!Number.isFinite(minThreat)) { minThreat = 0; maxThreat = 100 }
+  if (!Number.isFinite(minStart)) { minStart = 0; maxStart = 0 }
+  if (!Number.isFinite(minLinkCount)) { minLinkCount = 1; maxLinkCount = 1 }
+
+  // 5. 逐个归一化并计算加权总分
+  const totalWeight = weights.threat + weights.earlyTime + weights.isolation + weights.relay || 1.0
+
+  const scoredList: PrioritizedTransmissionLink[] = featureList.map((f) => {
+    // 5.1 威胁度归一化 [0, 1]
+    let threatNorm = 0.5
+    if (maxThreat > minThreat) {
+      threatNorm = (f.threatRaw - minThreat) / (maxThreat - minThreat)
+    } else {
+      threatNorm = Math.min(Math.max(f.threatRaw / 100, 0), 1)
+    }
+
+    // 5.2 传输最早时间归一化 [0, 1]（越早越接近 1.0）
+    let earlyTimeNorm = 1.0
+    if (maxStart > minStart) {
+      earlyTimeNorm = (maxStart - f.startMs) / (maxStart - minStart)
+    }
+
+    // 5.3 孤立度归一化 [0, 1]（链路越少越孤立，1条链路为最孤立）
+    let isolationNorm = 1.0
+    if (maxLinkCount > minLinkCount) {
+      isolationNorm = (maxLinkCount - f.linkCount) / (maxLinkCount - minLinkCount)
+    } else {
+      isolationNorm = f.linkCount === 1 ? 1.0 : 1 / f.linkCount
+    }
+
+    // 5.4 中继优先级归一化 [0, 1]
+    const relayNorm = f.isRelay ? 1.0 : 0.2
+
+    // 5.5 加权总分 (0 - 100)
+    const weightedSum =
+      (weights.threat * threatNorm +
+        weights.earlyTime * earlyTimeNorm +
+        weights.isolation * isolationNorm +
+        weights.relay * relayNorm) /
+      totalWeight
+
+    const totalScore = Number((weightedSum * 100).toFixed(1))
+
+    // 5.6 生成分项与综合原因
+    const reasonTags: string[] = []
+    const timeStr = f.link.transmitTime.split('~')[0]?.trim() || f.link.transmitTime
+
+    let threatText = ''
+    if (threatNorm >= 0.7 || f.threatRaw >= 70) {
+      reasonTags.push(`高威胁(${f.threatRaw.toFixed(0)}分)`)
+      threatText = `源卫星【${f.satName}】威胁度高达 ${f.threatRaw.toFixed(0)} 分，属于高价值情报节点`
+    } else {
+      threatText = `源卫星【${f.satName}】威胁度评分为 ${f.threatRaw.toFixed(0)} 分`
+    }
+
+    let timeText = ''
+    if (earlyTimeNorm >= 0.8) {
+      reasonTags.push('紧急下传')
+      timeText = `传输最早于 ${timeStr} 启动，拦截响应窗口最紧迫`
+    } else {
+      timeText = `传输开始时间为 ${timeStr}，响应窗口尚算宽裕`
+    }
+
+    let isolationText = ''
+    if (f.linkCount === 1) {
+      reasonTags.push('独占孤立')
+      isolationText = `该星仅有 1 条通信链路（无可复用备用路径），阻断该链路可使其彻底失效`
+    } else if (f.linkCount <= 2) {
+      reasonTags.push(`低冗余(${f.linkCount}条)`)
+      isolationText = `该星仅有 ${f.linkCount} 条下传链路，备用路径极少，具备极高阻断效益`
+    } else {
+      isolationText = `该星共有 ${f.linkCount} 条关联链路，存在备用下传通道`
+    }
+
+    let relayText = ''
+    if (f.isRelay) {
+      const relayNode = f.link.nodes.find((n) => n.layer === 'RELAY')
+      const relayName = relayNode ? relayNode.name : '中继卫星'
+      reasonTags.push(`中继枢纽(${relayName})`)
+      relayText = `经由中继星【${relayName}】转发下传，破坏该链路可瘫痪天基中继聚合通道`
+    } else {
+      relayText = `直接下传至地面接收站`
+    }
+
+    const reason = `${threatText}；${timeText}；${isolationText}；${relayText}。`
+
+    return {
+      link: f.link,
+      priority: {
+        threatScoreRaw: f.threatRaw,
+        threatScoreNorm: Number(threatNorm.toFixed(3)),
+        transmitStartMs: f.startMs,
+        earlyTimeNorm: Number(earlyTimeNorm.toFixed(3)),
+        satelliteLinkCount: f.linkCount,
+        isolationNorm: Number(isolationNorm.toFixed(3)),
+        isRelay: f.isRelay,
+        relayNorm: Number(relayNorm.toFixed(3)),
+        totalScore,
+        rank: 0,
+        reason,
+        reasonDetails: {
+          threatText,
+          timeText,
+          isolationText,
+          relayText,
+        },
+        reasonTags,
+      },
+    }
+  })
+
+  // 6. 按综合得分降序排序（同分时按传输时间升序，再按威胁度降序）
+  scoredList.sort((a, b) => {
+    if (b.priority.totalScore !== a.priority.totalScore) {
+      return b.priority.totalScore - a.priority.totalScore
+    }
+    if (a.priority.transmitStartMs !== b.priority.transmitStartMs) {
+      return a.priority.transmitStartMs - b.priority.transmitStartMs
+    }
+    return b.priority.threatScoreRaw - a.priority.threatScoreRaw
+  })
+
+  // 7. 分配名次
+  scoredList.forEach((item, idx) => {
+    item.priority.rank = idx + 1
+  })
+
+  return scoredList
+}
+

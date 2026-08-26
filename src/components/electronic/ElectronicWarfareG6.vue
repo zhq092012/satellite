@@ -115,8 +115,14 @@
         </div>
 
         <div class="topo-side topo-side--right">
-          <TopoRightPanel :matrix-data="matrixData" :selected-norad="selectedNorad" :selected-link-id="selectedLinkId"
-            :selected-node-id="selectedPanelNodeId" :selected-node-layer="selectedPanelNodeLayer" />
+          <TopoRightPanel
+            :matrix-data="matrixData"
+            :selected-norad="selectedNorad"
+            :selected-link-id="selectedLinkId"
+            :selected-node-id="selectedPanelNodeId"
+            :selected-node-layer="selectedPanelNodeLayer"
+            @select-link="handleSelectLink"
+          />
         </div>
       </div>
 
