@@ -78,6 +78,16 @@
               @keydown.enter.prevent="handleLinkCardClick(link)">
               <div class="link-card-header">
                 <span class="link-index">链路 {{ idx + 1 }}</span>
+                <div class="link-metrics-row">
+                  <div class="link-metric-card">
+                    <span class="link-metric-label">链路时长</span>
+                    <strong>{{ formatElapsedTime(link.transmitEndMs - link.transmitStartMs) }}</strong>
+                  </div>
+                  <div class="link-metric-card">
+                    <span class="link-metric-label">链路时延</span>
+                    <strong>{{ formatElapsedTime(link.transmitEndMs - taskStartMs) }}</strong>
+                  </div>
+                </div>
               </div>
 
               <div class="link-flow-row">
@@ -129,6 +139,21 @@ import {
 
 const router = useRouter()
 const store = useLayoutStore()
+
+/** 当前任务起始时间戳，用于计算链路时延。 */
+const taskStartMs = computed(() => {
+  const beginDate = store.activedTask?.beginDate
+  if (!beginDate) return 0
+  const timestamp = new Date(beginDate.replace(/-/g, '/')).getTime()
+  return Number.isNaN(timestamp) ? 0 : timestamp
+})
+
+/** 将毫秒时长格式化为小时和分钟。 */
+const formatElapsedTime = (durationMs: number): string => {
+  if (!Number.isFinite(durationMs) || durationMs < 0) return '--'
+  const totalMinutes = Math.floor(durationMs / 60000)
+  return `${Math.floor(totalMinutes / 60)}时${totalMinutes % 60}分`
+}
 
 /**
  * 快捷跳转页面
@@ -501,9 +526,13 @@ onMounted(() => {
   .link-card-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+
 
     .link-index {
-      font-size: 11px;
+      font-size: 14px;
+      flex-shrink: 0;
       font-weight: 700;
       color: #7dd3fc;
     }
@@ -564,6 +593,36 @@ onMounted(() => {
   padding: 4px 8px;
   border-radius: 4px;
   background: rgba(148, 163, 184, 0.08);
+}
+
+.link-metrics-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.link-metric-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+
+  .link-metric-label {
+    color: #8494aa;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  strong {
+    color: #d2d440;
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
 }
 
 .link-meta-row {
