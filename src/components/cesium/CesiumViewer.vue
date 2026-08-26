@@ -740,7 +740,7 @@ const showTransmissionLink = (link: SatelliteTransmissionLink | null) => {
           color: TRANSMISSION_LINK_LINE_COLOR,
           dashLength: 18,
         }),
-        arcType: Cesium.ArcType.NONE,
+        arcType: Cesium.ArcType.GEODESIC,
       },
     })
     transmissionLinkEntityIds.add(entityId)
@@ -1220,7 +1220,7 @@ const setClockPlaying = (playing: boolean, multiplier?: number) => {
   playbackSpeed.value = mult
   viewer.clock.multiplier = mult
   viewer.clock.shouldAnimate = playing
- 
+
 }
 
 watch(
@@ -1486,14 +1486,14 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
           new Cesium.TimeInterval({ start: currentViewer.clock.startTime, stop: currentViewer.clock.stopTime }),
         ]),
         position: positionProperty,
-     
+
         point: {
           pixelSize: 8,
           color: Cesium.Color.BLUE,
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: 2,
           heightReference: Cesium.HeightReference.NONE,
-     
+
         },
         label: {
           text: buildSatelliteLabelText(noradId, satel.name_en),
