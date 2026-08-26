@@ -1486,7 +1486,18 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
     { id: string; name: string; earliestMs: number; receiveStruck: boolean; delayMin: number }
   >()
   const relayMap = new Map<string, { id: string; name: string }>()
-  const stationMap = new Map<string, { id: string; name: string; receiveId: string }>()
+  const stationMap = new Map<string, { id: string; name: string; receiveId: string; stationStruck: boolean }>()
+  /**
+   * 解析数据中心是否被打击（优先打击后关系表，回退初始关系表）
+   * @param stationId 数据中心 ID
+   * @returns 是否被打击
+   */
+  const resolveStationStruck = (stationId: string): boolean => {
+    const stObj =
+      data.stationRelationList?.stationObjList?.find((st) => st.stationId === stationId) ||
+      data.initRelationList?.stationObjList?.find((st) => st.stationId === stationId)
+    return stObj?.stationStatus === 1
+  }
 
   links.forEach((link) => {
     const satNode = link.nodes.find((n) => n.layer === 'SAT')
@@ -1519,7 +1530,14 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
       }
       if (n.layer === 'STATION') {
         const receiveNode = link.nodes.find((x) => x.layer === 'RECEIVE')
-        stationMap.set(n.id, { id: n.id, name: n.name, receiveId: receiveNode?.id || '' })
+        const stationStruck = resolveStationStruck(n.id)
+        const existingStation = stationMap.get(n.id)
+        stationMap.set(n.id, {
+          id: n.id,
+          name: n.name,
+          receiveId: receiveNode?.id || existingStation?.receiveId || '',
+          stationStruck: stationStruck || existingStation?.stationStruck || false,
+        })
       }
     })
   })
@@ -1625,6 +1643,7 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
         kind: 'station',
         x,
         layer: 4,
+        struck: st.stationStruck,
         showLabel: true,
       })
     )
@@ -2018,6 +2037,45 @@ const parseAndSelectNode = (model: any) => {
 }
 
 /**
+ * 是否为「卫星聚焦视图」：已选卫星但未选中具体链路/地面站/时间轴标记。
+ * 该模式下应展示全部链路节点及打击配色，而非仅高亮单颗卫星、其余置灰。
+ *
+ * @returns 是否处于卫星聚焦视图
+ */
+const isSatelliteScopeSelection = (): boolean => {
+  if (selectedLinkId.value || selectedReceiveId.value || selectedTimelinePoint.value) {
+    return false
+  }
+  if (!selectedNodeInfo.value) return true
+  const { type, id } = selectedNodeInfo.value
+  return type === 'sat' || type === 'relay' || id.startsWith('sat-')
+}
+
+/**
+ * 卫星聚焦视图下恢复全部节点/链路的打击配色，并按当前时刻高亮活跃节点
+ */
+const applySatelliteScopeHighlight = () => {
+  if (!graph || graph.get('destroyed')) return
+
+  graph.getNodes().forEach((node: any) => {
+    graph.setItemState(node, 'selected', false)
+    graph.setItemState(node, 'inactive', false)
+    graph.setItemState(node, 'highlight', false)
+    graph.setItemState(node, 'active', false)
+  })
+
+  graph.getEdges().forEach((edge: any) => {
+    const model = edge.getModel()
+    graph.updateItem(edge, { style: buildLinkEdgeStyle(!!model.linkStruck, false) })
+    graph.setItemState(edge, 'highlight', false)
+    graph.setItemState(edge, 'inactive', false)
+    graph.setItemState(edge, 'active', false)
+  })
+
+  highlightActiveElements()
+}
+
+/**
  * 更新 G6 图节点与链路的选中/高亮样式
  */
 const updateGraphHighlightState = () => {
@@ -2087,12 +2145,12 @@ const updateGraphHighlightState = () => {
     return
   }
 
-  if (!selectedNodeInfo.value) {
-    highlightActiveElements()
+  if (isSatelliteScopeSelection()) {
+    applySatelliteScopeHighlight()
     return
   }
 
-  const selId = selectedNodeInfo.value.id
+  const selId = selectedNodeInfo.value!.id
 
   graph.getNodes().forEach((node: any) => {
     const id = node.get('id')
