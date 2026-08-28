@@ -24,8 +24,7 @@
           class="link-card" :class="[
             { active: selectedLinkId === item.id, struck: item.struck, ok: !item.struck },
             item.rank ? `rank-card--${item.rank}` : ''
-          ]"
-          @click="handleSelect(item)">
+          ]" @click="handleSelect(item)">
           <div class="link-card-top">
             <div class="link-path">
               <template v-for="(node, idx) in item.nodes" :key="`${item.id}-${idx}`">
@@ -237,13 +236,13 @@ watch(
   margin-bottom: 10px;
 
   .header-title {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
     color: #40f2ff;
   }
 
   .count-tag {
-    font-size: 11px;
+    font-size: 12px;
     padding: 1px 8px;
     border-radius: 10px;
     background: rgba(56, 189, 248, 0.15);
@@ -261,11 +260,11 @@ watch(
   border-radius: 6px;
   background: rgba(0, 225, 255, 0.08);
   border: 1px solid rgba(0, 225, 255, 0.2);
-  font-size: 12px;
+  font-size: 13px;
   color: #bae6fd;
 
   .norad-tag {
-    font-size: 10px;
+    font-size: 11px;
     color: #94a3b8;
   }
 }
@@ -371,11 +370,11 @@ watch(
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
 
     .path-icon {
-      font-size: 11px;
+      font-size: 12px;
       flex-shrink: 0;
     }
 
@@ -402,7 +401,7 @@ watch(
 
   .path-arrow {
     color: #475569;
-    font-size: 11px;
+    font-size: 12px;
     flex-shrink: 0;
   }
 
@@ -425,7 +424,7 @@ watch(
     }
 
     .score-mini-pill {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       color: #40f2ff;
       background: rgba(0, 225, 255, 0.12);
@@ -440,7 +439,7 @@ watch(
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.45;
 
     .meta-key {
@@ -476,6 +475,7 @@ watch(
 
   &.rank-card--1 {
     border-left-color: #eab308;
+
     &.active {
       border-color: #facc15;
       box-shadow: 0 0 12px rgba(234, 179, 8, 0.3);
@@ -484,6 +484,7 @@ watch(
 
   &.rank-card--2 {
     border-left-color: #38bdf8;
+
     &.active {
       border-color: #38bdf8;
       box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
@@ -492,6 +493,7 @@ watch(
 
   &.rank-card--3 {
     border-left-color: #fb923c;
+
     &.active {
       border-color: #fb923c;
       box-shadow: 0 0 12px rgba(251, 146, 60, 0.3);
@@ -500,7 +502,7 @@ watch(
 }
 
 .rank-mini-tag {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   padding: 1px 5px;
   border-radius: 3px;
@@ -527,7 +529,7 @@ watch(
 
 .status-badge {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 11px;
   padding: 2px 7px;
   border-radius: 4px;
   font-weight: 700;
@@ -546,7 +548,7 @@ watch(
 }
 
 .selected-indicator {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 4px;
@@ -559,7 +561,7 @@ watch(
 .empty-tip {
   padding: 24px 8px;
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: #64748b;
   line-height: 1.6;
 

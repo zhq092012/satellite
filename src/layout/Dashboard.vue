@@ -20,7 +20,6 @@
             </div>
             <div class="user-meta">
               <span class="user-name">{{ displayUserName }}</span>
-              <span class="user-role-tag">{{ displayRoleText }}</span>
             </div>
             <button type="button" class="sci-logout-btn" @click="handleLogout">
               <span>退出登录</span>
@@ -476,14 +475,14 @@ onUnmounted(() => { })
           gap: 2px;
 
           .user-name {
-            font-size: 13px;
+            font-size: 15px;
             font-weight: 700;
             color: #f1f7ff;
             line-height: 1.2;
           }
 
           .user-role-tag {
-            font-size: 11px;
+            font-size: 13px;
             color: #7dd3fc;
             background: rgba(0, 225, 255, 0.1);
             padding: 1px 6px;
@@ -500,7 +499,7 @@ onUnmounted(() => { })
           gap: 6px;
           padding: 6px 12px;
           border-radius: 6px;
-          font-size: 12px;
+          font-size: 14px;
           font-weight: 600;
           background: rgba(239, 68, 68, 0.12);
           border: 1px solid rgba(239, 68, 68, 0.35);

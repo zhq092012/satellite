@@ -298,9 +298,9 @@ onMounted(async () => {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 16px;
-        font-size: 14px;
-        font-weight: 500;
+        padding: 7px 18px;
+        font-size: 16px;
+        font-weight: 600;
         color: #8eb3d6;
         background: rgba(16, 36, 62, 0.6);
         border: 1px solid rgba(79, 147, 221, 0.25);
@@ -309,7 +309,7 @@ onMounted(async () => {
         transition: all 0.25s ease;
 
         .btn-icon {
-          font-size: 14px;
+          font-size: 16px;
         }
 
         &:hover {
@@ -344,7 +344,7 @@ onMounted(async () => {
         border-radius: 20px;
         cursor: pointer;
         transition: all 0.25s ease;
-        font-size: 13px;
+        font-size: 15px;
 
         &:hover {
           border-color: #00e1ff;
@@ -367,6 +367,7 @@ onMounted(async () => {
         .switch-btn {
           margin-left: 4px;
           color: #4f93dd;
+          font-size: 15px;
         }
       }
 

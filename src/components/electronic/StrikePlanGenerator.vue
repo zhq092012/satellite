@@ -8,7 +8,7 @@
       </div>
 
       <div class="header-center">
-        <span class="type-label">方案名称</span>
+        <span class="type-label">方案名称：</span>
         <div class="type-selector">
           <button v-for="item in usageTypeOptions" :key="item.value" class="type-btn"
             :class="{ active: store.selectedZhchUsageTypes.includes(item.value) }"
@@ -16,32 +16,19 @@
             {{ item.label }}
           </button>
         </div>
-        <el-button type="primary" size="small" :loading="store.zhchPlanLoading" @click="handleGenerate">
-          生成方案
+
+      </div>
+
+
+      <div class="header-right">
+        <el-button type="primary" size="default" :loading="store.zhchPlanLoading" @click="handleGenerate">
+          <span class="btn-icon">⚡</span> 生成方案
         </el-button>
-        <el-button size="small" :loading="cacheClearing" @click="handleClearCache">
-          清除缓存
+        <el-button type="warning" size="default" :loading="cacheClearing" @click="handleClearCache">
+          <span class="btn-icon">🗑️</span> 清除缓存
         </el-button>
       </div>
 
-      <div class="header-right" v-if="isSingleMode && primaryPlan">
-        <div class="stat-badge-item">
-          <span class="label">卫星</span>
-          <span class="value glow-text-cyan">{{ primaryPlan.satNum }} 颗</span>
-        </div>
-        <div class="stat-badge-item">
-          <span class="label">接收站</span>
-          <span class="value glow-text-yellow">{{ primaryPlan.receiveNum }} 个</span>
-        </div>
-        <div class="stat-badge-item">
-          <span class="label">武器</span>
-          <span class="value glow-text-red">{{ primaryPlan.weaponNum }} 套</span>
-        </div>
-        <div class="stat-badge-item">
-          <span class="label">平均延迟</span>
-          <span class="value">{{ primaryPlan.avgDelayMin }} 分钟</span>
-        </div>
-      </div>
     </div>
 
     <!-- 主体内容 -->
@@ -121,7 +108,8 @@
               <p class="summary-text">{{ getPlanByType(usageType)!.summary || '暂无概述' }}</p>
               <div class="weapon-types" v-if="getPlanByType(usageType)!.weaponTypes?.length">
                 <span class="weapon-types-label">武器类型：</span>
-                <span class="weapon-type-chip">{{ getPlanByType(usageType)!.weaponTypes.join('、') }}</span>
+                <span v-for="(wt, idx) in getPlanByType(usageType)!.weaponTypes" :key="wt" class="weapon-type-chip">
+                  {{ wt }}{{ idx < getPlanByType(usageType)!.weaponTypes.length - 1 ? '、' : '' }} </span>
               </div>
             </div>
 
@@ -368,9 +356,9 @@ const PlanStatsRow = defineComponent({
   setup(props) {
     return () =>
       h('div', { class: ['plan-stats-row', props.compact ? 'plan-stats-row--compact' : ''] }, [
-        h('span', { class: 'stat' }, [`卫星 ${props.plan.satNum}`]),
-        h('span', { class: 'stat' }, [`接收站 ${props.plan.receiveNum}`]),
-        h('span', { class: 'stat' }, [`武器 ${props.plan.weaponNum}`]),
+        h('span', { class: 'stat stat--sat' }, [`卫星 ${props.plan.satNum}`]),
+        h('span', { class: 'stat stat--station' }, [`接收站 ${props.plan.receiveNum}`]),
+        h('span', { class: 'stat stat--weapon' }, [`武器 ${props.plan.weaponNum}`]),
         h('span', { class: 'stat stat--delay' }, [`延迟 ${props.plan.avgDelayMin} 分`]),
       ])
   },
@@ -552,7 +540,7 @@ watch(
     flex-wrap: wrap;
 
     .type-label {
-      font-size: 13px;
+      font-size: 16px;
       color: #94a3b8;
     }
 
@@ -582,6 +570,43 @@ watch(
           border-color: #00e1ff;
           box-shadow: 0 0 10px rgba(0, 225, 255, 0.35);
         }
+      }
+    }
+
+    :deep(.atlas-app-button) {
+      height: auto;
+      padding: 5px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+
+      .btn-icon {
+        margin-right: 2px;
+      }
+    }
+
+    :deep(.atlas-app-button--primary) {
+      background: linear-gradient(135deg, rgba(79, 147, 221, 0.85) 0%, rgba(0, 180, 216, 0.9) 100%);
+      border-color: #00e1ff;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(0, 225, 255, 0.35);
+
+      &:hover {
+        background: linear-gradient(135deg, rgba(79, 147, 221, 1) 0%, rgba(0, 180, 216, 1) 100%);
+        border-color: #00e1ff;
+      }
+    }
+
+    :deep(.atlas-app-button--default) {
+      background: rgba(16, 36, 62, 0.7);
+      border: 1px solid rgba(79, 147, 221, 0.3);
+      color: #8eb3d6;
+
+      &:hover {
+        color: #fff;
+        border-color: rgba(0, 225, 255, 0.5);
+        background: rgba(16, 36, 62, 0.9);
       }
     }
   }
@@ -761,17 +786,19 @@ watch(
 
   .column-head {
     flex-shrink: 0;
-    padding: 12px 14px;
+    padding: 14px 16px;
     border-bottom: 1px solid rgba(79, 147, 221, 0.2);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
   }
 
   .column-title {
-    font-size: 15px;
-    font-weight: 700;
+    font-size: 20px;
+    font-weight: 800;
     color: #40f2ff;
+    letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(64, 242, 255, 0.45);
   }
 
   .column-body {
@@ -787,26 +814,45 @@ watch(
 :deep(.plan-stats-row) {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 
   .stat {
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 6px;
     background: rgba(8, 15, 26, 0.6);
     color: #cbd5e1;
     border: 1px solid rgba(79, 147, 221, 0.2);
 
-    &--delay {
+    &--sat {
+      color: #38bdf8;
+      border-color: rgba(56, 189, 248, 0.35);
+    }
+
+    &--station {
       color: #fbbf24;
-      border-color: rgba(251, 191, 36, 0.3);
+      border-color: rgba(251, 191, 36, 0.35);
+    }
+
+    &--weapon {
+      color: #f87171;
+      border-color: rgba(248, 113, 113, 0.35);
+    }
+
+    &--delay {
+      color: #4ade80;
+      font-weight: 800;
+      background: rgba(74, 222, 128, 0.1);
+      border: 1px solid rgba(74, 222, 128, 0.45);
+      box-shadow: 0 0 10px rgba(74, 222, 128, 0.25);
     }
   }
 }
 
 :deep(.plan-stats-row--compact .stat) {
-  font-size: 10px;
-  padding: 2px 6px;
+  font-size: 11px;
+  padding: 2px 7px;
 }
 
 .matrix-toggle-btn {
@@ -815,8 +861,9 @@ watch(
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 8px 12px;
-  font-size: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
   color: #7dd3fc;
   background: rgba(0, 225, 255, 0.08);
   border: 1px dashed rgba(0, 225, 255, 0.35);
@@ -830,8 +877,10 @@ watch(
   }
 
   .toggle-count {
-    font-size: 10px;
-    color: #94a3b8;
+    font-size: 13px;
+    font-weight: 800;
+    color: #40f2ff;
+    text-shadow: 0 0 8px rgba(64, 242, 255, 0.4);
   }
 }
 
@@ -842,31 +891,34 @@ watch(
   border: 1px solid rgba(79, 147, 221, 0.25);
 
   &.compact {
-    padding: 10px 12px;
+    padding: 12px 14px;
   }
 
   .summary-title {
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 16px;
+    font-weight: 800;
     color: #7dd3fc;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
+    padding-left: 8px;
+    border-left: 3px solid #00e1ff;
   }
 
   .summary-text {
     margin: 0;
-    font-size: 12px;
-    line-height: 1.6;
-    color: #cbd5e1;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #e2e8f0;
   }
 
   .weapon-types {
-    margin-top: 8px;
-    font-size: 11px;
+    margin-top: 10px;
+    font-size: 13px;
     color: #94a3b8;
 
     .weapon-type-chip {
-      color: #fca5a5;
-      font-weight: 600;
+      color: #7dd3fc;
+      font-weight: 700;
+      text-shadow: 0 0 6px rgba(125, 211, 252, 0.35);
     }
   }
 }

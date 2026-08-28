@@ -73,6 +73,11 @@ const handleTabChange = (tabName: string) => {
   color: var(--text-color-strong);
   box-sizing: border-box;
 
+  :deep(.atlas-app-tabs__item) {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
   :deep(.el-card__body) {
     padding: 6px 12px 12px 12px;
   }

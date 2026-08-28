@@ -7,21 +7,12 @@
         <span class="header-title">链路决策与详情</span>
       </div>
       <div class="tab-switcher">
-        <button
-          type="button"
-          class="tab-btn"
-          :class="{ active: activeTab === 'priority' }"
-          @click="activeTab = 'priority'"
-        >
+        <button type="button" class="tab-btn" :class="{ active: activeTab === 'priority' }"
+          @click="activeTab = 'priority'">
           <span>🎯 优先推荐</span>
           <span class="tab-count-badge" v-if="top3PriorityLinks.length">TOP 3</span>
         </button>
-        <button
-          type="button"
-          class="tab-btn"
-          :class="{ active: activeTab === 'detail' }"
-          @click="activeTab = 'detail'"
-        >
+        <button type="button" class="tab-btn" :class="{ active: activeTab === 'detail' }" @click="activeTab = 'detail'">
           <span>🔍 节点/详情</span>
           <span class="tab-dot" v-if="detail"></span>
         </button>
@@ -65,21 +56,13 @@
 
         <!-- TOP 3 推荐链路列表 -->
         <div class="top-list">
-          <div
-            v-for="item in top3PriorityLinks"
-            :key="item.link.id"
-            class="priority-card"
-            :class="[
-              `rank-${item.priority.rank}`,
-              {
-                active: selectedLinkId === item.link.id,
-                struck: item.link.struck,
-              },
-            ]"
-            role="button"
-            tabindex="0"
-            @click="handleSelectPriorityLink(item.link.id)"
-          >
+          <div v-for="item in top3PriorityLinks" :key="item.link.id" class="priority-card" :class="[
+            `rank-${item.priority.rank}`,
+            {
+              active: selectedLinkId === item.link.id,
+              struck: item.link.struck,
+            },
+          ]" role="button" tabindex="0" @click="handleSelectPriorityLink(item.link.id)">
             <!-- 卡片头部：名次、综合得分、状态 -->
             <div class="card-header-row">
               <div class="rank-badge-wrap">
@@ -114,10 +97,8 @@
               <div class="dim-item">
                 <span class="dim-label">🚨 卫星威胁</span>
                 <div class="dim-val-bar">
-                  <div
-                    class="dim-fill dim-fill--threat"
-                    :style="{ width: `${item.priority.threatScoreNorm * 100}%` }"
-                  ></div>
+                  <div class="dim-fill dim-fill--threat" :style="{ width: `${item.priority.threatScoreNorm * 100}%` }">
+                  </div>
                 </div>
                 <span class="dim-score">{{ item.priority.threatScoreRaw.toFixed(0) }}分</span>
               </div>
@@ -125,10 +106,8 @@
               <div class="dim-item">
                 <span class="dim-label">⏱️ 传输时效</span>
                 <div class="dim-val-bar">
-                  <div
-                    class="dim-fill dim-fill--time"
-                    :style="{ width: `${item.priority.earlyTimeNorm * 100}%` }"
-                  ></div>
+                  <div class="dim-fill dim-fill--time" :style="{ width: `${item.priority.earlyTimeNorm * 100}%` }">
+                  </div>
                 </div>
                 <span class="dim-score">{{ (item.priority.earlyTimeNorm * 100).toFixed(0) }}%</span>
               </div>
@@ -136,21 +115,17 @@
               <div class="dim-item">
                 <span class="dim-label">🔗 链路孤立</span>
                 <div class="dim-val-bar">
-                  <div
-                    class="dim-fill dim-fill--iso"
-                    :style="{ width: `${item.priority.isolationNorm * 100}%` }"
-                  ></div>
+                  <div class="dim-fill dim-fill--iso" :style="{ width: `${item.priority.isolationNorm * 100}%` }"></div>
                 </div>
-                <span class="dim-score">{{ item.priority.satelliteLinkCount === 1 ? '独占' : `${item.priority.satelliteLinkCount}条` }}</span>
+                <span class="dim-score">{{ item.priority.satelliteLinkCount === 1 ? '独占' :
+                  `${item.priority.satelliteLinkCount}条`
+                }}</span>
               </div>
 
               <div class="dim-item">
                 <span class="dim-label">📡 节点类型</span>
                 <div class="dim-val-bar">
-                  <div
-                    class="dim-fill dim-fill--relay"
-                    :style="{ width: `${item.priority.relayNorm * 100}%` }"
-                  ></div>
+                  <div class="dim-fill dim-fill--relay" :style="{ width: `${item.priority.relayNorm * 100}%` }"></div>
                 </div>
                 <span class="dim-score">{{ item.priority.isRelay ? '中继' : '直连' }}</span>
               </div>
@@ -194,13 +169,8 @@
               <span class="action-hint">
                 {{ selectedLinkId === item.link.id ? '✓ 当前已在拓扑中高亮' : '点击在拓扑图中高亮此链路' }}
               </span>
-              <el-button
-                size="small"
-                link
-                type="primary"
-                class="view-detail-link"
-                @click.stop="viewLinkFullDetail(item.link.id)"
-              >
+              <el-button size="small" link type="primary" class="view-detail-link"
+                @click.stop="viewLinkFullDetail(item.link.id)">
                 查看完整参数 →
               </el-button>
             </div>
@@ -242,12 +212,8 @@
           </div>
 
           <div class="meta-grid">
-            <div
-              v-for="row in detail.metaRows"
-              :key="row.label"
-              class="meta-row"
-              :class="row.tone ? `meta-row--${row.tone}` : ''"
-            >
+            <div v-for="row in detail.metaRows" :key="row.label" class="meta-row"
+              :class="row.tone ? `meta-row--${row.tone}` : ''">
               <span class="meta-label">{{ row.label }}</span>
               <strong class="meta-val">{{ row.value }}</strong>
             </div>
@@ -299,7 +265,8 @@
 
         <div v-else-if="detail.connections?.length" class="section-block">
           <div class="section-title">拓扑关联</div>
-          <div v-for="(conn, idx) in detail.connections" :key="idx" class="conn-item" :class="`conn-item--${conn.layer}`">
+          <div v-for="(conn, idx) in detail.connections" :key="idx" class="conn-item"
+            :class="`conn-item--${conn.layer}`">
             <span class="conn-icon">{{ conn.icon }}</span>
             <span class="conn-layer">{{ conn.direction === 'up' ? '←' : '→' }} {{ conn.layerLabel }}</span>
             <span class="conn-name">{{ conn.name }}</span>
@@ -692,7 +659,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
     color: #40f2ff;
     white-space: nowrap;
@@ -718,7 +685,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     border: none;
     background: transparent;
     color: #94a3b8;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -736,7 +703,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     }
 
     .tab-count-badge {
-      font-size: 9px;
+      font-size: 10px;
       padding: 1px 4px;
       border-radius: 3px;
       background: rgba(234, 179, 8, 0.25);
@@ -770,7 +737,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     display: flex;
     align-items: center;
     gap: 5px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     color: #7dd3fc;
     margin-bottom: 6px;
@@ -786,7 +753,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 10px;
+    font-size: 11px;
     padding: 1px 6px;
     border-radius: 3px;
     background: rgba(8, 18, 32, 0.7);
@@ -799,10 +766,21 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
       border-radius: 50%;
     }
 
-    &.chip--threat .chip-dot { background: #f87171; }
-    &.chip--time .chip-dot { background: #fbbf24; }
-    &.chip--iso .chip-dot { background: #34d399; }
-    &.chip--relay .chip-dot { background: #c084fc; }
+    &.chip--threat .chip-dot {
+      background: #f87171;
+    }
+
+    &.chip--time .chip-dot {
+      background: #fbbf24;
+    }
+
+    &.chip--iso .chip-dot {
+      background: #34d399;
+    }
+
+    &.chip--relay .chip-dot {
+      background: #c084fc;
+    }
   }
 }
 
@@ -890,7 +868,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     gap: 4px;
     padding: 2px 7px;
     border-radius: 4px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.5px;
 
@@ -926,19 +904,19 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     border: 1px solid rgba(0, 225, 255, 0.25);
 
     .score-label {
-      font-size: 9px;
+      font-size: 10px;
       color: #94a3b8;
     }
 
     .score-number {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 800;
       color: #40f2ff;
       font-family: Consolas, monospace;
     }
 
     .score-unit {
-      font-size: 9px;
+      font-size: 10px;
       color: #7dd3fc;
     }
   }
@@ -959,22 +937,33 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
 
     .flow-icon {
-      font-size: 11px;
+      font-size: 12px;
     }
 
-    &--sat .flow-name { color: #67e8f9; }
-    &--relay .flow-name { color: #c4b5fd; }
-    &--receive .flow-name { color: #5eead4; }
-    &--station .flow-name { color: #93c5fd; }
+    &--sat .flow-name {
+      color: #67e8f9;
+    }
+
+    &--relay .flow-name {
+      color: #c4b5fd;
+    }
+
+    &--receive .flow-name {
+      color: #5eead4;
+    }
+
+    &--station .flow-name {
+      color: #93c5fd;
+    }
   }
 
   .flow-arrow {
     color: #475569;
-    font-size: 10px;
+    font-size: 11px;
   }
 }
 
@@ -991,7 +980,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 10px;
+    font-size: 11px;
 
     .dim-label {
       color: #94a3b8;
@@ -1012,15 +1001,26 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
         border-radius: 2px;
         transition: width 0.3s ease;
 
-        &--threat { background: linear-gradient(90deg, #f87171, #ef4444); }
-        &--time { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
-        &--iso { background: linear-gradient(90deg, #34d399, #10b981); }
-        &--relay { background: linear-gradient(90deg, #c084fc, #a855f7); }
+        &--threat {
+          background: linear-gradient(90deg, #f87171, #ef4444);
+        }
+
+        &--time {
+          background: linear-gradient(90deg, #fbbf24, #f59e0b);
+        }
+
+        &--iso {
+          background: linear-gradient(90deg, #34d399, #10b981);
+        }
+
+        &--relay {
+          background: linear-gradient(90deg, #c084fc, #a855f7);
+        }
       }
     }
 
     .dim-score {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       color: #e2efff;
       width: 28px;
@@ -1042,7 +1042,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-    font-size: 11px;
+    font-size: 12px;
     color: #40f2ff;
     margin-bottom: 6px;
 
@@ -1059,7 +1059,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   }
 
   .reason-tag {
-    font-size: 9px;
+    font-size: 10px;
     padding: 0 4px;
     border-radius: 3px;
     background: rgba(0, 225, 255, 0.12);
@@ -1074,7 +1074,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.45;
     color: #cbd5e1;
 
@@ -1103,14 +1103,14 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   align-items: center;
   justify-content: space-between;
   padding-top: 4px;
-  font-size: 10px;
+  font-size: 11px;
 
   .action-hint {
     color: #64748b;
   }
 
   .view-detail-link {
-    font-size: 10px;
+    font-size: 11px;
     padding: 0;
     height: auto;
   }
@@ -1164,30 +1164,44 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 700;
 
-    .path-icon { font-size: 12px; }
-    &--sat .path-name { color: #67e8f9; }
-    &--relay .path-name { color: #c4b5fd; }
-    &--receive .path-name { color: #5eead4; }
-    &--station .path-name { color: #93c5fd; }
+    .path-icon {
+      font-size: 13px;
+    }
+
+    &--sat .path-name {
+      color: #67e8f9;
+    }
+
+    &--relay .path-name {
+      color: #c4b5fd;
+    }
+
+    &--receive .path-name {
+      color: #5eead4;
+    }
+
+    &--station .path-name {
+      color: #93c5fd;
+    }
   }
 
   .path-arrow {
     color: #475569;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .detail-name {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 700;
     color: #fff;
     word-break: break-all;
   }
 
   .detail-type {
-    font-size: 11px;
+    font-size: 12px;
     color: #7dd3fc;
     margin-top: 4px;
   }
@@ -1195,7 +1209,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
 
 .status-badge {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 11px;
   padding: 2px 8px;
   border-radius: 4px;
   font-weight: 700;
@@ -1225,7 +1239,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   grid-template-columns: 72px 1fr;
   gap: 10px;
   align-items: start;
-  font-size: 12px;
+  font-size: 13px;
   padding: 7px 0;
   border-bottom: 1px dashed rgba(148, 163, 184, 0.15);
   text-align: left;
@@ -1275,7 +1289,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   text-align: left;
 
   .section-title {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     color: #7dd3fc;
     margin-bottom: 8px;
@@ -1297,7 +1311,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   background: rgba(12, 22, 38, 0.85);
   border: 1px solid rgba(79, 147, 221, 0.18);
   border-left: 3px solid #00e1ff;
-  font-size: 11px;
+  font-size: 12px;
   text-align: left;
 
   &.struck {
@@ -1324,13 +1338,13 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   }
 
   .window-subject {
-    font-size: 10px;
+    font-size: 11px;
     color: #64748b;
     font-weight: 500;
   }
 
   .window-name {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 700;
     color: #e2efff;
     word-break: break-word;
@@ -1349,7 +1363,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   }
 
   .window-field-label {
-    font-size: 10px;
+    font-size: 11px;
     color: #64748b;
     flex-shrink: 0;
   }
@@ -1357,7 +1371,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   .window-time {
     color: #94a3b8;
     font-family: Consolas, monospace;
-    font-size: 10px;
+    font-size: 11px;
     word-break: break-all;
   }
 
@@ -1373,7 +1387,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
 
   .strike-tag {
     flex-shrink: 0;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     padding: 2px 8px;
     border-radius: 4px;
@@ -1398,7 +1412,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   gap: 6px;
 
   .weapon-chip {
-    font-size: 11px;
+    font-size: 12px;
     padding: 2px 8px;
     border-radius: 4px;
     color: #fca5a5;
@@ -1412,7 +1426,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   grid-template-columns: 24px 72px minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  font-size: 12px;
+  font-size: 13px;
   padding: 7px 10px;
   margin-bottom: 4px;
   border-radius: 4px;
@@ -1420,12 +1434,12 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   text-align: left;
 
   .conn-icon {
-    font-size: 14px;
+    font-size: 15px;
     flex-shrink: 0;
   }
 
   .conn-layer {
-    font-size: 11px;
+    font-size: 12px;
     color: #64748b;
     font-weight: 600;
   }
@@ -1436,10 +1450,21 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     word-break: break-all;
   }
 
-  &--sat .conn-name { color: #67e8f9; }
-  &--relay .conn-name { color: #c4b5fd; }
-  &--receive .conn-name { color: #5eead4; }
-  &--station .conn-name { color: #93c5fd; }
+  &--sat .conn-name {
+    color: #67e8f9;
+  }
+
+  &--relay .conn-name {
+    color: #c4b5fd;
+  }
+
+  &--receive .conn-name {
+    color: #5eead4;
+  }
+
+  &--station .conn-name {
+    color: #93c5fd;
+  }
 }
 
 .empty-box {
@@ -1450,7 +1475,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   justify-content: center;
   gap: 8px;
   color: #64748b;
-  font-size: 13px;
+  font-size: 14px;
   text-align: center;
   padding: 24px 12px;
 
@@ -1459,4 +1484,3 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   }
 }
 </style>
-

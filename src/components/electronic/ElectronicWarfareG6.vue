@@ -115,14 +115,9 @@
         </div>
 
         <div class="topo-side topo-side--right">
-          <TopoRightPanel
-            :matrix-data="matrixData"
-            :selected-norad="selectedNorad"
-            :selected-link-id="selectedLinkId"
-            :selected-node-id="selectedPanelNodeId"
-            :selected-node-layer="selectedPanelNodeLayer"
-            @select-link="handleSelectLink"
-          />
+          <TopoRightPanel :matrix-data="matrixData" :selected-norad="selectedNorad" :selected-link-id="selectedLinkId"
+            :selected-node-id="selectedPanelNodeId" :selected-node-layer="selectedPanelNodeLayer"
+            @select-link="handleSelectLink" />
         </div>
       </div>
 
@@ -2270,7 +2265,7 @@ onUnmounted(() => {
   z-index: 100;
 
   .header-title {
-    font-size: 17px;
+    font-size: 18px;
     font-weight: 700;
     color: #00e1ff;
     letter-spacing: 1px;
@@ -2314,12 +2309,12 @@ onUnmounted(() => {
   }
 
   .label-text {
-    font-size: 12px;
+    font-size: 13px;
     color: #94a3b8;
   }
 
   .status-val {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 700;
     color: #67e8f9;
     max-width: 160px;
@@ -2334,7 +2329,7 @@ onUnmounted(() => {
   gap: 8px;
 
   .label-text {
-    font-size: 12px;
+    font-size: 13px;
     color: #94a3b8;
     white-space: nowrap;
   }
@@ -2354,7 +2349,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  font-size: 13px;
+  font-size: 14px;
   color: #94a3b8;
 
   .label-text {
@@ -2416,7 +2411,7 @@ onUnmounted(() => {
   align-items: center;
   padding: 0 20px;
   gap: 20px;
-  font-size: 12px;
+  font-size: 13px;
   color: #cbd5e1;
 
   .stat-badge {
@@ -2513,13 +2508,13 @@ onUnmounted(() => {
   }
 
   .chain-banner-title {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     color: #7dd3fc;
   }
 
   .chain-banner-time {
-    font-size: 11px;
+    font-size: 12px;
     font-family: monospace;
     color: #67e8f9;
   }
@@ -2547,7 +2542,7 @@ onUnmounted(() => {
     }
 
     .step-name {
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 600;
       color: #e2e8f0;
       text-align: center;
@@ -2638,7 +2633,7 @@ onUnmounted(() => {
   }
 
   .layer-title {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     color: #00e1ff;
     line-height: 1.3;
@@ -2684,7 +2679,7 @@ onUnmounted(() => {
   padding: 6px 12px;
   border-top: 1px solid rgba(0, 225, 255, 0.12);
   background: rgba(9, 16, 30, 0.85);
-  font-size: 12px;
+  font-size: 13px;
 
   .toolbar-label {
     color: #94a3b8;
@@ -2712,14 +2707,14 @@ onUnmounted(() => {
     gap: 6px;
     border-radius: 4px;
     padding: 2px 10px;
-    font-size: 12px;
+    font-size: 13px;
 
     .badge-label {
       color: #94a3b8;
     }
 
     .badge-val {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 700;
     }
 

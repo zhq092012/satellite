@@ -3,19 +3,6 @@
     <!-- 顶部控制与全景 Header -->
     <div class="gantt-header">
       <div class="header-left">
-        <span class="header-icon">
-          <!-- Lucide Satellite Icon SVG -->
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-            class="lucide lucide-satellite">
-            <path d="M13 7 9 3 5 7l4 4" />
-            <path d="m17 11 4 4-4 4-4-4" />
-            <path d="m8 12 4 4" />
-            <path d="m13 17 3 3" />
-            <path d="M4 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />
-            <path d="M24 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />
-          </svg>
-        </span>
         <span class="header-title glow-text">卫星-接收站 电磁信号干扰甘特图矩阵</span>
       </div>
 
@@ -161,18 +148,6 @@
             'is-selected': selectedSatNorad === sat.norad,
           }" :ref="(el) => setSatTreeItemRef(sat.norad, el as Element | null)" @click="selectSatelliteRow(sat)">
             <div class="sat-item-header">
-              <span class="sat-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                  class="lucide lucide-satellite">
-                  <path d="M13 7 9 3 5 7l4 4" />
-                  <path d="m17 11 4 4-4 4-4-4" />
-                  <path d="m8 12 4 4" />
-                  <path d="m13 17 3 3" />
-                  <path d="M4 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />
-                  <path d="M24 11a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />
-                </svg>
-              </span>
               <span class="sat-name-text" :title="sat.name">{{ sat.name }}</span>
               <span class="sat-status-tag" :class="sat.satelliteStatus === 1 ? 'tag-danger' : 'tag-success'">
                 {{ sat.satelliteStatus === 1 ? '卫星被干扰' : '正常' }}
@@ -181,11 +156,8 @@
 
             <!-- 关联接收站过境窗口摘要列表 -->
             <div class="sat-windows-sublist">
-              <div
-                v-for="win in resolveSatelliteStationWindows(sat)"
-                :key="win.receiveId + '-' + win.peakWindow"
-                class="win-sub-item"
-                :class="{
+              <div v-for="win in resolveSatelliteStationWindows(sat)" :key="win.receiveId + '-' + win.peakWindow"
+                class="win-sub-item" :class="{
                   'is-win-struck': win.strikeStatus === 1,
                   'is-win-selected': isStationWindowSelected(sat.norad, win),
                 }" @click.stop="selectStationWindow(sat, win)">
@@ -230,29 +202,20 @@
                     </div>
                     <div class="sat-meta-row">
                       <span class="meta-label">卫星</span>
-                      <span
-                        class="status-pill"
-                        :class="ganttRow.satelliteStatus === 1 ? 'is-struck' : 'is-normal'"
-                      >
+                      <span class="status-pill" :class="ganttRow.satelliteStatus === 1 ? 'is-struck' : 'is-normal'">
                         {{ formatStrikeStatus(ganttRow.satelliteStatus) }}
                       </span>
                     </div>
                   </div>
 
                   <div v-if="getRowActiveTransits(ganttRow).length" class="row-active-transit">
-                    <div
-                      v-for="transit in getRowActiveTransits(ganttRow)"
-                      :key="transit.id"
-                      class="transit-card"
-                      :class="transit.strikeStatus === 1 ? 'transit-card--struck' : 'transit-card--normal'"
-                    >
+                    <div v-for="transit in getRowActiveTransits(ganttRow)" :key="transit.id" class="transit-card"
+                      :class="transit.strikeStatus === 1 ? 'transit-card--struck' : 'transit-card--normal'">
                       <div class="transit-card-top">
                         <span class="transit-station" :title="transit.receiveName">{{ transit.receiveName }}</span>
                         <span class="meta-label">地面站</span>
-                        <span
-                          class="status-pill status-pill--sm"
-                          :class="transit.strikeStatus === 1 ? 'is-struck' : 'is-normal'"
-                        >
+                        <span class="status-pill status-pill--sm"
+                          :class="transit.strikeStatus === 1 ? 'is-struck' : 'is-normal'">
                           {{ formatStrikeStatus(transit.strikeStatus) }}
                         </span>
                       </div>
@@ -1984,7 +1947,7 @@ watch(playheadLeftPx, () => {
       }
 
       .header-title {
-        font-size: 16px;
+        font-size: 17px;
         font-weight: 700;
         letter-spacing: 0.5px;
         color: #f8fafc;
@@ -2004,7 +1967,7 @@ watch(playheadLeftPx, () => {
         background-color: rgba(30, 41, 59, 0.7);
         border: 1px solid #334155;
         border-radius: 4px;
-        font-size: 12px;
+        font-size: 14px;
 
         .label {
           color: #94a3b8;
@@ -2030,7 +1993,7 @@ watch(playheadLeftPx, () => {
         display: flex;
         align-items: center;
         gap: 8px;
-        font-size: 12px;
+        font-size: 13px;
 
         .zoom-label {
           color: #94a3b8;
@@ -2075,7 +2038,7 @@ watch(playheadLeftPx, () => {
     }
 
     .banner-empty-hint {
-      font-size: 13px;
+      font-size: 14px;
       color: #64748b;
       white-space: nowrap;
       overflow: hidden;
@@ -2112,12 +2075,12 @@ watch(playheadLeftPx, () => {
       }
 
       .label-text {
-        font-size: 12px;
+        font-size: 13px;
         color: #94a3b8;
       }
 
       .status-val {
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 700;
         color: #67e8f9;
         max-width: 160px;
@@ -2132,7 +2095,7 @@ watch(playheadLeftPx, () => {
       gap: 8px;
 
       .label-text {
-        font-size: 12px;
+        font-size: 13px;
         color: #94a3b8;
         white-space: nowrap;
       }
@@ -2171,13 +2134,13 @@ watch(playheadLeftPx, () => {
       min-width: 0;
 
       .banner-label {
-        font-size: 11px;
+        font-size: 12px;
         color: #7dd3fc;
         letter-spacing: 0.5px;
       }
 
       .banner-name {
-        font-size: 18px;
+        font-size: 19px;
         font-weight: 800;
         color: #00e1ff;
         text-shadow: 0 0 12px rgba(0, 225, 255, 0.45);
@@ -2197,7 +2160,7 @@ watch(playheadLeftPx, () => {
     }
 
     .banner-chip {
-      font-size: 11px;
+      font-size: 12px;
       padding: 3px 10px;
       border-radius: 12px;
       background: rgba(15, 23, 42, 0.8);
@@ -2207,7 +2170,7 @@ watch(playheadLeftPx, () => {
     }
 
     .banner-status {
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 700;
       padding: 4px 12px;
       border-radius: 4px;
@@ -2233,11 +2196,13 @@ watch(playheadLeftPx, () => {
   }
 
   @keyframes sat-pulse {
+
     0%,
     100% {
       opacity: 1;
       transform: scale(1);
     }
+
     50% {
       opacity: 0.55;
       transform: scale(0.85);
@@ -2405,7 +2370,7 @@ watch(playheadLeftPx, () => {
         padding: 10px;
 
         .legend-title {
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 600;
           color: #94a3b8;
           margin-bottom: 8px;
@@ -2420,7 +2385,7 @@ watch(playheadLeftPx, () => {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 11px;
+            font-size: 12px;
             color: #cbd5e1;
 
             .color-dot {
@@ -2458,7 +2423,7 @@ watch(playheadLeftPx, () => {
         min-height: 0;
 
         .tree-header {
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 600;
           color: #64748b;
           text-transform: uppercase;
@@ -2495,7 +2460,7 @@ watch(playheadLeftPx, () => {
             }
 
             .sat-name-text {
-              font-size: 13px;
+              font-size: 14px;
               font-weight: 600;
               color: #f1f5f9;
               flex: 1;
@@ -2503,7 +2468,7 @@ watch(playheadLeftPx, () => {
             }
 
             .sat-status-tag {
-              font-size: 10px;
+              font-size: 11px;
               padding: 2px 6px;
               border-radius: 3px;
 
@@ -2530,7 +2495,7 @@ watch(playheadLeftPx, () => {
               display: flex;
               align-items: center;
               justify-content: space-between;
-              font-size: 11px;
+              font-size: 12px;
               color: #94a3b8;
               padding: 3px 6px;
               border-radius: 4px;
@@ -2950,7 +2915,7 @@ watch(playheadLeftPx, () => {
         align-items: center;
         gap: 6px;
         color: #38bdf8;
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 700;
         padding-bottom: 6px;
         border-bottom: 1px solid #1e293b;
@@ -2958,7 +2923,7 @@ watch(playheadLeftPx, () => {
 
         .panel-subtitle {
           margin-left: auto;
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 600;
           color: #7dd3fc;
           background: rgba(56, 189, 248, 0.12);
@@ -2983,12 +2948,12 @@ watch(playheadLeftPx, () => {
           border: 1px solid rgba(0, 225, 255, 0.2);
 
           .playhead-time-label {
-            font-size: 10px;
+            font-size: 11px;
             color: #94a3b8;
           }
 
           .playhead-time-val {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
             color: #67e8f9;
             font-family: monospace;
@@ -3047,7 +3012,7 @@ watch(playheadLeftPx, () => {
 
             .compact-status-tag {
               flex-shrink: 0;
-              font-size: 10px;
+              font-size: 11px;
               font-weight: 700;
               line-height: 1.2;
               padding: 1px 5px;
@@ -3057,7 +3022,7 @@ watch(playheadLeftPx, () => {
             }
 
             .compact-link-line {
-              font-size: 11px;
+              font-size: 12px;
               font-weight: 600;
               line-height: 1.3;
               color: #e2e8f0;
@@ -3077,7 +3042,7 @@ watch(playheadLeftPx, () => {
               align-items: center;
               gap: 4px;
               min-height: 18px;
-              font-size: 10px;
+              font-size: 11px;
 
               &.compact-time-row {
                 grid-template-columns: 42px 1fr;
@@ -3108,7 +3073,7 @@ watch(playheadLeftPx, () => {
               }
 
               .compact-tag {
-                font-size: 9px;
+                font-size: 10px;
                 font-weight: 600;
                 padding: 0 4px;
                 border-radius: 2px;
@@ -3139,7 +3104,7 @@ watch(playheadLeftPx, () => {
               display: flex;
               flex-direction: column;
               gap: 1px;
-              font-size: 10px;
+              font-size: 11px;
               line-height: 1.25;
 
               .weapon-name {
@@ -3152,7 +3117,7 @@ watch(playheadLeftPx, () => {
 
               .weapon-meta {
                 color: #94a3b8;
-                font-size: 9px;
+                font-size: 10px;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
@@ -3174,7 +3139,7 @@ watch(playheadLeftPx, () => {
         padding: 12px;
 
         .tip-text {
-          font-size: 11px;
+          font-size: 12px;
           line-height: 1.4;
         }
       }

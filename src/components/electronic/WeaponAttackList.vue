@@ -24,7 +24,7 @@
       </div>
 
       <div class="header-right">
-        <el-input v-model="searchKeyword" placeholder="搜索武器名称/类型/打击目标..." prefix-icon="Search" clearable size="small"
+        <el-input v-model="searchKeyword" placeholder="请输入搜索信息" prefix-icon="Search" clearable size="small"
           class="search-input" />
       </div>
     </div>
@@ -716,7 +716,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 13px;
+      font-size: 15px;
       background: rgba(8, 14, 26, 0.6);
       padding: 4px 12px;
       border-radius: 4px;
@@ -735,7 +735,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   .search-input {
     width: 240px;
 
-    :deep(.el-input__wrapper) {
+    :deep(.atlas-app-input__wrapper) {
       background-color: rgba(8, 14, 26, 0.8);
       box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.25) inset;
       color: #e2e8f0;
@@ -745,9 +745,9 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
       }
     }
 
-    :deep(.el-input__inner) {
+    :deep(.atlas-app-input__inner) {
       color: #e2e8f0;
-      font-size: 12px;
+      font-size: 14px;
     }
   }
 }
@@ -768,7 +768,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   }
 
   .filter-label {
-    font-size: 12px;
+    font-size: 14px;
     color: #94a3b8;
     white-space: nowrap;
   }
@@ -776,15 +776,15 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   .filter-select {
     width: 160px;
 
-    :deep(.el-select__wrapper) {
+    :deep(.atlas-app-select__wrapper) {
       background-color: rgba(8, 14, 26, 0.8);
       box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.2) inset;
     }
 
-    :deep(.el-select__placeholder),
-    :deep(.el-select__selected-item),
-    :deep(.el-tag) {
-      font-size: 12px;
+    :deep(.atlas-app-select__placeholder),
+    :deep(.atlas-app-select__selected-item),
+    :deep(.atlas-app-tag) {
+      font-size: 14px;
     }
   }
 
@@ -795,9 +795,14 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
       width: 100px;
     }
 
-    :deep(.el-select__wrapper) {
+    :deep(.atlas-app-select__wrapper) {
       background-color: rgba(8, 14, 26, 0.8);
       box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.2) inset;
+    }
+
+    :deep(.atlas-app-select__placeholder),
+    :deep(.atlas-app-select__selected-item) {
+      font-size: 14px;
     }
   }
 
@@ -810,7 +815,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
 
   .clear-filter-btn {
     margin-left: auto;
-    font-size: 12px;
+    font-size: 14px;
   }
 }
 
@@ -921,7 +926,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   flex-shrink: 0;
 
   .cell-label {
-    font-size: 11px;
+    font-size: 13px;
     color: #64748b;
     white-space: nowrap;
   }
@@ -934,7 +939,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   }
 
   .cell-value {
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 700;
     white-space: nowrap;
   }
@@ -950,7 +955,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     }
 
     .weapon-name {
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 700;
       color: #ffffff;
     }
@@ -960,7 +965,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     min-width: 110px;
 
     .target-name {
-      font-size: 13px;
+      font-size: 15px;
       font-weight: 700;
       color: #f87171;
       word-break: break-all;
@@ -979,7 +984,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     }
 
     .time-range {
-      font-size: 11px;
+      font-size: 13px;
       color: #38bdf8;
       font-weight: 600;
       white-space: nowrap;
@@ -987,7 +992,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
 
     .time-sep {
       color: #64748b;
-      font-size: 11px;
+      font-size: 13px;
     }
   }
 
@@ -1004,13 +1009,13 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   display: flex;
   align-items: center;
   color: rgba(0, 225, 255, 0.35);
-  font-size: 14px;
+  font-size: 16px;
   padding-top: 14px;
   flex-shrink: 0;
 }
 
 .type-badge {
-  font-size: 10px;
+  font-size: 12px;
   padding: 1px 6px;
   border-radius: 3px;
   font-weight: 600;
@@ -1058,13 +1063,13 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
     color: #94a3b8;
     padding: 0 2px;
 
     .window-count {
-      font-size: 11px;
+      font-size: 13px;
       color: #64748b;
       font-weight: 500;
     }
@@ -1083,7 +1088,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     align-items: center;
     gap: 8px;
     padding: 6px 10px;
-    font-size: 11px;
+    font-size: 13px;
   }
 
   &__head {
@@ -1133,7 +1138,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
 }
 
 .no-windows-tip {
-  font-size: 12px;
+  font-size: 14px;
   color: #64748b;
   font-style: italic;
   padding: 8px 10px;
