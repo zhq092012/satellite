@@ -27,7 +27,7 @@
           <span class="series-loading-text">正在加载系列数据...</span>
         </div>
         <div class="series-list-header">
-          <span class="series-title">📋 包含系列 {{ seriesOptions.length }} 个</span>
+          <span class="series-title">包含系列 {{ seriesOptions.length }} 个</span>
           <span class="series-current" :title="selectedSeries || '全部系列'">
             当前系列：{{ selectedSeries || '全部系列' }}
           </span>
@@ -35,13 +35,13 @@
         <div class="series-list">
           <div class="series-item" :class="{ active: !selectedSeries, disabled: seriesPanelLoading }"
             @click="selectSeries('')">
-            <span class="series-icon">🌐</span>
+            <span class="series-icon"></span>
             <span class="series-name">全部系列</span>
             <span class="series-status">{{ !selectedSeries ? '✓ 已筛选' : '点击筛选' }}</span>
           </div>
           <div v-for="series in seriesOptions" :key="series" class="series-item"
             :class="{ active: selectedSeries === series, disabled: seriesPanelLoading }" @click="selectSeries(series)">
-            <span class="series-icon">🏷️</span>
+            <span class="series-icon"></span>
             <span class="series-name">{{ series }}</span>
             <span class="series-status">{{ selectedSeries === series ? '✓ 已筛选' : '点击筛选' }}</span>
           </div>
@@ -53,7 +53,6 @@
     <div class="panel-section section-space">
       <div class="section-header-block">
         <div class="section-title">
-          <span class="title-icon">🛰️</span>
           <span>敌方卫星列表</span>
           <span class="count-tag">{{ satList.length }} 颗</span>
           <span v-if="selectedSatelliteName" class="current-sat" :title="selectedSatelliteName">
@@ -172,7 +171,8 @@
               </div>
               <div class="param-item">
                 <span class="param-label">剩余工作寿命</span>
-                <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.remainLifetimeIndicator ?? '--' }}</span>
+                <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.remainLifetimeIndicator ?? '--'
+                }}</span>
               </div>
               <div class="param-item">
                 <span class="param-label">国别</span>
@@ -287,7 +287,7 @@ const seriesOptions = computed<string[]>(() => {
  */
 const isTypeDisabled = (type: string): boolean => {
   if (!type) return false
-  return type.includes('导航') || type.includes('通信') || type.includes('导弹预警')
+  return type.includes('导航') || type.includes('导弹预警')
 }
 
 /**

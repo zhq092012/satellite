@@ -252,7 +252,7 @@ const adminMenus = computed(() => {
         {
           path: '/system/missileBases',
           meta: {
-            title: '导弹基地管理',
+            title: '基地管理',
             icon: 'icon-missile-base',
             showInMenu: true,
             permission: 'system:missileBases:list',

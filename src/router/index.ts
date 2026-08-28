@@ -156,7 +156,7 @@ const routes: Array<RouteRecordRaw> = [
             name: 'MissileBaseManage',
             component: () => import('@/views/weapons/MissileBase.vue'),
             meta: {
-              title: '导弹基地管理',
+              title: '基地管理',
               icon: 'icon-missile-base',
               showInMenu: true,
               requiresAuth: true,

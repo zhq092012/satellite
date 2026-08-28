@@ -6,7 +6,7 @@
       <div class="menu-tabs">
         <button v-for="tab in menuTabs" :key="tab.key" class="menu-btn" :class="{ active: activeTab === tab.key }"
           @click="switchTab(tab.key)">
-          <span class="btn-icon">{{ tab.icon }}</span>
+          <!-- <span class="btn-icon">{{ tab.icon }}</span> -->
           <span class="btn-label">{{ tab.name }}</span>
         </button>
       </div>
@@ -15,9 +15,9 @@
       <div class="task-status-bar">
         <!-- 场景 A：已选择战场和任务 -->
         <div v-if="store.battle && store.activedTask" class="task-info-badge" @click="openTaskSelector">
-          <span class="battle-name">⚔️ {{ store.battle.name }}</span>
+          <span class="battle-name"> {{ store.battle.name }}</span>
           <span class="divider">/</span>
-          <span class="task-name">📋 {{ store.activedTask.name }}</span>
+          <span class="task-name"> {{ store.activedTask.name }}</span>
           <el-button type="primary" size="small" link class="switch-btn">切换任务</el-button>
         </div>
 
@@ -30,20 +30,19 @@
 
     <!-- 下层内容展示区域 -->
     <main class="bottom-content">
-      <keep-alive :include="['BattleSituation', 'ElectronicWarfareG6', 'SatelliteGantt', 'WeaponAttackList', 'StrikePlanGenerator']">
+      <keep-alive
+        :include="['BattleSituation', 'ElectronicWarfareG6', 'SatelliteGantt', 'WeaponAttackList', 'StrikePlanGenerator']">
         <component :is="currentComponent" :key="activeTab" />
       </keep-alive>
     </main>
 
     <!-- 战场与任务选择模态弹窗 -->
-    <el-dialog v-model="selectorDialogVisible" title="🎯 选择战场与任务" width="540px" append-to-body
+    <el-dialog v-model="selectorDialogVisible" title=" 选择战场与任务" width="540px" append-to-body
       class="task-selector-dialog">
       <div class="dialog-body" v-loading="loadingData">
-        <div class="form-tip">请选择当前分析所基于的战场及关联任务：</div>
-
         <!-- 级联选择器 -->
-        <el-form label-width="90px">
-          <el-form-item label="选择任务">
+        <el-form>
+          <el-form-item>
             <el-cascader v-model="selectedCascadeValue" :options="battleTaskOptions"
               :props="{ expandTrigger: 'hover', value: 'id', label: 'name', children: 'children' }"
               placeholder="请选择 战场 / 任务" style="width: 100%" filterable @change="handleCascaderChange" />
@@ -55,11 +54,11 @@
           <div class="tree-title">快捷选择列表：</div>
           <el-scrollbar max-height="260px">
             <div v-for="battle in battleListWithTasks" :key="battle.id" class="battle-group">
-              <div class="battle-group-name">⚔️ {{ battle.name }}</div>
+              <div class="battle-group-name"> {{ battle.name }}</div>
               <div class="task-chips">
                 <div v-for="task in battle.tasks" :key="task.id" class="task-chip"
                   :class="{ active: store.activedTask?.id === task.id }" @click="selectBattleAndTask(battle, task)">
-                  📋 {{ task.name }}
+                  {{ task.name }}
                 </div>
                 <div v-if="!battle.tasks || battle.tasks.length === 0" class="no-task">暂无所属任务</div>
               </div>
@@ -148,11 +147,11 @@ const pendingSelection = ref<{ battle: BattleForm; task: TaskForm } | null>(null
 const battleTaskOptions = computed(() => {
   return battleListWithTasks.value.map((battle) => ({
     id: `battle_${battle.id}`,
-    name: `⚔️ ${battle.name}`,
+    name: `${battle.name}`,
     battleObj: battle,
     children: (battle.tasks || []).map((task) => ({
       id: `task_${task.id}`,
-      name: `📋 ${task.name}`,
+      name: `${task.name}`,
       taskObj: task,
       battleObj: battle,
     })),
@@ -305,7 +304,6 @@ onMounted(async () => {
         color: #8eb3d6;
         background: rgba(16, 36, 62, 0.6);
         border: 1px solid rgba(79, 147, 221, 0.25);
-        border-radius: 6px;
         cursor: pointer;
         outline: none;
         transition: all 0.25s ease;
