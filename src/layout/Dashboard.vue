@@ -5,9 +5,7 @@
       <el-header class="header-wrapper">
         <div class="header-left">
           <div class="logo">
-            <span class="logo-icon">🛰️</span>
             <span class="logo-title">卫星态势分析系统</span>
-            <span class="logo-badge">SYSTEM</span>
           </div>
         </div>
 
@@ -367,9 +365,9 @@ const handleLogout = async () => {
   await router.replace({ name: 'Login' })
 }
 
-onMounted(() => {})
+onMounted(() => { })
 
-onUnmounted(() => {})
+onUnmounted(() => { })
 </script>
 
 <style lang="scss" scoped>
@@ -381,12 +379,10 @@ onUnmounted(() => {})
     position: relative;
     gap: 24px;
     height: 60px;
-    background: linear-gradient(
-      90deg,
-      rgba(8, 22, 44, 0.98) 0%,
-      rgba(13, 35, 62, 0.95) 50%,
-      rgba(8, 22, 44, 0.98) 100%
-    );
+    background: linear-gradient(90deg,
+        rgba(8, 22, 44, 0.98) 0%,
+        rgba(13, 35, 62, 0.95) 50%,
+        rgba(8, 22, 44, 0.98) 100%);
     border-bottom: 1px solid rgba(0, 225, 255, 0.25);
     box-shadow:
       0 4px 20px rgba(0, 0, 0, 0.5),
@@ -415,7 +411,7 @@ onUnmounted(() => {})
           font-size: 19px;
           font-weight: 800;
           letter-spacing: 1.2px;
-          background: linear-gradient(135deg, #ffffff 30%, #00e1ff 100%);
+          background: #fff;
           background-clip: text;
           -webkit-text-fill-color: transparent;
           filter: drop-shadow(0 0 10px rgba(0, 225, 255, 0.3));

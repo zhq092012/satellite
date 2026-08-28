@@ -2,74 +2,68 @@
   <aside class="c2-panel c2-panel--right dark-theme">
     <div class="panel-header">
       <div class="header-title-box">
-        <span class="header-icon">📊</span>
         <span class="header-title glow-text-cyan">态势统计分析</span>
       </div>
       <span class="panel-badge">{{ overviewStats.scopeLabel }}</span>
     </div>
 
-    <div class="panel-body-scroll">
-      <div v-if="!activeMatrix" class="empty-sat-box">
-        <span class="empty-icon">📡</span>
-        <p class="empty-text">暂无矩阵数据</p>
-        <p class="empty-sub">请在左侧选择系列，或选择「全部系列」加载态势</p>
+    <div v-if="!activeMatrix" class="empty-sat-box">
+      <span class="empty-icon">📡</span>
+      <p class="empty-text">暂无矩阵数据</p>
+      <p class="empty-sub">请在左侧选择系列，或选择「全部系列」加载态势</p>
+    </div>
+
+    <template v-else>
+      <div class="stats-strip">
+        <div class="stats-strip-item stats-strip-item--sat" role="button" tabindex="0" title="点击跳转到卫星管理"
+          @click="goToSatellites" @keydown.enter.prevent="goToSatellites">
+          <strong class="stats-strip-label">卫星</strong>
+          <div class="stats-strip-bottom">
+            <span class="stats-strip-value">{{ overviewStats.satelliteCount }}</span>
+            <span class="stats-strip-unit">颗</span>
+          </div>
+        </div>
+        <div class="stats-strip-divider"></div>
+        <div class="stats-strip-item stats-strip-item--receive" role="button" tabindex="0" title="点击跳转到基站管理"
+          @click="goToBaseStations" @keydown.enter.prevent="goToBaseStations">
+          <strong class="stats-strip-label">地面站</strong>
+          <div class="stats-strip-bottom">
+            <span class="stats-strip-value">{{ overviewStats.receiveCount }}</span>
+            <span class="stats-strip-unit">个</span>
+          </div>
+        </div>
+        <div class="stats-strip-divider"></div>
+        <div class="stats-strip-item stats-strip-item--station" role="button" tabindex="0" title="点击跳转到基站管理"
+          @click="goToBaseStations" @keydown.enter.prevent="goToBaseStations">
+          <strong class="stats-strip-label">数据中心</strong>
+          <div class="stats-strip-bottom">
+            <span class="stats-strip-value">{{ overviewStats.stationCount }}</span>
+            <span class="stats-strip-unit">个</span>
+          </div>
+        </div>
+        <div class="stats-strip-divider"></div>
+        <div class="stats-strip-item stats-strip-item--weapon" role="button" tabindex="0" title="点击跳转到武器管理"
+          @click="goToWeapons" @keydown.enter.prevent="goToWeapons">
+          <strong class="stats-strip-label">我方武器</strong>
+          <div class="stats-strip-bottom">
+            <span class="stats-strip-value">{{ ourWeaponCount }}</span>
+            <span class="stats-strip-unit">件</span>
+          </div>
+        </div>
       </div>
 
-      <template v-else>
-        <div class="scope-banner">
-          <span class="scope-label">统计范围</span>
-          <strong class="scope-value">{{ overviewStats.scopeLabel }}</strong>
+      <div class="link-section">
+        <div class="link-section-header">
+          <div class="link-section-title-wrap">
+            <span class="link-section-title">可能传输链路</span>
+            <span class="link-section-count">{{ transmissionLinks.length }} 条</span>
+          </div>
+          <span class="link-section-hint">
+            {{ selectedSatelliteNorad != null ? '按过境开始时间升序' : '打击前全路径枚举' }}
+          </span>
         </div>
 
-        <div class="stats-strip">
-          <div class="stats-strip-item stats-strip-item--sat" role="button" tabindex="0" title="点击跳转到卫星管理"
-            @click="goToSatellites" @keydown.enter.prevent="goToSatellites">
-            <strong class="stats-strip-label">卫星</strong>
-            <div class="stats-strip-bottom">
-              <span class="stats-strip-value">{{ overviewStats.satelliteCount }}</span>
-              <span class="stats-strip-unit">颗</span>
-            </div>
-          </div>
-          <div class="stats-strip-divider"></div>
-          <div class="stats-strip-item stats-strip-item--receive" role="button" tabindex="0" title="点击跳转到基站管理"
-            @click="goToBaseStations" @keydown.enter.prevent="goToBaseStations">
-            <strong class="stats-strip-label">地面站</strong>
-            <div class="stats-strip-bottom">
-              <span class="stats-strip-value">{{ overviewStats.receiveCount }}</span>
-              <span class="stats-strip-unit">个</span>
-            </div>
-          </div>
-          <div class="stats-strip-divider"></div>
-          <div class="stats-strip-item stats-strip-item--station" role="button" tabindex="0" title="点击跳转到基站管理"
-            @click="goToBaseStations" @keydown.enter.prevent="goToBaseStations">
-            <strong class="stats-strip-label">数据中心</strong>
-            <div class="stats-strip-bottom">
-              <span class="stats-strip-value">{{ overviewStats.stationCount }}</span>
-              <span class="stats-strip-unit">个</span>
-            </div>
-          </div>
-          <div class="stats-strip-divider"></div>
-          <div class="stats-strip-item stats-strip-item--weapon" role="button" tabindex="0" title="点击跳转到武器管理"
-            @click="goToWeapons" @keydown.enter.prevent="goToWeapons">
-            <strong class="stats-strip-label">我方武器</strong>
-            <div class="stats-strip-bottom">
-              <span class="stats-strip-value">{{ ourWeaponCount }}</span>
-              <span class="stats-strip-unit">件</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="link-section">
-          <div class="link-section-header">
-            <div class="link-section-title-wrap">
-              <span class="link-section-title">可能传输链路</span>
-              <span class="link-section-count">{{ transmissionLinks.length }} 条</span>
-            </div>
-            <span class="link-section-hint">
-              {{ selectedSatelliteNorad != null ? '按过境开始时间升序' : '打击前全路径枚举' }}
-            </span>
-          </div>
-
+        <div class="link-section-scroll">
           <div v-if="transmissionLinks.length" class="transmission-link-list">
             <div v-for="(link, idx) in transmissionLinks" :key="link.id" class="transmission-link-card" :class="[
               {
@@ -82,8 +76,10 @@
               <div class="link-card-header">
                 <div class="link-title-left">
                   <span class="link-index">链路 {{ idx + 1 }}</span>
-                  <span v-if="getLinkPriority(link.id)?.rank && getLinkPriority(link.id)!.rank <= 3" class="rank-badge" :class="`rank-badge--${getLinkPriority(link.id)!.rank}`">
-                    {{ getRankMedal(getLinkPriority(link.id)!.rank) }} TOP {{ getLinkPriority(link.id)!.rank }} ({{ getLinkPriority(link.id)!.totalScore }}分)
+                  <span v-if="getLinkPriority(link.id)?.rank && getLinkPriority(link.id)!.rank <= 3" class="rank-badge"
+                    :class="`rank-badge--${getLinkPriority(link.id)!.rank}`">
+                    {{ getRankMedal(getLinkPriority(link.id)!.rank) }} TOP {{ getLinkPriority(link.id)!.rank }} ({{
+                      getLinkPriority(link.id)!.totalScore }}分)
                   </span>
                 </div>
                 <div class="link-metrics-row">
@@ -109,7 +105,8 @@
                 </template>
               </div>
 
-              <div v-if="getLinkPriority(link.id)?.rank && getLinkPriority(link.id)!.rank <= 3" class="priority-reason-tip">
+              <div v-if="getLinkPriority(link.id)?.rank && getLinkPriority(link.id)!.rank <= 3"
+                class="priority-reason-tip">
                 <span class="reason-icon">💡</span>
                 <span class="reason-text">{{ getLinkPriority(link.id)!.reason }}</span>
               </div>
@@ -127,8 +124,8 @@
             {{ selectedSatelliteNorad != null ? '该卫星暂无关联传输链路' : '当前范围内暂无可枚举链路' }}
           </div>
         </div>
-      </template>
-    </div>
+      </div>
+    </template>
   </aside>
 </template>
 
@@ -314,31 +311,11 @@ onMounted(() => {
   overflow: hidden;
 }
 
-.panel-body-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding-right: 8px;
-  scrollbar-gutter: stable;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 225, 255, 0.28);
-    border-radius: 4px;
-  }
-}
-
 .panel-header {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(0, 225, 255, 0.15);
   margin-bottom: 10px;
 
   .header-title-box {
@@ -394,6 +371,7 @@ onMounted(() => {
 }
 
 .stats-strip {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
   align-items: stretch;
@@ -492,10 +470,12 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
   min-height: 0;
 }
 
 .link-section-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -525,6 +505,24 @@ onMounted(() => {
 .link-section-hint {
   font-size: 11px;
   color: #64748b;
+}
+
+.link-section-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 225, 255, 0.28);
+    border-radius: 4px;
+  }
 }
 
 .transmission-link-list {
@@ -741,6 +739,10 @@ onMounted(() => {
     text-align: right;
     line-height: 1.4;
   }
+}
+
+.empty-sat-box {
+  margin: auto 0;
 }
 
 .empty-sat-box,

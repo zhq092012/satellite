@@ -17,6 +17,10 @@ import { useElectronicCesiumBridge, type InfrastructureLocation } from '@/compos
 import { useLayoutStore } from '@/store/modules/layout'
 import type { SatelliteData, Weapon } from '@/types/dashboard'
 import { markBattleArea } from '@/utils/tools/functionTool'
+import laserStationIcon from '@/assets/icons/LaserStation.png'
+import satelliteIcon from '@/assets/icons/Satellite.png'
+import radarStationIcon from '@/assets/icons/RadarStation.png'
+import launchSiteIcon from '@/assets/icons/LaunchSite.png'
 import * as Cesium from 'cesium'
 import { CallbackProperty } from 'cesium'
 import * as satellitejs from 'satellite.js'
@@ -313,79 +317,6 @@ const selectedTransmissionLinkNodeKeys = ref<Set<string>>(new Set())
 /** 传输链路高亮线颜色：淡黄色虚线 */
 const TRANSMISSION_LINK_LINE_COLOR = Cesium.Color.fromCssColorString('#F5E6A3').withAlpha(0.92)
 
-const infraShapeImageCache = new Map<string, string>()
-
-const getInfraShapeImage = (shape: 'triangle' | 'square'): string => {
-  const cached = infraShapeImageCache.get(shape)
-  if (cached) return cached
-
-  const size = 48
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return ''
-
-  ctx.clearRect(0, 0, size, size)
-  ctx.fillStyle = '#ffffff'
-  ctx.strokeStyle = '#111111'
-  ctx.lineWidth = 3
-  ctx.lineJoin = 'round'
-
-  if (shape === 'triangle') {
-    ctx.beginPath()
-    ctx.moveTo(size / 2, 4)
-    ctx.lineTo(size - 4, size - 4)
-    ctx.lineTo(4, size - 4)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-  } else {
-    ctx.beginPath()
-    ctx.rect(6, 6, size - 12, size - 12)
-    ctx.fill()
-    ctx.stroke()
-  }
-
-  const dataUrl = canvas.toDataURL('image/png')
-  infraShapeImageCache.set(shape, dataUrl)
-  return dataUrl
-}
-
-/**
- * 生成我方武器倒立三角形 Billboard 贴图（锥尖朝下）
- *
- * @returns 倒立三角形 PNG Data URL
- */
-const getOurWeaponShapeImage = (): string => {
-  const cacheKey = 'inverted-triangle'
-  const cached = infraShapeImageCache.get(cacheKey)
-  if (cached) return cached
-
-  const size = 48
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return ''
-
-  ctx.clearRect(0, 0, size, size)
-  ctx.fillStyle = '#ffffff'
-  ctx.strokeStyle = '#111111'
-  ctx.lineWidth = 3
-  ctx.lineJoin = 'round'
-  ctx.beginPath()
-  ctx.moveTo(size / 2, size - 4)
-  ctx.lineTo(4, 4)
-  ctx.lineTo(size - 4, 4)
-  ctx.closePath()
-  ctx.fill()
-  ctx.stroke()
-
-  const dataUrl = canvas.toDataURL('image/png')
-  infraShapeImageCache.set(cacheKey, dataUrl)
-  return dataUrl
-}
 /**
  * 判断地面基础设施节点是否被选中
  * @param node 地面基础设施节点
@@ -519,9 +450,8 @@ const clearElectronicInfrastructureNodes = () => {
 const buildSatelliteLabelText = (noradId: number, fallbackName?: string) => {
   const matrixSats = props.matrixData?.initMatrixList || []
   const satInfo = matrixSats.find((s) => s.norad === noradId)
-  const isRelay = noradId === 22314 || (satInfo?.satType || '').includes('中继')
   const name = satInfo?.name || fallbackName || `NORAD: ${noradId}`
-  return `[敌方${isRelay ? '数据中继卫星' : '过境卫星'}]\n${name}`
+  return `${name}`
 }
 
 
@@ -545,9 +475,8 @@ const renderElectronicInfrastructureNodes = () => {
       const entityId = `infra-node-${node.type}-${node.id}`
       const position = Cesium.Cartesian3.fromDegrees(node.longitude, node.latitude, node.altitude)
       const isReceive = node.type === 'RECEIVE'
-      const baseColor = isReceive ? Cesium.Color.CYAN : Cesium.Color.DODGERBLUE
       const highlightColor = Cesium.Color.YELLOW
-      const labelText = `[敌方${isReceive ? '地面接收站' : '数据中心'}]\n${node.name}`
+      const labelText = `${node.name}`
       const isNodeHighlighted = () => {
         if (isInfrastructureSelected(node)) return true
         const keys = selectedTransmissionLinkNodeKeys.value
@@ -558,17 +487,17 @@ const renderElectronicInfrastructureNodes = () => {
           keys.has(node.name)
         )
       }
-      const resolveColor = () => (isNodeHighlighted() ? highlightColor : baseColor)
+      const resolveColor = () => (isNodeHighlighted() ? highlightColor : Cesium.Color.WHITE)
 
 
       viewer.entities.add({
         id: entityId,
         position,
         billboard: {
-          image: getInfraShapeImage(isReceive ? 'triangle' : 'square'),
+          image: isReceive ? radarStationIcon : launchSiteIcon,
           color: new Cesium.CallbackProperty(() => resolveColor(), false) as unknown as Cesium.Property,
-          width: isReceive ? 22 : 20,
-          height: isReceive ? 22 : 20,
+          width: isReceive ? 28 : 28,
+          height: isReceive ? 28 : 28,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           disableDepthTestDistance: 0,
           heightReference: Cesium.HeightReference.NONE,
@@ -613,23 +542,19 @@ const renderElectronicInfrastructureNodes = () => {
         keys.has(sat.name)
       )
     }
-    const resolveSatPointColor = () => (isSatHighlighted() ? Cesium.Color.GOLD : satColor)
-    const resolveSatOutlineColor = () =>
-      isSatHighlighted() ? Cesium.Color.YELLOW : isRelay ? Cesium.Color.GOLD : Cesium.Color.WHITE
-    const resolveSatOutlineWidth = () => (isSatHighlighted() ? 4 : 2.5)
-    const resolveSatPixelSize = () => (isSatHighlighted() ? 18 : isRelay ? 16 : 13)
     const resolveSatLabelColor = () => (isSatHighlighted() ? Cesium.Color.YELLOW : satColor)
 
     viewer.entities.add({
       id: satEntityId,
       position: new Cesium.CallbackProperty(resolveSatPosition, false) as unknown as Cesium.PositionProperty,
-      point: {
-        pixelSize: new Cesium.CallbackProperty(resolveSatPixelSize, false) as unknown as Cesium.Property,
-        color: new Cesium.CallbackProperty(resolveSatPointColor, false) as unknown as Cesium.Property,
-        outlineColor: new Cesium.CallbackProperty(resolveSatOutlineColor, false) as unknown as Cesium.Property,
-        outlineWidth: new Cesium.CallbackProperty(resolveSatOutlineWidth, false) as unknown as Cesium.Property,
+      billboard: {
+        image: satelliteIcon,
+        color: new Cesium.CallbackProperty(() => (isSatHighlighted() ? Cesium.Color.YELLOW : Cesium.Color.WHITE), false) as unknown as Cesium.Property,
+        width: new Cesium.CallbackProperty(() => (isSatHighlighted() ? 32 : 24), false) as unknown as Cesium.Property,
+        height: new Cesium.CallbackProperty(() => (isSatHighlighted() ? 32 : 24), false) as unknown as Cesium.Property,
         disableDepthTestDistance: 0,
       },
+
       label: {
         text: buildSatelliteLabelText(sat.norad, sat.name),
         font: 'bold 12px sans-serif',
@@ -774,8 +699,6 @@ const ourWeaponStyleCache = new Map<string, OurWeaponEntityStyle>()
 const OUR_WEAPON_HIGHLIGHT_COLOR = Cesium.Color.YELLOW
 const OUR_WEAPON_DEFAULT_COLOR = Cesium.Color.fromCssColorString('#ef6b73')
 const OUR_WEAPON_DEFAULT_LABEL_COLOR = Cesium.Color.fromCssColorString('#ff9e9e')
-/** 与敌方地面站图标一致的 Billboard 尺寸（像素） */
-const OUR_WEAPON_BILLBOARD_SIZE = 22
 /** 武器标签最大可见距离（米），超过后不再显示 */
 const OUR_WEAPON_LABEL_MAX_DISTANCE = 60000000
 
@@ -962,7 +885,6 @@ const renderRedWeaponsOnCesium = () => {
 
     const weaponId = `our-weapon-${weapon.id ?? index}`
     const position = Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 0)
-    const weaponColor = OUR_WEAPON_DEFAULT_COLOR
     const rangeMeters = Math.max(10000, Number(weapon.range ?? 0) * 1000)
 
     const entity = viewer.entities.add({
@@ -971,10 +893,10 @@ const renderRedWeaponsOnCesium = () => {
       position: new Cesium.ConstantPositionProperty(position),
       show: true,
       billboard: {
-        image: getOurWeaponShapeImage(),
-        color: weaponColor,
-        width: OUR_WEAPON_BILLBOARD_SIZE,
-        height: OUR_WEAPON_BILLBOARD_SIZE,
+        image: laserStationIcon,
+        color: Cesium.Color.WHITE,
+        width: 28,
+        height: 28,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         disableDepthTestDistance: 0,
@@ -1015,7 +937,7 @@ const renderRedWeaponsOnCesium = () => {
     newEntities.push(entity)
 
     ourWeaponStyleCache.set(weaponId, {
-      billboardColor: weaponColor,
+      billboardColor: Cesium.Color.WHITE,
       labelFillColor: OUR_WEAPON_DEFAULT_LABEL_COLOR,
       ellipseMaterial: OUR_WEAPON_DEFAULT_COLOR.withAlpha(0.1),
       ellipseOutlineColor: OUR_WEAPON_DEFAULT_COLOR.withAlpha(0.5),
@@ -1492,6 +1414,13 @@ const renderSateliitePathWithEntity = async (taskId: number, namespace?: string)
         ]),
         position: positionProperty,
 
+        billboard: {
+          image: satelliteIcon,
+          width: 24,
+          height: 24,
+          color: Cesium.Color.WHITE,
+          disableDepthTestDistance: 0,
+        },
         point: {
           pixelSize: 8,
           color: Cesium.Color.BLUE,
@@ -1575,6 +1504,12 @@ const resetHighlightSatellites = () => {
       const pixelSize = isRelay ? 16 : 13
       const outlineWidth = 2.5
 
+      if (entity && entity.billboard) {
+        entity.billboard.color = new Cesium.ConstantProperty(Cesium.Color.WHITE)
+        entity.billboard.width = new Cesium.ConstantProperty(24)
+        entity.billboard.height = new Cesium.ConstantProperty(24)
+      }
+
       if (entity && entity.point) {
         entity.point.color = new Cesium.ConstantProperty(satColor)
         entity.point.outlineColor = new Cesium.ConstantProperty(outlineColor)
@@ -1634,6 +1569,11 @@ const highlightSatellite = (sate: { norad_id: string }) => {
 
   // 2. Entity 模式节点高亮
   viewer.selectedEntity = entity
+  if (entity.billboard) {
+    entity.billboard.color = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
+    entity.billboard.width = new Cesium.ConstantProperty(32)
+    entity.billboard.height = new Cesium.ConstantProperty(32)
+  }
   if (entity.point) {
     entity.point.outlineColor = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
     entity.point.outlineWidth = new Cesium.ConstantProperty(4)

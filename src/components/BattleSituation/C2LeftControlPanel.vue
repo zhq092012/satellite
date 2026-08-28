@@ -83,7 +83,7 @@
         }" @click="handleSelectSatellite(sat.norad)">
           <div class="card-top">
             <span class="sat-name">
-              {{ sat.isRelay ? '📡' : '🛰️' }} <strong>{{ sat.name }}</strong>
+              🛰️<strong>{{ sat.name }}</strong>
               <span v-if="sat.isRelay" class="relay-tag">中继</span>
             </span>
             <span v-if="sortMode === 'threat'" class="metric-highlight"
