@@ -42,7 +42,11 @@ import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPa
 import BattleGlobeTimeline from '@/components/BattleSituation/BattleGlobeTimeline.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
-import { collectSeriesTransmissionLinks, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
+import {
+  collectSeriesTransmissionLinks,
+  collectSatelliteTransmissionLinks,
+  type SatelliteTransmissionLink,
+} from '@/utils/satelliteFullChainAnalysis'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 
 /** [变量说明] 全局布局 Store */
@@ -234,7 +238,10 @@ const handleSelectTransmissionLink = (link: SatelliteTransmissionLink | null) =>
  * 按当前系列筛选范围加载矩阵：有系列时加载单系列，无系列时合并全部系列。
  */
 let matrixLoadToken = 0
-
+/**
+ * 这个函数在当前任务或选中系列发生变更时调用，重新加载算法矩阵数据。
+ * - 若当前任务未选中，则清空矩阵数据与选中卫星。 
+ */
 const loadMatrixForCurrentScope = async () => {
   const taskId = store.activedTask?.id
   if (!taskId) {
@@ -307,12 +314,25 @@ const handleSelectSatellite = (norad: number | null) => {
 }
 
 /**
- * 在任务时间轴完成时刻同步后，再执行卫星高亮与相机飞赴
+ * 在任务时间轴完成时刻同步后，再执行卫星高亮与相机定位：
+ * - 若右侧有传输链路：高亮卫星，相机定位到右侧第一个链路的包围球；
+ * - 若右侧没有传输链路：只是高亮卫星，不做其他处理。
  * @param norad 目标卫星 NORAD
  */
 const scheduleFlyToSelectedSatellite = (norad: number) => {
   nextTick(() => {
-    cesiumViewerRef.value?.highlightSatellite({ norad_id: String(norad) })
+    const viewer = cesiumViewerRef.value
+    if (!viewer) return
+
+    const matrix = store.matrixData
+    const links = collectSatelliteTransmissionLinks(matrix, norad)
+
+    if (links && links.length > 0) {
+      viewer.highlightSatellite({ norad_id: String(norad) }, true)
+      viewer.flyToLinkBoundingSphere?.(links[0])
+    } else {
+      viewer.highlightSatellite({ norad_id: String(norad) })
+    }
   })
 }
 

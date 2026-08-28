@@ -10,7 +10,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { getAllWeapons, getSatelliteDetail, getSatelliteTLEData, getTLEDataByTaskId } from '@/api/dashboard'
+import { getAllWeapons, getSatelliteDetail } from '@/api/dashboard'
 import type { MatrixResult } from '@/api/electronic'
 import type { ChainNode, SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 import { useElectronicCesiumBridge, type InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
@@ -18,13 +18,17 @@ import { useLayoutStore } from '@/store/modules/layout'
 import type { SatelliteData, Weapon } from '@/types/dashboard'
 import { markBattleArea } from '@/utils/tools/functionTool'
 import laserStationIcon from '@/assets/icons/LaserStation.png'
+import groundStationIcon from '@/assets/icons/GroundStation.png'
+import opticalTrackingStationIcon from '@/assets/icons/OpticalTrackingStation.png'
+import launchPadIcon from '@/assets/icons/LaunchPad.png'
 import satelliteIcon from '@/assets/icons/Satellite.png'
 import radarStationIcon from '@/assets/icons/RadarStation.png'
 import launchSiteIcon from '@/assets/icons/LaunchSite.png'
 import * as Cesium from 'cesium'
 import { CallbackProperty } from 'cesium'
 import * as satellitejs from 'satellite.js'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
+// import { listenCameraLocaion, listenClickPositionCartesian } from '@/utils/tools/cameraTools'
 
 // 全局布局状态管理 store
 const store = useLayoutStore()
@@ -202,7 +206,7 @@ const initViewer = async () => {
       initTaskClock()
       syncOrbitAnimationMode()
 
-      // 绑定自定义的相机监听（用于显示相机位置/角度等）
+      // // 绑定自定义的相机监听（用于显示相机位置/角度等）
       // listenCameraLocaion(viewer)
       // 监控鼠标点击事件
       handleViewerClickEvent()
@@ -302,11 +306,7 @@ const satelliteTleCache = new Map<number, any>()
  * - 任务切换时清空（cachedTaskId 不匹配时）
  */
 let cachedSatelliteList: SatelliteData[] | null = null
-// 当前缓存对应的任务 ID
-let cachedTaskId: number | null = null
 
-// 当前渲染任务的 taskId，用于切换任务时检测是否需要清理缓存
-let currentRenderTaskId: number | null = null
 
 // 存储电子信息网络基础设施实体 ID (地面站、中心云站)
 const electronicNodeEntityIds = new Set<string>()
@@ -365,36 +365,7 @@ const flyToInfrastructureNode = (node: InfrastructureLocation) => {
   })
 }
 
-/**
- * 视角平滑定位到我方武器节点上空
- *
- * @param weapon 武器对象（含经纬度与射程）
- */
-const flyToOurWeapon = (weapon: { id?: string; name: string; latitude: number; longitude: number; range?: number }) => {
-  if (!viewer || !Number.isFinite(weapon.latitude) || !Number.isFinite(weapon.longitude)) return
 
-  const weaponPos =
-    findOurWeaponEntity(weapon)?.position?.getValue(Cesium.JulianDate.now()) ??
-    Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 0)
-  const boundingSphere = new Cesium.BoundingSphere(weaponPos, 0)
-  const rangeKm = Math.max(10, Number(weapon.range ?? 500))
-  const cameraHeight = Math.min(Math.max(rangeKm * 3000, 800000), 3000000)
-  const offset = new Cesium.HeadingPitchRange(Cesium.Math.toRadians(0), Cesium.Math.toRadians(-50), cameraHeight)
-
-  const entity = findOurWeaponEntity(weapon)
-
-  if (entity) {
-    viewer.flyTo(entity, {
-      duration: 1.5,
-      offset,
-    })
-  } else {
-    viewer.camera.flyToBoundingSphere(boundingSphere, {
-      duration: 1.5,
-      offset,
-    })
-  }
-}
 
 // 监听 store 中选中的地面基础设施节点，如果外部选择变更则定位相机
 watch(
@@ -488,7 +459,7 @@ const renderElectronicInfrastructureNodes = () => {
         )
       }
       const resolveColor = () => (isNodeHighlighted() ? highlightColor : Cesium.Color.WHITE)
-
+      const resolveLabelColor = () => (isNodeHighlighted() ? highlightColor : Cesium.Color.CYAN)
 
       viewer.entities.add({
         id: entityId,
@@ -496,8 +467,8 @@ const renderElectronicInfrastructureNodes = () => {
         billboard: {
           image: isReceive ? radarStationIcon : launchSiteIcon,
           color: new Cesium.CallbackProperty(() => resolveColor(), false) as unknown as Cesium.Property,
-          width: isReceive ? 28 : 28,
-          height: isReceive ? 28 : 28,
+          width: 28,
+          height: 28,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           disableDepthTestDistance: 0,
           heightReference: Cesium.HeightReference.NONE,
@@ -505,7 +476,7 @@ const renderElectronicInfrastructureNodes = () => {
         label: {
           text: labelText,
           font: 'bold 13px sans-serif',
-          fillColor: new Cesium.CallbackProperty(() => resolveColor(), false) as unknown as Cesium.Property,
+          fillColor: new Cesium.CallbackProperty(() => resolveLabelColor(), false) as unknown as Cesium.Property,
           outlineColor: Cesium.Color.BLACK,
           outlineWidth: 2,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
@@ -532,7 +503,7 @@ const renderElectronicInfrastructureNodes = () => {
     const isRelay = sat.satType.includes('中继')
     const satColor = isRelay ? Cesium.Color.PURPLE : Cesium.Color.CYAN
 
-    const resolveSatPosition = () => getSatellitePositionInCesium(sat.norad) || initialPos
+    const resolveSatPosition = (time?: Cesium.JulianDate) => getSatellitePositionInCesium(sat.norad, time) || initialPos
     const isSatHighlighted = () => {
       const keys = selectedTransmissionLinkNodeKeys.value
       return (
@@ -599,7 +570,7 @@ const resolveChainNodePosition = (node: ChainNode, time?: Cesium.JulianDate): Ce
 
   if (node.layer === 'RECEIVE') {
     const matched = infrastructureNodes.value.find(
-      (item) => item.type === 'RECEIVE' && (item.id === node.id || item.name === node.name)
+      (item) => item.type === 'RECEIVE' && (String(item.id) === String(node.id) || item.name === node.name)
     )
     if (matched) {
       return Cesium.Cartesian3.fromDegrees(matched.longitude, matched.latitude, matched.altitude)
@@ -608,7 +579,7 @@ const resolveChainNodePosition = (node: ChainNode, time?: Cesium.JulianDate): Ce
 
   if (node.layer === 'STATION') {
     const matched = infrastructureNodes.value.find(
-      (item) => item.type === 'STATION' && (item.id === node.id || item.name === node.name)
+      (item) => item.type === 'STATION' && (String(item.id) === String(node.id) || item.name === node.name)
     )
     if (matched) {
       return Cesium.Cartesian3.fromDegrees(matched.longitude, matched.latitude, matched.altitude)
@@ -616,6 +587,45 @@ const resolveChainNodePosition = (node: ChainNode, time?: Cesium.JulianDate): Ce
   }
 
   return null
+}
+
+/**
+ * 视角定位到指定传输链路全向节点（包含卫星、地面站、中继卫星、数据中心等）构成的包围球视角
+ * @param link 传输链路
+ */
+const flyToLinkBoundingSphere = (link: SatelliteTransmissionLink | null) => {
+  if (!link || !viewer || viewer.isDestroyed()) return
+
+  const time = viewer.clock.currentTime
+  const positions: Cesium.Cartesian3[] = []
+
+  link.nodes.forEach((node) => {
+    const pos = resolveChainNodePosition(node, time)
+    if (pos) {
+      positions.push(pos)
+    }
+  })
+
+  if (!positions.length) return
+
+  const boundingSphere = Cesium.BoundingSphere.fromPoints(positions)
+
+  // 防止节点过于集中或单节点时视角靠得太近
+  if (boundingSphere.radius < 300000) {
+    boundingSphere.radius = 300000
+  }
+
+  const cameraRange = Math.max(boundingSphere.radius * 2.3, 1800000)
+  const offset = new Cesium.HeadingPitchRange(
+    Cesium.Math.toRadians(0),
+    Cesium.Math.toRadians(-90),
+    cameraRange
+  )
+
+  viewer.camera.flyToBoundingSphere(boundingSphere, {
+    duration: 1.5,
+    offset,
+  })
 }
 
 /**
@@ -696,12 +706,15 @@ interface OurWeaponEntityStyle {
 }
 
 const ourWeaponStyleCache = new Map<string, OurWeaponEntityStyle>()
-const OUR_WEAPON_HIGHLIGHT_COLOR = Cesium.Color.YELLOW
 const OUR_WEAPON_DEFAULT_COLOR = Cesium.Color.fromCssColorString('#ef6b73')
 const OUR_WEAPON_DEFAULT_LABEL_COLOR = Cesium.Color.fromCssColorString('#ff9e9e')
 /** 武器标签最大可见距离（米），超过后不再显示 */
 const OUR_WEAPON_LABEL_MAX_DISTANCE = 60000000
 
+/**
+ * 更新我方武器图层的可见性
+ * @param visible 是否显示我方武器
+ */
 const updateOurWeaponsVisibility = (visible = true) => {
   redWeaponEntities.value.forEach((entity) => {
     entity.show = visible
@@ -718,116 +731,7 @@ const handleOurWeaponsToggle = (visible: boolean | string | number) => {
   if (!show) return
   store.setShowOurWeapons(true)
   updateOurWeaponsVisibility(true)
-  if (store.selectedOurWeapon) {
-    highlightOurWeaponOnMap(store.selectedOurWeapon)
-  }
-}
 
-/**
- * 根据武器信息查找地图上对应的 Cesium 实体
- *
- * @param weapon 武器对象
- * @returns 匹配的 Entity 或 undefined
- */
-const findOurWeaponEntity = (weapon: {
-  id?: string
-  name: string
-  latitude: number
-  longitude: number
-}): Cesium.Entity | undefined => {
-  if (!viewer) return undefined
-  if (weapon.id) {
-    const byId = viewer.entities.getById(`our-weapon-${weapon.id}`)
-    if (byId) return byId
-  }
-  const byName = redWeaponEntities.value.find((entity) => entity.name === weapon.name)
-  if (byName) return byName
-  return redWeaponEntities.value.find((entity) => {
-    const pos = entity.position?.getValue(Cesium.JulianDate.now())
-    if (!pos) return false
-    const carto = Cesium.Cartographic.fromCartesian(pos)
-    const lat = Cesium.Math.toDegrees(carto.latitude)
-    const lon = Cesium.Math.toDegrees(carto.longitude)
-    return Math.abs(lat - weapon.latitude) < 0.02 && Math.abs(lon - weapon.longitude) < 0.02
-  })
-}
-
-/**
- * 恢复所有我方武器实体至默认样式，并移除高亮环
- */
-const resetOurWeaponHighlight = () => {
-  if (!viewer || viewer.isDestroyed()) return
-
-  redWeaponEntities.value.forEach((entity) => {
-    const entityId = String(entity.id ?? '')
-    const cached = ourWeaponStyleCache.get(entityId)
-    if (!cached) return
-
-    const highlightRing = viewer.entities.getById(`${entityId}-highlight-ring`)
-    if (highlightRing) {
-      viewer.entities.remove(highlightRing)
-    }
-
-    if (entity.billboard) {
-      entity.billboard.color = new Cesium.ConstantProperty(cached.billboardColor)
-    }
-    if (entity.label) {
-      entity.label.fillColor = new Cesium.ConstantProperty(cached.labelFillColor)
-    }
-    if (entity.ellipse) {
-      entity.ellipse.material = new Cesium.ColorMaterialProperty(cached.ellipseMaterial)
-      entity.ellipse.outlineColor = new Cesium.ConstantProperty(cached.ellipseOutlineColor)
-    }
-  })
-}
-
-/**
- * 将指定我方武器在地图上以黄色高亮显示
- *
- * @param weapon 武器对象
- */
-const highlightOurWeaponOnMap = (weapon: {
-  id?: string
-  name: string
-  latitude: number
-  longitude: number
-  range?: number
-}) => {
-  if (!viewer || viewer.isDestroyed()) return
-
-  resetOurWeaponHighlight()
-
-  const entity = findOurWeaponEntity(weapon)
-  if (!entity) return
-
-  const entityId = String(entity.id ?? '')
-  const rangeMeters = Math.max(10000, Number(weapon.range ?? 0) * 1000)
-  const ringRadius = Math.min(Math.max(rangeMeters * 0.08, 30000), 120000)
-
-  if (entity.billboard) {
-    entity.billboard.color = new Cesium.ConstantProperty(OUR_WEAPON_HIGHLIGHT_COLOR)
-  }
-  if (entity.label) {
-    entity.label.fillColor = new Cesium.ConstantProperty(OUR_WEAPON_HIGHLIGHT_COLOR)
-  }
-  if (entity.ellipse) {
-    entity.ellipse.material = new Cesium.ColorMaterialProperty(OUR_WEAPON_HIGHLIGHT_COLOR.withAlpha(0.22))
-    entity.ellipse.outlineColor = new Cesium.ConstantProperty(OUR_WEAPON_HIGHLIGHT_COLOR)
-  }
-
-  viewer.entities.add({
-    id: `${entityId}-highlight-ring`,
-    position: entity.position,
-    ellipse: {
-      semiMajorAxis: ringRadius,
-      semiMinorAxis: ringRadius,
-      material: OUR_WEAPON_HIGHLIGHT_COLOR.withAlpha(0.35),
-      outline: true,
-      outlineColor: OUR_WEAPON_HIGHLIGHT_COLOR,
-      outlineWidth: 3,
-      height: 0,
-    },
-  })
 }
 
 
@@ -845,24 +749,37 @@ const highlightOurWeaponOnMap = (weapon: {
  * - 标签在相机距离过远时自动隐藏
  * - 我方武器图层始终显示
  */
-const loadAndRenderRedWeapons = async () => {
+const loadAndRenderWeapons = async () => {
   if (!viewer) return
   try {
     const res = await getAllWeapons()
     if (res.code === 200 && res.data?.weapons) {
       redWeaponDataList.value = res.data.weapons
-      renderRedWeaponsOnCesium()
+      renderWeaponsOnCesium()
     }
   } catch (err) {
     console.error('获取我方武器列表失败:', err)
   }
 }
-
+const getWeaponImageByType = (type: string) => {
+  switch (type) {
+    case '动能':
+      return launchPadIcon
+    case '定向能':
+      return laserStationIcon
+    case '电子干扰':
+      return groundStationIcon
+    case '地面武器':
+      return opticalTrackingStationIcon
+    default:
+      return launchPadIcon
+  }
+}
 /**
  * [功能]
  * 在 Cesium Viewer 中构造并绘制我方武器 3D 节点与作用防线
  */
-const renderRedWeaponsOnCesium = () => {
+const renderWeaponsOnCesium = () => {
   if (!viewer) return
 
   // 清理旧的武器实体
@@ -885,22 +802,22 @@ const renderRedWeaponsOnCesium = () => {
 
     const weaponId = `our-weapon-${weapon.id ?? index}`
     const position = Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 0)
-    const rangeMeters = Math.max(10000, Number(weapon.range ?? 0) * 1000)
-
+    // const rangeMeters = Math.max(10000, Number(weapon.range ?? 0) * 1000)
+    const weaponType = weapon.type
     const entity = viewer.entities.add({
       id: weaponId,
       name: weapon.name,
       position: new Cesium.ConstantPositionProperty(position),
       show: true,
       billboard: {
-        image: laserStationIcon,
+        image: getWeaponImageByType(weaponType),
         color: Cesium.Color.WHITE,
         width: 28,
         height: 28,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         disableDepthTestDistance: 0,
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        heightReference: Cesium.HeightReference.NONE,
       },
       label: {
         text: `${weapon.name} (${weapon.type || '武器'})`,
@@ -911,17 +828,10 @@ const renderRedWeaponsOnCesium = () => {
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         showBackground: true,
         backgroundColor: new Cesium.Color(0, 0, 0, 0.3),
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, -28),
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        heightReference: Cesium.HeightReference.NONE,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, OUR_WEAPON_LABEL_MAX_DISTANCE),
-      },
-      ellipse: {
-        semiMajorAxis: rangeMeters,
-        semiMinorAxis: rangeMeters,
-        material: Cesium.Color.fromCssColorString('#ef6b73').withAlpha(0.1),
-        outline: true,
-        outlineColor: Cesium.Color.fromCssColorString('#ef6b73').withAlpha(0.5),
-        height: 0,
       },
       description: `<div style="padding: 12px; font-family: sans-serif; background-color: #1a2233; color: #e6f7ff; border-radius: 8px; border: 1px solid #ef6b73;">
         <h3 style="margin: 0 0 10px 0; color: #ef6b73; font-size: 16px;">🛩️ 我方武器资产</h3>
@@ -946,9 +856,7 @@ const renderRedWeaponsOnCesium = () => {
 
   redWeaponEntities.value = newEntities
   updateOurWeaponsVisibility(true)
-  if (store.selectedOurWeapon) {
-    highlightOurWeaponOnMap(store.selectedOurWeapon)
-  }
+
 }
 
 // [变量用途]
@@ -978,7 +886,7 @@ const getSatellitePositionInCesium = (
   positionCalculatingSet.add(norad)
 
   try {
-    // 2. 尝试从 TLE 两行数据中推算当前时刻 3D 位置
+    // 直接根据 TLE 和 Cesium 当前帧时间计算，避免读取自身 CallbackProperty 造成递归。
     const matrixSats = props.matrixData?.initMatrixList || []
     const initSat = matrixSats.find((s) => s.norad === norad)
     let line1 = initSat?.line1
@@ -1019,16 +927,24 @@ const getSatellitePositionInCesium = (
 
   return null
 }
-
+// [变量用途]
+// 延迟渲染标记：当 Cesium 容器尺寸不合法时，推迟渲染
 let pendingInfrastructureRender = false
-
+/**
+ * [功能]
+ * 立即刷新渲染敌方地面接收站、中心云数据中心与天基过境 / 中继卫星集群 3D 实体
+ */
 const flushPendingInfrastructureRender = () => {
   if (!pendingInfrastructureRender || !viewer || viewer.isDestroyed()) return
   if (!props.matrixData || !hasValidContainerSize(cesiumContainer.value || null)) return
   pendingInfrastructureRender = false
+  //渲染敌方地面接收站、中心云数据中心与天基过境 / 中继卫星集群 3D 实体
   renderElectronicInfrastructureNodes()
 }
-
+/**
+ * [功能]
+ * 调度渲染敌方地面接收站、中心云数据中心与天基过境 / 中继卫星集群 3D 实体
+ */
 const scheduleInfrastructureRender = () => {
   if (!viewer || viewer.isDestroyed()) return
   if (!props.matrixData) {
@@ -1041,6 +957,7 @@ const scheduleInfrastructureRender = () => {
     return
   }
   pendingInfrastructureRender = false
+  //渲染敌方地面接收站、中心云数据中心与天基过境 / 中继卫星集群 3D 实体
   renderElectronicInfrastructureNodes()
 }
 
@@ -1073,6 +990,7 @@ const ensureClockTickListener = () => {
   clockTickRemoveListener = viewer.clock.onTick.addEventListener((clock: Cesium.Clock) => {
     if (!viewer || viewer.isDestroyed()) return
     if (clock.shouldAnimate) {
+      viewer.scene.requestRender()
       emit('clock-tick', Cesium.JulianDate.toDate(clock.currentTime).getTime())
     }
   })
@@ -1144,10 +1062,18 @@ const setClockTime = (ms: number) => {
 const setClockPlaying = (playing: boolean, multiplier?: number) => {
   if (!viewer || viewer.isDestroyed()) return
   const mult = multiplier ?? playbackSpeed.value ?? (props.selectedNorad ? 1 : ORBIT_PLAYBACK_MULTIPLIER)
+  const clock = viewer.clock
+  if (playing) {
+    clock.canAnimate = true
+    if (Cesium.JulianDate.lessThan(clock.currentTime, clock.startTime) ||
+      Cesium.JulianDate.greaterThan(clock.currentTime, clock.stopTime)) {
+      clock.currentTime = clock.startTime.clone()
+    }
+  }
   playbackSpeed.value = mult
-  viewer.clock.multiplier = mult
-  viewer.clock.shouldAnimate = playing
-
+  clock.multiplier = mult
+  clock.shouldAnimate = playing
+  viewer.scene.requestRender()
 }
 
 watch(
@@ -1168,6 +1094,10 @@ let cameraMoveEndListener: Cesium.Event.RemoveCallback | null = null
 function handleViewerClickEvent() {
   viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
   viewer.screenSpaceEventHandler.setInputAction(async function (event: Cesium.ScreenSpaceEventHandler.PositionedEvent) {
+
+    // //在鼠标点击的地方获取经纬度，并标注一个红点 【测试使用】
+    // listenClickPositionCartesian(event, viewer)
+
     const picked = viewer.scene.pick(event.position)
     if (!Cesium.defined(picked)) {
       store.setSelectedSatellite(null) // 清空选择的卫星
@@ -1212,18 +1142,6 @@ function handleViewerClickEvent() {
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
 }
 
-/**
- * [功能]
- * 将逗号分隔的国家字符串解析为国家名数组
- *
- * @param value 逗号分隔的国家字符串
- * @returns 去除空白后的国家名数组
- */
-const normalizeCountryList = (value?: string) =>
-  String(value ?? '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
 
 /**
  * [功能]
@@ -1314,148 +1232,6 @@ const ensureOrbitData = (norad: number, satel: any): Cesium.SampledPositionPrope
   satellitePositionPropertyCache.set(norad, positionProperty)
   return positionProperty
 }
-/**
- * 根据任务Id查询所有过境卫星的tle数据，并在cesium视图上渲染
- * @param taskId
- * @param namespace
- */
-const renderSateliitePathWithEntity = async (taskId: number, namespace?: string) => {
-  if (!viewer) return
-  const currentViewer = viewer
-
-  const isViewerInvalid = () => {
-    return !currentViewer || currentViewer !== viewer || (currentViewer as any).isDestroyed?.()
-  }
-
-  // 任务切换时清理缓存（避免重复计算 / 内存持续增长）
-  if (currentRenderTaskId !== taskId) {
-    currentRenderTaskId = taskId
-    cachedTaskId = taskId
-    cachedSatelliteList = null
-    satelliteTleCache.clear()
-    satelliteOrbitData.clear()
-    satellitePositionPropertyCache.clear()
-    satelliteEntities.clear()
-
-    // 暂停渲染循环，防止 removeAll() 与 _onTick 并发访问已销毁的 Batch
-    const prevLoop = viewer.useDefaultRenderLoop
-    viewer.useDefaultRenderLoop = false
-    viewer.entities.removeAll()
-    if (!viewer.isDestroyed()) {
-      viewer.useDefaultRenderLoop = prevLoop
-    }
-  }
-
-  // 获取任务的卫星列表（只在第一次或任务切换时请求）
-  if (!cachedSatelliteList || cachedTaskId !== taskId) {
-    const res = await getTLEDataByTaskId(taskId)
-    if (!(res.code === 200 && res.data)) return
-
-    cachedSatelliteList = res.data.results || []
-    cachedTaskId = taskId
-  }
-
-  if (!cachedSatelliteList) return
-  const enemyCountrySet = computed(() => new Set(normalizeCountryList(store.activedTask?.enemyCountry)))
-  // 过滤条件应用
-  let satelliteList = cachedSatelliteList.filter((s) => enemyCountrySet.value.has(s.country))
-  // 保存任务相关的所有卫星，网络安全使用
-  store.saveTaskSatellite(satelliteList)
-  // 需要渲染的卫星 ID 集合，用于隐藏未命中的实体
-  const wantedNorads = new Set(satelliteList.map((s) => Number(s.norad_id)))
-
-  // 隐藏不在当前过滤条件中的实体（保留缓存，避免重复创建）
-  for (const [norad, entity] of satelliteEntities.entries()) {
-    if (!wantedNorads.has(norad)) {
-      entity.show = false
-    }
-  }
-
-  // 如果该任务下没有任何卫星，则直接结束
-  if (satelliteList.length === 0) {
-    return
-  }
-
-  // 只请求尚未缓存的 TLE
-  const needTleNorads = satelliteList.map((s) => Number(s.norad_id)).filter((norad) => !satelliteTleCache.has(norad))
-
-  if (needTleNorads.length) {
-    const tleDataRes = await getSatelliteTLEData({ norads: needTleNorads })
-    if (isViewerInvalid()) return
-    if (tleDataRes.code === 200 && Array.isArray(tleDataRes.data)) {
-      for (const row of tleDataRes.data) {
-        if (row && typeof row.noradId !== 'undefined') {
-          satelliteTleCache.set(Number(row.noradId), row.satelliteTleResp)
-        }
-      }
-    }
-  }
-
-  if (isViewerInvalid()) return
-
-  const nsPrefix = namespace ? `${namespace}-` : ''
-
-  for (const satel of satelliteList) {
-    if (!satel) continue
-    const noradId = Number(satel.norad_id)
-    if (Number.isNaN(noradId)) continue
-
-    const positionProperty = ensureOrbitData(noradId, satel)
-    if (!positionProperty) continue
-
-    const entityId = `${nsPrefix}satellite-${noradId}`
-    let entity = viewer.entities.getById(entityId) as Cesium.Entity | undefined
-    if (!entity) {
-      entity = viewer.entities.add({
-        id: entityId,
-        name: satel.name_en,
-        availability: new Cesium.TimeIntervalCollection([
-          new Cesium.TimeInterval({ start: currentViewer.clock.startTime, stop: currentViewer.clock.stopTime }),
-        ]),
-        position: positionProperty,
-
-        billboard: {
-          image: satelliteIcon,
-          width: 24,
-          height: 24,
-          color: Cesium.Color.WHITE,
-          disableDepthTestDistance: 0,
-        },
-        point: {
-          pixelSize: 8,
-          color: Cesium.Color.BLUE,
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: 2,
-          heightReference: Cesium.HeightReference.NONE,
-
-        },
-        label: {
-          text: buildSatelliteLabelText(noradId, satel.name_en),
-          font: 'bold 12px sans-serif',
-          fillColor: Cesium.Color.CYAN,
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 2,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          pixelOffset: new Cesium.Cartesian2(0, -28),
-          showBackground: true,
-          backgroundColor: new Cesium.Color(0, 0, 0, 0.45),
-        },
-        path: {
-          show: false,
-          leadTime: satel.orbit_type === 1 ? 90 * 60 : satel.orbit_type === 2 ? 12 * 3600 : 24 * 3600,
-          trailTime: 0,
-          width: 1,
-          material: new Cesium.PolylineGlowMaterialProperty({
-            glowPower: 0.2,
-            color: Cesium.Color.YELLOW,
-          }),
-        },
-      })
-      satelliteEntities.set(noradId, entity)
-    }
-
-  }
-}
 
 /**
  * [功能]
@@ -1545,8 +1321,9 @@ const resetHighlightSatellites = () => {
  * 高亮指定 NORAD 编号的敌方卫星、加粗显示其 Entity 自带的 path 轨迹并自动平滑飞赴定位
  *
  * @param sate 包含 norad_id 的对象
+ * @param skipFlyTo 是否跳过飞赴目标卫星视角（默认 false）
  */
-const highlightSatellite = (sate: { norad_id: string }) => {
+const highlightSatellite = (sate: { norad_id: string }, skipFlyTo = false) => {
   if (!viewer || viewer.isDestroyed()) return
   resetHighlightSatellites()
 
@@ -1596,9 +1373,11 @@ const highlightSatellite = (sate: { norad_id: string }) => {
   }
 
   // 3. 相机视角平滑飞赴定位至目标卫星
-  viewer.flyTo(entity, {
-    duration: 1.5,
-  })
+  if (!skipFlyTo) {
+    viewer.flyTo(entity, {
+      duration: 1.5,
+    })
+  }
 }
 
 
@@ -1627,7 +1406,7 @@ onMounted(async () => {
   await initViewer()
   if (viewer) {
     store.setShowOurWeapons(true)
-    void loadAndRenderRedWeapons()
+    void loadAndRenderWeapons()
   }
   startContainerSizeObserver()
 })
@@ -1680,8 +1459,6 @@ onBeforeUnmount(() => {
   satellitePositionPropertyCache.clear()
   satelliteTleCache.clear()
   cachedSatelliteList = null
-  cachedTaskId = null
-  currentRenderTaskId = null
 
   if (viewer) {
     if (!viewer.isDestroyed()) {
@@ -1742,7 +1519,6 @@ const refreshAfterActivate = () => {
 defineExpose({
   clearViewer,
   clearElectronicInfrastructureNodes,
-  renderSateliitePathWithEntity,
   markBattle,
   highlightSatellite,
   pauseClockAnimation,
@@ -1754,9 +1530,9 @@ defineExpose({
   getClockTimeMs,
   refreshAfterActivate,
   setOurWeaponsVisible: (visible: boolean) => handleOurWeaponsToggle(visible),
-  flyToOurWeapon,
   showTransmissionLink,
   clearTransmissionLinkOverlay,
+  flyToLinkBoundingSphere,
 })
 </script>
 <style lang="scss" scoped>
