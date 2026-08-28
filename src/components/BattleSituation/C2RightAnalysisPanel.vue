@@ -4,7 +4,7 @@
       <div class="header-title-box">
         <span class="header-title glow-text-cyan">态势统计分析</span>
       </div>
-      <span class="panel-badge">{{ overviewStats.scopeLabel }}</span>
+
     </div>
 
     <div v-if="!activeMatrix" class="empty-sat-box">
@@ -623,14 +623,19 @@ onMounted(() => {
     border-radius: 4px;
     background: rgba(0, 225, 255, 0.08);
     border: 1px solid rgba(0, 225, 255, 0.2);
-    font-size: 11px;
+    font-size: 13px;
     color: #bae6fd;
-    line-height: 1.4;
+    line-height: 1.5;
+    text-align: left;
 
     .reason-icon {
-      font-size: 11px;
+      font-size: 13px;
       flex-shrink: 0;
       margin-top: 1px;
+    }
+
+    .reason-text {
+      text-align: left;
     }
   }
 }

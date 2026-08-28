@@ -480,9 +480,9 @@ const scrollToSatTreeItem = (norad: number) => {
   })
 }
 
-// 时间刻度步长档位（默认 10 分钟/格）
+// 时间刻度步长档位（默认 5 分钟/格）
 const TICK_STEP_OPTIONS = [15, 30, 60, 300, 600] as const
-const DEFAULT_TICK_STEP_INDEX = 4
+const DEFAULT_TICK_STEP_INDEX = 3
 const PIXELS_PER_TICK = 80
 const BAR_LINE_HEIGHT = 13
 const BAR_PADDING_Y = 10
@@ -1266,7 +1266,7 @@ const scrollPlayheadIntoView = (force = false) => {
  * 将甘特图对齐到当前卫星的第一个过境窗口（行、列表、播放头、横向滚动）。
  */
 const syncGanttViewToCurrentSatelliteFirstWindow = () => {
-  const norad = selectedSatNorad.value ?? store.selectedAnalysisNorad
+  const norad = selectedSatNorad.value ?? store.selectedAnalysisNorad ?? filteredSatellites.value[0]?.norad ?? null
   if (norad == null) return
 
   const sat =
@@ -1607,7 +1607,13 @@ const handleGanttRowLabelClick = (row: ProcessedGanttRow) => {
  */
 const applySharedSatelliteSelection = (forceSeekFirstWindow = false) => {
   const norad = store.selectedAnalysisNorad
-  if (norad == null) return
+  if (norad == null) {
+    if (selectedSatNorad.value == null) {
+      const firstSat = filteredSatellites.value[0]
+      if (firstSat) selectSatelliteRow(firstSat)
+    }
+    return
+  }
 
   const sat =
     currentData.value?.satelliteMatrixList?.find((item) => item.norad === norad) ||
@@ -2370,8 +2376,8 @@ watch(playheadLeftPx, () => {
         padding: 10px;
 
         .legend-title {
-          font-size: 13px;
-          font-weight: 600;
+          font-size: 16px;
+          font-weight: 700;
           color: #94a3b8;
           margin-bottom: 8px;
         }
@@ -2409,6 +2415,11 @@ watch(playheadLeftPx, () => {
                 background: linear-gradient(135deg, #9333ea, #7e22ce);
                 box-shadow: 0 0 6px rgba(147, 51, 234, 0.8);
               }
+            }
+
+            .legend-text {
+              font-size: 16px;
+              font-weight: 700;
             }
           }
         }
@@ -2495,7 +2506,7 @@ watch(playheadLeftPx, () => {
               display: flex;
               align-items: center;
               justify-content: space-between;
-              font-size: 12px;
+              font-size: 14px;
               color: #94a3b8;
               padding: 3px 6px;
               border-radius: 4px;
@@ -2901,7 +2912,7 @@ watch(playheadLeftPx, () => {
 
     /* 2.3 右侧栏 Right Detail Panel */
     .gantt-sidebar-right {
-      width: 300px;
+      width: 350px;
       min-width: 280px;
       background-color: #0f172a;
       border-left: 1px solid #1e293b;
@@ -2963,7 +2974,7 @@ watch(playheadLeftPx, () => {
         .playhead-link-block {
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: 12px;
           padding: 6px;
           border-radius: 6px;
           border: 1px solid #233148;
@@ -3038,14 +3049,16 @@ watch(playheadLeftPx, () => {
 
             .compact-row {
               display: grid;
-              grid-template-columns: 42px 1fr auto;
+              grid-template-columns: 50px 1fr auto;
               align-items: center;
               gap: 4px;
               min-height: 18px;
-              font-size: 11px;
+              text-align: left;
+              padding-left: 10px;
+              font-size: 14px;
 
               &.compact-time-row {
-                grid-template-columns: 42px 1fr;
+                grid-template-columns: 50px 1fr;
               }
 
               .compact-key {
@@ -3102,10 +3115,10 @@ watch(playheadLeftPx, () => {
 
             .compact-weapon-row {
               display: flex;
-              flex-direction: column;
               gap: 1px;
-              font-size: 11px;
+              font-size: 14px;
               line-height: 1.25;
+              justify-content: space-between;
 
               .weapon-name {
                 color: #e2e8f0;
@@ -3113,14 +3126,15 @@ watch(playheadLeftPx, () => {
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
+                text-align: left;
               }
 
               .weapon-meta {
                 color: #94a3b8;
-                font-size: 10px;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
+                text-align: left;
               }
             }
           }

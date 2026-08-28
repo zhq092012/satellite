@@ -5,7 +5,6 @@
       <div class="header-title-box">
         <span class="header-title glow-text-cyan">卫星类型与系列</span>
       </div>
-      <span class="panel-badge">传输链路</span>
     </div>
 
     <!-- 卫星类型与系列按钮/列表筛选区 -->
