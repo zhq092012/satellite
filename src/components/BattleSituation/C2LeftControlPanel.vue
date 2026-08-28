@@ -120,11 +120,11 @@
           <div class="threat-summary-card">
             <div class="summary-item">
               <span class="summary-label">NORAD</span>
-              <strong>{{ threatInfo.satelliteBaseModelResp.norad }}</strong>
+              <strong>{{ threatInfo.satelliteBaseModelResp?.norad ?? threatDialogSat?.norad ?? '--' }}</strong>
             </div>
             <div class="summary-item">
               <span class="summary-label">卫星名称</span>
-              <strong>{{ threatInfo.satelliteBaseModelResp.name_en }}</strong>
+              <strong>{{ threatInfo.satelliteBaseModelResp?.name_en || threatDialogSat?.name || '--' }}</strong>
             </div>
             <div class="summary-item highlight">
               <span class="summary-label">威胁度评分</span>
@@ -144,7 +144,7 @@
             <div class="param-grid">
               <div class="param-item">
                 <span class="param-label">载荷类型</span>
-                <span class="param-value">{{ threatInfo.satelliteBaseModelResp.sat_type || '--' }}</span>
+                <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.sat_type || '--' }}</span>
               </div>
               <div class="param-item">
                 <span class="param-label">成像分辨率</span>
@@ -168,19 +168,19 @@
               </div>
               <div class="param-item">
                 <span class="param-label">在轨状态</span>
-                <span class="param-value">{{ threatInfo.satelliteBaseModelResp.orbitStatusIndicator ?? '--' }}</span>
+                <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.orbitStatusIndicator ?? '--' }}</span>
               </div>
               <div class="param-item">
                 <span class="param-label">剩余工作寿命</span>
-                <span class="param-value">{{ threatInfo.satelliteBaseModelResp.remainLifetimeIndicator ?? '--' }}</span>
+                <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.remainLifetimeIndicator ?? '--' }}</span>
               </div>
               <div class="param-item">
                 <span class="param-label">国别</span>
-                <span class="param-value">{{ threatInfo.satelliteBaseModelResp.countryIndicator }}</span>
+                <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.countryIndicator ?? '--' }}</span>
               </div>
               <div class="param-item">
                 <span class="param-label">用户属性</span>
-                <span class="param-value">{{ threatInfo.satelliteBaseModelResp.usageIndicator }}</span>
+                <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.usageIndicator ?? '--' }}</span>
               </div>
             </div>
           </div>
@@ -207,9 +207,10 @@
  * - 触发视角切换与控制事件
  */
 import { ref, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import {
   getSatelliteTypeSerials,
+  getSatelliteThreatInfo,
   type MatrixResult,
   type SatelliteMatrix,
   type InitMatrix,
@@ -236,8 +237,6 @@ const emit = defineEmits<{
 
 /** 布局 Store，用于读取当前任务及持久化卫星筛选状态。 */
 const store = useLayoutStore()
-/** 路由实例，用于跳转至卫星威胁分析页。 */
-const router = useRouter()
 
 /** 从接口获取的卫星类型与对应系列映射。 */
 const typeSerialsMap = ref<Record<string, string[]>>({})
@@ -526,13 +525,34 @@ const getThreatLevelClass = (score: number): string => {
  */
 const openThreatDetail = async (sat: SatListItem) => {
   emit('select-satellite', sat.norad)
-  await router.push({
-    name: 'SatelliteThreat',
-    query: {
-      norad: String(sat.norad),
-      autoAnalyze: '1',
-    },
-  })
+  /** 当前任务 ID，用于请求卫星威胁度详情。 */
+  const taskId = store.activedTask?.id
+  if (!taskId) {
+    ElMessage.warning('请先选择任务')
+    return
+  }
+
+  threatDialogSat.value = { norad: sat.norad, name: sat.name }
+  threatDialogVisible.value = true
+  threatLoading.value = true
+  threatInfo.value = null
+
+  try {
+    /** 卫星威胁度详情接口响应。 */
+    const res = await getSatelliteThreatInfo({
+      norad: sat.norad,
+      series: selectedType.value || '侦察',
+      taskId,
+    })
+    if (res.code === 200 && res.data?.length) {
+      threatInfo.value = res.data[0]
+    }
+  } catch (err) {
+    console.error('获取卫星威胁度详情失败:', err)
+    ElMessage.error('获取威胁度详情失败')
+  } finally {
+    threatLoading.value = false
+  }
 }
 /**
  * [函数说明]
