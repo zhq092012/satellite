@@ -72,6 +72,21 @@ interface State {
 /** 综合打击方案可选用途类型（与 StrikePlanGenerator 选项一致） */
 export const ZHCH_USAGE_TYPE_OPTIONS = ['军用', '民用', '军用民用'] as const
 
+/** 综合打击方案用途类型展示名称 */
+export const ZHCH_USAGE_TYPE_LABELS: Record<(typeof ZHCH_USAGE_TYPE_OPTIONS)[number], string> = {
+  军用: '软杀伤打击军用',
+  民用: '软杀伤打击民用',
+  军用民用: '软杀伤打击军用民用',
+}
+
+/**
+ * 获取综合打击方案用途类型的展示名称
+ * @param type 用途类型（军用 / 民用 / 军用民用）
+ */
+export function getZhchUsageTypeLabel(type: string): string {
+  return ZHCH_USAGE_TYPE_LABELS[type as (typeof ZHCH_USAGE_TYPE_OPTIONS)[number]] ?? type
+}
+
 /** 同一 scope 的矩阵拉取 in-flight 去重，避免多组件并发请求互相覆盖 */
 let matrixScopeInflight: Promise<MatrixResult | null> | null = null
 let matrixScopeInflightKey = ''
@@ -517,12 +532,12 @@ export const useLayoutStore = defineStore('layout-store', {
       const valid = new Set<string>(ZHCH_USAGE_TYPE_OPTIONS)
       this.selectedZhchUsageTypes = this.selectedZhchUsageTypes.filter((t) => valid.has(t))
       if (!this.selectedZhchUsageTypes.length) {
-        this.selectedZhchUsageTypes = ['打击军用']
+        this.selectedZhchUsageTypes = ['军用']
       }
     },
     /**
      * 切换综合打击方案用途类型多选
-     * @param type 用途类型（打击军用 / 打击民用 / 打击军用民用）
+     * @param type 用途类型（软杀伤打击军用 / 软杀伤打击民用 / 软杀伤打击军用民用）
      */
     toggleZhchUsageType(type: string) {
       this.sanitizeZhchUsageTypes()

@@ -2,18 +2,14 @@
   <div class="satellite-section">
     <div v-if="showSectionTitle" class="section-title">
       卫星打击矩阵
-      <span class="count-tag">{{ plan.satelliteMatrixList?.length || 0 }} 颗</span>
+      <span class="count-tag">{{ satelliteList.length }} 颗</span>
     </div>
 
-    <div v-if="!plan.satelliteMatrixList?.length" class="empty-tip">暂无卫星打击数据</div>
+    <div v-if="!satelliteList.length" class="empty-tip">暂无卫星打击数据</div>
 
     <div v-else class="satellite-grid">
-      <div
-        v-for="sat in plan.satelliteMatrixList"
-        :key="`${panelKey}-${sat.norad}`"
-        class="satellite-card"
-        :class="{ struck: sat.satelliteStatus === 1 }"
-      >
+      <div v-for="sat in satelliteList" :key="`${panelKey}-${sat.norad}`" class="satellite-card"
+        :class="{ struck: sat.satelliteStatus === 1 }">
         <div class="sat-header">
           <div class="sat-title">
             <span class="sat-name">{{ sat.name }}</span>
@@ -50,23 +46,15 @@
         </div>
 
         <div class="window-block">
-          <button
-            type="button"
-            class="block-title block-title--clickable"
-            :class="{ expanded: isWindowExpanded(sat.norad) }"
-            @click="emit('toggle-windows', panelKey, sat.norad)"
-          >
+          <button type="button" class="block-title block-title--clickable"
+            :class="{ expanded: isWindowExpanded(sat.norad) }" @click="emit('toggle-windows', panelKey, sat.norad)">
             接收站过境窗口 ({{ sat.stationWindows?.length || 0 }})
             <span class="expand-icon">{{ isWindowExpanded(sat.norad) ? '▲' : '▼' }}</span>
           </button>
           <template v-if="!windowsCollapsible || isWindowExpanded(sat.norad)">
             <div v-if="sat.stationWindows?.length" class="window-list">
-              <div
-                v-for="win in sat.stationWindows"
-                :key="win.receiveId + win.peakWindow"
-                class="window-item"
-                :class="{ struck: win.strikeStatus === 1 }"
-              >
+              <div v-for="win in sat.stationWindows" :key="win.receiveId + win.peakWindow" class="window-item"
+                :class="{ struck: win.strikeStatus === 1 }">
                 <div class="window-top">
                   <span class="receive-name">📡 {{ win.receiveName }}</span>
                   <span class="strike-tag" :class="win.strikeStatus === 1 ? 'struck' : 'ok'">
@@ -91,19 +79,44 @@
 </template>
 
 <script setup lang="ts">
-import type { ZhchPlanResp } from '@/api/electronic'
+import { computed } from 'vue'
+import type { ZhchPlanResp, ZhchPlanSatelliteMatrix } from '@/api/electronic'
 
 const props = defineProps<{
+  /** 综合打击方案数据 */
   plan: ZhchPlanResp
+  /** 面板标识，用于展开状态 key */
   panelKey: string
+  /** 已展开的窗口 key 集合 */
   expandedWindows: Set<string>
+  /** 是否可折叠过境窗口 */
   windowsCollapsible?: boolean
+  /** 是否显示区块标题 */
   showSectionTitle?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'toggle-windows', panelKey: string, norad: number): void
 }>()
+
+/**
+ * 从各系列实体合并卫星矩阵列表（按 NORAD 去重）
+ */
+const satelliteList = computed((): ZhchPlanSatelliteMatrix[] => {
+  const list: ZhchPlanSatelliteMatrix[] = []
+  const seen = new Set<number>()
+
+  for (const entity of props.plan.levelSeriesEntities || []) {
+    for (const sat of entity.satelliteMatrixList || []) {
+      if (!seen.has(sat.norad)) {
+        seen.add(sat.norad)
+        list.push(sat)
+      }
+    }
+  }
+
+  return list
+})
 
 /**
  * 判断过境窗口是否展开
