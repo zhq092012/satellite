@@ -11,6 +11,21 @@
         </button>
       </div>
 
+      <!-- 当前打击方案切换 -->
+      <div v-if="store.activedTask" class="plan-switch-bar">
+        <span class="plan-switch-label">当前方案</span>
+        <button
+          v-for="type in ZHCH_USAGE_TYPE_OPTIONS"
+          :key="type"
+          class="plan-switch-btn"
+          :class="{ active: store.activeZhchUsageType === type }"
+          :disabled="planSwitching"
+          @click="handleSwitchPlan(type)"
+        >
+          {{ getZhchUsageTypeLabel(type) }}
+        </button>
+      </div>
+
       <!-- 右侧：战场与任务显示 / 切换区域 -->
       <div class="task-status-bar">
         <!-- 场景 A：已选择战场和任务 -->
@@ -82,7 +97,7 @@ import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import WeaponAttackList from '@/components/electronic/WeaponAttackList.vue'
 import StrikePlanGenerator from '@/components/electronic/StrikePlanGenerator.vue'
-import { useLayoutStore } from '@/store/modules/layout'
+import { useLayoutStore, ZHCH_USAGE_TYPE_OPTIONS, getZhchUsageTypeLabel } from '@/store/modules/layout'
 import { getBattleList, getTaskList } from '@/api/dashboard'
 import type { BattleForm, TaskForm } from '@/types/dashboard'
 import { ElMessage } from 'element-plus'
@@ -91,6 +106,23 @@ defineOptions({ name: 'Home' })
 
 /** [变量说明] 全局 Store */
 const store = useLayoutStore()
+
+/** 打击方案切换中 */
+const planSwitching = ref(false)
+
+/**
+ * 切换当前激活的综合打击方案
+ * @param type 用途类型
+ */
+const handleSwitchPlan = async (type: string) => {
+  if (store.activeZhchUsageType === type || planSwitching.value) return
+  planSwitching.value = true
+  try {
+    await store.setActiveZhchUsageType(type)
+  } finally {
+    planSwitching.value = false
+  }
+}
 
 /**
  * [类型定义]
@@ -226,21 +258,26 @@ const selectBattleAndTask = (battle: BattleForm, task: TaskForm) => {
 /**
  * [函数说明] 确认选择并写入全局 Store
  */
-const confirmTaskSelection = () => {
+const confirmTaskSelection = async () => {
   if (pendingSelection.value) {
     const { battle, task } = pendingSelection.value
     store.setActivedBattle(battle)
     store.setActivedTask(task)
     selectorDialogVisible.value = false
     ElMessage.success(`已设置当前任务：${battle.name} / ${task.name}`)
+    await store.ensureActiveZhchPlan(true)
+    await store.fetchMatrixForCurrentScope(true)
   }
 }
 
 onMounted(async () => {
-  // 异步预加载战场与任务数据
   await loadBattleAndTaskData()
 
-  // 如果 Store 中没有战场或任务信息，自动弹出选择框提示用户选择
+  if (store.activedTask?.id) {
+    await store.ensureActiveZhchPlan(false)
+    await store.fetchMatrixForCurrentScope(false)
+  }
+
   if (!store.battle || !store.activedTask) {
     selectorDialogVisible.value = true
   }
@@ -325,6 +362,51 @@ onMounted(async () => {
           background: linear-gradient(135deg, rgba(79, 147, 221, 0.8) 0%, rgba(0, 180, 216, 0.9) 100%);
           border-color: #00e1ff;
           box-shadow: 0 0 12px rgba(0, 225, 255, 0.4);
+        }
+      }
+    }
+
+    .plan-switch-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 0 12px;
+
+      .plan-switch-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #94a3b8;
+        white-space: nowrap;
+      }
+
+      .plan-switch-btn {
+        padding: 5px 12px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #8eb3d6;
+        background: rgba(16, 36, 62, 0.7);
+        border: 1px solid rgba(79, 147, 221, 0.3);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+
+        &:hover:not(:disabled) {
+          color: #fff;
+          border-color: rgba(0, 225, 255, 0.5);
+        }
+
+        &.active {
+          color: #fff;
+          background: linear-gradient(135deg, rgba(251, 191, 36, 0.85) 0%, rgba(245, 158, 11, 0.9) 100%);
+          border-color: #fbbf24;
+          box-shadow: 0 0 10px rgba(251, 191, 36, 0.35);
+        }
+
+        &:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
       }
     }

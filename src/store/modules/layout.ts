@@ -1,10 +1,9 @@
 import { defineStore } from 'pinia'
 import * as Cesium from 'cesium'
 import {
-  getReconnaissanceAttackMatrix,
   getSatelliteThreatInfoByType,
-  getSatelliteTypeSerials,
   type MatrixResult,
+  type ZhchPlanLevelSeriesEntity,
   type ZhchPlanResp,
 } from '@/api/electronic'
 import { mergeMatrixResults } from '@/utils/satelliteFullChainAnalysis'
@@ -61,8 +60,10 @@ interface State {
   zhchPlanTaskId: number | null
   /** 综合打击方案加载状态 */
   zhchPlanLoading: boolean
-  /** 当前勾选的用途类型（多选） */
+  /** 当前勾选的用途类型（多选，打击方案生成页对比用） */
   selectedZhchUsageTypes: string[]
+  /** 当前激活的综合打击方案用途类型（整体态势矩阵数据源） */
+  activeZhchUsageType: string
   /** 整体态势地图上是否显示我方武器图层 */
   showOurWeapons: boolean
   /** 右侧面板选中的我方武器（用于地图定位） */
@@ -128,11 +129,21 @@ export const useLayoutStore = defineStore('layout-store', {
       zhchPlanTaskId: null,
       zhchPlanLoading: false,
       selectedZhchUsageTypes: ['军用'],
+      activeZhchUsageType: '军用',
       showOurWeapons: true,
       selectedOurWeapon: null,
     }
   },
   getters: {
+    /** 当前激活用途类型对应的综合打击方案 */
+    activeZhchPlan(state): ZhchPlanResp | null {
+      return state.zhchPlanMap[state.activeZhchUsageType] ?? null
+    },
+    /** 当前方案下全部卫星系列名称列表 */
+    zhchPlanSeriesList(state): string[] {
+      const plan = state.zhchPlanMap[state.activeZhchUsageType]
+      return (plan?.levelSeriesEntities || []).map((entity) => entity.series)
+    },
     // 从 battle.area 中解析 lonlats 并计算战场区域边界包围盒
     battleAreaBounds(
       state
@@ -280,45 +291,64 @@ export const useLayoutStore = defineStore('layout-store', {
       this.selectedSatSeries = series
     },
     /**
-     * [功能说明]
-     * 统一在 Store 中执行算法侦察打击矩阵查询并全局持久共享
-     * @param params 查询参数 (taskId, series)
+     * 将综合打击方案中的系列实体转为矩阵结果（结构与 MatrixResult 一致）
+     * @param entity 系列级打击矩阵实体
+     */
+    levelSeriesEntityToMatrix(entity: ZhchPlanLevelSeriesEntity): MatrixResult {
+      return entity as unknown as MatrixResult
+    },
+    /**
+     * 从综合打击方案中解析当前系列筛选下的矩阵数据（本地切片，不请求后端）
+     * @param plan 综合打击方案
+     * @param series 指定系列；为空时合并全部系列
+     */
+    resolveMatrixFromZhchPlan(plan: ZhchPlanResp, series?: string): MatrixResult | null {
+      const entities = plan.levelSeriesEntities || []
+      if (!entities.length) return null
+
+      if (series) {
+        const entity = entities.find((item) => item.series === series)
+        return entity ? this.levelSeriesEntityToMatrix(entity) : null
+      }
+
+      const matrices = entities.map((entity) => this.levelSeriesEntityToMatrix(entity))
+      if (matrices.length === 1) return matrices[0]
+      return mergeMatrixResults(matrices)
+    },
+    /**
+     * 确保当前激活用途类型的综合打击方案已加载
      * @param force 是否强制重新请求
+     */
+    async ensureActiveZhchPlan(force = false): Promise<ZhchPlanResp | null> {
+      const taskId = this.activedTask?.id
+      if (!taskId) {
+        this.clearZhchPlans()
+        return null
+      }
+
+      const type = this.activeZhchUsageType
+      const needFetch = force || this.zhchPlanTaskId !== taskId || !this.zhchPlanMap[type]
+      if (needFetch) {
+        const ok = await this.fetchZhchPlans([type], force)
+        if (!ok) return null
+      }
+
+      return this.zhchPlanMap[type] ?? null
+    },
+    /**
+     * [功能说明]
+     * 按当前系列筛选范围从综合打击方案中加载矩阵（不再调用 calSeriesChainV2）
+     * @param params 兼容旧调用：可指定 series
+     * @param force 是否强制重新解析
      */
     async fetchReconnaissanceAttackMatrix(
       params?: { taskId?: number; series?: string },
       force = false
     ): Promise<MatrixResult | null> {
-      const taskId = params?.taskId ?? this.activedTask?.id ?? 0
-      const series = params?.series ?? this.selectedSatSeries ?? ''
-
-      if (!taskId) {
-        this.clearMatrixData()
-        return null
+      if (params?.series !== undefined && params.series !== this.selectedSatSeries) {
+        this.setSelectedSatSeries(params.series)
       }
-
-      const queryKey = `${taskId}_${series}`
-      if (!force && this.matrixQueryKey === queryKey && this.matrixData) {
-        return this.matrixData
-      }
-
-      const token = ++this.matrixFetchToken
-      const scopeKey = series ? `${taskId}::series::${series}` : this.buildMatrixScopeKey(taskId)
-      this.matrixLoading = true
-      try {
-        const res = await getReconnaissanceAttackMatrix({
-          taskId,
-          series,
-        })
-        if (res && res.code === 200 && res.data) {
-          return this.applyMatrixResult(token, scopeKey, taskId, queryKey, res.data)
-        }
-      } catch (err) {
-        console.error('全局 Store 获取算法侦察打击矩阵失败:', err)
-      } finally {
-        this.finishMatrixFetch(token)
-      }
-      return this.matrixData
+      return this.fetchMatrixForCurrentScope(force)
     },
     /**
      * [功能说明]
@@ -335,8 +365,9 @@ export const useLayoutStore = defineStore('layout-store', {
     buildMatrixScopeKey(taskId?: number): string {
       const id = taskId ?? this.activedTask?.id ?? 0
       if (!id) return ''
-      if (this.selectedSatSeries) return `${id}::series::${this.selectedSatSeries}`
-      return `${id}::all::${this.selectedSatType || 'ALL_TYPES'}`
+      const usage = this.activeZhchUsageType
+      if (this.selectedSatSeries) return `${id}::${usage}::series::${this.selectedSatSeries}`
+      return `${id}::${usage}::all`
     },
     /**
      * 开始一次矩阵拉取，返回用于校验响应是否仍有效的上下文
@@ -345,9 +376,10 @@ export const useLayoutStore = defineStore('layout-store', {
       const taskId = this.activedTask?.id ?? 0
       const token = ++this.matrixFetchToken
       const scopeKey = this.buildMatrixScopeKey(taskId)
+      const usageType = this.activeZhchUsageType
       const queryKey = this.selectedSatSeries
-        ? `${taskId}_${this.selectedSatSeries}`
-        : `${taskId}__ALL_SERIES__${this.selectedSatType || 'ALL_TYPES'}__`
+        ? `${taskId}_${usageType}_${this.selectedSatSeries}`
+        : `${taskId}_${usageType}__ALL_SERIES__`
       this.matrixLoading = true
       return { token, scopeKey, queryKey, taskId }
     },
@@ -386,8 +418,8 @@ export const useLayoutStore = defineStore('layout-store', {
       }
     },
     /**
-     * 按当前系列筛选范围拉取矩阵：选中系列时拉单系列，未选系列时合并全部系列。
-     * @param force 是否强制重新请求
+     * 按当前方案与系列筛选范围加载矩阵：从 activeZhchPlan.levelSeriesEntities 本地切片/合并。
+     * @param force 是否强制重新解析
      */
     async fetchMatrixForCurrentScope(force = false): Promise<MatrixResult | null> {
       const taskId = this.activedTask?.id ?? 0
@@ -396,9 +428,10 @@ export const useLayoutStore = defineStore('layout-store', {
         return null
       }
 
+      const usageType = this.activeZhchUsageType
       const queryKey = this.selectedSatSeries
-        ? `${taskId}_${this.selectedSatSeries}`
-        : `${taskId}__ALL_SERIES__${this.selectedSatType || 'ALL_TYPES'}__`
+        ? `${taskId}_${usageType}_${this.selectedSatSeries}`
+        : `${taskId}_${usageType}__ALL_SERIES__`
 
       if (!force && this.matrixQueryKey === queryKey && this.matrixData) {
         return this.matrixData
@@ -412,50 +445,29 @@ export const useLayoutStore = defineStore('layout-store', {
       matrixScopeInflightKey = inflightKey
       matrixScopeInflight = (async () => {
         try {
-          if (this.selectedSatSeries) {
-            return await this.fetchReconnaissanceAttackMatrix({ taskId, series: this.selectedSatSeries }, true)
+          // 方案拉取使用 zhchPlanLoading，避免阻塞系列列表
+          const plan = await this.ensureActiveZhchPlan(force)
+          if (!plan) {
+            return this.matrixData
           }
 
-          const { token, scopeKey, queryKey: activeQueryKey, taskId: activeTaskId } = this.beginMatrixFetch()
+          const { token, scopeKey, queryKey: activeQueryKey, taskId: activeTaskId } =
+            this.beginMatrixFetch()
           try {
-            const serialsRes = await getSatelliteTypeSerials(taskId)
             if (!this.isMatrixFetchCurrent(token)) {
               return this.matrixData
             }
 
-            const typeSerialsMap = serialsRes.data || {}
-            const scopedSeries =
-              this.selectedSatType && typeSerialsMap[this.selectedSatType]?.length
-                ? typeSerialsMap[this.selectedSatType]
-                : Array.from(new Set(Object.values(typeSerialsMap).flat())).filter(Boolean)
-            const allSeries = Array.from(new Set(scopedSeries)).filter(Boolean)
-            if (!allSeries.length) {
-              return this.matrixData
-            }
-
-            const matrixResults = await Promise.all(
-              allSeries.map(async (series) => {
-                try {
-                  const res = await getReconnaissanceAttackMatrix({ taskId, series })
-                  return res?.code === 200 && res.data ? res.data : null
-                } catch (err) {
-                  console.error(`获取系列 ${series} 矩阵失败:`, err)
-                  return null
-                }
-              })
+            const matrix = this.resolveMatrixFromZhchPlan(
+              plan,
+              this.selectedSatSeries || undefined
             )
-            if (!this.isMatrixFetchCurrent(token)) {
-              return this.matrixData
-            }
-            const matrixList = matrixResults.filter((matrix): matrix is MatrixResult => matrix !== null)
-
-            const merged = mergeMatrixResults(matrixList)
-            return this.applyMatrixResult(token, scopeKey, activeTaskId, activeQueryKey, merged)
-          } catch (err) {
-            console.error('获取全部系列矩阵失败:', err)
+            return this.applyMatrixResult(token, scopeKey, activeTaskId, activeQueryKey, matrix)
           } finally {
             this.finishMatrixFetch(token)
           }
+        } catch (err) {
+          console.error('从综合打击方案解析矩阵失败:', err)
           return this.matrixData
         } finally {
           if (matrixScopeInflightKey === inflightKey) {
@@ -473,6 +485,28 @@ export const useLayoutStore = defineStore('layout-store', {
      */
     setMainActiveTab(tab: string) {
       this.mainActiveTab = tab
+    },
+    /**
+     * 切换当前激活的综合打击方案，并重新解析矩阵
+     * @param type 用途类型（军用 / 民用 / 军用民用）
+     */
+    async setActiveZhchUsageType(type: string) {
+      if (!(ZHCH_USAGE_TYPE_OPTIONS as readonly string[]).includes(type)) return
+      if (this.activeZhchUsageType === type) return
+
+      this.activeZhchUsageType = type
+      this.matrixQueryKey = ''
+      this.matrixData = null
+
+      if (
+        this.selectedSatSeries &&
+        this.zhchPlanSeriesList.length &&
+        !this.zhchPlanSeriesList.includes(this.selectedSatSeries)
+      ) {
+        this.selectedSatSeries = ''
+      }
+
+      await this.fetchMatrixForCurrentScope(true)
     },
     /**
      * 设置当前分析选中的卫星 NORAD（整体态势与拓扑分析共享）
@@ -555,6 +589,7 @@ export const useLayoutStore = defineStore('layout-store', {
     clearZhchPlans() {
       this.zhchPlanMap = {}
       this.zhchPlanTaskId = null
+      this.clearMatrixData()
     },
     /**
      * 拉取并缓存指定用途类型的综合打击方案
@@ -618,6 +653,7 @@ export const useLayoutStore = defineStore('layout-store', {
       'satelliteTotal',
       'selectedSatType',
       'selectedSatSeries',
+      'activeZhchUsageType',
     ],
   },
 })

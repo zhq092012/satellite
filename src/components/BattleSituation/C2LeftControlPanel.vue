@@ -3,27 +3,23 @@
     <!-- 面板标题 Header -->
     <div class="panel-header">
       <div class="header-title-box">
-        <span class="header-title glow-text-cyan">卫星类型与系列</span>
+        <span class="header-title glow-text-cyan">卫星系列（当前方案）</span>
       </div>
     </div>
 
-    <!-- 卫星类型与系列按钮/列表筛选区 -->
+    <!-- 卫星系列列表（来自当前综合打击方案 levelSeriesEntities） -->
     <div class="filter-section">
-      <!-- 卫星类型选择按钮组 (占满一行) -->
-      <div class="type-button-bar">
-        <button v-for="item in typeOptions" :key="item" class="type-btn" :class="{
-          active: selectedType === item,
-          disabled: isTypeDisabled(item),
-        }" :disabled="isTypeDisabled(item)" @click="selectType(item)">
-          {{ item }}
-        </button>
-      </div>
-
-      <!-- 卫星系列列表 (排成一列 list，全部类型或指定类型下均可展示) -->
-      <div v-if="seriesOptions.length > 0" class="series-list-box" :class="{ 'is-loading': seriesPanelLoading }">
-        <div v-if="seriesPanelLoading" class="series-loading-mask">
+      <div v-if="store.zhchPlanLoading && !seriesOptions.length" class="series-list-box is-loading">
+        <div class="series-loading-mask">
           <span class="series-loading-spinner" aria-hidden="true" />
           <span class="series-loading-text">正在加载系列数据...</span>
+        </div>
+      </div>
+
+      <div v-else-if="seriesOptions.length > 0" class="series-list-box" :class="{ 'is-loading': matrixMerging }">
+        <div v-if="matrixMerging" class="series-loading-mask series-loading-mask--light">
+          <span class="series-loading-spinner" aria-hidden="true" />
+          <span class="series-loading-text">正在合并矩阵...</span>
         </div>
         <div class="series-list-header">
           <span class="series-title">包含系列 {{ seriesOptions.length }} 个</span>
@@ -32,19 +28,23 @@
           </span>
         </div>
         <div class="series-list">
-          <div class="series-item" :class="{ active: !selectedSeries, disabled: seriesPanelLoading }"
+          <div class="series-item" :class="{ active: !selectedSeries, disabled: matrixMerging }"
             @click="selectSeries('')">
             <span class="series-icon"></span>
             <span class="series-name">全部系列</span>
             <span class="series-status">{{ !selectedSeries ? '✓ 已筛选' : '点击筛选' }}</span>
           </div>
           <div v-for="series in seriesOptions" :key="series" class="series-item"
-            :class="{ active: selectedSeries === series, disabled: seriesPanelLoading }" @click="selectSeries(series)">
+            :class="{ active: selectedSeries === series, disabled: matrixMerging }" @click="selectSeries(series)">
             <span class="series-icon"></span>
             <span class="series-name">{{ series }}</span>
             <span class="series-status">{{ selectedSeries === series ? '✓ 已筛选' : '点击筛选' }}</span>
           </div>
         </div>
+      </div>
+
+      <div v-else class="series-empty-tip">
+        暂无系列数据，请确认当前方案接口已返回 levelSeriesEntities
       </div>
     </div>
 
@@ -208,7 +208,6 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  getSatelliteTypeSerials,
   getSatelliteThreatInfo,
   type MatrixResult,
   type SatelliteMatrix,
@@ -237,104 +236,43 @@ const emit = defineEmits<{
 /** 布局 Store，用于读取当前任务及持久化卫星筛选状态。 */
 const store = useLayoutStore()
 
-/** 从接口获取的卫星类型与对应系列映射。 */
-const typeSerialsMap = ref<Record<string, string[]>>({})
-
-/** 当前选中的卫星类型筛选值，与 Store 全局同步。 */
-const selectedType = computed({
-  get: () => store.selectedSatType,
-  set: (val: string) => store.setSelectedSatType(val),
-})
-
 /** 当前选中的卫星系列筛选值，与 Store 全局同步。 */
 const selectedSeries = computed({
   get: () => store.selectedSatSeries,
   set: (val: string) => store.setSelectedSatSeries(val),
 })
 
-/** 系列矩阵加载中：禁用系列面板点击并显示 loading */
-const seriesPanelLoading = computed(() => store.matrixLoading)
+/** 方案接口请求中（系列列表尚未返回） */
+const planLoading = computed(() => store.zhchPlanLoading)
 
-/**
- * 获取可供选择的卫星类型列表。
- *
- * @returns 卫星类型名称列表
- */
-const typeOptions = computed<string[]>(() => {
-  return Object.keys(typeSerialsMap.value)
-})
-
-/**
- * [计算属性说明]
- * 当前选中的卫星类型下可供选择的系列列表（若选择"全部类型"或未选类型，则汇总合并展示所有类型下的所有系列）
- */
-const seriesOptions = computed<string[]>(() => {
-  if (!selectedType.value) {
-    /** 合并后的全部卫星系列名称。 */
-    const allSeries = Object.values(typeSerialsMap.value).flat()
-    return Array.from(new Set(allSeries))
-  }
-  return typeSerialsMap.value[selectedType.value] || []
-})
-
-/**
- * [功能说明]
- * 判断当前卫星类型按钮是否需要禁用（禁用“导航”、“通信”、“导弹预警”）
- *
- * @param type 卫星类型名称
- * @returns 是否禁用
- */
-const isTypeDisabled = (type: string): boolean => {
-  if (!type) return false
-  return type.includes('导航') || type.includes('导弹预警')
-}
-
-/**
- * [函数说明]
- * 选择并切换选中的卫星类型，并同步保存至 Store，自动联动选中该类型下的首个可用系列
- *
- * @param type 选中的卫星类型名称
- */
-const selectType = (type: string) => {
-  if (!type || isTypeDisabled(type)) return
-  store.setSelectedSatType(type)
-
-  /** 当前类型下可用的卫星系列列表。 */
-  const availSeries = typeSerialsMap.value[type] || []
-  if (store.selectedSatSeries && !availSeries.includes(store.selectedSatSeries)) {
-    store.setSelectedSatSeries('')
-  }
-}
-
-/**
- * [监听器说明]
- * 监听卫星类型选项列表，保持现有有效类型或自动选中第一个未禁用的卫星类型 (如 "侦察")
- */
-watch(
-  typeOptions,
-  (options) => {
-    if (!options || options.length === 0) return
-    /** 当前需要保留或恢复的卫星类型。 */
-    let currentType = store.selectedSatType || ''
-    if (!currentType || isTypeDisabled(currentType) || !options.includes(currentType)) {
-      /** 第一个未被禁用的卫星类型。 */
-      const validOption = options.find((opt) => !isTypeDisabled(opt))
-      if (validOption) {
-        store.setSelectedSatType(validOption)
-      }
-    }
-  },
-  { immediate: true }
+/** 矩阵本地合并中（系列已可见，不应整页遮罩） */
+const matrixMerging = computed(
+  () => store.matrixLoading && seriesOptions.value.length > 0
 )
 
 /**
- * [监听器说明]
- * 当前类型下系列列表变化时，校验 Store 中已选系列是否仍有效
+ * 当前综合打击方案下的卫星系列列表（来自 levelSeriesEntities，无需逐系列请求后端）
  */
+const seriesOptions = computed<string[]>(() => store.zhchPlanSeriesList)
+
+/**
+ * [函数说明]
+ * 选择或切换选中的卫星系列，并同步保存至 Store
+ * @param series 选中的卫星系列名称（空字符串表示全部系列）
+ */
+const selectSeries = (series: string) => {
+  if (planLoading.value) return
+  if (store.selectedSatSeries === series) {
+    store.setSelectedSatSeries('')
+  } else {
+    store.setSelectedSatSeries(series)
+  }
+}
+
 watch(
   seriesOptions,
   (sOptions) => {
-    if (!sOptions || sOptions.length === 0) return
+    if (!sOptions?.length) return
     const stored = store.selectedSatSeries
     if (stored && !sOptions.includes(stored)) {
       store.setSelectedSatSeries('')
@@ -343,68 +281,14 @@ watch(
   { immediate: true }
 )
 
-/**
- * [函数说明]
- * 选择或切换选中的卫星系列，并同步保存至 Store
- * @param series 选中的卫星系列名称（空字符串表示全部系列）
- */
-const selectSeries = (series: string) => {
-  if (seriesPanelLoading.value) return
-  if (store.selectedSatSeries === series) {
-    store.setSelectedSatSeries('')
-  } else {
-    store.setSelectedSatSeries(series)
-  }
-}
-
-/**
- * [函数说明]
- * 根据任务 ID 从后端异步加载卫星类型与系列映射数据
- *
- * [处理规则]
- * - 校验 taskId 是否有效，若无效清空 typeSerialsMap 并返回
- * - 调用 getSatelliteTypeSerials(taskId)
- * - 成功后将返回的数据保存至 typeSerialsMap
- *
- * [副作用]
- * - 发送网络 HTTP 请求
- * - 更新 typeSerialsMap 响应式数据
- *
- * [异常处理]
- * 捕获请求异常并在控制台记录 error
- *
- * [修改约束]
- * 保持入参格式与异步更新逻辑一致
- *
- * @param taskId 任务 ID
- */
-const fetchTypeSerials = async (taskId?: number) => {
-  if (!taskId) {
-    typeSerialsMap.value = {}
-    return
-  }
-  try {
-    /** 卫星类型与系列映射接口响应。 */
-    const res = await getSatelliteTypeSerials(taskId)
-    if (res.code === 200 && res.data) {
-      typeSerialsMap.value = res.data
-    }
-  } catch (err) {
-    console.error('获取卫星类型与系列映射失败:', err)
-  }
-}
-
-// 监听当前激活的任务 ID 变化，自动查询对应任务的类型与系列列表
+// 任务切换时重置系列筛选
 watch(
   () => store.activedTask?.id,
   (newTaskId) => {
     if (!newTaskId) {
-      store.setSelectedSatType('')
       store.setSelectedSatSeries('')
     }
-    void fetchTypeSerials(newTaskId)
-  },
-  { immediate: true }
+  }
 )
 
 /**
@@ -540,7 +424,7 @@ const openThreatDetail = async (sat: SatListItem) => {
     /** 卫星威胁度详情接口响应。 */
     const res = await getSatelliteThreatInfo({
       norad: sat.norad,
-      series: selectedType.value || '侦察',
+      series: selectedSeries.value || '侦察',
       taskId,
     })
     if (res.code === 200 && res.data?.length) {
@@ -941,6 +825,20 @@ const selectedSatelliteName = computed(() => {
       border-radius: 6px;
       background: rgba(8, 15, 26, 0.78);
       pointer-events: all;
+
+      &--light {
+        background: rgba(8, 15, 26, 0.45);
+      }
+    }
+
+    .series-empty-tip {
+      padding: 16px 12px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: rgba(255, 255, 255, 0.55);
+      text-align: center;
+      border: 1px dashed rgba(79, 147, 221, 0.35);
+      border-radius: 6px;
     }
 
     .series-loading-spinner {

@@ -134,6 +134,10 @@ const handleGenerate = async () => {
   const ok = await store.fetchZhchPlans(selectedUsageTypes.value, true)
   if (!ok) {
     ElMessage.warning('获取打击方案失败，请稍后重试')
+    return
+  }
+  if (selectedUsageTypes.value.includes(store.activeZhchUsageType)) {
+    await store.fetchMatrixForCurrentScope(true)
   }
 }
 

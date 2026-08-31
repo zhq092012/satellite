@@ -360,7 +360,7 @@ watch(
  * 选择系列后，重新查询对应的算法矩阵，并从已查询出的矩阵中加载地面站、数据中心及天基传输资产。
  */
 watch(
-  () => [store.selectedSatSeries, store.selectedSatType] as const,
+  () => [store.selectedSatSeries, store.selectedSatType, store.activeZhchUsageType] as const,
   () => {
     void loadMatrixForCurrentScope()
   },

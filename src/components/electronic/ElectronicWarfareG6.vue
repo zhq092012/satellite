@@ -134,7 +134,7 @@
 import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
 import G6 from '@antv/g6'
 import { useLayoutStore } from '@/store/modules/layout'
-import { getSatelliteTypeSerials, type MatrixResult, type Weapon } from '@/api/electronic'
+import { type MatrixResult, type Weapon } from '@/api/electronic'
 import type { FuncType } from '@/types/electronic'
 import TopoLeftPanel from '@/components/electronic/TopoLeftPanel.vue'
 import TopoRightPanel from '@/components/electronic/TopoRightPanel.vue'
@@ -380,40 +380,16 @@ const handleTimelineMarkerClick = (payload: {
   updateGraphHighlightState()
 }
 
-// 卫星类型与系列映射
-const typeSerialsMap = ref<Record<string, string[]>>({})
-
-const seriesOptions = computed<string[]>(() => {
-  const type = store.selectedSatType
-  if (type && typeSerialsMap.value[type]?.length) {
-    return typeSerialsMap.value[type]
-  }
-  const allSeries = Object.values(typeSerialsMap.value).flat()
-  return Array.from(new Set(allSeries))
-})
+// 卫星系列列表（来自当前综合打击方案）
+const seriesOptions = computed<string[]>(() => store.zhchPlanSeriesList)
 
 const selectedSeries = computed({
   get: () => store.selectedSatSeries,
   set: (val: string) => store.setSelectedSatSeries(val),
 })
 
-const fetchTypeSerials = async (taskId?: number) => {
-  if (!taskId) {
-    typeSerialsMap.value = {}
-    return
-  }
-  try {
-    const res = await getSatelliteTypeSerials(taskId)
-    if (res.code === 200 && res.data) {
-      typeSerialsMap.value = res.data
-    }
-  } catch (err) {
-    console.error('获取卫星类型与系列映射失败:', err)
-  }
-}
-
 /**
- * 切换卫星系列，同步 Store 并重新查询矩阵数据
+ * 切换卫星系列，同步 Store（矩阵从 levelSeriesEntities 本地切片，不请求后端）
  */
 const handleSeriesChange = (series: string) => {
   if (!series || store.selectedSatSeries === series) return
@@ -424,10 +400,11 @@ const handleSeriesChange = (series: string) => {
 
 watch(
   () => store.activedTask?.id,
-  (taskId) => {
-    void fetchTypeSerials(taskId)
-  },
-  { immediate: true }
+  () => {
+    if (!store.activedTask?.id) {
+      store.setSelectedSatSeries('')
+    }
+  }
 )
 
 watch(selectedNorad, (norad) => {
@@ -1029,6 +1006,17 @@ watch(
     if (!taskId || taskId === prevTaskId) return
     if (store.selectedSatSeries) {
       void fetchMatrixData(true)
+    }
+  }
+)
+
+watch(
+  () => store.activeZhchUsageType,
+  () => {
+    if (store.selectedSatSeries) {
+      void fetchMatrixData(true)
+    } else {
+      syncMatrixFromStoreAndRebuild()
     }
   }
 )

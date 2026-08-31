@@ -395,7 +395,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch, nextTick } from 'vue'
-import { getSatelliteTypeSerials, type MatrixResult, type SatelliteMatrix, type StationWindow, type Weapon, type CommucationMatrix } from '@/api/electronic'
+import { type MatrixResult, type SatelliteMatrix, type StationWindow, type Weapon, type CommucationMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
 import { collectSatelliteTransmissionLinks, listNormalSatelliteNorads } from '@/utils/satelliteFullChainAnalysis'
 
@@ -589,21 +589,8 @@ const currentData = computed<MatrixResult | null>(() => {
   return props.matrixData || store.matrixData || internalMatrixData.value
 })
 
-/** 卫星类型与系列映射（taskId -> 类型 -> 系列列表） */
-const typeSerialsMap = ref<Record<string, string[]>>({})
-
-/**
- * 当前任务下可选的卫星系列列表。
- * 优先按 store 中选中的卫星类型过滤，否则合并全部系列。
- */
-const seriesOptions = computed<string[]>(() => {
-  const type = store.selectedSatType
-  if (type && typeSerialsMap.value[type]?.length) {
-    return typeSerialsMap.value[type]
-  }
-  const allSeries = Object.values(typeSerialsMap.value).flat()
-  return Array.from(new Set(allSeries))
-})
+/** 卫星系列列表（来自当前综合打击方案） */
+const seriesOptions = computed<string[]>(() => store.zhchPlanSeriesList)
 
 /** 与 Store 双向绑定的当前卫星系列 */
 const selectedSeries = computed({
@@ -641,39 +628,14 @@ const resolveSatName = (norad: number): string => {
 }
 
 /**
- * 拉取任务对应的卫星类型与系列映射。
- * @param taskId 当前激活任务 ID
- */
-const fetchTypeSerials = async (taskId?: number) => {
-  if (!taskId) {
-    typeSerialsMap.value = {}
-    return
-  }
-  try {
-    const res = await getSatelliteTypeSerials(taskId)
-    if (res.code === 200 && res.data) {
-      typeSerialsMap.value = res.data
-    }
-  } catch (err) {
-    console.error('获取卫星类型与系列映射失败:', err)
-  }
-}
-
-/**
- * 拉取甘特图矩阵数据。
- * @param force 为 true 时忽略缓存强制重新请求
+ * 拉取甘特图矩阵数据（从综合打击方案 levelSeriesEntities 本地解析）。
+ * @param force 为 true 时忽略缓存强制重新解析
  */
 const fetchMatrixData = async (force = false) => {
   if (props.matrixData) return
   loading.value = true
   try {
-    const data = await store.fetchReconnaissanceAttackMatrix(
-      {
-        taskId: store.activedTask?.id || 0,
-        series: store.selectedSatSeries || '',
-      },
-      force
-    )
+    const data = await store.fetchMatrixForCurrentScope(force)
     if (data) {
       internalMatrixData.value = data
       if (taskTimeBounds.value) {
@@ -681,7 +643,7 @@ const fetchMatrixData = async (force = false) => {
       }
       nextTick(() => applySharedSatelliteSelection(true))
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('获取甘特图矩阵数据异常:', err)
   } finally {
     loading.value = false
@@ -730,9 +692,10 @@ const handleClearSelectedSatellite = () => {
 watch(
   () => store.activedTask?.id,
   (taskId) => {
-    void fetchTypeSerials(taskId)
-  },
-  { immediate: true }
+    if (!taskId) {
+      store.setSelectedSatSeries('')
+    }
+  }
 )
 
 watch(seriesOptions, (options) => {
@@ -749,7 +712,7 @@ watch(seriesOptions, (options) => {
  * 监听 store 中选中的卫星系列和激活的任务改变，自动同步矩阵数据
  */
 watch(
-  [() => store.matrixData, () => store.selectedSatSeries, () => store.activedTask?.id],
+  [() => store.matrixData, () => store.selectedSatSeries, () => store.activedTask?.id, () => store.activeZhchUsageType],
   () => {
     if (!props.matrixData && !store.matrixData) {
       void loadMatrixData()
