@@ -13,15 +13,10 @@
 
       <!-- 当前打击方案切换 -->
       <div v-if="store.activedTask" class="plan-switch-bar">
-        <span class="plan-switch-label">当前方案</span>
-        <button
-          v-for="type in ZHCH_USAGE_TYPE_OPTIONS"
-          :key="type"
-          class="plan-switch-btn"
-          :class="{ active: store.activeZhchUsageType === type }"
-          :disabled="planSwitching"
-          @click="handleSwitchPlan(type)"
-        >
+        <span class="plan-switch-label">打击方案选择：</span>
+        <button v-for="type in ZHCH_USAGE_TYPE_OPTIONS" :key="type" class="plan-switch-btn"
+          :class="{ active: store.activeZhchUsageType === type }" :disabled="planSwitching"
+          @click="handleSwitchPlan(type)">
           {{ getZhchUsageTypeLabel(type) }}
         </button>
       </div>
@@ -399,9 +394,9 @@ onMounted(async () => {
 
         &.active {
           color: #fff;
-          background: linear-gradient(135deg, rgba(251, 191, 36, 0.85) 0%, rgba(245, 158, 11, 0.9) 100%);
-          border-color: #fbbf24;
-          box-shadow: 0 0 10px rgba(251, 191, 36, 0.35);
+          background: linear-gradient(135deg, rgba(79, 147, 221, 0.8) 0%, rgba(0, 180, 216, 0.9) 100%);
+          border-color: #00e1ff;
+          box-shadow: 0 0 12px rgba(0, 225, 255, 0.4);
         }
 
         &:disabled {

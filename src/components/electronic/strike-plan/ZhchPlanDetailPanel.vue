@@ -75,12 +75,16 @@
         </div>
       </div>
     </div>
+
+    <!-- 4. 系列链路通断时序（分层甘特式展示） -->
+    <SeriesLinkTimeline :plan="plan" />
   </div>
 </template>
 
 <script setup lang="ts">
 import type { ZhchPlanResp } from '@/api/electronic'
 import { highlightResultText } from '@/utils/zhchPlanDisplay'
+import SeriesLinkTimeline from './SeriesLinkTimeline.vue'
 
 defineProps<{
   /** 综合打击方案完整数据 */
@@ -99,7 +103,10 @@ const highlightText = (text?: string | null) => highlightResultText(text)
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+  overflow: hidden;
 }
 
 .result-header {

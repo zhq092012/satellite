@@ -180,6 +180,7 @@ watch(
 .strike-plan-generator {
   width: 100%;
   height: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   background-color: #060913;
@@ -265,6 +266,7 @@ watch(
 
 .plan-body {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 16px 20px;
@@ -274,6 +276,9 @@ watch(
   display: grid;
   gap: 14px;
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 
   &--single {
     grid-template-columns: 1fr !important;
@@ -284,6 +289,9 @@ watch(
   border-radius: 10px;
   border: 1px solid rgba(79, 147, 221, 0.3);
   background: rgba(10, 20, 36, 0.9);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 
   .column-type-title {
     padding: 14px;
@@ -299,6 +307,9 @@ watch(
 
   .column-content {
     padding: 16px;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
   }
 }
 
