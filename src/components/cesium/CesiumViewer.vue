@@ -211,6 +211,8 @@ const initViewer = async () => {
       // 监控鼠标点击事件
       handleViewerClickEvent()
 
+      ensureScenePostUpdateListener()
+
       // 开始监听容器尺寸变化
       startContainerSizeObserver()
       // 同步渲染循环
@@ -316,6 +318,29 @@ const transmissionLinkEntityIds = new Set<string>()
 const selectedTransmissionLinkNodeKeys = ref<Set<string>>(new Set())
 /** 传输链路高亮线颜色：淡黄色虚线 */
 const TRANSMISSION_LINK_LINE_COLOR = Cesium.Color.fromCssColorString('#F5E6A3').withAlpha(0.92)
+/** 卫星标签近距离 LOD 上限（米），此距离内显示完整标签 */
+const SAT_LABEL_LOD_NEAR = 6000000
+/** 卫星标签远距离 LOD 上限（米），超过后隐藏标签 */
+const SAT_LABEL_LOD_FAR = 12000000
+/** 高亮/选中卫星标签最大可见距离（米） */
+const SAT_LABEL_HIGHLIGHT_MAX_DISTANCE = 20000000
+/** 地面站/数据中心标签近距离 LOD 上限（米） */
+const GROUND_LABEL_LOD_NEAR = 6000000
+/** 地面站/数据中心链路高亮标签最大可见距离（米） */
+const GROUND_LABEL_HIGHLIGHT_MAX_DISTANCE = 20000000
+/** 武器标签近距离 LOD 上限（米） */
+const WEAPON_LABEL_LOD_NEAR = 6000000
+/** 当前渲染的卫星实体映射（NORAD → Entity） */
+const satelliteEntityMap = new Map<number, Cesium.Entity>()
+/** 地面基础设施实体映射（entityId → 实体与节点元数据） */
+const infraEntityMap = new Map<string, { entity: Cesium.Entity; node: InfrastructureLocation }>()
+/** 卫星 TLE satrec 缓存，避免每帧重复解析两行根数 */
+const satelliteSatrecCache = new Map<number, satellitejs.SatRec>()
+/** 场景 postUpdate 监听器移除函数 */
+let scenePostUpdateRemoveListener: Cesium.Event.RemoveCallback | null = null
+/** 相机方向与卫星方向计算用的临时向量 */
+const scratchCameraDir = new Cesium.Cartesian3()
+const scratchSatelliteDir = new Cesium.Cartesian3()
 
 /**
  * 判断地面基础设施节点是否被选中
@@ -385,6 +410,10 @@ const clearElectronicInfrastructureNodes = () => {
   if (!viewer || viewer.isDestroyed()) return
 
   clearTransmissionLinkOverlay()
+
+  satelliteEntityMap.clear()
+  satelliteSatrecCache.clear()
+  infraEntityMap.clear()
 
   // 1. 根据保存的电子节点 Entity ID 集合逐个移除 Cesium 实体
   electronicNodeEntityIds.forEach((entityId) => {
@@ -461,7 +490,7 @@ const renderElectronicInfrastructureNodes = () => {
       const resolveColor = () => (isNodeHighlighted() ? highlightColor : Cesium.Color.WHITE)
       const resolveLabelColor = () => (isNodeHighlighted() ? highlightColor : Cesium.Color.CYAN)
 
-      viewer.entities.add({
+      const infraEntity = viewer.entities.add({
         id: entityId,
         position,
         billboard: {
@@ -485,45 +514,47 @@ const renderElectronicInfrastructureNodes = () => {
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, -28),
           heightReference: Cesium.HeightReference.NONE,
+          show: false,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, GROUND_LABEL_HIGHLIGHT_MAX_DISTANCE),
         },
       })
       electronicNodeEntityIds.add(entityId)
+      infraEntityMap.set(entityId, { entity: infraEntity, node })
     })
   }
 
   // 3. 渲染敌方天基过境与中继卫星集群 3D 实体
   const matrixSats = props.matrixData?.initMatrixList || []
   matrixSats.forEach((sat) => {
-    if (!sat || !sat.satType) return
+    if (!sat?.norad) return
     const satEntityId = `sat-node-${sat.norad}`
 
     const initialPos = getSatellitePositionInCesium(sat.norad)
-    if (!initialPos) return
+    if (!initialPos) {
+      console.warn(
+        `[CesiumViewer] 卫星 ${sat.name ?? sat.norad} (NORAD ${sat.norad}) 缺少有效 TLE 或位置计算失败，已跳过地图渲染`
+      )
+      return
+    }
 
-    const isRelay = sat.satType.includes('中继')
+    const satType = sat.satType || ''
+    const isRelay = satType.includes('中继')
     const satColor = isRelay ? Cesium.Color.PURPLE : Cesium.Color.CYAN
 
-    const resolveSatPosition = (time?: Cesium.JulianDate) => getSatellitePositionInCesium(sat.norad, time) || initialPos
-    const isSatHighlighted = () => {
-      const keys = selectedTransmissionLinkNodeKeys.value
-      return (
-        keys.has(`SAT-${sat.norad}`) ||
-        keys.has(`RELAY-${sat.norad}`) ||
-        keys.has(String(sat.norad)) ||
-        keys.has(sat.name)
-      )
-    }
+    const isSatHighlighted = () => isNoradLinkHighlighted(sat.norad, sat.name)
     const resolveSatLabelColor = () => (isSatHighlighted() ? Cesium.Color.YELLOW : satColor)
 
-    viewer.entities.add({
+    const entity = viewer.entities.add({
       id: satEntityId,
-      position: new Cesium.CallbackProperty(resolveSatPosition, false) as unknown as Cesium.PositionProperty,
+      position: new Cesium.ConstantPositionProperty(initialPos),
+      show: true,
       billboard: {
         image: satelliteIcon,
         color: new Cesium.CallbackProperty(() => (isSatHighlighted() ? Cesium.Color.YELLOW : Cesium.Color.WHITE), false) as unknown as Cesium.Property,
         width: new Cesium.CallbackProperty(() => (isSatHighlighted() ? 32 : 24), false) as unknown as Cesium.Property,
         height: new Cesium.CallbackProperty(() => (isSatHighlighted() ? 32 : 24), false) as unknown as Cesium.Property,
         disableDepthTestDistance: 0,
+        show: true,
       },
 
       label: {
@@ -536,11 +567,16 @@ const renderElectronicInfrastructureNodes = () => {
         showBackground: true,
         backgroundColor: new Cesium.Color(0, 0, 0, 0.3),
         pixelOffset: new Cesium.Cartesian2(0, -28),
+        show: false,
+        disableDepthTestDistance: 0,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, SAT_LABEL_LOD_FAR),
       },
     })
     electronicNodeEntityIds.add(satEntityId)
+    satelliteEntityMap.set(sat.norad, entity)
   })
 
+  ensureScenePostUpdateListener()
 }
 
 /**
@@ -630,13 +666,14 @@ const flyToLinkBoundingSphere = (link: SatelliteTransmissionLink | null) => {
 
 /**
  * 在地图上绘制选中传输链路的淡黄色虚线连接并高亮其沿途实体。
+ * 折线坐标在点击时按当前时钟时刻一次性计算，不再随时间实时更新。
  * @param link 传输链路；传 null 时清除连线与高亮
  */
 const showTransmissionLink = (link: SatelliteTransmissionLink | null) => {
   clearTransmissionLinkOverlay()
   if (!link || !viewer || viewer.isDestroyed()) return
 
-  // 1. 记录链路节点标识，触发 CallbackProperty 高亮相应实体
+  // 1. 记录链路节点标识，触发实体高亮
   const nextKeys = new Set<string>()
   link.nodes.forEach((node) => {
     nextKeys.add(`${node.layer}-${node.id}`)
@@ -655,23 +692,21 @@ const showTransmissionLink = (link: SatelliteTransmissionLink | null) => {
   })
   selectedTransmissionLinkNodeKeys.value = nextKeys
 
-  // 2. 在地图上绘制虚线连接，卫星端点通过 CallbackProperty 随时间实时更新
+  // 2. 创建折线实体（静态坐标，仅在点击时计算一次）
+  const time = viewer.clock.currentTime
   for (let i = 0; i < link.nodes.length - 1; i++) {
     const startNode = link.nodes[i]
     const endNode = link.nodes[i + 1]
-    const initialStart = resolveChainNodePosition(startNode)
-    const initialEnd = resolveChainNodePosition(endNode)
+    const initialStart = resolveChainNodePosition(startNode, time)
+    const initialEnd = resolveChainNodePosition(endNode, time)
     if (!initialStart || !initialEnd) continue
 
     const entityId = `transmission-link-${link.id}-${i}`
     viewer.entities.add({
       id: entityId,
+      show: true,
       polyline: {
-        positions: new Cesium.CallbackProperty((time) => {
-          const start = resolveChainNodePosition(startNode, time)
-          const end = resolveChainNodePosition(endNode, time)
-          return start && end ? [start, end] : []
-        }, false),
+        positions: new Cesium.ConstantProperty([initialStart, initialEnd]),
         width: 3,
         material: new Cesium.PolylineDashMaterialProperty({
           color: TRANSMISSION_LINK_LINE_COLOR,
@@ -683,6 +718,9 @@ const showTransmissionLink = (link: SatelliteTransmissionLink | null) => {
     transmissionLinkEntityIds.add(entityId)
   }
 
+  updateInfrastructureLabelVisuals()
+  updateSatelliteVisuals()
+  viewer.scene.requestRender()
 }
 
 // [变量用途]
@@ -708,8 +746,6 @@ interface OurWeaponEntityStyle {
 const ourWeaponStyleCache = new Map<string, OurWeaponEntityStyle>()
 const OUR_WEAPON_DEFAULT_COLOR = Cesium.Color.fromCssColorString('#ef6b73')
 const OUR_WEAPON_DEFAULT_LABEL_COLOR = Cesium.Color.fromCssColorString('#ff9e9e')
-/** 武器标签最大可见距离（米），超过后不再显示 */
-const OUR_WEAPON_LABEL_MAX_DISTANCE = 60000000
 
 /**
  * 更新我方武器图层的可见性
@@ -831,7 +867,8 @@ const renderWeaponsOnCesium = () => {
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, -28),
         heightReference: Cesium.HeightReference.NONE,
-        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, OUR_WEAPON_LABEL_MAX_DISTANCE),
+        show: false,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, WEAPON_LABEL_LOD_NEAR),
       },
       description: `<div style="padding: 12px; font-family: sans-serif; background-color: #1a2233; color: #e6f7ff; border-radius: 8px; border: 1px solid #ef6b73;">
         <h3 style="margin: 0 0 10px 0; color: #ef6b73; font-size: 16px;">🛩️ 我方武器资产</h3>
@@ -856,12 +893,256 @@ const renderWeaponsOnCesium = () => {
 
   redWeaponEntities.value = newEntities
   updateOurWeaponsVisibility(true)
+  updateWeaponLabelVisuals()
 
 }
 
 // [变量用途]
 // 防重入防死循环集合：避免 CallbackProperty 计算 position 时触发递归调用导致栈溢出
 const positionCalculatingSet = new Set<number>()
+
+/**
+ * 获取或创建卫星 satrec 缓存（避免每帧重复 twoline2satrec）。
+ * @param norad 卫星 NORAD 编号
+ */
+const getOrCreateSatrec = (norad: number): satellitejs.SatRec | null => {
+  const cached = satelliteSatrecCache.get(norad)
+  if (cached) return cached
+
+  const matrixSats = props.matrixData?.initMatrixList || []
+  const initSat = matrixSats.find((s) => s.norad === norad)
+  let line1 = initSat?.line1
+  let line2 = initSat?.line2
+  if (!line1 || !line2) {
+    const tleCache = satelliteTleCache.get(norad)
+    if (tleCache?.line1 && tleCache?.line2) {
+      line1 = tleCache.line1
+      line2 = tleCache.line2
+    }
+  }
+  if (!line1 || !line2) return null
+
+  try {
+    const satrec = satellitejs.twoline2satrec(line1, line2)
+    if (satrec) {
+      satelliteSatrecCache.set(norad, satrec)
+      return satrec
+    }
+  } catch {
+    // ignore parse error
+  }
+  return null
+}
+
+/**
+ * 判断世界坐标是否位于相机朝向地球中心的半球（正面可见侧）。
+ * @param position 目标点世界坐标
+ * @param cameraPosition 相机世界坐标，默认取当前相机
+ */
+const isPositionFacingCamera = (
+  position: Cesium.Cartesian3,
+  cameraPosition?: Cesium.Cartesian3
+): boolean => {
+  if (!viewer) return true
+  const camPos = cameraPosition ?? viewer.camera.positionWC
+  Cesium.Cartesian3.subtract(camPos, Cesium.Cartesian3.ZERO, scratchCameraDir)
+  Cesium.Cartesian3.subtract(position, Cesium.Cartesian3.ZERO, scratchSatelliteDir)
+  if (
+    Cesium.Cartesian3.magnitudeSquared(scratchCameraDir) < 1e-6 ||
+    Cesium.Cartesian3.magnitudeSquared(scratchSatelliteDir) < 1e-6
+  ) {
+    return true
+  }
+  Cesium.Cartesian3.normalize(scratchCameraDir, scratchCameraDir)
+  Cesium.Cartesian3.normalize(scratchSatelliteDir, scratchSatelliteDir)
+  return Cesium.Cartesian3.dot(scratchCameraDir, scratchSatelliteDir) > 0
+}
+
+/**
+ * 判断卫星是否为当前选中传输链路上的节点。
+ * @param norad 卫星 NORAD 编号
+ * @param satName 卫星名称（可选，用于名称匹配）
+ */
+const isNoradLinkHighlighted = (norad: number, satName?: string): boolean => {
+  const keys = selectedTransmissionLinkNodeKeys.value
+  if (keys.has(`SAT-${norad}`) || keys.has(`RELAY-${norad}`) || keys.has(String(norad))) return true
+  return !!(satName && keys.has(satName))
+}
+
+/**
+ * 判断卫星是否应强制显示（选中或处于传输链路高亮中）。
+ * @param norad 卫星 NORAD 编号
+ */
+const isNoradVisuallyForced = (norad: number): boolean => {
+  if (props.selectedNorad === norad) return true
+  const matrixSats = props.matrixData?.initMatrixList || []
+  const sat = matrixSats.find((s) => s.norad === norad)
+  return isNoradLinkHighlighted(norad, sat?.name)
+}
+
+/**
+ * 判断地面基础设施是否为当前选中传输链路上的节点。
+ * @param node 地面基础设施节点
+ */
+const isInfrastructureLinkHighlighted = (node: InfrastructureLocation): boolean => {
+  const keys = selectedTransmissionLinkNodeKeys.value
+  return (
+    keys.has(`${node.type}-${node.id}`) ||
+    keys.has(`${node.type}-${node.name}`) ||
+    keys.has(String(node.id)) ||
+    keys.has(node.name)
+  )
+}
+
+/**
+ * 按 LOD 规则判断标签是否应显示。
+ * @param distanceToCamera 相机与目标距离（米）
+ * @param forced 是否强制显示（选中/链路高亮）
+ * @param nearDistance 近距离 LOD 上限（米）
+ * @param highlightMaxDistance 强制显示时的最大距离（米）
+ */
+const shouldShowLabelByLod = (
+  distanceToCamera: number,
+  forced: boolean,
+  nearDistance: number,
+  highlightMaxDistance: number
+): boolean => {
+  if (forced) return distanceToCamera <= highlightMaxDistance
+  return distanceToCamera <= nearDistance
+}
+
+/**
+ * 设置实体 label 的 show 属性（兼容 ConstantProperty 复用）。
+ * @param entity Cesium 实体
+ * @param show 是否显示
+ */
+const setEntityLabelShow = (entity: Cesium.Entity, show: boolean) => {
+  if (!entity.label) return
+  const labelShow = entity.label.show
+  if (labelShow instanceof Cesium.ConstantProperty) {
+    labelShow.setValue(show)
+  } else {
+    entity.label.show = new Cesium.ConstantProperty(show)
+  }
+}
+
+/**
+ * 获取实体当前世界坐标。
+ * @param entity Cesium 实体
+ */
+const getEntityWorldPosition = (entity: Cesium.Entity): Cesium.Cartesian3 | null => {
+  if (!viewer) return null
+  const position = entity.position?.getValue(viewer.clock.currentTime)
+  return position ?? null
+}
+
+/**
+ * 按 LOD 规则判断卫星标签是否应显示。
+ * @param distanceToCamera 相机与卫星距离（米）
+ * @param forced 是否强制显示（选中/链路高亮）
+ */
+const shouldShowSatelliteLabel = (distanceToCamera: number, forced: boolean): boolean => {
+  return shouldShowLabelByLod(
+    distanceToCamera,
+    forced,
+    SAT_LABEL_LOD_NEAR,
+    SAT_LABEL_HIGHLIGHT_MAX_DISTANCE
+  )
+}
+
+/**
+ * 每帧按 LOD 更新地面站/数据中心标签可见性；链路节点强制显示。
+ */
+const updateInfrastructureLabelVisuals = () => {
+  if (!viewer || viewer.isDestroyed() || infraEntityMap.size === 0) return
+  const cameraPos = viewer.camera.positionWC
+  infraEntityMap.forEach(({ entity, node }) => {
+    const position = getEntityWorldPosition(entity)
+    if (!position) return
+    const forced = isInfrastructureSelected(node) || isInfrastructureLinkHighlighted(node)
+    const distance = Cesium.Cartesian3.distance(cameraPos, position)
+    setEntityLabelShow(
+      entity,
+      shouldShowLabelByLod(distance, forced, GROUND_LABEL_LOD_NEAR, GROUND_LABEL_HIGHLIGHT_MAX_DISTANCE)
+    )
+  })
+}
+
+/**
+ * 每帧按 LOD 更新武器标签可见性。
+ */
+const updateWeaponLabelVisuals = () => {
+  if (!viewer || viewer.isDestroyed() || !redWeaponEntities.value.length) return
+  const cameraPos = viewer.camera.positionWC
+  redWeaponEntities.value.forEach((entity) => {
+    const position = getEntityWorldPosition(entity)
+    if (!position) return
+    const distance = Cesium.Cartesian3.distance(cameraPos, position)
+    setEntityLabelShow(entity, distance <= WEAPON_LABEL_LOD_NEAR)
+  })
+}
+
+/**
+ * 每帧批量更新卫星位置、正面可见性与标签 LOD，替代 per-entity CallbackProperty。
+ */
+const updateSatelliteVisuals = () => {
+  if (!viewer || viewer.isDestroyed() || satelliteEntityMap.size === 0) return
+
+  const time = viewer.clock.currentTime
+  const cameraPos = viewer.camera.positionWC
+
+  satelliteEntityMap.forEach((entity, norad) => {
+    const position = getSatellitePositionInCesium(norad, time)
+    if (!position) {
+      entity.show = false
+      return
+    }
+
+    const posProp = entity.position
+    if (posProp instanceof Cesium.ConstantPositionProperty) {
+      posProp.setValue(position)
+    } else {
+      entity.position = new Cesium.ConstantPositionProperty(position)
+    }
+
+    const facing = isPositionFacingCamera(position, cameraPos)
+    const forced = isNoradVisuallyForced(norad)
+    const distance = Cesium.Cartesian3.distance(cameraPos, position)
+    // 仅显示相机朝向地球的正面半球，与地面站一致；高亮仅影响颜色与 label LOD
+    const showBillboard = facing
+
+    entity.show = showBillboard
+    if (entity.billboard) {
+      const billboardShow = entity.billboard.show
+      if (billboardShow instanceof Cesium.ConstantProperty) {
+        billboardShow.setValue(showBillboard)
+      } else {
+        entity.billboard.show = new Cesium.ConstantProperty(showBillboard)
+      }
+    }
+    if (entity.label) {
+      const showLabel = showBillboard && shouldShowSatelliteLabel(distance, forced)
+      const labelShow = entity.label.show
+      if (labelShow instanceof Cesium.ConstantProperty) {
+        labelShow.setValue(showLabel)
+      } else {
+        entity.label.show = new Cesium.ConstantProperty(showLabel)
+      }
+    }
+  })
+}
+
+/**
+ * 注册场景 postUpdate 监听：每帧批量更新卫星位置与可见性。
+ */
+const ensureScenePostUpdateListener = () => {
+  if (!viewer || viewer.isDestroyed() || scenePostUpdateRemoveListener) return
+  scenePostUpdateRemoveListener = viewer.scene.postUpdate.addEventListener(() => {
+    updateSatelliteVisuals()
+    updateInfrastructureLabelVisuals()
+    updateWeaponLabelVisuals()
+  })
+}
 
 /**
  * [功能说明]
@@ -886,39 +1167,22 @@ const getSatellitePositionInCesium = (
   positionCalculatingSet.add(norad)
 
   try {
-    // 直接根据 TLE 和 Cesium 当前帧时间计算，避免读取自身 CallbackProperty 造成递归。
-    const matrixSats = props.matrixData?.initMatrixList || []
-    const initSat = matrixSats.find((s) => s.norad === norad)
-    let line1 = initSat?.line1
-    let line2 = initSat?.line2
-    if (!line1 || !line2) {
-      const tleCache = satelliteTleCache.get(norad)
-      if (tleCache?.line1 && tleCache?.line2) {
-        line1 = tleCache.line1
-        line2 = tleCache.line2
-      }
-    }
-
-    if (line1 && line2 && viewer) {
+    const satrec = getOrCreateSatrec(norad)
+    if (satrec && viewer) {
       try {
-        const satrec = satellitejs.twoline2satrec(line1, line2)
-        if (satrec) {
-          const now = time || viewer.clock.currentTime
-          const date = Cesium.JulianDate.toDate(now)
-          const posVel = satellitejs.propagate(satrec, date)
-          if (posVel && posVel.position) {
-            const gmst = satellitejs.gstime(date)
-            let posEcf = satellitejs.eciToEcf(posVel.position, gmst)
-            if (store.effectModel) {
-              posEcf = posVel.position
-            }
-            if (posEcf) {
-              return new Cesium.Cartesian3(posEcf.x * 1000, posEcf.y * 1000, posEcf.z * 1000)
-            }
+        const now = time || viewer.clock.currentTime
+        const date = Cesium.JulianDate.toDate(now)
+        const posVel = satellitejs.propagate(satrec, date)
+        if (posVel && posVel.position) {
+          const gmst = satellitejs.gstime(date)
+          // Cesium 地球为地固系，统一将 TLE 传播结果转换到 ECEF
+          const posEcf = satellitejs.eciToEcf(posVel.position, gmst)
+          if (posEcf) {
+            return new Cesium.Cartesian3(posEcf.x * 1000, posEcf.y * 1000, posEcf.z * 1000)
           }
         }
-      } catch (e) {
-        // ignore parse error
+      } catch {
+        // ignore propagate error
       }
     }
   } finally {
@@ -1054,6 +1318,7 @@ const setClockTime = (ms: number) => {
   const date = new Date(ms)
   if (Number.isNaN(date.getTime())) return
   viewer.clock.currentTime = Cesium.JulianDate.fromDate(date)
+  viewer.scene.requestRender()
 }
 
 /**
@@ -1450,11 +1715,22 @@ onBeforeUnmount(() => {
     cameraMoveEndListener = null
   }
 
+  if (scenePostUpdateRemoveListener) {
+    try {
+      scenePostUpdateRemoveListener()
+    } catch (e) {
+      console.warn('failed to remove scenePostUpdateRemoveListener on unmount', e)
+    }
+    scenePostUpdateRemoveListener = null
+  }
+
   satelliteRenderToken += 1
   satelliteRenderBusy.value = false
 
   clearElectronicInfrastructureNodes()
   satelliteEntities.clear()
+  satelliteEntityMap.clear()
+  satelliteSatrecCache.clear()
   satelliteOrbitData.clear()
   satellitePositionPropertyCache.clear()
   satelliteTleCache.clear()

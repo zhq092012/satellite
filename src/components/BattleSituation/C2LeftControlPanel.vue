@@ -804,6 +804,8 @@ const selectedSatelliteName = computed(() => {
     flex-direction: column;
     gap: 6px;
     padding: 8px;
+    min-height: 120px;
+    box-sizing: border-box;
     background: rgba(12, 22, 38, 0.75);
     border: 1px dashed rgba(0, 225, 255, 0.25);
     border-radius: 6px;

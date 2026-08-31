@@ -43,7 +43,6 @@ import BattleGlobeTimeline from '@/components/BattleSituation/BattleGlobeTimelin
 import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
 import {
-  collectSeriesTransmissionLinks,
   collectSatelliteTransmissionLinks,
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
@@ -63,10 +62,8 @@ const selectedNorad = ref<number | null>(null)
 
 /** 当前选中的传输链路 ID（右侧面板点击链路时高亮并绘制地图连线） */
 const selectedTransmissionLinkId = ref<string | null>(null)
-/** 当前手动选中的传输链路，用于播放后按时间窗口恢复高亮。 */
+/** 当前手动选中的传输链路（仅点击右侧面板链路时在地图上绘制） */
 const selectedTransmissionLink = ref<SatelliteTransmissionLink | null>(null)
-/** 当前自动高亮的链路 ID，避免时钟每个 tick 重建相同连线。 */
-const highlightedTransmissionLinkId = ref<string | null>(null)
 
 /** 地球时钟当前时刻（毫秒），用于轨道仿真时间轴游标 */
 const currentClockMs = ref<number>(0)
@@ -89,43 +86,6 @@ const taskTimeRange = computed(() => {
 const handleTimelineTimeChange = (ms: number) => {
   cesiumViewerRef.value?.setClockTime(ms)
   currentClockMs.value = ms
-  syncTransmissionLinkHighlight(ms)
-}
-
-/**
- * 根据当前时刻更新传输链路高亮。
- * 手动选中链路且处于暂停状态时保持该链路高亮；播放后仅在链路时间窗口内高亮。
- */
-const syncTransmissionLinkHighlight = (ms: number) => {
-  const viewer = cesiumViewerRef.value
-  if (!viewer || !matrixData.value) return
-
-  const manualLink = selectedTransmissionLink.value
-  if (manualLink && !isClockPlaying.value) {
-    if (highlightedTransmissionLinkId.value !== manualLink.id) {
-      viewer.showTransmissionLink?.(manualLink)
-      highlightedTransmissionLinkId.value = manualLink.id
-    }
-    return
-  }
-
-  const link = manualLink && ms >= manualLink.transmitStartMs && ms <= manualLink.transmitEndMs
-    ? manualLink
-    : manualLink
-      ? null
-      : collectSeriesTransmissionLinks(matrixData.value).find(
-        (item) => ms >= item.transmitStartMs && ms <= item.transmitEndMs
-      ) || null
-
-  if (link) {
-    if (highlightedTransmissionLinkId.value !== link.id) {
-      viewer.showTransmissionLink?.(link)
-      highlightedTransmissionLinkId.value = link.id
-    }
-  } else if (highlightedTransmissionLinkId.value !== null) {
-    viewer.clearTransmissionLinkOverlay?.()
-    highlightedTransmissionLinkId.value = null
-  }
 }
 
 /**
@@ -138,8 +98,7 @@ const handleTogglePlay = (playing?: boolean) => {
   if (!viewer) return
 
   if (nextState && selectedTransmissionLink.value) {
-    viewer.clearTransmissionLinkOverlay?.()
-    highlightedTransmissionLinkId.value = null
+    clearTransmissionLinkSelection()
   }
 
   if (nextState) {
@@ -168,7 +127,6 @@ const handleSpeedChange = (speed: number) => {
 const handleClockTick = (ms: number) => {
   if (!selectedNorad.value) {
     currentClockMs.value = ms
-    syncTransmissionLinkHighlight(ms)
   }
 }
 
@@ -201,7 +159,6 @@ const syncGlobeTimeMode = () => {
 const clearTransmissionLinkSelection = () => {
   selectedTransmissionLinkId.value = null
   selectedTransmissionLink.value = null
-  highlightedTransmissionLinkId.value = null
   cesiumViewerRef.value?.clearTransmissionLinkOverlay?.()
   syncGlobeTimeMode()
 }
@@ -230,7 +187,7 @@ const handleSelectTransmissionLink = (link: SatelliteTransmissionLink | null) =>
 
   nextTick(() => {
     viewer.showTransmissionLink?.(link)
-    highlightedTransmissionLinkId.value = link.id
+    viewer.flyToLinkBoundingSphere?.(link)
   })
 }
 
@@ -261,7 +218,6 @@ const loadMatrixForCurrentScope = async () => {
     store.setSelectedAnalysisNorad(null)
     selectedTransmissionLinkId.value = null
     selectedTransmissionLink.value = null
-    highlightedTransmissionLinkId.value = null
 
     nextTick(() => {
       if (loadToken !== matrixLoadToken) return
@@ -291,7 +247,6 @@ const handleSelectSatellite = (norad: number | null) => {
   if (selectedTransmissionLinkId.value) {
     selectedTransmissionLinkId.value = null
     selectedTransmissionLink.value = null
-    highlightedTransmissionLinkId.value = null
     cesiumViewerRef.value?.clearTransmissionLinkOverlay?.()
   }
 
