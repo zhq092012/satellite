@@ -51,7 +51,10 @@
         <div v-for="usageType in selectedUsageTypes" :key="usageType" class="plan-column">
           <div class="column-type-title">{{ getZhchUsageTypeLabel(usageType) }}</div>
           <div v-if="getPlanByType(usageType)" class="column-content">
-            <ZhchPlanDetailPanel :plan="getPlanByType(usageType)!" />
+            <ZhchPlanDetailPanel
+              :plan="getPlanByType(usageType)!"
+              :show-series-link-timeline="selectedUsageTypes.length === 1"
+            />
           </div>
           <div v-else class="empty-container small">
             <div class="empty-text">暂无 {{ getZhchUsageTypeLabel(usageType) }} 方案数据</div>

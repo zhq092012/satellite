@@ -64,63 +64,129 @@
         </div>
 
         <div class="link-section-scroll">
-          <div v-if="transmissionLinks.length" class="transmission-link-list">
-            <div v-for="(link, idx) in transmissionLinks" :key="link.id" class="transmission-link-card" :class="[
-              {
-                active: selectedTransmissionLinkId === link.id,
-                blocked: link.blocked,
-              },
-              getLinkPriority(link.id)?.rank ? `priority-rank-${getLinkPriority(link.id)?.rank}` : ''
-            ]" role="button" tabindex="0" @click="handleLinkCardClick(link)"
-              @keydown.enter.prevent="handleLinkCardClick(link)">
-              <div class="link-card-header">
-                <div class="link-title-left">
-                  <span class="link-index">链路 {{ idx + 1 }}</span>
-                  <span v-if="getLinkPriority(link.id)?.rank && getLinkPriority(link.id)!.rank <= 3" class="rank-badge"
-                    :class="`rank-badge--${getLinkPriority(link.id)!.rank}`">
-                    {{ getRankMedal(getLinkPriority(link.id)!.rank) }} TOP {{ getLinkPriority(link.id)!.rank }} ({{
-                      getLinkPriority(link.id)!.totalScore }}分)
-                  </span>
+          <template v-if="top3PriorityLinks.length">
+            <div class="subsection-header">
+              <span class="subsection-title">🎯 优先推荐 TOP 3</span>
+            </div>
+            <div class="transmission-link-list transmission-link-list--top">
+              <div
+                v-for="item in top3PriorityLinks"
+                :key="item.link.id"
+                class="transmission-link-card"
+                :class="[
+                  {
+                    active: selectedTransmissionLinkId === item.link.id,
+                    blocked: item.link.blocked,
+                  },
+                  `priority-rank-${item.priority.rank}`,
+                ]"
+                role="button"
+                tabindex="0"
+                @click="handleLinkCardClick(item.link)"
+                @keydown.enter.prevent="handleLinkCardClick(item.link)"
+              >
+                <div class="link-card-header">
+                  <div class="link-title-left">
+                    <span class="link-index">链路 {{ item.priority.rank }}</span>
+                    <span class="rank-badge" :class="`rank-badge--${item.priority.rank}`">
+                      {{ getRankMedal(item.priority.rank) }} TOP {{ item.priority.rank }} ({{ item.priority.totalScore }}分)
+                    </span>
+                  </div>
+                  <div class="link-metrics-row">
+                    <div class="link-metric-card">
+                      <span class="link-metric-label">链路时长</span>
+                      <strong>{{ formatElapsedTime(item.link.transmitEndMs - item.link.transmitStartMs) }}</strong>
+                    </div>
+                    <div class="link-metric-card">
+                      <span class="link-metric-label">链路时延</span>
+                      <strong>{{ formatElapsedTime(item.link.transmitEndMs - taskStartMs) }}</strong>
+                    </div>
+                  </div>
                 </div>
-                <div class="link-metrics-row">
-                  <div class="link-metric-card">
-                    <span class="link-metric-label">链路时长</span>
-                    <strong>{{ formatElapsedTime(link.transmitEndMs - link.transmitStartMs) }}</strong>
-                  </div>
-                  <div class="link-metric-card">
-                    <span class="link-metric-label">链路时延</span>
-                    <strong>{{ formatElapsedTime(link.transmitEndMs - taskStartMs) }}</strong>
-                  </div>
+
+                <div class="link-flow-row">
+                  <template v-for="(node, nodeIdx) in item.link.nodes" :key="item.link.id + '-' + node.layer + node.id">
+                    <div class="flow-node">
+                      <span class="flow-node-icon">{{ node.icon }}</span>
+                      <span class="flow-node-name" :title="node.name">{{ node.name }}</span>
+                      <span class="flow-node-layer">{{ chainLayerLabel(node.layer) }}</span>
+                    </div>
+                    <span v-if="nodeIdx < item.link.nodes.length - 1" class="flow-arrow">→</span>
+                  </template>
                 </div>
-              </div>
 
-              <div class="link-flow-row">
-                <template v-for="(node, nodeIdx) in link.nodes" :key="link.id + '-' + node.layer + node.id">
-                  <div class="flow-node">
-                    <span class="flow-node-icon">{{ node.icon }}</span>
-                    <span class="flow-node-name" :title="node.name">{{ node.name }}</span>
-                    <span class="flow-node-layer">{{ chainLayerLabel(node.layer) }}</span>
-                  </div>
-                  <span v-if="nodeIdx < link.nodes.length - 1" class="flow-arrow">→</span>
-                </template>
-              </div>
+                <div class="priority-reason-tip">
+                  <span class="reason-icon">💡</span>
+                  <span class="reason-text">{{ item.priority.reason }}</span>
+                </div>
 
-              <div v-if="getLinkPriority(link.id)?.rank && getLinkPriority(link.id)!.rank <= 3"
-                class="priority-reason-tip">
-                <span class="reason-icon">💡</span>
-                <span class="reason-text">{{ getLinkPriority(link.id)!.reason }}</span>
-              </div>
+                <div v-if="item.link.blocked" class="link-blocked-tip">{{ item.link.blockedReason }}</div>
 
-              <div v-if="link.blocked" class="link-blocked-tip">{{ link.blockedReason }}</div>
-
-              <div class="link-meta-row">
-                <span class="link-meta-label">传输时间</span>
-                <strong class="link-meta-val">{{ link.transmitTime }}</strong>
+                <div class="link-meta-row">
+                  <span class="link-meta-label">传输时间</span>
+                  <strong class="link-meta-val">{{ item.link.transmitTime }}</strong>
+                </div>
               </div>
             </div>
-          </div>
+          </template>
 
-          <div v-else class="empty-link-box">
+          <template v-if="otherTransmissionLinks.length">
+            <div v-if="top3PriorityLinks.length" class="subsection-header subsection-header--rest">
+              <span class="subsection-title">其他链路</span>
+              <span class="subsection-count">{{ otherTransmissionLinks.length }} 条</span>
+            </div>
+            <div class="transmission-link-list">
+              <div
+                v-for="(link, idx) in otherTransmissionLinks"
+                :key="link.id"
+                class="transmission-link-card"
+                :class="{
+                  active: selectedTransmissionLinkId === link.id,
+                  blocked: link.blocked,
+                }"
+                role="button"
+                tabindex="0"
+                @click="handleLinkCardClick(link)"
+                @keydown.enter.prevent="handleLinkCardClick(link)"
+              >
+                <div class="link-card-header">
+                  <div class="link-title-left">
+                    <span class="link-index">链路 {{ idx + top3PriorityLinks.length + 1 }}</span>
+                  </div>
+                  <div class="link-metrics-row">
+                    <div class="link-metric-card">
+                      <span class="link-metric-label">链路时长</span>
+                      <strong>{{ formatElapsedTime(link.transmitEndMs - link.transmitStartMs) }}</strong>
+                    </div>
+                    <div class="link-metric-card">
+                      <span class="link-metric-label">链路时延</span>
+                      <strong>{{ formatElapsedTime(link.transmitEndMs - taskStartMs) }}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="link-flow-row">
+                  <template v-for="(node, nodeIdx) in link.nodes" :key="link.id + '-' + node.layer + node.id">
+                    <div class="flow-node">
+                      <span class="flow-node-icon">{{ node.icon }}</span>
+                      <span class="flow-node-name" :title="node.name">{{ node.name }}</span>
+                      <span class="flow-node-layer">{{ chainLayerLabel(node.layer) }}</span>
+                    </div>
+                    <span v-if="nodeIdx < link.nodes.length - 1" class="flow-arrow">→</span>
+                  </template>
+                </div>
+
+                <div v-if="link.blocked" class="link-blocked-tip">{{ link.blockedReason }}</div>
+
+                <div class="link-meta-row">
+                  <span class="link-meta-label">传输时间</span>
+                  <strong class="link-meta-val">{{ link.transmitTime }}</strong>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="!transmissionLinks.length" class="empty-link-box">
             {{ selectedSatelliteNorad != null ? '该卫星暂无关联传输链路' : '当前范围内暂无可枚举链路' }}
           </div>
         </div>
@@ -146,7 +212,7 @@ import {
   rankTransmissionLinksByPriority,
   type ChainNode,
   type SatelliteTransmissionLink,
-  type LinkPriorityMetrics,
+  type PrioritizedTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
 
 const router = useRouter()
@@ -244,18 +310,24 @@ const transmissionLinks = computed<SatelliteTransmissionLink[]>(() => {
 })
 
 /**
- * 计算当前传输链路的多维优先级评估结果
+ * 按多维优先级评估后的传输链路列表（降序）
  */
-const prioritizedLinkMap = computed(() => {
+const prioritizedLinks = computed<PrioritizedTransmissionLink[]>(() => {
   const matrix = activeMatrix.value
-  if (!matrix || !transmissionLinks.value.length) return new Map<string, LinkPriorityMetrics>()
-  const ranked = rankTransmissionLinksByPriority(matrix, transmissionLinks.value)
-  return new Map(ranked.map((item) => [item.link.id, item.priority]))
+  if (!matrix || !transmissionLinks.value.length) return []
+  return rankTransmissionLinksByPriority(matrix, transmissionLinks.value)
 })
 
-const getLinkPriority = (linkId: string): LinkPriorityMetrics | undefined => {
-  return prioritizedLinkMap.value.get(linkId)
-}
+/** 优先级 TOP 1-3 推荐链路 */
+const top3PriorityLinks = computed(() => prioritizedLinks.value.slice(0, 3))
+
+/** TOP 3 链路 ID 集合，用于从下方列表中排除重复展示 */
+const top3LinkIdSet = computed(() => new Set(top3PriorityLinks.value.map((item) => item.link.id)))
+
+/** 除 TOP 3 外的其余传输链路（保持原有排序） */
+const otherTransmissionLinks = computed(() =>
+  transmissionLinks.value.filter((link) => !top3LinkIdSet.value.has(link.id))
+)
 
 const getRankMedal = (rank: number): string => {
   if (rank === 1) return '🥇'
@@ -529,6 +601,46 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+
+  &--top {
+    margin-bottom: 4px;
+  }
+}
+
+.subsection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(234, 179, 8, 0.08);
+  border: 1px solid rgba(234, 179, 8, 0.22);
+
+  &--rest {
+    margin-top: 10px;
+    background: rgba(56, 189, 248, 0.06);
+    border-color: rgba(56, 189, 248, 0.2);
+  }
+
+  .subsection-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: #fef08a;
+  }
+
+  .subsection-count {
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+  }
+}
+
+.subsection-header--rest .subsection-title {
+  color: #7dd3fc;
 }
 
 .transmission-link-card {

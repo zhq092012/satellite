@@ -76,8 +76,8 @@
       </div>
     </div>
 
-    <!-- 4. 系列链路通断时序（分层甘特式展示） -->
-    <SeriesLinkTimeline :plan="plan" />
+    <!-- 4. 系列链路通断时序（仅单方案展示，多方案对比时隐藏） -->
+    <SeriesLinkTimeline v-if="showSeriesLinkTimeline" :plan="plan" />
   </div>
 </template>
 
@@ -89,6 +89,8 @@ import SeriesLinkTimeline from './SeriesLinkTimeline.vue'
 defineProps<{
   /** 综合打击方案完整数据 */
   plan: ZhchPlanResp
+  /** 是否展示系列链路通断时序（多方案对比时不展示） */
+  showSeriesLinkTimeline?: boolean
 }>()
 
 /**
