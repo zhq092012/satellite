@@ -36,6 +36,7 @@
         <el-table-column prop="longitude" label="经度" width="110" />
         <el-table-column prop="latitude" label="纬度" width="110" />
         <el-table-column prop="range" label="打击高度(km)" width="130" />
+        <el-table-column prop="interval" label="打击间隔(分钟)" width="130" />
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="scope">
             <el-button link type="primary" @click="openEditDialog(scope.row)">编辑</el-button>
@@ -45,18 +46,13 @@
       </el-table>
 
       <div class="pager">
-        <el-pagination
-          v-model:current-page="page.current"
-          v-model:page-size="page.size"
-          :total="filteredCount"
-          layout="total, prev, pager, next, sizes"
-          :page-sizes="[10, 20, 50, 100]"
-        />
+        <el-pagination v-model:current-page="page.current" v-model:page-size="page.size" :total="filteredCount"
+          layout="total, prev, pager, next, sizes" :page-sizes="[10, 20, 50, 100]" />
       </div>
     </section>
 
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="680px" destroy-on-close>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="800px" destroy-on-close>
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="150px">
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="武器名称" prop="name">
@@ -86,25 +82,20 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
+            <el-form-item label="打击间隔(分钟)" prop="interval">
+              <el-input-number v-model.number="form.interval" :min="0" :controls="true" class="full-width-number" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
             <el-form-item label="经度" prop="longitude">
-              <el-input-number
-                v-model.number="form.longitude"
-                :min="-180"
-                :max="180"
-                :controls="true"
-                class="full-width-number"
-              />
+              <el-input-number v-model.number="form.longitude" :min="-180" :max="180" :controls="true"
+                class="full-width-number" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="纬度" prop="latitude">
-              <el-input-number
-                v-model.number="form.latitude"
-                :min="-90"
-                :max="90"
-                :controls="true"
-                class="full-width-number"
-              />
+              <el-input-number v-model.number="form.latitude" :min="-90" :max="90" :controls="true"
+                class="full-width-number" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -171,6 +162,7 @@ const createEmptyForm = (): Weapon => ({
   longitude: 0,
   range: 0,
   satellite_type: '',
+  interval: '',
 })
 
 // [变量用途]

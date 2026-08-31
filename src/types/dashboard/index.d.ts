@@ -1,5 +1,3 @@
-
-
 interface TaskForm {
   id?: number
   battleId: number
@@ -287,7 +285,8 @@ export interface Weapon {
   longitude: number
   /** 打击高度或最大射程(km) */
   range: number
+  /** 打击间隔时间（分钟） */
+  interval: string
   /** 适用/目标卫星类型（如：低轨通信卫星、导航卫星等） */
   satellite_type?: string
 }
-
