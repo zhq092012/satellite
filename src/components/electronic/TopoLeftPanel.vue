@@ -3,7 +3,21 @@
     <div class="panel-header">
       <span class="header-icon">🔗</span>
       <span class="header-title">传输链路清单</span>
-      <span class="count-tag">{{ linkItems.length }}</span>
+      <span class="count-tag">{{ filteredLinkItems.length }}</span>
+    </div>
+
+    <!-- 搜索筛选框 -->
+    <div class="sidebar-search-box">
+      <el-input v-model="searchKeyword" placeholder="搜索卫星/接收站/武器..." size="small" clearable>
+        <template #prefix>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            class="lucide lucide-search">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+        </template>
+      </el-input>
     </div>
 
     <div v-if="!matrixData" class="empty-tip top-empty">
@@ -14,13 +28,21 @@
       该卫星暂无传输链路
     </div>
 
-    <template v-else-if="linkItems.length">
+    <div v-else-if="!linkItems.length" class="empty-tip top-empty">
+      该系列暂无传输链路
+    </div>
+
+    <div v-else-if="!filteredLinkItems.length" class="empty-tip top-empty">
+      未搜索到匹配的传输链路
+    </div>
+
+    <template v-else>
       <div v-if="selectedNorad" class="sat-hint">
         <span class="norad-tag">NORAD {{ selectedNorad }}</span>
       </div>
 
       <el-scrollbar class="link-scroll">
-        <div v-for="item in linkItems" :key="item.id" :ref="(el) => setLinkCardRef(item.id, el as HTMLElement | null)"
+        <div v-for="item in filteredLinkItems" :key="item.id" :ref="(el) => setLinkCardRef(item.id, el as HTMLElement | null)"
           class="link-card" :class="[
             { active: selectedLinkId === item.id, struck: item.struck, ok: !item.struck },
             item.rank ? `rank-card--${item.rank}` : ''
@@ -71,13 +93,11 @@
         </div>
       </el-scrollbar>
     </template>
-
-    <div v-else class="empty-tip top-empty">该系列暂无传输链路</div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import type { MatrixResult } from '@/api/electronic'
 import {
   collectSatelliteTransmissionLinks,
@@ -136,6 +156,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select-link', linkId: string | null): void
 }>()
+
+/** 搜索过滤关键词 */
+const searchKeyword = ref<string>('')
 
 const getRankMedal = (rank: number): string => {
   if (rank === 1) return '🥇'
@@ -216,6 +239,30 @@ const linkItems = computed<LinkListItem[]>(() => {
   })
 })
 
+/** 过滤后的传输链路列表（支持根据节点名、武器名、干扰状态、传输时间多维度检索） */
+const filteredLinkItems = computed<LinkListItem[]>(() => {
+  const list = linkItems.value
+  const kw = searchKeyword.value.trim().toLowerCase()
+  if (!kw) return list
+
+  return list.filter((item) => {
+    // 匹配节点名称（卫星、中继、接收站、数据中心）
+    const matchNode = item.nodes.some((node) => node.name.toLowerCase().includes(kw))
+    // 匹配武器名称
+    const matchWeapon = !!item.weaponNames && item.weaponNames.toLowerCase().includes(kw)
+    // 匹配干扰/打击状态描述
+    const matchStatus =
+      item.interferenceStatus.toLowerCase().includes(kw) ||
+      (!!item.struckDetailText && item.struckDetailText.toLowerCase().includes(kw))
+    // 匹配传输时间
+    const matchTime = !!item.transmitTime && item.transmitTime.toLowerCase().includes(kw)
+    // 匹配打击目标
+    const matchTarget = !!item.strikeTargetLabel && item.strikeTargetLabel.toLowerCase().includes(kw)
+
+    return matchNode || matchWeapon || matchStatus || matchTime || matchTarget
+  })
+})
+
 /**
  * 选择/取消选择链路
  * @param item 链路列表项
@@ -284,6 +331,41 @@ watch(
     border-radius: 10px;
     background: rgba(56, 189, 248, 0.15);
     color: #7dd3fc;
+  }
+}
+
+.sidebar-search-box {
+  margin-bottom: 10px;
+  flex-shrink: 0;
+
+  :deep(.el-input__wrapper) {
+    background-color: #1e293b;
+    box-shadow: 0 0 0 1px #334155 inset;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+
+    &:hover {
+      box-shadow: 0 0 0 1px #475569 inset;
+    }
+
+    &.is-focus {
+      box-shadow: 0 0 0 1px #00e1ff inset, 0 0 8px rgba(0, 225, 255, 0.25) !important;
+    }
+
+    .el-input__inner {
+      color: #f8fafc;
+      font-size: 12px;
+
+      &::placeholder {
+        color: #64748b;
+      }
+    }
+
+    .el-input__prefix {
+      color: #64748b;
+      display: flex;
+      align-items: center;
+    }
   }
 }
 

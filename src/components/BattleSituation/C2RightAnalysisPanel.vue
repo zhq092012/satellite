@@ -778,7 +778,7 @@ onMounted(() => {
   .flow-node-name {
     font-size: 10px;
     font-weight: 600;
-    color: #e2efff;
+    color: cyan;
     text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
