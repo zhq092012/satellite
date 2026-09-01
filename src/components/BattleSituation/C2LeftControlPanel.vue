@@ -1271,7 +1271,7 @@ const selectedSatelliteName = computed(() => {
       display: inline-flex;
       align-items: center;
       padding: 1px 7px;
-      font-size: 11px;
+      font-size: 14px;
       line-height: 16px;
       border-radius: 3px;
       font-weight: 500;
@@ -1333,7 +1333,7 @@ const selectedSatelliteName = computed(() => {
     }
 
     .detail-btn {
-      font-size: 11px;
+      font-size: medium;
       padding: 0;
       height: auto;
       margin-left: auto;

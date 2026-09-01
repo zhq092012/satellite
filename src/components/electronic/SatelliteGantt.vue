@@ -83,7 +83,7 @@
         <div class="series-filter-group">
           <span class="label-text">卫星系列</span>
           <el-select v-model="selectedSeries" class="series-select" size="small" placeholder="选择系列"
-            :disabled="seriesOptions.length === 0" @change="handleSeriesChange">
+            :disabled="seriesOptions.length === 0" @change="handleSeriesChange" filterable>
             <el-option v-for="series in seriesOptions" :key="series" :label="series" :value="series" />
           </el-select>
         </div>
@@ -338,7 +338,6 @@
             :class="[bar.colorStatusClass, { 'is-click-selected': selectedBarId === bar.id }]"
             @click="handleSelectBar(bar)">
             <div class="compact-link-header" :class="bar.colorStatusClass">
-              <span class="compact-status-tag">{{ bar.statusLabel }}</span>
               <span class="compact-link-line" :title="bar.routeText || `${bar.satName} → ${bar.receiveName}`">
                 <template v-if="bar.relayName && bar.relayName !== (bar.sourceSatName || bar.satName)">
                   🛰️ {{ bar.sourceSatName || bar.satName }} → 🛰️ {{ bar.relayName }} → 📡 {{ bar.receiveName }}
@@ -2524,7 +2523,9 @@ watch(playheadLeftPx, () => {
               border-radius: 4px;
               cursor: pointer;
               border: 1px solid transparent;
-
+              .sub-rec-name{
+                font-size: 12px;
+              }
               &:hover {
                 color: #e2e8f0;
                 background: rgba(56, 189, 248, 0.08);
@@ -3050,6 +3051,7 @@ watch(playheadLeftPx, () => {
               line-height: 1.3;
               color: #e2e8f0;
               word-break: break-all;
+              text-align: end;
             }
           }
 

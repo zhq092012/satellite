@@ -463,7 +463,7 @@ const buildSatelliteLabelText = (noradId: number, fallbackName?: string) => {
  * [处理规则]
  * - 渲染新矩阵前，务必先调用 clearElectronicInfrastructureNodes 彻底清空旧任务/旧系列的实体残留，防止跨任务/跨系列切换时残留节点叠加
  */
-const renderElectronicInfrastructureNodes = () => {
+const loadSatelliteAndStations = () => {
   if (!viewer || viewer.isDestroyed()) return
 
   // 1. 每次重新渲染前，必须先彻底清理上一任务/系列的渲染残留
@@ -570,7 +570,7 @@ const renderElectronicInfrastructureNodes = () => {
         show: false,
         disableDepthTestDistance: 0,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, SAT_LABEL_LOD_FAR),
-      },
+      },   
     })
     electronicNodeEntityIds.add(satEntityId)
     satelliteEntityMap.set(sat.norad, entity)
@@ -1227,7 +1227,7 @@ const flushPendingInfrastructureRender = () => {
   if (!props.matrixData || !hasValidContainerSize(cesiumContainer.value || null)) return
   pendingInfrastructureRender = false
   //渲染敌方地面接收站、中心云数据中心与天基过境 / 中继卫星集群 3D 实体
-  renderElectronicInfrastructureNodes()
+  loadSatelliteAndStations()
 }
 /**
  * [功能]
@@ -1246,7 +1246,7 @@ const scheduleInfrastructureRender = () => {
   }
   pendingInfrastructureRender = false
   //渲染敌方地面接收站、中心云数据中心与天基过境 / 中继卫星集群 3D 实体
-  renderElectronicInfrastructureNodes()
+  loadSatelliteAndStations()
 }
 
 /**
@@ -1848,7 +1848,7 @@ const refreshAfterActivate = () => {
   syncViewerRenderLoopWithContainer()
   if (props.matrixData) {
     pendingInfrastructureRender = false
-    renderElectronicInfrastructureNodes()
+    loadSatelliteAndStations()
   }
   viewer?.scene.requestRender()
 }

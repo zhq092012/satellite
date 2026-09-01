@@ -768,9 +768,8 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  min-width: 56px;
-  max-width: 88px;
   padding: 4px;
+  flex: 1;
 
   .flow-node-icon {
     font-size: 14px;
