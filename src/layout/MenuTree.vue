@@ -177,7 +177,7 @@ const getIcon = (item: RouteRecordRaw): string => {
     }
   }
 
-  :deep(.el-sub-menu .el-sub-menu__icon-arrow) {
+  :deep(.atlas-app-sub-menu .el-sub-menu__icon-arrow) {
     color: #94a3b8;
     margin-left: 6px;
   }

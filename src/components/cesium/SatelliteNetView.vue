@@ -891,16 +891,16 @@ watch(
         }
       }
 
-      :deep(.el-descriptions__title) {
+      :deep(.atlas-app-descriptions__title) {
         color: #d8ecff;
       }
 
-      :deep(.el-descriptions__label) {
+      :deep(.atlas-app-descriptions__label) {
         color: #cde4ff;
         background: rgba(19, 67, 98, 0.9);
       }
 
-      :deep(.el-descriptions__content) {
+      :deep(.atlas-app-descriptions__content) {
         color: #eef7ff;
         background: rgba(14, 52, 79, 0.85);
       }
@@ -928,10 +928,10 @@ watch(
       width: 150px;
     }
 
-    :deep(.el-checkbox__label),
-    :deep(.el-switch__label),
-    :deep(.el-select__placeholder),
-    :deep(.el-input__inner) {
+    :deep(.atlas-app-checkbox__label),
+    :deep(.atlas-app-switch__label),
+    :deep(.atlas-app-select__placeholder),
+    :deep(.atlas-app-input__inner) {
       color: #d8ecff;
     }
   }

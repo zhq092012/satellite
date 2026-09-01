@@ -1168,7 +1168,7 @@ onMounted(async () => {
     margin-bottom: 8px;
   }
 
-  :deep(.el-table) {
+  :deep(.atlas-app-table) {
     th.el-table__cell {
       padding: 8px 6px;
       .cell {

@@ -316,7 +316,7 @@ onMounted(async () => {
   gap: 14px;
 }
 
-.table-card :deep(.el-table) {
+.table-card :deep(.atlas-app-table) {
   --el-table-border-color: var(--surface-border-color);
   --el-table-header-bg-color: var(--surface-bg-color-strong);
   --el-table-bg-color: var(--surface-bg-color);
@@ -329,18 +329,18 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-.table-card :deep(.el-table th.el-table__cell) {
+.table-card :deep(.atlas-app-table th.el-table__cell) {
   color: var(--accent-color-active);
   font-size: 13px;
   font-weight: 800;
 }
 
-.table-card :deep(.el-table td.el-table__cell) {
+.table-card :deep(.atlas-app-table td.el-table__cell) {
   color: var(--text-color-primary);
   background: var(--surface-bg-color);
 }
 
-.table-card :deep(.el-table__empty-block) {
+.table-card :deep(.atlas-app-table__empty-block) {
   background: var(--surface-bg-color);
 }
 

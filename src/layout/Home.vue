@@ -11,29 +11,42 @@
         </button>
       </div>
 
-      <!-- 当前打击方案切换 -->
-      <div v-if="store.activedTask" class="plan-switch-bar">
-        <span class="plan-switch-label">当前打击方案：</span>
-        <button v-for="type in ZHCH_USAGE_TYPE_OPTIONS" :key="type" class="plan-switch-btn"
-          :class="{ active: store.activeZhchUsageType === type }" :disabled="planSwitching"
-          @click="handleSwitchPlan(type)">
-          {{ getZhchUsageTypeLabel(type) }}
-        </button>
-      </div>
-
-      <!-- 右侧：战场与任务显示 / 切换区域 -->
-      <div class="task-status-bar">
-        <!-- 场景 A：已选择战场和任务 -->
-        <div v-if="store.battle && store.activedTask" class="task-info-badge" @click="openTaskSelector">
-          <span class="battle-name"> {{ store.battle.name }}</span>
-          <span class="divider">/</span>
-          <span class="task-name"> {{ store.activedTask.name }}</span>
-          <el-button type="primary" size="small" link class="switch-btn">切换任务</el-button>
+      <!-- 右侧：方案选择与任务状态区域 -->
+      <div class="header-right-group">
+        <!-- 当前打击方案切换按钮组 -->
+        <div v-if="store.activedTask" class="plan-segmented-bar">
+          <span class="segmented-label">
+            <span class="segmented-icon">🎯</span>
+            <span>打击方案</span>
+          </span>
+          <div class="segmented-group">
+            <button
+              v-for="type in ZHCH_USAGE_TYPE_OPTIONS"
+              :key="type"
+              class="segmented-btn"
+              :class="{ active: store.activeZhchUsageType === type }"
+              :disabled="planSwitching"
+              @click="handleSwitchPlan(type)"
+            >
+              {{ getZhchUsageTypeLabel(type) }}
+            </button>
+          </div>
         </div>
 
-        <!-- 场景 B：尚未选择战场任务，突出提醒 -->
-        <div v-else class="task-prompt-badge" @click="openTaskSelector">
-          <el-tag type="warning" effect="dark" round class="prompt-tag"> ⚠️ 尚未选择战场任务（点击选择） </el-tag>
+        <!-- 战场与任务显示 / 切换区域 -->
+        <div class="task-status-bar">
+          <!-- 场景 A：已选择战场和任务 -->
+          <div v-if="store.battle && store.activedTask" class="task-info-badge" @click="openTaskSelector">
+            <span class="battle-name"> {{ store.battle.name }}</span>
+            <span class="divider">/</span>
+            <span class="task-name"> {{ store.activedTask.name }}</span>
+            <el-button type="primary" size="small" link class="switch-btn">切换任务</el-button>
+          </div>
+
+          <!-- 场景 B：尚未选择战场任务，突出提醒 -->
+          <div v-else class="task-prompt-badge" @click="openTaskSelector">
+            <el-tag type="warning" effect="dark" round class="prompt-tag"> ⚠️ 尚未选择战场任务（点击选择） </el-tag>
+          </div>
         </div>
       </div>
     </header>
@@ -361,47 +374,80 @@ onMounted(async () => {
       }
     }
 
-    .plan-switch-bar {
+    .header-right-group {
       display: flex;
       align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin: 0 12px;
+      gap: 12px;
+    }
 
-      .plan-switch-label {
-        font-size: 14px;
+    .plan-segmented-bar {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 4px 3px 12px;
+      background: rgba(14, 38, 66, 0.85);
+      border: 1px solid rgba(79, 147, 221, 0.35);
+      border-radius: 20px;
+      transition: all 0.25s ease;
+
+      &:hover {
+        border-color: rgba(0, 225, 255, 0.6);
+        box-shadow: 0 0 12px rgba(0, 225, 255, 0.2);
+      }
+
+      .segmented-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13px;
         font-weight: 600;
         color: #94a3b8;
         white-space: nowrap;
+
+        .segmented-icon {
+          font-size: 14px;
+          line-height: 1;
+        }
       }
 
-      .plan-switch-btn {
-        padding: 5px 12px;
-        font-size: 13px;
-        font-weight: 600;
-        color: #8eb3d6;
-        background: rgba(16, 36, 62, 0.7);
-        border: 1px solid rgba(79, 147, 221, 0.3);
-        border-radius: 6px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        white-space: nowrap;
+      .segmented-group {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(8, 20, 36, 0.9);
+        border: 1px solid rgba(79, 147, 221, 0.25);
+        border-radius: 16px;
+        padding: 2px;
+        gap: 2px;
 
-        &:hover:not(:disabled) {
-          color: #fff;
-          border-color: rgba(0, 225, 255, 0.5);
-        }
+        .segmented-btn {
+          padding: 4px 12px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #8eb3d6;
+          background: transparent;
+          border: none;
+          border-radius: 14px;
+          cursor: pointer;
+          transition: all 0.25s ease;
+          white-space: nowrap;
+          outline: none;
 
-        &.active {
-          color: #fff;
-          background: linear-gradient(135deg, rgba(79, 147, 221, 0.8) 0%, rgba(0, 180, 216, 0.9) 100%);
-          border-color: #00e1ff;
-          box-shadow: 0 0 12px rgba(0, 225, 255, 0.4);
-        }
+          &:hover:not(:disabled):not(.active) {
+            color: #e2efff;
+            background: rgba(0, 225, 255, 0.12);
+          }
 
-        &:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
+          &.active {
+            color: #ffffff;
+            font-weight: 700;
+            background: linear-gradient(135deg, rgba(79, 147, 221, 0.9) 0%, rgba(0, 180, 216, 0.95) 100%);
+            box-shadow: 0 0 10px rgba(0, 225, 255, 0.45);
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
         }
       }
     }
@@ -521,7 +567,7 @@ onMounted(async () => {
     margin-bottom: 16px;
   }
 
-  :deep(.el-form-item__label) {
+  :deep(.atlas-app-form-item__label) {
     color: #cbd5e1 !important;
     font-weight: 500;
   }

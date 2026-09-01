@@ -78,11 +78,11 @@ const handleTabChange = (tabName: string) => {
     font-weight: 600;
   }
 
-  :deep(.el-card__body) {
+  :deep(.atlas-app-card__body) {
     padding: 6px 12px 12px 12px;
   }
 
-  :deep(.el-tabs__header) {
+  :deep(.atlas-app-tabs__header) {
     margin-bottom: 4px;
   }
 }

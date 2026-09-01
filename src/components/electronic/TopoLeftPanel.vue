@@ -2,8 +2,8 @@
   <aside class="topo-panel topo-panel--left dark-theme">
     <div class="panel-header">
       <span class="header-icon">🔗</span>
-      <span class="header-title">传输链路清单</span>
-      <span class="count-tag">{{ filteredLinkItems.length }}</span>
+      <span class="header-title">数据传输链路</span>
+      <span class="count-tag">{{ filteredLinkItems.length }} 条</span>
     </div>
 
     <!-- 搜索筛选框 -->
@@ -338,7 +338,7 @@ watch(
   margin-bottom: 10px;
   flex-shrink: 0;
 
-  :deep(.el-input__wrapper) {
+  :deep(.atlas-app-input__wrapper) {
     background-color: #1e293b;
     box-shadow: 0 0 0 1px #334155 inset;
     border-radius: 4px;
@@ -392,17 +392,17 @@ watch(
   flex: 1;
   min-height: 0;
 
-  :deep(.el-scrollbar__bar.is-vertical) {
+  :deep(.atlas-app-scrollbar__bar.is-vertical) {
     right: 0;
     width: 6px;
   }
 
-  :deep(.el-scrollbar__thumb) {
+  :deep(.atlas-app-scrollbar__thumb) {
     background: rgba(0, 225, 255, 0.28);
     border-radius: 4px;
   }
 
-  :deep(.el-scrollbar__view) {
+  :deep(.atlas-app-scrollbar__view) {
     padding: 0 10px 4px 0;
     box-sizing: border-box;
   }

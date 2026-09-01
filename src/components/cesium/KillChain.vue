@@ -1456,7 +1456,7 @@ const saveStationPlan = async () => {
     }
   }
 
-  :deep(.el-descriptions) {
+  :deep(.atlas-app-descriptions) {
     --el-descriptions-table-border: 1px solid rgba(0, 225, 255, 0.15);
     --el-descriptions-item-bordered-label-background: rgba(8, 18, 33, 0.8);
     .el-descriptions__cell {

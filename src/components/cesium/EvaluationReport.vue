@@ -1597,7 +1597,7 @@ watch(drawer, (open) => {
     }
   }
 
-  :deep(.el-checkbox) {
+  :deep(.atlas-app-checkbox) {
     color: #cbd5e1;
     .el-checkbox__inner {
       background-color: rgba(15, 30, 52, 0.8);
@@ -1929,14 +1929,14 @@ watch(drawer, (open) => {
 
   /* 抽屉/参数配置面板 (.drawer-box & .config-params) 美化 */
   .drawer-box {
-    :deep(.el-drawer) {
+    :deep(.atlas-app-drawer) {
       background: linear-gradient(180deg, #08162a 0%, #0a1f38 100%) !important;
       color: #e2e8f0;
       border-left: 1px solid rgba(0, 225, 255, 0.25);
       box-shadow: -10px 0 30px rgba(0, 0, 0, 0.6);
     }
 
-    :deep(.el-drawer__body) {
+    :deep(.atlas-app-drawer__body) {
       padding: 20px;
       display: flex;
       flex-direction: column;
@@ -1950,13 +1950,13 @@ watch(drawer, (open) => {
       padding-bottom: 12px;
       border-bottom: 1px solid rgba(0, 225, 255, 0.15);
 
-      :deep(.el-input__wrapper) {
+      :deep(.atlas-app-input__wrapper) {
         background-color: rgba(8, 18, 33, 0.8) !important;
         border-color: rgba(0, 225, 255, 0.2) !important;
         box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.2) inset !important;
       }
 
-      :deep(.el-button) {
+      :deep(.atlas-app-button) {
         background: linear-gradient(135deg, rgba(0, 102, 255, 0.6), rgba(0, 225, 255, 0.4)) !important;
         border-color: rgba(0, 225, 255, 0.5) !important;
         color: #ffffff !important;
@@ -2038,11 +2038,11 @@ watch(drawer, (open) => {
       margin-bottom: 10px;
     }
 
-    :deep(.el-form-item__label) {
+    :deep(.atlas-app-form-item__label) {
       color: #94a3b8 !important;
     }
 
-    :deep(.el-input-number) {
+    :deep(.atlas-app-input-number) {
       width: 100%;
       .el-input__wrapper {
         background-color: rgba(13, 27, 49, 0.8) !important;

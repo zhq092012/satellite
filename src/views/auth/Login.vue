@@ -170,7 +170,7 @@ const handleLogin = async () => {
 }
 
 .login-form {
-  :deep(.el-form-item__label) {
+  :deep(.atlas-app-form-item__label) {
     color: rgba(234, 243, 255, 0.78);
   }
 }

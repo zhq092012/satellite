@@ -31,18 +31,31 @@
         <div class="zoom-controls">
           <span class="time-span-display">{{ currentTickSpanLabel }}</span>
           <span class="zoom-label">时间刻度:</span>
-          <el-button-group>
-            <el-button size="small" type="primary" :disabled="tickStepIndex >= TICK_STEP_OPTIONS.length - 1"
-              @click="zoomOut">
+          <div class="zoom-btn-group">
+            <button
+              class="zoom-btn"
+              :disabled="tickStepIndex >= TICK_STEP_OPTIONS.length - 1"
+              title="切换到更粗的时间刻度"
+              @click="zoomOut"
+            >
               缩小 -
-            </el-button>
-            <el-button size="small" type="primary" @click="resetScale">
+            </button>
+            <button
+              class="zoom-btn zoom-btn--val"
+              title="点击重置为默认刻度"
+              @click="resetScale"
+            >
               {{ currentTickSpanShort }}
-            </el-button>
-            <el-button size="small" type="primary" :disabled="tickStepIndex <= 0" @click="zoomIn">
+            </button>
+            <button
+              class="zoom-btn"
+              :disabled="tickStepIndex <= 0"
+              title="切换到更细的时间刻度"
+              @click="zoomIn"
+            >
               放大 +
-            </el-button>
-          </el-button-group>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -2021,6 +2034,64 @@ watch(playheadLeftPx, () => {
           color: #38bdf8;
           font-weight: 600;
         }
+
+        .zoom-btn-group {
+          display: inline-flex;
+          align-items: center;
+          background: rgba(14, 28, 48, 0.85);
+          border: 1px solid rgba(0, 225, 255, 0.28);
+          border-radius: 4px;
+          overflow: hidden;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+
+          .zoom-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #94eaff;
+            background: transparent;
+            border: none;
+            border-right: 1px solid rgba(0, 225, 255, 0.18);
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+
+            &:last-child {
+              border-right: none;
+            }
+
+            &:hover:not(:disabled) {
+              color: #ffffff;
+              background: rgba(0, 225, 255, 0.15);
+              box-shadow: inset 0 0 8px rgba(0, 225, 255, 0.2);
+            }
+
+            &:active:not(:disabled) {
+              background: rgba(0, 225, 255, 0.25);
+            }
+
+            &--val {
+              color: #00e1ff;
+              font-weight: 700;
+              background: rgba(0, 225, 255, 0.06);
+
+              &:hover:not(:disabled) {
+                background: rgba(0, 225, 255, 0.18);
+                color: #ffffff;
+              }
+            }
+
+            &:disabled {
+              color: #475569;
+              background: rgba(15, 23, 42, 0.5);
+              cursor: not-allowed;
+            }
+          }
+        }
       }
     }
   }
@@ -2278,7 +2349,7 @@ watch(playheadLeftPx, () => {
           width: 92px;
           flex: none;
 
-          :deep(.el-select__wrapper) {
+          :deep(.atlas-app-select__wrapper) {
             min-width: 92px;
             width: 92px;
           }
@@ -2370,7 +2441,7 @@ watch(playheadLeftPx, () => {
       gap: 12px;
 
       .sidebar-search-box {
-        :deep(.el-input__wrapper) {
+        :deep(.atlas-app-input__wrapper) {
           background-color: #1e293b;
           box-shadow: 0 0 0 1px #334155 inset;
 
@@ -2406,8 +2477,8 @@ watch(playheadLeftPx, () => {
             color: #cbd5e1;
 
             .color-dot {
-              width: 10px;
-              height: 10px;
+              width: 22px;
+              height: 15px;
               border-radius: 2px;
 
               &.dot-normal {

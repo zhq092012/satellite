@@ -635,22 +635,22 @@ onMounted(() => {
   height: 100%;
 }
 
-.table-shell :deep(.el-table th.el-table__cell) {
+.table-shell :deep(.atlas-app-table th.el-table__cell) {
   color: #9dccff;
   font-size: 13px;
   font-weight: 800;
 }
 
-.table-shell :deep(.el-table td.el-table__cell) {
+.table-shell :deep(.atlas-app-table td.el-table__cell) {
   color: #d0e0f5;
   background: #091d39;
 }
 
-.table-shell :deep(.el-table__empty-block) {
+.table-shell :deep(.atlas-app-table__empty-block) {
   background: #091d39;
 }
 
-.table-shell :deep(.el-table__inner-wrapper::before) {
+.table-shell :deep(.atlas-app-table__inner-wrapper::before) {
   background-color: rgba(92, 139, 208, 0.18);
 }
 

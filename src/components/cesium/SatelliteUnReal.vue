@@ -2563,11 +2563,11 @@ defineExpose({
   white-space: nowrap;
 }
 
-.history-plan-dialog :deep(.el-dialog) {
+.history-plan-dialog :deep(.atlas-app-dialog) {
   overflow: hidden;
 }
 
-.history-plan-dialog :deep(.el-dialog__body) {
+.history-plan-dialog :deep(.atlas-app-dialog__body) {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -2617,7 +2617,7 @@ defineExpose({
   word-break: break-word;
 }
 
-:deep(.el-progress-bar__outer) {
+:deep(.atlas-app-progress-bar__outer) {
   background-color: rgba(116, 168, 225, 0.14);
 }
 
@@ -2676,7 +2676,7 @@ defineExpose({
 }
 
 /* 杀伤链方案对话框样式 */
-.killchain-plan-dialog :deep(.el-dialog) {
+.killchain-plan-dialog :deep(.atlas-app-dialog) {
   background: var(--card-bg-strong);
   border: 1px solid var(--card-border-strong);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
@@ -2684,19 +2684,19 @@ defineExpose({
   overflow: hidden;
 }
 
-.killchain-plan-dialog :deep(.el-dialog__header) {
+.killchain-plan-dialog :deep(.atlas-app-dialog__header) {
   border-bottom: 1px solid rgba(116, 168, 225, 0.16);
   padding: 20px 24px;
 }
 
-.killchain-plan-dialog :deep(.el-dialog__title) {
+.killchain-plan-dialog :deep(.atlas-app-dialog__title) {
   color: var(--text-color-primary);
   font-size: 18px;
   font-weight: 600;
   letter-spacing: 0.05em;
 }
 
-.killchain-plan-dialog :deep(.el-dialog__body) {
+.killchain-plan-dialog :deep(.atlas-app-dialog__body) {
   padding: 24px;
   overflow-y: auto;
 }
@@ -2707,7 +2707,7 @@ defineExpose({
   justify-content: center;
 }
 
-.killchain-plan-dialog__radio-group :deep(.el-radio-button__inner) {
+.killchain-plan-dialog__radio-group :deep(.atlas-app-radio-button__inner) {
   background: rgba(15, 42, 67, 0.88);
   border-color: rgba(116, 168, 225, 0.28);
   color: var(--text-color-secondary);
@@ -2715,7 +2715,7 @@ defineExpose({
   padding: 10px 24px;
 }
 
-.killchain-plan-dialog__radio-group :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+.killchain-plan-dialog__radio-group :deep(.atlas-app-radio-button__original-radio:checked + .el-radio-button__inner) {
   background: linear-gradient(180deg, rgba(26, 93, 142, 0.98), rgba(14, 58, 92, 0.96));
   border-color: rgba(98, 213, 255, 0.72);
   color: var(--text-color-strong);
