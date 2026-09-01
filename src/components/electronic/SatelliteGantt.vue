@@ -156,12 +156,19 @@
 
             <!-- 关联接收站过境窗口摘要列表 -->
             <div class="sat-windows-sublist">
-              <div v-for="win in resolveSatelliteStationWindows(sat)" :key="win.receiveId + '-' + win.peakWindow"
+              <div v-for="win in resolveSatelliteStationWindows(sat)" :key="win.receiveId + '-' + (win.sourceSatName || '') + '-' + win.peakWindow"
                 class="win-sub-item" :class="{
                   'is-win-struck': win.strikeStatus === 1,
                   'is-win-selected': isStationWindowSelected(sat.norad, win),
                 }" @click.stop="selectStationWindow(sat, win)">
-                <span class="sub-rec-name">📡 {{ win.receiveName }}</span>
+                <span class="sub-rec-name" :title="win.sourceSatName && win.sourceSatName !== sat.name ? `${win.sourceSatName} → ${win.receiveName}` : win.receiveName">
+                  <template v-if="win.sourceSatName && win.sourceSatName !== sat.name">
+                    🛰️ {{ win.sourceSatName }} → 📡 {{ win.receiveName }}
+                  </template>
+                  <template v-else>
+                    📡 {{ win.receiveName }}
+                  </template>
+                </span>
                 <span class="sub-win-time">{{
                   win.peakWindow.length >= 16 ? win.peakWindow.substring(11, 16) : win.peakWindow
                 }}</span>
@@ -332,15 +339,24 @@
             @click="handleSelectBar(bar)">
             <div class="compact-link-header" :class="bar.colorStatusClass">
               <span class="compact-status-tag">{{ bar.statusLabel }}</span>
-              <span class="compact-link-line" :title="`${bar.satName} → ${bar.receiveName}`">
-                🛰️ {{ bar.satName }} → 📡 {{ bar.receiveName }}
+              <span class="compact-link-line" :title="bar.routeText || `${bar.satName} → ${bar.receiveName}`">
+                <template v-if="bar.relayName && bar.relayName !== (bar.sourceSatName || bar.satName)">
+                  🛰️ {{ bar.sourceSatName || bar.satName }} → 🛰️ {{ bar.relayName }} → 📡 {{ bar.receiveName }}
+                </template>
+                <template v-else>
+                  🛰️ {{ bar.satName }} → 📡 {{ bar.receiveName }}
+                </template>
               </span>
             </div>
 
             <div class="compact-detail-grid">
+              <div class="compact-row" v-if="bar.relayName && bar.relayName !== (bar.sourceSatName || bar.satName)">
+                <span class="compact-key">源卫星</span>
+                <span class="compact-val">{{ bar.sourceSatName }}</span>
+              </div>
               <div class="compact-row">
-                <span class="compact-key">卫星</span>
-                <span class="compact-val" :title="`NORAD: ${bar.satNorad}`">{{ bar.satName }}</span>
+                <span class="compact-key">{{ bar.relayName && bar.relayName !== (bar.sourceSatName || bar.satName) ? '中继星' : '卫星' }}</span>
+                <span class="compact-val" :title="`NORAD: ${bar.satNorad}`">{{ (bar.relayName && bar.relayName !== (bar.sourceSatName || bar.satName)) ? bar.relayName : bar.satName }}</span>
                 <span class="compact-tag" :class="bar.satStatus === 1 ? 'is-danger' : 'is-success'">
                   {{ bar.satStatus === 1 ? '被干扰' : '正常' }}
                 </span>
@@ -522,6 +538,12 @@ interface ProcessedGanttBar {
   satNorad: number
   /** 卫星名称 */
   satName: string
+  /** 源卫星名称 (对于中继转发链路，为真正产生数据的侦察卫星) */
+  sourceSatName?: string
+  /** 中继卫星名称 (若经过中继) */
+  relayName?: string
+  /** 完整路径文案 (如 LEGION-3 → TDRS-11 → 俄勒冈Oregon) */
+  routeText?: string
   /** 卫星干扰状态 (0-未干扰，1-被干扰) */
   satStatus: number
   /** 地面接收站 ID */
@@ -958,7 +980,7 @@ const getInterferenceStatusLabel = (satStatus: number, strikeStatus: number): st
  * @returns 「被打击」或「正常」
  */
 const formatStrikeStatus = (status?: number | null): string => {
-  return status === 1 ? '被打击' : '正常'
+  return status === 1 ? '被干扰' : '正常'
 }
 
 const buildBarLabelLines = (
@@ -968,9 +990,16 @@ const buildBarLabelLines = (
   peakWindowShort: string,
   endWindowShort: string,
   delayMin?: number,
-  relayName?: string
+  relayName?: string,
+  sourceSatName?: string
 ): string[] => {
-  const route = relayName ? `${satName} → ${relayName} → ${recName}` : `${satName} → ${recName}`
+  const actualSource = sourceSatName || satName
+  let route = ''
+  if (relayName && relayName !== actualSource) {
+    route = `${actualSource} → ${relayName} → ${recName}`
+  } else {
+    route = `${actualSource} → ${recName}`
+  }
   const lines = [route, statusLabel, `${peakWindowShort} ~ ${endWindowShort}`]
   if (delayMin !== undefined && delayMin !== null && Number(delayMin) > 0) {
     lines.push(`延时 +${delayMin}分钟`)
@@ -1022,20 +1051,26 @@ const isReconMatrix = (matrix: MatrixResult | CommucationMatrix | null | undefin
  * @param sat 卫星矩阵项
  * @returns 左侧树展示的过境窗口摘要
  */
-const resolveSatelliteStationWindows = (sat: SatelliteMatrix): StationWindow[] => {
+const resolveSatelliteStationWindows = (sat: SatelliteMatrix): (StationWindow & { sourceSatName?: string; relayName?: string })[] => {
   const matrix = currentData.value
   if (isReconMatrix(matrix)) {
     const links = collectSatelliteTransmissionLinks(matrix, sat.norad)
     if (links.length > 0) {
-      return links.map((link) => ({
-        receiveId: link.receiveId,
-        receiveName: link.receiveName,
-        peakWindow: formatPlayTime(Math.floor(link.transmitStartMs / 1000)),
-        endWindow: formatPlayTime(Math.floor(link.transmitEndMs / 1000)),
-        strikeStatus: link.struck ? 1 : 0,
-        delayMin: link.delayMin,
-        weapons: [],
-      }))
+      return links.map((link) => {
+        const sourceSatNode = link.nodes.find((node) => node.layer === 'SAT')
+        const relayNode = link.nodes.find((node) => node.layer === 'RELAY')
+        return {
+          receiveId: link.receiveId,
+          receiveName: link.receiveName,
+          peakWindow: formatPlayTime(Math.floor(link.transmitStartMs / 1000)),
+          endWindow: formatPlayTime(Math.floor(link.transmitEndMs / 1000)),
+          strikeStatus: link.struck ? 1 : 0,
+          delayMin: link.delayMin,
+          weapons: [],
+          sourceSatName: sourceSatNode?.name,
+          relayName: relayNode?.name,
+        }
+      })
     }
   }
   return sat.stationWindows || []
@@ -1076,14 +1111,21 @@ const buildWindowEntriesFromLinks = (sat: SatelliteMatrix, matrix: MatrixResult)
       if (!start || end < start) return null
 
       const relayNode = link.nodes.find((node) => node.layer === 'RELAY')
+      const sourceSatNode = link.nodes.find((node) => node.layer === 'SAT')
       const effectiveSatStatus = link.satelliteStruck || link.relayStruck ? 1 : sat.satelliteStatus || 0
+      const sourceSatName = sourceSatNode?.name || sat.name || `Sat-${sat.norad}`
+      const relayName = relayNode?.name
+
       const win = {
         receiveId: link.receiveId,
         receiveName: link.receiveName,
         strikeStatus: link.receiveStruck ? 1 : 0,
         delayMin: link.delayMin,
         weapons: [] as Weapon[],
-        relayName: relayNode?.name,
+        relayName,
+        sourceSatName,
+        sourceSatNorad: sourceSatNode ? Number(sourceSatNode.id) : sat.norad,
+        linkNodes: link.nodes,
       }
 
       return {
@@ -1330,6 +1372,8 @@ const buildBarsForWindows = (
     const recName = win.receiveName || options.defaultTargetName
     const recId = win.receiveId || 'target-area'
     const satName = sat?.name || `Sat-${sat?.norad || ''}`
+    const sourceSatName = win.sourceSatName || satName
+    const relayName = win.relayName
     const satNorad = sat?.norad || 0
     const statusLabel = getInterferenceStatusLabel(satStatus, strikeStatusVal)
     const barLabelLines = buildBarLabelLines(
@@ -1339,8 +1383,10 @@ const buildBarsForWindows = (
       peakWindowShort,
       endWindowShort,
       win.delayMin,
-      win.relayName
+      relayName,
+      sourceSatName
     )
+    const routeText = barLabelLines[0] || (relayName && relayName !== sourceSatName ? `${sourceSatName} → ${relayName} → ${recName}` : `${sourceSatName} → ${recName}`)
     const barTooltip = barLabelLines.join('\n')
     const barHeight = computeBarHeight(barLabelLines, widthPx)
     const rightPx = leftPx + widthPx
@@ -1359,9 +1405,12 @@ const buildBarsForWindows = (
       ; (win.weapons || []).forEach((w: Weapon) => weaponMap.set(w.id, w))
 
     bars.push({
-      id: `bar-sat-${satNorad}-${recId}-${idx}`,
+      id: `bar-sat-${satNorad}-${win.sourceSatNorad || satNorad}-${recId}-${idx}`,
       satNorad,
       satName,
+      sourceSatName,
+      relayName,
+      routeText,
       satStatus,
       receiveId: recId,
       receiveName: recName,

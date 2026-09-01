@@ -28,7 +28,7 @@
           <div class="link-card-top">
             <div class="link-path">
               <template v-for="(node, idx) in item.nodes" :key="`${item.id}-${idx}`">
-                <span class="path-node" :class="`path-node--${node.layer}`">
+                <span class="path-node" :class="[`path-node--${node.layer}`, { 'path-node--struck': node.struck }]">
                   <span class="path-icon">{{ node.icon }}</span>
                   <span class="path-name">{{ node.name }}</span>
                 </span>
@@ -40,10 +40,11 @@
                 {{ getRankMedal(item.rank) }} TOP {{ item.rank }}
               </span>
               <span class="status-badge" :class="item.struck ? 'struck' : 'ok'">
-                {{ item.struck ? '被打击' : '正常' }}
+                {{ item.interferenceStatus }}
               </span>
             </div>
           </div>
+
           <div class="link-meta">
             <div class="meta-row-two-col">
               <span class="meta-line meta-line--time">
@@ -56,7 +57,7 @@
             </div>
             <span v-if="item.struck" class="meta-line meta-line--strike-target">
               <span class="meta-key">打击</span>
-              <span class="meta-val">{{ item.strikeTargetLabel }}</span>
+              <span class="meta-val">{{ item.struckDetailText }}</span>
             </span>
             <span v-if="item.weaponNames" class="meta-line meta-line--weapon">
               <span class="meta-key">武器</span>
@@ -93,6 +94,8 @@ interface LinkNodeItem {
   layer: 'sat' | 'relay' | 'receive' | 'station'
   /** 节点图标 */
   icon: string
+  /** 节点是否被打击/干扰 */
+  struck: boolean
 }
 
 /** 左侧链路列表项 */
@@ -101,6 +104,10 @@ interface LinkListItem {
   id: string
   /** 路径节点序列 */
   nodes: LinkNodeItem[]
+  /** 干扰状态标签（星扰 / 站扰 / 双扰 / 正常） */
+  interferenceStatus: string
+  /** 详细打击描述 */
+  struckDetailText: string
   /** 传输时间区间 */
   transmitTime: string
   /** 是否被打击 */
@@ -149,7 +156,19 @@ const mapNodeLayer = (layer: string): LinkNodeItem['layer'] => {
   return 'sat'
 }
 
-/** 当前展示的全部传输链路（单星或全系列，包含优先级排名与评分） */
+/**
+ * 计算链路干扰状态标签（星扰 / 站扰 / 双扰 / 正常）
+ */
+const getLinkInterferenceStatus = (link: SatelliteTransmissionLink): string => {
+  const satOrRelayStruck = !!link.satelliteStruck || !!link.relayStruck
+  const recStruck = !!link.receiveStruck
+  if (satOrRelayStruck && recStruck) return '双扰'
+  if (satOrRelayStruck) return '星扰'
+  if (recStruck) return '站扰'
+  return '正常'
+}
+
+/** 当前展示的全部传输链路（单星或全系列，按优先级评分降序排列 TOP 1 ~ N） */
 const linkItems = computed<LinkListItem[]>(() => {
   if (!props.matrixData) return []
   const rawLinks = props.selectedNorad
@@ -157,24 +176,42 @@ const linkItems = computed<LinkListItem[]>(() => {
     : collectSeriesTransmissionLinks(props.matrixData)
 
   const ranked = rankTransmissionLinksByPriority(props.matrixData, rawLinks)
-  const rankMap = new Map(ranked.map((r) => [r.link.id, r.priority]))
 
-  return rawLinks.map((link) => {
-    const priority = rankMap.get(link.id)
-    return {
-      id: link.id,
-      nodes: link.nodes.map((n) => ({
+  return ranked.map((r) => {
+    const link = r.link
+    const priority = r.priority
+
+    const nodes: LinkNodeItem[] = link.nodes.map((n) => {
+      let isStruck = false
+      if (n.layer === 'SAT') isStruck = !!link.satelliteStruck
+      else if (n.layer === 'RELAY') isStruck = !!link.relayStruck
+      else if (n.layer === 'RECEIVE') isStruck = !!link.receiveStruck
+      return {
         name: n.name,
         layer: mapNodeLayer(n.layer),
         icon: n.icon,
-      })),
+        struck: isStruck,
+      }
+    })
+
+    const interferenceStatus = getLinkInterferenceStatus(link)
+    const struckNodeNames = nodes.filter((n) => n.struck).map((n) => n.name).join('、')
+    const struckDetailText = struckNodeNames
+      ? `${interferenceStatus}（${struckNodeNames}）`
+      : '全链路正常'
+
+    return {
+      id: link.id,
+      nodes,
+      interferenceStatus,
+      struckDetailText,
       transmitTime: link.transmitTime,
       struck: link.struck,
       strikeTargetLabel: link.strikeTargetLabel,
       weaponNames: link.weaponNames,
       delayMin: link.delayMin,
-      rank: priority?.rank,
-      totalScore: priority?.totalScore,
+      rank: priority.rank,
+      totalScore: priority.totalScore,
     }
   })
 })
@@ -372,6 +409,9 @@ watch(
     gap: 3px;
     font-size: 13px;
     font-weight: 600;
+    padding: 1px 4px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
 
     .path-icon {
       font-size: 12px;
@@ -396,6 +436,18 @@ watch(
 
     &--station .path-name {
       color: #93c5fd;
+    }
+
+    &--struck {
+      background: rgba(239, 68, 68, 0.22);
+      border: 1px solid rgba(248, 113, 113, 0.6);
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
+
+      .path-name {
+        color: #f87171 !important;
+        font-weight: 800;
+        text-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+      }
     }
   }
 
@@ -527,12 +579,15 @@ watch(
   }
 }
 
+
 .status-badge {
   flex-shrink: 0;
   font-size: 11px;
   padding: 2px 7px;
   border-radius: 4px;
   font-weight: 700;
+  max-width: 100%;
+  white-space: nowrap;
 
   &.ok {
     color: #00e1ff;
@@ -541,9 +596,10 @@ watch(
   }
 
   &.struck {
-    color: #cbd5e1;
-    background: rgba(148, 163, 184, 0.15);
-    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #fecaca;
+    background: rgba(239, 68, 68, 0.18);
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    text-shadow: 0 0 6px rgba(239, 68, 68, 0.35);
   }
 }
 

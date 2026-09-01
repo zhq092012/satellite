@@ -1317,7 +1317,7 @@ export const mergeMatrixResults = (matrices: MatrixResult[]): MatrixResult | nul
 
   type RelayRelation = NonNullable<MatrixResult['relayRelation']>
 
-  const mergeRelayRelations = (relations: (RelayRelation | undefined)[]): RelayRelation | undefined => {
+  const mergeRelayRelations = (relations: (RelayRelation | null | undefined)[]): RelayRelation | undefined => {
     const validRelay = relations.filter(Boolean) as RelayRelation[]
     if (!validRelay.length) return undefined
     return {

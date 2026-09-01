@@ -30,7 +30,7 @@
         <div class="series-filter-group">
           <span class="label-text">卫星系列</span>
           <el-select v-model="selectedSeries" class="series-select" size="small" placeholder="选择系列"
-            :disabled="seriesOptions.length === 0" @change="handleSeriesChange">
+            :disabled="seriesOptions.length === 0" @change="handleSeriesChange" filterable>
             <el-option v-for="series in seriesOptions" :key="series" :label="series" :value="series" />
           </el-select>
         </div>

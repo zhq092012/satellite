@@ -13,7 +13,7 @@
 
       <!-- 当前打击方案切换 -->
       <div v-if="store.activedTask" class="plan-switch-bar">
-        <span class="plan-switch-label">打击方案选择：</span>
+        <span class="plan-switch-label">当前打击方案：</span>
         <button v-for="type in ZHCH_USAGE_TYPE_OPTIONS" :key="type" class="plan-switch-btn"
           :class="{ active: store.activeZhchUsageType === type }" :disabled="planSwitching"
           @click="handleSwitchPlan(type)">

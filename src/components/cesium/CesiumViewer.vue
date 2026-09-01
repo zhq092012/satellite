@@ -541,7 +541,7 @@ const renderElectronicInfrastructureNodes = () => {
     const isRelay = satType.includes('中继')
     const satColor = isRelay ? Cesium.Color.PURPLE : Cesium.Color.CYAN
 
-    const isSatHighlighted = () => isNoradLinkHighlighted(sat.norad, sat.name)
+    const isSatHighlighted = () => isNoradVisuallyForced(sat.norad)
     const resolveSatLabelColor = () => (isSatHighlighted() ? Cesium.Color.YELLOW : satColor)
 
     const entity = viewer.entities.add({
@@ -806,7 +806,7 @@ const getWeaponImageByType = (type: string) => {
     case '电子干扰':
       return groundStationIcon
     case '地面武器':
-      return opticalTrackingStationIcon
+      return launchPadIcon
     default:
       return launchPadIcon
   }
@@ -966,7 +966,7 @@ const isPositionFacingCamera = (
 const isNoradLinkHighlighted = (norad: number, satName?: string): boolean => {
   const keys = selectedTransmissionLinkNodeKeys.value
   if (keys.has(`SAT-${norad}`) || keys.has(`RELAY-${norad}`) || keys.has(String(norad))) return true
-  return !!(satName && keys.has(satName))
+  return !!(satName && (keys.has(satName) || keys.has(`SAT-${satName}`) || keys.has(`RELAY-${satName}`)))
 }
 
 /**
@@ -974,7 +974,7 @@ const isNoradLinkHighlighted = (norad: number, satName?: string): boolean => {
  * @param norad 卫星 NORAD 编号
  */
 const isNoradVisuallyForced = (norad: number): boolean => {
-  if (props.selectedNorad === norad) return true
+  if (props.selectedNorad === norad || store.selectedAnalysisNorad === norad) return true
   const matrixSats = props.matrixData?.initMatrixList || []
   const sat = matrixSats.find((s) => s.norad === norad)
   return isNoradLinkHighlighted(norad, sat?.name)
@@ -1090,6 +1090,7 @@ const updateSatelliteVisuals = () => {
 
   const time = viewer.clock.currentTime
   const cameraPos = viewer.camera.positionWC
+  const matrixSats = props.matrixData?.initMatrixList || []
 
   satelliteEntityMap.forEach((entity, norad) => {
     const position = getSatellitePositionInCesium(norad, time)
@@ -1105,6 +1106,10 @@ const updateSatelliteVisuals = () => {
       entity.position = new Cesium.ConstantPositionProperty(position)
     }
 
+    const satInfo = matrixSats.find((s) => s.norad === norad)
+    const isRelay = norad === 22314 || (satInfo?.satType || '').includes('中继')
+    const satColor = isRelay ? Cesium.Color.PURPLE : Cesium.Color.CYAN
+
     const facing = isPositionFacingCamera(position, cameraPos)
     const forced = isNoradVisuallyForced(norad)
     const distance = Cesium.Cartesian3.distance(cameraPos, position)
@@ -1119,6 +1124,18 @@ const updateSatelliteVisuals = () => {
       } else {
         entity.billboard.show = new Cesium.ConstantProperty(showBillboard)
       }
+
+      const targetBillboardColor = forced ? Cesium.Color.YELLOW : Cesium.Color.WHITE
+      const targetBillboardSize = forced ? 32 : 24
+      if (entity.billboard.color instanceof Cesium.ConstantProperty) {
+        entity.billboard.color.setValue(targetBillboardColor)
+      }
+      if (entity.billboard.width instanceof Cesium.ConstantProperty) {
+        entity.billboard.width.setValue(targetBillboardSize)
+      }
+      if (entity.billboard.height instanceof Cesium.ConstantProperty) {
+        entity.billboard.height.setValue(targetBillboardSize)
+      }
     }
     if (entity.label) {
       const showLabel = showBillboard && shouldShowSatelliteLabel(distance, forced)
@@ -1127,6 +1144,13 @@ const updateSatelliteVisuals = () => {
         labelShow.setValue(showLabel)
       } else {
         entity.label.show = new Cesium.ConstantProperty(showLabel)
+      }
+
+      const targetLabelColor = forced ? Cesium.Color.YELLOW : satColor
+      if (entity.label.fillColor instanceof Cesium.ConstantProperty) {
+        entity.label.fillColor.setValue(targetLabelColor)
+      } else if (!entity.label.fillColor) {
+        entity.label.fillColor = new Cesium.ConstantProperty(targetLabelColor)
       }
     }
   })
@@ -1545,10 +1569,23 @@ const resetHighlightSatellites = () => {
       const pixelSize = isRelay ? 16 : 13
       const outlineWidth = 2.5
 
+      const isForced = norad ? isNoradVisuallyForced(norad) : false
+      const targetBillboardColor = isForced ? Cesium.Color.YELLOW : Cesium.Color.WHITE
+      const targetBillboardSize = isForced ? 32 : 24
+      const targetLabelColor = isForced ? Cesium.Color.YELLOW : satColor
+
       if (entity && entity.billboard) {
-        entity.billboard.color = new Cesium.ConstantProperty(Cesium.Color.WHITE)
-        entity.billboard.width = new Cesium.ConstantProperty(24)
-        entity.billboard.height = new Cesium.ConstantProperty(24)
+        if (entity.billboard.color instanceof Cesium.ConstantProperty) {
+          entity.billboard.color.setValue(targetBillboardColor)
+        } else if (!(entity.billboard.color instanceof Cesium.CallbackProperty)) {
+          entity.billboard.color = new Cesium.ConstantProperty(targetBillboardColor)
+        }
+        if (entity.billboard.width instanceof Cesium.ConstantProperty) {
+          entity.billboard.width.setValue(targetBillboardSize)
+        }
+        if (entity.billboard.height instanceof Cesium.ConstantProperty) {
+          entity.billboard.height.setValue(targetBillboardSize)
+        }
       }
 
       if (entity && entity.point) {
@@ -1559,7 +1596,11 @@ const resetHighlightSatellites = () => {
       }
 
       if (entity && entity.label) {
-        entity.label.fillColor = new Cesium.ConstantProperty(satColor)
+        if (entity.label.fillColor instanceof Cesium.ConstantProperty) {
+          entity.label.fillColor.setValue(targetLabelColor)
+        } else if (!(entity.label.fillColor instanceof Cesium.CallbackProperty)) {
+          entity.label.fillColor = new Cesium.ConstantProperty(targetLabelColor)
+        }
         const isMatrixNode = entityIdStr.startsWith('sat-node-')
         const satNodeEnt = norad ? viewer.entities.getById(`sat-node-${norad}`) : null
         const fallbackName =
@@ -1612,15 +1653,35 @@ const highlightSatellite = (sate: { norad_id: string }, skipFlyTo = false) => {
   // 2. Entity 模式节点高亮
   viewer.selectedEntity = entity
   if (entity.billboard) {
-    entity.billboard.color = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
-    entity.billboard.width = new Cesium.ConstantProperty(32)
-    entity.billboard.height = new Cesium.ConstantProperty(32)
+    if (entity.billboard.color instanceof Cesium.ConstantProperty) {
+      entity.billboard.color.setValue(Cesium.Color.YELLOW)
+    } else {
+      entity.billboard.color = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
+    }
+    if (entity.billboard.width instanceof Cesium.ConstantProperty) {
+      entity.billboard.width.setValue(32)
+    } else {
+      entity.billboard.width = new Cesium.ConstantProperty(32)
+    }
+    if (entity.billboard.height instanceof Cesium.ConstantProperty) {
+      entity.billboard.height.setValue(32)
+    } else {
+      entity.billboard.height = new Cesium.ConstantProperty(32)
+    }
   }
   if (entity.point) {
     entity.point.outlineColor = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
     entity.point.outlineWidth = new Cesium.ConstantProperty(4)
     entity.point.pixelSize = new Cesium.ConstantProperty(18)
     entity.point.color = new Cesium.ConstantProperty(Cesium.Color.GOLD)
+  }
+  if (entity.label) {
+    if (entity.label.fillColor instanceof Cesium.ConstantProperty) {
+      entity.label.fillColor.setValue(Cesium.Color.YELLOW)
+    } else {
+      entity.label.fillColor = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
+    }
+    entity.label.show = new Cesium.ConstantProperty(true)
   }
 
 

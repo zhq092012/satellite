@@ -70,21 +70,23 @@
                   <span class="medal-icon">{{ getRankMedal(item.priority.rank) }}</span>
                   <span class="rank-text">TOP {{ item.priority.rank }}</span>
                 </span>
+              </div>
+              <div class="card-header-right">
                 <span class="priority-score-pill">
                   <span class="score-label">优先级评分</span>
                   <strong class="score-number">{{ item.priority.totalScore }}</strong>
                   <span class="score-unit">分</span>
                 </span>
+                <span class="status-badge" :class="item.link.struck ? 'struck' : 'ok'">
+                  {{ getLinkInterferenceStatusLabel(item.link) }}
+                </span>
               </div>
-              <span class="status-badge" :class="item.link.struck ? 'struck' : 'ok'">
-                {{ item.link.struck ? '已打击' : '优先压制' }}
-              </span>
             </div>
 
             <!-- 链路路径流 -->
             <div class="link-path-flow">
-              <template v-for="(node, idx) in item.link.nodes" :key="idx">
-                <span class="flow-node" :class="`flow-node--${node.layer.toLowerCase()}`">
+              <template v-for="(node, idx) in getLinkFlowNodes(item.link)" :key="idx">
+                <span class="flow-node" :class="[`flow-node--${node.layer}`, { 'flow-node--struck': node.struck }]">
                   <span class="flow-icon">{{ node.icon }}</span>
                   <span class="flow-name" :title="node.name">{{ node.name }}</span>
                 </span>
@@ -196,7 +198,7 @@
             <div class="detail-text">
               <div v-if="detail.linkNodes?.length" class="detail-path">
                 <template v-for="(node, idx) in detail.linkNodes" :key="idx">
-                  <span class="path-node" :class="`path-node--${node.layer}`">
+                  <span class="path-node" :class="[`path-node--${node.layer}`, { 'path-node--struck': node.struck }]">
                     <span class="path-icon">{{ node.icon }}</span>
                     <span class="path-name">{{ node.name }}</span>
                   </span>
@@ -207,7 +209,7 @@
               <div class="detail-type">{{ detail.typeLabel }}</div>
             </div>
             <span class="status-badge" :class="detail.struck ? 'struck' : 'ok'">
-              {{ detail.struck ? '被打击' : '正常' }}
+              {{ detail.interferenceStatus || (detail.struck ? '星扰' : '正常') }}
             </span>
           </div>
 
@@ -229,7 +231,7 @@
                 <span class="window-name">{{ win.title }}</span>
               </div>
               <span class="strike-tag" :class="win.struck ? 'struck' : 'ok'">
-                {{ win.struck ? '已打击' : '正常' }}
+                {{ win.struck ? '已干扰' : '正常' }}
               </span>
             </div>
             <div class="window-time-row">
@@ -255,11 +257,15 @@
         </div>
 
         <div v-if="detail.linkNodes?.length" class="section-block">
-          <div class="section-title">拓扑节点</div>
-          <div v-for="(node, idx) in detail.linkNodes" :key="idx" class="conn-item" :class="`conn-item--${node.layer}`">
+          <div class="section-title">拓扑节点打击状态</div>
+          <div v-for="(node, idx) in detail.linkNodes" :key="idx" class="conn-item conn-item--with-badge"
+            :class="[`conn-item--${node.layer}`, node.struck ? 'conn-item--struck' : 'conn-item--ok']">
             <span class="conn-icon">{{ node.icon }}</span>
-            <span class="conn-layer">{{ node.layerLabel }}</span>
+            <span class="conn-layer">[{{ node.layerLabel }}]</span>
             <span class="conn-name">{{ node.name }}</span>
+            <span class="conn-strike-badge" :class="node.struck ? 'struck' : 'ok'">
+              {{ node.struck ? (node.layer === 'receive' ? '站扰' : '星扰') : '正常' }}
+            </span>
           </div>
         </div>
 
@@ -288,6 +294,7 @@ import {
   resolveLinkStrikeTarget,
   DEFAULT_PRIORITY_WEIGHTS,
   type PrioritizedTransmissionLink,
+  type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
 
 /** 节点详情窗口项 */
@@ -306,6 +313,7 @@ interface DetailLinkNode {
   icon: string
   layer: 'sat' | 'relay' | 'receive' | 'station'
   layerLabel: string
+  struck: boolean
 }
 
 /** 元信息行 */
@@ -330,6 +338,7 @@ interface NodeDetailView {
   name: string
   typeLabel: string
   struck: boolean
+  interferenceStatus?: string
   metaRows: DetailMetaRow[]
   linkNodes?: DetailLinkNode[]
   windows?: DetailWindowItem[]
@@ -470,6 +479,41 @@ const buildUniqueConnections = (
   return items
 }
 
+/**
+ * 计算链路干扰状态标签（星扰 / 站扰 / 双扰 / 正常）
+ */
+const getLinkInterferenceStatusLabel = (link: SatelliteTransmissionLink): string => {
+  const satOrRelayStruck = !!link.satelliteStruck || !!link.relayStruck
+  const recStruck = !!link.receiveStruck
+  if (satOrRelayStruck && recStruck) return '双扰'
+  if (satOrRelayStruck) return '星扰'
+  if (recStruck) return '站扰'
+  return '正常'
+}
+
+/** 链路流展示节点 */
+interface FlowDisplayNode {
+  name: string
+  icon: string
+  layer: string
+  struck: boolean
+}
+
+const getLinkFlowNodes = (link: SatelliteTransmissionLink): FlowDisplayNode[] => {
+  return link.nodes.map((n) => {
+    let isStruck = false
+    if (n.layer === 'SAT') isStruck = !!link.satelliteStruck
+    else if (n.layer === 'RELAY') isStruck = !!link.relayStruck
+    else if (n.layer === 'RECEIVE') isStruck = !!link.receiveStruck
+    return {
+      name: n.name,
+      icon: n.icon,
+      layer: n.layer.toLowerCase(),
+      struck: isStruck,
+    }
+  })
+}
+
 const detail = computed<NodeDetailView | null>(() => {
   const data = props.matrixData
   if (!data) return null
@@ -479,23 +523,32 @@ const detail = computed<NodeDetailView | null>(() => {
     if (!link) return null
     const linkNodes: DetailLinkNode[] = link.nodes.map((n) => {
       const layer = mapLinkLayer(n.layer)
+      let struck = false
+      if (n.layer === 'SAT') struck = !!link.satelliteStruck
+      else if (n.layer === 'RELAY') struck = !!link.relayStruck
+      else if (n.layer === 'RECEIVE') struck = !!link.receiveStruck
       return {
         name: n.name,
         icon: n.icon,
         layer,
         layerLabel: layerLabelMap[layer],
+        struck,
       }
     })
+    const interferenceStatus = getLinkInterferenceStatusLabel(link)
+    const struckNodeNames = linkNodes.filter((n) => n.struck).map((n) => n.name).join('、')
+    const struckTargetVal = struckNodeNames ? `${interferenceStatus}（${struckNodeNames}）` : '无'
     return {
       icon: '🔗',
       name: link.nodes.map((n) => n.name).join(' → '),
       typeLabel: '传输链路',
       struck: link.struck,
+      interferenceStatus,
       linkNodes,
       metaRows: [
         { label: '传输时间', value: link.transmitTime, tone: 'time' },
         { label: '完成时间', value: link.finishTime, tone: 'time' },
-        { label: '打击目标', value: link.struck ? link.strikeTargetLabel : '无', tone: link.struck ? 'strike' : 'neutral' },
+        { label: '打击目标', value: struckTargetVal, tone: link.struck ? 'strike' : 'neutral' },
         { label: '延迟', value: link.delayText, tone: 'delay' },
         { label: '武器', value: link.weaponNames || '无', tone: link.weaponNames ? 'weapon' : 'neutral' },
       ],
@@ -862,6 +915,12 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     gap: 8px;
   }
 
+  .card-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   .rank-badge {
     display: inline-flex;
     align-items: center;
@@ -939,6 +998,9 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     gap: 3px;
     font-size: 12px;
     font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
 
     .flow-icon {
       font-size: 12px;
@@ -958,6 +1020,18 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
 
     &--station .flow-name {
       color: #93c5fd;
+    }
+
+    &--struck {
+      background: rgba(239, 68, 68, 0.22);
+      border: 1px solid rgba(248, 113, 113, 0.6);
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
+
+      .flow-name {
+        color: #f87171 !important;
+        font-weight: 800;
+        text-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+      }
     }
   }
 
@@ -1166,6 +1240,9 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     gap: 3px;
     font-size: 14px;
     font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
 
     .path-icon {
       font-size: 13px;
@@ -1185,6 +1262,18 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
 
     &--station .path-name {
       color: #93c5fd;
+    }
+
+    &--struck {
+      background: rgba(239, 68, 68, 0.22);
+      border: 1px solid rgba(248, 113, 113, 0.6);
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
+
+      .path-name {
+        color: #f87171 !important;
+        font-weight: 800;
+        text-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+      }
     }
   }
 
@@ -1213,6 +1302,8 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   padding: 2px 8px;
   border-radius: 4px;
   font-weight: 700;
+  max-width: 100%;
+  white-space: nowrap;
 
   &.ok {
     color: #00e1ff;
@@ -1221,9 +1312,10 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   }
 
   &.struck {
-    color: #cbd5e1;
-    background: rgba(148, 163, 184, 0.15);
-    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #fecaca;
+    background: rgba(239, 68, 68, 0.18);
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    text-shadow: 0 0 6px rgba(239, 68, 68, 0.35);
   }
 }
 
@@ -1421,6 +1513,8 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   }
 }
 
+
+
 .conn-item {
   display: grid;
   grid-template-columns: 24px 72px minmax(0, 1fr);
@@ -1432,6 +1526,10 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   border-radius: 4px;
   background: rgba(8, 15, 26, 0.55);
   text-align: left;
+
+  &--with-badge {
+    grid-template-columns: 24px 72px minmax(0, 1fr) auto;
+  }
 
   .conn-icon {
     font-size: 15px;
@@ -1448,6 +1546,25 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     color: #e2efff;
     font-weight: 600;
     word-break: break-all;
+  }
+
+  .conn-strike-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+
+    &.struck {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.18);
+      border: 1px solid rgba(248, 113, 113, 0.45);
+    }
+
+    &.ok {
+      color: #7dd3fc;
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
   }
 
   &--sat .conn-name {

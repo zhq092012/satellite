@@ -27,18 +27,33 @@
             当前系列：{{ selectedSeries || '全部系列' }}
           </span>
         </div>
+        <div class="series-search-bar">
+          <el-input
+            v-model="seriesSearchKey"
+            size="small"
+            placeholder="搜索系列名称..."
+            clearable
+            :prefix-icon="Search"
+            class="series-search-input"
+          />
+        </div>
         <div class="series-list">
-          <div class="series-item" :class="{ active: !selectedSeries, disabled: matrixMerging }"
+          <div v-if="!seriesSearchKey.trim() || '全部系列'.includes(seriesSearchKey.trim())"
+            class="series-item" :class="{ active: !selectedSeries, disabled: matrixMerging }"
             @click="selectSeries('')">
             <span class="series-icon"></span>
             <span class="series-name">全部系列</span>
             <span class="series-status">{{ !selectedSeries ? '✓ 已筛选' : '点击筛选' }}</span>
           </div>
-          <div v-for="series in seriesOptions" :key="series" class="series-item"
+          <div v-for="series in filteredSeriesOptions" :key="series" class="series-item"
             :class="{ active: selectedSeries === series, disabled: matrixMerging }" @click="selectSeries(series)">
             <span class="series-icon"></span>
             <span class="series-name">{{ series }}</span>
             <span class="series-status">{{ selectedSeries === series ? '✓ 已筛选' : '点击筛选' }}</span>
+          </div>
+          <div v-if="filteredSeriesOptions.length === 0 && (seriesSearchKey.trim() && !'全部系列'.includes(seriesSearchKey.trim()))"
+            class="series-search-empty">
+            无匹配系列
           </div>
         </div>
       </div>
@@ -91,6 +106,17 @@
             </span>
             <span v-else class="metric-highlight metric-duration">
               链路时长 {{ sat.timeEffect ? formatDuration(sat.timeEffect.duration) : '--' }}
+            </span>
+          </div>
+          <div class="card-meta-row" v-if="sat.satType || sat.usage || sat.orbitType != null">
+            <span v-if="sat.satType" class="meta-tag tag-type" title="卫星类型">
+              {{ sat.satType }}
+            </span>
+            <span v-if="sat.usage" class="meta-tag tag-usage" title="用途">
+              {{ sat.usage }}
+            </span>
+            <span v-if="sat.orbitType != null" class="meta-tag tag-orbit" title="轨道类型">
+              {{ orbitTypeLabel(sat.orbitType) }}
             </span>
           </div>
           <div class="card-time-row" v-if="sortMode === 'transTime'">
@@ -206,6 +232,7 @@
  * - 触发视角切换与控制事件
  */
 import { ref, computed, watch } from 'vue'
+import { Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import {
   getSatelliteThreatInfo,
@@ -250,10 +277,18 @@ const matrixMerging = computed(
   () => store.matrixLoading && seriesOptions.value.length > 0
 )
 
-/**
- * 当前综合打击方案下的卫星系列列表（来自 levelSeriesEntities，无需逐系列请求后端）
- */
+/** 当前综合打击方案下的卫星系列列表（来自 levelSeriesEntities，无需逐系列请求后端） */
 const seriesOptions = computed<string[]>(() => store.zhchPlanSeriesList)
+
+/** 卫星系列快速搜索关键词 */
+const seriesSearchKey = ref('')
+
+/** 根据搜索关键词筛选后的卫星系列列表 */
+const filteredSeriesOptions = computed<string[]>(() => {
+  const query = seriesSearchKey.value.trim().toLowerCase()
+  if (!query) return seriesOptions.value
+  return seriesOptions.value.filter((s) => s.toLowerCase().includes(query))
+})
 
 /**
  * [函数说明]
@@ -281,13 +316,14 @@ watch(
   { immediate: true }
 )
 
-// 任务切换时重置系列筛选
+// 任务切换时重置系列筛选与搜索词
 watch(
   () => store.activedTask?.id,
   (newTaskId) => {
     if (!newTaskId) {
       store.setSelectedSatSeries('')
     }
+    seriesSearchKey.value = ''
   }
 )
 
@@ -323,6 +359,10 @@ interface SatListItem {
   name: string
   /** 卫星类型。 */
   satType: string
+  /** 卫星用途（商用/军用/民用等）。 */
+  usage?: string
+  /** 轨道类型（1-低轨 2-中轨 3-高轨 等）。 */
+  orbitType?: number | string | null
   /** 是否为中继卫星。 */
   isRelay: boolean
   /** 威胁度分数，未计算时为空。 */
@@ -355,6 +395,22 @@ const threatDialogSat = ref<{ norad: number; name: string } | null>(null)
 const formatThreatScore = (score: number): string => {
   if (Number.isInteger(score)) return String(score)
   return Number(score.toFixed(2)).toString()
+}
+
+/**
+ * 轨道类型枚举转中文标签。
+ *
+ * @param orbitType 轨道类型枚举值 (1-低轨, 2-中轨, 3-高轨, 4-大椭圆)
+ * @returns 中文轨道类型
+ */
+const orbitTypeLabel = (orbitType?: number | string | null): string => {
+  if (orbitType == null || orbitType === '') return '--'
+  if (typeof orbitType === 'string' && isNaN(Number(orbitType))) {
+    return orbitType
+  }
+  const map: Record<number, string> = { 1: '低轨', 2: '中轨', 3: '高轨', 4: '大椭圆' }
+  const num = Number(orbitType)
+  return map[num] || `类型${num}`
 }
 
 /**
@@ -528,6 +584,8 @@ const satList = computed<SatListItem[]>(() => {
       norad: s.norad,
       name: s.name,
       satType: s.satType,
+      usage: s.usage,
+      orbitType: s.orbitType,
       isRelay,
       threatScore: threatMap.get(s.norad) ?? null,
       timeEffect: timeEffectMap.get(s.norad) ?? null,
@@ -536,13 +594,16 @@ const satList = computed<SatListItem[]>(() => {
   satMatrixList.forEach((s: SatelliteMatrix) => {
     /** 根据卫星类型或中继关系判断是否为中继卫星。 */
     const isRelay = (s.satType || '').includes('中继') || relayList.includes(s.norad)
+    const existing = map.get(s.norad)
     map.set(s.norad, {
       norad: s.norad,
       name: s.name,
-      satType: s.satType,
+      satType: s.satType || existing?.satType || '',
+      usage: s.usage || existing?.usage,
+      orbitType: s.orbitType ?? existing?.orbitType,
       isRelay,
-      threatScore: threatMap.get(s.norad) ?? null,
-      timeEffect: timeEffectMap.get(s.norad) ?? null,
+      threatScore: threatMap.get(s.norad) ?? existing?.threatScore ?? null,
+      timeEffect: timeEffectMap.get(s.norad) ?? existing?.timeEffect ?? null,
     })
   })
 
@@ -888,6 +949,62 @@ const selectedSatelliteName = computed(() => {
       }
     }
 
+    .series-search-bar {
+      margin: 2px 0 4px;
+
+      :deep(.series-search-input) {
+        width: 100%;
+
+        .el-input__wrapper {
+          background-color: rgba(8, 20, 36, 0.85);
+          box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.25) inset;
+          border-radius: 4px;
+          padding: 1px 8px;
+          transition: all 0.2s ease;
+
+          &:hover {
+            box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.5) inset, 0 0 6px rgba(0, 225, 255, 0.15);
+          }
+
+          &.is-focus {
+            box-shadow: 0 0 0 1px #00e1ff inset, 0 0 8px rgba(0, 225, 255, 0.3) !important;
+          }
+        }
+
+        .el-input__inner {
+          color: #e2efff;
+          font-size: 11px;
+          height: 24px;
+          line-height: 24px;
+
+          &::placeholder {
+            color: rgba(158, 197, 237, 0.45);
+          }
+        }
+
+        .el-input__prefix {
+          color: #40f2ff;
+          margin-right: 4px;
+        }
+
+        .el-input__clear {
+          color: #7dd3fc;
+          font-size: 12px;
+
+          &:hover {
+            color: #ffffff;
+          }
+        }
+      }
+    }
+
+    .series-search-empty {
+      padding: 12px 8px;
+      font-size: 11px;
+      color: rgba(158, 197, 237, 0.6);
+      text-align: center;
+    }
+
     .series-list {
       display: flex;
       flex-direction: column;
@@ -1139,6 +1256,44 @@ const selectedSatelliteName = computed(() => {
         color: #86efac;
         background: rgba(34, 197, 94, 0.14);
         border: 1px solid rgba(34, 197, 94, 0.35);
+      }
+    }
+  }
+
+  .card-meta-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+
+    .meta-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 7px;
+      font-size: 11px;
+      line-height: 16px;
+      border-radius: 3px;
+      font-weight: 500;
+      white-space: nowrap;
+      letter-spacing: 0.2px;
+
+      &.tag-type {
+        color: #38bdf8;
+        background: rgba(56, 189, 248, 0.12);
+        border: 1px solid rgba(56, 189, 248, 0.32);
+      }
+
+      &.tag-usage {
+        color: #c084fc;
+        background: rgba(192, 132, 252, 0.12);
+        border: 1px solid rgba(192, 132, 252, 0.32);
+      }
+
+      &.tag-orbit {
+        color: #34d399;
+        background: rgba(52, 211, 153, 0.12);
+        border: 1px solid rgba(52, 211, 153, 0.32);
       }
     }
   }
