@@ -1,7 +1,10 @@
 <template>
-  <div class="series-link-timeline">
+  <div class="series-link-timeline" @click="handleCanvasClick">
     <div class="timeline-head">
-      <div class="timeline-title">系列链路通断时序</div>
+      <div class="timeline-title-wrap">
+        <div class="timeline-title">系列链路通断时序</div>
+        <span class="timeline-hint">点击星或站可高亮关联链路</span>
+      </div>
       <div class="timeline-legend">
         <span class="legend-item"><i class="dot dot--ok" />未打击</span>
         <span class="legend-item"><i class="dot dot--struck" />已打击</span>
@@ -40,13 +43,19 @@
                   v-for="block in group.topBlocks"
                   :key="block.id"
                   class="time-block"
-                  :class="block.struck ? 'is-struck' : 'is-ok'"
+                  :class="[
+                    block.struck ? 'is-struck' : 'is-ok',
+                    {
+                      'is-selected': isSelected(block.id),
+                      'is-highlighted': isBlockHighlighted(block.id, group),
+                      'is-dimmed': isBlockDimmed(block.id, group),
+                    },
+                  ]"
                   :style="blockStyle(block)"
+                  @click.stop="handleBlockClick(block)"
                   @mouseenter="showTooltip($event, block)"
                   @mouseleave="hideTooltip"
-                >
-                  <span class="block-label">{{ block.label }}</span>
-                </div>
+                />
               </div>
             </div>
 
@@ -64,6 +73,10 @@
                 :x2="conn.x2"
                 :y2="conn.y2"
                 class="link-line"
+                :class="{
+                  'is-highlighted': isConnHighlighted(conn),
+                  'is-dimmed': isConnDimmed(conn),
+                }"
               />
             </svg>
 
@@ -82,13 +95,19 @@
                   v-for="block in group.bottomBlocks"
                   :key="block.id"
                   class="time-block"
-                  :class="block.struck ? 'is-struck' : 'is-ok'"
+                  :class="[
+                    block.struck ? 'is-struck' : 'is-ok',
+                    {
+                      'is-selected': isSelected(block.id),
+                      'is-highlighted': isBlockHighlighted(block.id, group),
+                      'is-dimmed': isBlockDimmed(block.id, group),
+                    },
+                  ]"
                   :style="blockStyle(block)"
+                  @click.stop="handleBlockClick(block)"
                   @mouseenter="showTooltip($event, block)"
                   @mouseleave="hideTooltip"
-                >
-                  <span class="block-label">{{ block.label }}</span>
-                </div>
+                />
               </div>
             </div>
           </div>
@@ -116,7 +135,13 @@ import { useLayoutStore } from '@/store/modules/layout'
 import {
   buildPlanLinkTimelineModel,
   buildTimelineTicks,
+  LANE_HEIGHT,
+  LANE_GAP,
+  ROW_PADDING,
+  ROW_GAP,
   type SeriesLinkTimelineBlock,
+  type SeriesLinkTimelineConnection,
+  type SeriesLinkTimelineGroup,
 } from '@/utils/seriesLinkTimeline'
 
 const props = defineProps<{
@@ -124,10 +149,13 @@ const props = defineProps<{
   plan: ZhchPlanResp
 }>()
 
-/** 上下两行间距（需与工具函数 ROW_GAP 一致） */
-const rowGap = 28
+/** 上下两行间距（与工具函数 ROW_GAP 一致） */
+const rowGap = ROW_GAP
 
 const store = useLayoutStore()
+
+/** 当前选中的时间块 ID（星或站） */
+const selectedBlockId = ref<string | null>(null)
 
 /** 悬浮提示状态 */
 const tooltip = ref({
@@ -166,8 +194,58 @@ const ticks = computed(() => buildTimelineTicks(model.value.minMs, model.value.m
 const blockStyle = (block: SeriesLinkTimelineBlock) => ({
   left: `${block.leftPx}px`,
   width: `${block.widthPx}px`,
-  top: `${6 + block.lane * 26}px`,
+  height: `${LANE_HEIGHT}px`,
+  top: `${ROW_PADDING + block.lane * (LANE_HEIGHT + LANE_GAP)}px`,
 })
+
+/** 判断某个块是否为当前直接选中的项 */
+const isSelected = (blockId: string) => selectedBlockId.value === blockId
+
+/** 判断某个块是否处于关联高亮状态 */
+const isBlockHighlighted = (blockId: string, group: SeriesLinkTimelineGroup) => {
+  if (!selectedBlockId.value) return false
+  if (selectedBlockId.value === blockId) return true
+  return group.connections.some(
+    (conn) =>
+      (conn.topBlockId === selectedBlockId.value && conn.bottomBlockId === blockId) ||
+      (conn.bottomBlockId === selectedBlockId.value && conn.topBlockId === blockId)
+  )
+}
+
+/** 判断某个块是否应该变暗 */
+const isBlockDimmed = (blockId: string, group: SeriesLinkTimelineGroup) => {
+  if (!selectedBlockId.value) return false
+  return !isBlockHighlighted(blockId, group)
+}
+
+/** 判断连线是否处于高亮状态 */
+const isConnHighlighted = (conn: SeriesLinkTimelineConnection) => {
+  if (!selectedBlockId.value) return false
+  return conn.topBlockId === selectedBlockId.value || conn.bottomBlockId === selectedBlockId.value
+}
+
+/** 判断连线是否应该变暗 */
+const isConnDimmed = (conn: SeriesLinkTimelineConnection) => {
+  if (!selectedBlockId.value) return false
+  return !isConnHighlighted(conn)
+}
+
+/** 点击星或站时间块切换高亮 */
+const handleBlockClick = (block: SeriesLinkTimelineBlock) => {
+  if (selectedBlockId.value === block.id) {
+    selectedBlockId.value = null
+  } else {
+    selectedBlockId.value = block.id
+  }
+}
+
+/** 点击空白处清除高亮 */
+const handleCanvasClick = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (!target.closest('.time-block')) {
+    selectedBlockId.value = null
+  }
+}
 
 /**
  * 显示悬浮提示
@@ -213,11 +291,22 @@ const hideTooltip = () => {
   flex-wrap: wrap;
 }
 
+.timeline-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
 .timeline-title {
   font-size: 18px;
   font-weight: 800;
   color: #40f2ff;
   text-shadow: 0 0 10px rgba(64, 242, 255, 0.35);
+}
+
+.timeline-hint {
+  font-size: 12px;
+  color: #64748b;
 }
 
 .timeline-legend {
@@ -392,47 +481,79 @@ const hideTooltip = () => {
 .link-line {
   stroke: #22d3ee;
   stroke-width: 1.5;
-  stroke-dasharray: 5 4;
-  opacity: 0.85;
+  stroke-dasharray: 4 3;
+  opacity: 0.65;
+  transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+
+  &.is-dimmed {
+    opacity: 0.1;
+    stroke: #475569;
+  }
+
+  &.is-highlighted {
+    stroke: #00f0ff;
+    stroke-width: 2.5;
+    stroke-dasharray: 6 3;
+    opacity: 1;
+    filter: drop-shadow(0 0 6px #00e1ff);
+    animation: linkDashFlow 0.8s linear infinite;
+  }
+}
+
+@keyframes linkDashFlow {
+  from {
+    stroke-dashoffset: 9;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 .time-block {
   position: absolute;
-  height: 18px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-  cursor: default;
+  border-radius: 3px;
+  cursor: pointer;
   z-index: 3;
-  transition: filter 0.15s ease;
+  transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
   overflow: hidden;
 
+  &.is-dimmed {
+    opacity: 0.2;
+    filter: grayscale(0.5);
+  }
+
+  &.is-highlighted {
+    opacity: 1;
+    z-index: 8;
+    filter: brightness(1.2);
+    box-shadow: 0 0 10px rgba(0, 225, 255, 0.7);
+  }
+
+  &.is-selected {
+    opacity: 1;
+    z-index: 10;
+    transform: scale(1.15);
+    box-shadow: 0 0 14px #00e1ff, inset 0 0 4px #ffffff;
+    outline: 2px solid #00f0ff;
+    outline-offset: 1px;
+  }
+
   &:hover {
-    filter: brightness(1.15);
-    z-index: 4;
+    filter: brightness(1.3);
+    transform: scale(1.1);
+    z-index: 9;
   }
 
   &.is-ok {
-    background: linear-gradient(180deg, #34d399 0%, #16a34a 100%);
+    background: linear-gradient(180deg, #34d399 0%, #10b981 100%);
     border: 1px solid rgba(134, 239, 172, 0.8);
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.35);
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.35);
   }
 
   &.is-struck {
     background: linear-gradient(180deg, #94a3b8 0%, #64748b 100%);
     border: 1px solid rgba(148, 163, 184, 0.7);
-  }
-
-  .block-label {
-    font-size: 10px;
-    font-weight: 700;
-    color: #0f172a;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    max-width: 100%;
+    box-shadow: 0 0 4px rgba(100, 116, 139, 0.25);
   }
 }
 </style>

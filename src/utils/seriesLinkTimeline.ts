@@ -80,14 +80,16 @@ export interface PlanLinkTimelineModel {
 }
 
 /** 单行轨道布局常量 */
-const LANE_HEIGHT = 22
-const LANE_GAP = 4
-const ROW_PADDING = 6
-const ROW_GAP = 28
-const MIN_BLOCK_WIDTH = 6
-const MIN_CANVAS_WIDTH = 960
+export const LANE_HEIGHT = 14
+export const LANE_GAP = 4
+export const ROW_PADDING = 6
+export const ROW_GAP = 30
+export const MIN_BLOCK_WIDTH = 10
+export const MIN_CANVAS_WIDTH = 960
 /** 每分钟对应像素宽度 */
-const PX_PER_MINUTE = 3
+export const PX_PER_MINUTE = 3
+/** 同一层中两个块之间的最小水平像素间隙 */
+export const MIN_GAP_PX = 4
 
 interface RawTimelineBlock {
   id: string
@@ -143,6 +145,7 @@ const resolveCanvasWidth = (minMs: number, maxMs: number): number => {
 
 /**
  * 为同一行的时间块分配轨道并计算像素坐标。
+ * 当两个链路时间重叠或在屏幕像素上紧挨挤压时，自动错开分配到下一层（Lane+1），避免重叠堆叠。
  *
  * @param blocks 原始块列表
  * @param minMs 时间轴起点
@@ -157,20 +160,30 @@ const layoutBlocks = (
   canvasWidth: number
 ): SeriesLinkTimelineBlock[] => {
   const range = Math.max(maxMs - minMs, 1)
-  const sorted = [...blocks].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs)
-  const laneEnds: number[] = []
+  // 按开始时间排序，开始时间相同时按结束时间排序
+  const sorted = [...blocks].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs || a.id.localeCompare(b.id))
+
+  // 记录每个 lane 的当前结束时间戳与右边界像素
+  const laneStates: Array<{ endMs: number; rightPx: number }> = []
 
   return sorted.map((block) => {
-    let lane = laneEnds.findIndex((end) => end <= block.startMs)
-    if (lane === -1) {
-      lane = laneEnds.length
-      laneEnds.push(block.endMs)
-    } else {
-      laneEnds[lane] = block.endMs
-    }
-
     const leftPx = ((block.startMs - minMs) / range) * canvasWidth
     const widthPx = Math.max(((block.endMs - block.startMs) / range) * canvasWidth, MIN_BLOCK_WIDTH)
+    const rightPx = leftPx + widthPx
+
+    // 寻找能够容纳当前块的层（既满足时间不重叠，又满足像素上有安全间隙）
+    let lane = laneStates.findIndex(
+      (state) => state.endMs <= block.startMs && state.rightPx + MIN_GAP_PX <= leftPx
+    )
+
+    if (lane === -1) {
+      // 存在时间重叠或像素挤压，自动错开往下一层
+      lane = laneStates.length
+      laneStates.push({ endMs: block.endMs, rightPx })
+    } else {
+      // 放入该层，更新该层的占用状态
+      laneStates[lane] = { endMs: block.endMs, rightPx }
+    }
 
     return {
       ...block,
@@ -187,7 +200,7 @@ const layoutBlocks = (
  * @param blocks 已布局块
  * @returns 轨道高度（像素）
  */
-const trackHeightFromBlocks = (blocks: SeriesLinkTimelineBlock[]): number => {
+export const trackHeightFromBlocks = (blocks: SeriesLinkTimelineBlock[]): number => {
   if (!blocks.length) return LANE_HEIGHT + ROW_PADDING * 2
   const maxLane = Math.max(...blocks.map((item) => item.lane))
   return ROW_PADDING * 2 + (maxLane + 1) * LANE_HEIGHT + maxLane * LANE_GAP
