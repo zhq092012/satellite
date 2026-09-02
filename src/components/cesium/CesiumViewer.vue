@@ -27,7 +27,7 @@ import launchSiteIcon from '@/assets/icons/LaunchSite.png'
 import * as Cesium from 'cesium'
 import { CallbackProperty } from 'cesium'
 import * as satellitejs from 'satellite.js'
-import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
 // import { listenCameraLocaion, listenClickPositionCartesian } from '@/utils/tools/cameraTools'
 
 // 全局布局状态管理 store
@@ -64,44 +64,68 @@ let viewerInitializing = false
 // Cesium 是否已完成首次初始化（用于外部判断是否可以操作 Viewer）
 const cesiumInitialized = ref(false)
 
+// 缓存容器宽高（由 ResizeObserver 原生 contentRect 维护，避免逐帧读取 clientWidth 导致强制同步布局回流）
+let cachedContainerWidth = 0
+let cachedContainerHeight = 0
+
 /**
  * [功能]
  * 检查容器 DOM 元素是否具有有效尺寸（宽高均大于 0）
- *
- * [处理规则]
- * - 容器尺寸为 0 时 Cesium 会创建 0 宽高纹理导致 WebGL 报错，必须先检查
+ * 优先读取 ResizeObserver 缓存尺寸（0 回流开销），无缓存时兜底检查 DOM
  *
  * @param el 容器 DOM 元素
  * @returns 是否具有有效尺寸
  */
 const hasValidContainerSize = (el: HTMLElement | null) => {
+  if (cachedContainerWidth > 0 && cachedContainerHeight > 0) return true
   if (!el) return false
-  return el.clientWidth > 0 && el.clientHeight > 0
+  return (el.clientWidth || 0) > 0 && (el.clientHeight || 0) > 0
 }
 
 /**
  * [功能]
- * 等待 Cesium 容器 DOM 具有有效尺寸（宽高大于 0）
+ * 启动容器尺寸变化监听（ResizeObserver）
  *
  * [处理规则]
- * - 每帧检查一次，最多等待 maxFrames 帧（默认 180 帧 ≈ 3 秒）
- * - 适用于容器可能因 Tab 切换、CSS display:none 等原因暂时无尺寸的场景
- *
- * [修改约束]
- * - 不要改为同步等待，requestAnimationFrame 保证与渲染帧同步
- *
- * @param maxFrames 最大等待帧数，默认 180
- * @returns 是否在超时前获得有效尺寸
+ * - 直接从 entry.contentRect 读取尺寸，彻底消除 clientWidth 触发的 Layout Thrashing
+ * - 容器尺寸有效时开启渲染循环，并按需执行 resize 与刷新
+ * - 尺寸为 0 时关闭渲染循环，避免 WebGL 报 0 尺寸纹理错误
  */
-const waitForContainerReady = async (maxFrames = 180) => {
-  for (let i = 0; i < maxFrames; i += 1) {
-    if (hasValidContainerSize(cesiumContainer.value || null)) {
-      return true
+const startContainerSizeObserver = () => {
+  if (!cesiumContainer.value || resizeObserver) return
+  resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const { width, height } = entry.contentRect
+      cachedContainerWidth = width
+      cachedContainerHeight = height
+      const canRender = width > 0 && height > 0
+
+      if ((!viewer || viewer.isDestroyed()) && canRender) {
+        void initViewer()
+        return
+      }
+
+      if (viewer && !viewer.isDestroyed()) {
+        viewer.useDefaultRenderLoop = canRender
+        if (canRender) {
+          ;(viewer as any).resize?.()
+          viewer.scene.requestRender()
+          flushPendingInfrastructureRender()
+        }
+      }
     }
-    await nextTick()
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-  }
-  return false
+  })
+  resizeObserver.observe(cesiumContainer.value)
+}
+
+/**
+ * [功能]
+ * 停止并销毁容器尺寸变化监听器
+ */
+const stopContainerSizeObserver = () => {
+  if (!resizeObserver) return
+  resizeObserver.disconnect()
+  resizeObserver = null
 }
 
 /**
@@ -109,7 +133,7 @@ const waitForContainerReady = async (maxFrames = 180) => {
  * 根据当前容器尺寸，同步 Cesium Viewer 的渲染循环开关
  *
  * [处理规则]
- * - 容器尺寸有效时开启渲染循环，并强制 resize + 请求渲染
+ * - 容器尺寸有效时开启渲染循环，并按需执行 resize 与刷新
  * - 容器尺寸为 0 时暂停渲染，避免 Cesium 创建 0×0 纹理导致 WebGL 报错
  *
  * [副作用]
@@ -119,48 +143,14 @@ const waitForContainerReady = async (maxFrames = 180) => {
 const syncViewerRenderLoopWithContainer = () => {
   if (!viewer || viewer.isDestroyed() || !cesiumContainer.value) return
   const canRender = hasValidContainerSize(cesiumContainer.value)
-  // 当容器尺寸为 0 时暂停渲染，避免 Cesium 在更新 framebuffer 时创建 0 宽高纹理。
+  // 当容器尺寸为 0 时暂停渲染，避免 Cesium 在更新 framebuffer 时创建 0 宽高纹理
   viewer.useDefaultRenderLoop = canRender
   if (!canRender) return
-    ; (viewer as any).resize?.()
+  ;(viewer as any).resize?.()
   flushPendingInfrastructureRender()
-}
-
-/**
- * [功能]
- * 启动容器尺寸变化监听（ResizeObserver）
- *
- * [处理规则]
- * - 已存在监听器时直接返回，避免重复注册
- * - 容器尺寸从 0 变为有效值且 Viewer 尚未初始化（或已销毁）时，自动触发 initViewer
- * - 已初始化时同步渲染循环开关
- *
- * [修改约束]
- * - 必须与 stopContainerSizeObserver 配对调用，防止内存泄漏
- */
-const startContainerSizeObserver = () => {
-  if (!cesiumContainer.value || resizeObserver) return
-  resizeObserver = new ResizeObserver(() => {
-    if ((!viewer || viewer.isDestroyed()) && hasValidContainerSize(cesiumContainer.value)) {
-      void initViewer()
-      return
-    }
-    syncViewerRenderLoopWithContainer()
-  })
-  resizeObserver.observe(cesiumContainer.value)
-}
-
-/**
- * [功能]
- * 停止并销毁容器尺寸变化监听器
- *
- * [副作用]
- * - 断开 ResizeObserver 并置空引用
- */
-const stopContainerSizeObserver = () => {
-  if (!resizeObserver) return
-  resizeObserver.disconnect()
-  resizeObserver = null
+  if (!viewer.isDestroyed()) {
+    viewer.scene.requestRender()
+  }
 }
 
 const initViewer = async () => {
@@ -168,9 +158,8 @@ const initViewer = async () => {
   viewerInitializing = true
   try {
     if (cesiumContainer.value) {
-      const ready = await waitForContainerReady()
-      if (!ready) {
-        console.warn('Cesium container size is still 0 after waiting, skip viewer initialization for now.')
+      if (!hasValidContainerSize(cesiumContainer.value)) {
+        // 若容器当前尚无有效尺寸，交由 ResizeObserver 监听到尺寸后自动调用 initViewer
         return
       }
 
@@ -187,8 +176,10 @@ const initViewer = async () => {
         fullscreenButton: false, // 关闭全屏按钮
         baseLayerPicker: false, // 关闭底图选择器
         baseLayer: false, // 不使用默认底图
-        infoBox: false, // 打开消息框（点击实体时显示信息）
-        selectionIndicator: false, // 关闭选中指示器（我们自定义点击事件）
+        infoBox: false, // 关闭原生消息框
+        selectionIndicator: false, // 关闭原生选中指示器
+        requestRenderMode: true, // 启用按需渲染：静态态势下 0 GPU 空转，显著降低 GPU 负载
+        maximumRenderTimeChange: Infinity,
       })
       // 关闭默认双击追踪（保持相机不动）
       viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
@@ -330,51 +321,10 @@ const SAT_LABEL_HIGHLIGHT_MAX_DISTANCE = 20000000
 const GROUND_LABEL_LOD_NEAR = 6000000
 /** 地面站/数据中心链路高亮标签最大可见距离（米） */
 const GROUND_LABEL_HIGHLIGHT_MAX_DISTANCE = 20000000
-/** 地面站/数据中心图标 (Billboard) 最大可见距离（米），近处显示图标，超过此距离切换为三角/正方形几何图形 */
+/** 地面站/数据中心图标 (Billboard) 最大可见距离（米），近处显示图标，超过此距离切换为 Point 点 */
 const GROUND_BILLBOARD_MAX_DISTANCE = 8000000
-/** 我方武器图标 (Billboard) 最大可见距离（米），近处显示图标，超过此距离切换为菱形几何图形 */
+/** 我方武器图标 (Billboard) 最大可见距离（米），近处显示图标，超过此距离切换为 Point 点 */
 const WEAPON_BILLBOARD_MAX_DISTANCE = 8000000
-
-/**
- * 生成以经纬度为中心的等边三角形 PolygonHierarchy（用于地面站远距离展示）
- */
-const createTriangleHierarchy = (lon: number, lat: number, size = 0.65): Cesium.PolygonHierarchy => {
-  return new Cesium.PolygonHierarchy(
-    Cesium.Cartesian3.fromDegreesArray([
-      lon, lat + size,
-      lon + size * 0.866, lat - size * 0.5,
-      lon - size * 0.866, lat - size * 0.5,
-    ])
-  )
-}
-
-/**
- * 生成以经纬度为中心的正方形 PolygonHierarchy（用于数据中心远距离展示）
- */
-const createSquareHierarchy = (lon: number, lat: number, size = 0.55): Cesium.PolygonHierarchy => {
-  return new Cesium.PolygonHierarchy(
-    Cesium.Cartesian3.fromDegreesArray([
-      lon - size, lat - size,
-      lon + size, lat - size,
-      lon + size, lat + size,
-      lon - size, lat + size,
-    ])
-  )
-}
-
-/**
- * 生成以经纬度为中心的菱形 PolygonHierarchy（用于我方武器远距离展示）
- */
-const createDiamondHierarchy = (lon: number, lat: number, size = 0.65): Cesium.PolygonHierarchy => {
-  return new Cesium.PolygonHierarchy(
-    Cesium.Cartesian3.fromDegreesArray([
-      lon, lat + size,
-      lon + size, lat,
-      lon, lat - size,
-      lon - size, lat,
-    ])
-  )
-}
 
 /** 武器标签近距离 LOD 上限（米） */
 const WEAPON_LABEL_LOD_NEAR = 6000000
@@ -386,9 +336,20 @@ const infraEntityMap = new Map<string, { entity: Cesium.Entity; node: Infrastruc
 const satelliteSatrecCache = new Map<number, satellitejs.SatRec>()
 /** 场景 postUpdate 监听器移除函数 */
 let scenePostUpdateRemoveListener: Cesium.Event.RemoveCallback | null = null
-/** 相机方向与卫星方向计算用的临时向量 */
+/** 相机方向与卫星方向计算用的临时向量（对象池静态复用，杜绝逐帧 new） */
 const scratchCameraDir = new Cesium.Cartesian3()
 const scratchSatelliteDir = new Cesium.Cartesian3()
+const scratchSatPosition = new Cesium.Cartesian3()
+
+/** 敌方矩阵卫星 NORAD 快速索引映射（O(1) 查找，彻底消除每帧 N 次数组 find 线性遍历） */
+const matrixSatMap = computed(() => {
+  const map = new Map<number, NonNullable<typeof props.matrixData>['initMatrixList'][number]>()
+  const list = props.matrixData?.initMatrixList || []
+  list.forEach((item) => {
+    if (item?.norad) map.set(item.norad, item)
+  })
+  return map
+})
 
 /**
  * 判断地面基础设施节点是否被选中
@@ -543,7 +504,7 @@ const loadSatelliteAndStations = () => {
         : Cesium.Color.fromCssColorString('#c084fc')
       const resolveShapeColor = () => (isNodeHighlighted() ? highlightColor : defaultShapeColor)
 
-      // 单一实体：近距离显示真实图标 Billboard (<= 8,000 km)，远距离切换显示 Polygon 几何图形 (> 8,000 km)
+      // 单一实体：近距离显示真实图标 Billboard (<= 8,000 km)，远距离切换显示 Point 点 (> 8,000 km)
       const infraEntity = viewer.entities.add({
         id: entityId,
         position,
@@ -557,14 +518,10 @@ const loadSatelliteAndStations = () => {
           heightReference: Cesium.HeightReference.NONE,
           distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, GROUND_BILLBOARD_MAX_DISTANCE),
         },
-        polygon: {
-          hierarchy: isReceive
-            ? createTriangleHierarchy(node.longitude, node.latitude)
-            : createSquareHierarchy(node.longitude, node.latitude),
-          material: new Cesium.ColorMaterialProperty(
-            new Cesium.CallbackProperty(() => resolveShapeColor(), false) as unknown as Cesium.Property
-          ),
-          height: node.altitude || 0,
+        point: {
+          pixelSize: new Cesium.CallbackProperty(() => (isNodeHighlighted() ? 10 : 8), false) as unknown as Cesium.Property,
+          color: new Cesium.CallbackProperty(() => resolveShapeColor(), false) as unknown as Cesium.Property,
+          disableDepthTestDistance: 0,
           distanceDisplayCondition: new Cesium.DistanceDisplayCondition(GROUND_BILLBOARD_MAX_DISTANCE, Number.MAX_VALUE),
         },
         label: {
@@ -682,7 +639,8 @@ const resolveChainNodePosition = (node: ChainNode, time?: Cesium.JulianDate): Ce
   if (node.layer === 'SAT' || node.layer === 'RELAY') {
     const norad = Number(node.id)
     if (!Number.isFinite(norad)) return null
-    return getSatellitePositionInCesium(norad, time)
+    const pos = getSatellitePositionInCesium(norad, undefined, time)
+    return pos ? Cesium.Cartesian3.clone(pos) : null
   }
 
   if (node.layer === 'RECEIVE') {
@@ -922,7 +880,7 @@ const renderWeaponsOnCesium = () => {
     // const rangeMeters = Math.max(10000, Number(weapon.range ?? 0) * 1000)
     const weaponType = weapon.type
 
-    // 单一实体：近距离显示真实武器图标 Billboard (<= 8,000 km)，远距离切换显示菱形 Polygon (> 8,000 km)
+    // 单一实体：近距离显示真实武器图标 Billboard (<= 8,000 km)，远距离切换显示 Point 点 (> 8,000 km)
     const entity = viewer.entities.add({
       id: weaponId,
       name: weapon.name,
@@ -939,10 +897,10 @@ const renderWeaponsOnCesium = () => {
         heightReference: Cesium.HeightReference.NONE,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, WEAPON_BILLBOARD_MAX_DISTANCE),
       },
-      polygon: {
-        hierarchy: createDiamondHierarchy(weapon.longitude, weapon.latitude),
-        material: new Cesium.ColorMaterialProperty(OUR_WEAPON_DEFAULT_COLOR),
-        height: 0,
+      point: {
+        pixelSize: 8,
+        color: OUR_WEAPON_DEFAULT_COLOR,
+        disableDepthTestDistance: 0,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(WEAPON_BILLBOARD_MAX_DISTANCE, Number.MAX_VALUE),
       },
       label: {
@@ -1064,8 +1022,7 @@ const isNoradLinkHighlighted = (norad: number, satName?: string): boolean => {
  */
 const isNoradVisuallyForced = (norad: number): boolean => {
   if (props.selectedNorad === norad || store.selectedAnalysisNorad === norad) return true
-  const matrixSats = props.matrixData?.initMatrixList || []
-  const sat = matrixSats.find((s) => s.norad === norad)
+  const sat = matrixSatMap.value.get(norad)
   return isNoradLinkHighlighted(norad, sat?.name)
 }
 
@@ -1178,11 +1135,12 @@ const updateSatelliteVisuals = () => {
   if (!viewer || viewer.isDestroyed() || satelliteEntityMap.size === 0) return
 
   const time = viewer.clock.currentTime
+  const frameDate = Cesium.JulianDate.toDate(time)
   const cameraPos = viewer.camera.positionWC
-  const matrixSats = props.matrixData?.initMatrixList || []
+  const satMap = matrixSatMap.value
 
   satelliteEntityMap.forEach((entity, norad) => {
-    const position = getSatellitePositionInCesium(norad, time)
+    const position = getSatellitePositionInCesium(norad, frameDate)
     if (!position) {
       entity.show = false
       return
@@ -1195,7 +1153,7 @@ const updateSatelliteVisuals = () => {
       entity.position = new Cesium.ConstantPositionProperty(position)
     }
 
-    const satInfo = matrixSats.find((s) => s.norad === norad)
+    const satInfo = satMap.get(norad)
     const isRelay = norad === 22314 || (satInfo?.satType || '').includes('中继')
     const satColor = isRelay ? Cesium.Color.PURPLE : Cesium.Color.CYAN
 
@@ -1235,6 +1193,9 @@ const updateSatelliteVisuals = () => {
       if (entity.point.pixelSize instanceof Cesium.ConstantProperty) {
         entity.point.pixelSize.setValue(targetPointSize)
       }
+      if (entity.point.outlineWidth instanceof Cesium.ConstantProperty) {
+        entity.point.outlineWidth.setValue(0)
+      }
     }
     if (entity.label) {
       const showLabel = showBillboard && shouldShowSatelliteLabel(distance, forced)
@@ -1255,15 +1216,23 @@ const updateSatelliteVisuals = () => {
   })
 }
 
+let lastLodCheckTimestamp = 0
+const LOD_CHECK_INTERVAL_MS = 100 // 10 FPS 距离 LOD 计算足以保证丝滑过渡，节省 83% 的无谓计算
+
 /**
- * 注册场景 postUpdate 监听：每帧批量更新卫星位置与可见性。
+ * 注册场景 postUpdate 监听：每帧批量更新卫星位置与可见性（LOD 距离计算按 100ms 节流）。
  */
 const ensureScenePostUpdateListener = () => {
   if (!viewer || viewer.isDestroyed() || scenePostUpdateRemoveListener) return
   scenePostUpdateRemoveListener = viewer.scene.postUpdate.addEventListener(() => {
     updateSatelliteVisuals()
-    updateInfrastructureLabelVisuals()
-    updateWeaponLabelVisuals()
+
+    const now = performance.now()
+    if (now - lastLodCheckTimestamp >= LOD_CHECK_INTERVAL_MS) {
+      lastLodCheckTimestamp = now
+      updateInfrastructureLabelVisuals()
+      updateWeaponLabelVisuals()
+    }
   })
 }
 
@@ -1273,14 +1242,17 @@ const ensureScenePostUpdateListener = () => {
  *
  * [处理规则]
  * 1. 检查防重入集合，若当前 NORAD 已在计算栈中则直接返回 null，防止递归死循环。
- * 2. 优先从 satellitePointPrimitives 图元集合获取当前位置。
- * 3. 兜底通过 TLE 轨道根数（line1, line2）结合当前 Cesium 时钟时间使用 satellitejs 实时推算 3D 坐标。
+ * 2. 优先使用外部单帧统一计算的 frameDate，杜绝每颗卫星重复 new Date()。
+ * 3. 结果使用 scratchSatPosition 对象池复用，杜绝每帧 new Cartesian3 垃圾回收震荡。
  *
  * @param norad 卫星 NORAD 编号
+ * @param frameDate 当前帧复用的 Date 对象
+ * @param time 当前 Cesium JulianDate 时间
  * @returns Cesium.Cartesian3 坐标对象或 null
  */
 const getSatellitePositionInCesium = (
   norad: number,
+  frameDate?: Date,
   time?: Cesium.JulianDate
 ): Cesium.Cartesian3 | null => {
   if (!norad || positionCalculatingSet.has(norad)) {
@@ -1293,15 +1265,14 @@ const getSatellitePositionInCesium = (
     const satrec = getOrCreateSatrec(norad)
     if (satrec && viewer) {
       try {
-        const now = time || viewer.clock.currentTime
-        const date = Cesium.JulianDate.toDate(now)
+        const date = frameDate || (time ? Cesium.JulianDate.toDate(time) : Cesium.JulianDate.toDate(viewer.clock.currentTime))
         const posVel = satellitejs.propagate(satrec, date)
         if (posVel && posVel.position) {
           const gmst = satellitejs.gstime(date)
           // Cesium 地球为地固系，统一将 TLE 传播结果转换到 ECEF
           const posEcf = satellitejs.eciToEcf(posVel.position, gmst)
           if (posEcf) {
-            return new Cesium.Cartesian3(posEcf.x * 1000, posEcf.y * 1000, posEcf.z * 1000)
+            return Cesium.Cartesian3.fromElements(posEcf.x * 1000, posEcf.y * 1000, posEcf.z * 1000, scratchSatPosition)
           }
         }
       } catch {
@@ -1369,8 +1340,10 @@ const playbackSpeed = ref(1.0)
 /** 未选中卫星时 TLE 轨道仿真的时钟倍速 */
 const ORBIT_PLAYBACK_MULTIPLIER = 120
 
+let lastClockTickEmitTime = 0
+
 /**
- * 注册时钟 Tick 监听：动画模式下驱动 requestRender 并上报当前时刻
+ * 注册时钟 Tick 监听：动画模式下驱动 requestRender 并节流上报当前时刻
  */
 const ensureClockTickListener = () => {
   if (!viewer || viewer.isDestroyed() || clockTickRemoveListener) return
@@ -1378,7 +1351,12 @@ const ensureClockTickListener = () => {
     if (!viewer || viewer.isDestroyed()) return
     if (clock.shouldAnimate) {
       viewer.scene.requestRender()
-      emit('clock-tick', Cesium.JulianDate.toDate(clock.currentTime).getTime())
+      // 节流上报至 30 FPS（33ms），避免每帧高频触发父组件 Vue 响应式重渲染
+      const now = performance.now()
+      if (now - lastClockTickEmitTime >= 33) {
+        lastClockTickEmitTime = now
+        emit('clock-tick', Cesium.JulianDate.toDate(clock.currentTime).getTime())
+      }
     }
   })
 }
@@ -1461,6 +1439,8 @@ const setClockPlaying = (playing: boolean, multiplier?: number) => {
   playbackSpeed.value = mult
   clock.multiplier = mult
   clock.shouldAnimate = playing
+  // 动画播放时由时钟连续驱动渲染；暂停时开启 requestRenderMode 彻底停止 GPU 空转
+  viewer.scene.requestRenderMode = !playing
   viewer.scene.requestRender()
 }
 
@@ -1664,13 +1644,11 @@ const resetHighlightSatellites = () => {
       const isRelay = norad === 22314 || (satInfo?.satType || '').includes('中继')
 
       const satColor = isRelay ? Cesium.Color.PURPLE : Cesium.Color.CYAN
-      const outlineColor = isRelay ? Cesium.Color.GOLD : Cesium.Color.WHITE
-      const pixelSize = isRelay ? 16 : 13
-      const outlineWidth = 2.5
-
       const isForced = norad ? isNoradVisuallyForced(norad) : false
       const targetBillboardColor = isForced ? Cesium.Color.YELLOW : Cesium.Color.WHITE
       const targetBillboardSize = isForced ? 32 : 24
+      const targetPointColor = isForced ? Cesium.Color.YELLOW : satColor
+      const targetPointSize = isForced ? 10 : 8
       const targetLabelColor = isForced ? Cesium.Color.YELLOW : satColor
 
       if (entity && entity.billboard) {
@@ -1688,10 +1666,9 @@ const resetHighlightSatellites = () => {
       }
 
       if (entity && entity.point) {
-        entity.point.color = new Cesium.ConstantProperty(satColor)
-        entity.point.outlineColor = new Cesium.ConstantProperty(outlineColor)
-        entity.point.outlineWidth = new Cesium.ConstantProperty(outlineWidth)
-        entity.point.pixelSize = new Cesium.ConstantProperty(pixelSize)
+        entity.point.color = new Cesium.ConstantProperty(targetPointColor)
+        entity.point.outlineWidth = new Cesium.ConstantProperty(0)
+        entity.point.pixelSize = new Cesium.ConstantProperty(targetPointSize)
       }
 
       if (entity && entity.label) {
@@ -1769,10 +1746,9 @@ const highlightSatellite = (sate: { norad_id: string }, skipFlyTo = false) => {
     }
   }
   if (entity.point) {
-    entity.point.outlineColor = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
-    entity.point.outlineWidth = new Cesium.ConstantProperty(4)
-    entity.point.pixelSize = new Cesium.ConstantProperty(18)
-    entity.point.color = new Cesium.ConstantProperty(Cesium.Color.GOLD)
+    entity.point.outlineWidth = new Cesium.ConstantProperty(0)
+    entity.point.pixelSize = new Cesium.ConstantProperty(10)
+    entity.point.color = new Cesium.ConstantProperty(Cesium.Color.YELLOW)
   }
   if (entity.label) {
     if (entity.label.fillColor instanceof Cesium.ConstantProperty) {
