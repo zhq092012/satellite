@@ -982,26 +982,62 @@ const getOrCreateSatrec = (norad: number): satellitejs.SatRec | null => {
 }
 
 /**
- * 判断世界坐标是否位于相机朝向地球中心的半球（正面可见侧）。
- * @param position 目标点世界坐标
- * @param cameraPosition 相机世界坐标，默认取当前相机
+ * [几何判据 & 遮挡剔除]
+ * 判断目标点的三维世界坐标（ECEF）是否位于当前相机朝向地球中心的「正面可见半球」。
+ *
+ * [核心原理]
+ * 1. 坐标系基准：Cesium 的世界坐标系为地心地固坐标系 (ECEF)，原点 (0, 0, 0) 为地球质心。
+ * 2. 向量构造：
+ *    - 向量 A（地心 → 相机位置）：以地心为起点，指向相机的方向。
+ *    - 向量 B（地心 → 目标位置）：以地心为起点，指向卫星/地面节点的方向。
+ * 3. 半球可见性判定：
+ *    - 计算向量 A 与向量 B 单位化后的向量点积（即二者夹角的余弦值 cos θ）。
+ *    - 当 dot > 0 (θ < 90°) 时，目标位于相机可见的正面半球（面向相机一侧）；
+ *    - 当 dot <= 0 (θ >= 90°) 时，目标位于地球背面，处于视线几何盲区（被地球球体遮挡）。
+ * 4. 性能与 GC 优化：
+ *    - 全程复用预分配的静态暂存向量 `scratchCameraDir` 与 `scratchSatelliteDir`，杜绝每帧数千次对象创建带来的 GC 停顿；
+ *    - 使用 `magnitudeSquared` 规避耗时的开平方根运算。
+ *
+ * [涉及的 Cesium API]
+ * - `viewer.camera.positionWC`: 相机在世界坐标系（World Coordinates / ECEF）中的绝对笛卡尔坐标。
+ * - `Cesium.Cartesian3.ZERO`: 地心地固坐标系原点 (0, 0, 0)。
+ * - `Cesium.Cartesian3.subtract(left, right, result)`: 向量减法 (left - right)，结果写入预分配的 result 容器中。
+ * - `Cesium.Cartesian3.magnitudeSquared(cartesian)`: 快速计算向量模长的平方 (x² + y² + z²)，用于接近地心零向量时的安全退化判断。
+ * - `Cesium.Cartesian3.normalize(cartesian, result)`: 将向量单位化为模长为 1 的方向向量。
+ * - `Cesium.Cartesian3.dot(left, right)`: 计算两向量的点乘积 (x₁x₂ + y₁y₂ + z₁z₂)。
+ *
+ * @param position 目标点世界坐标 (Cesium.Cartesian3)
+ * @param cameraPosition 相机世界坐标（可选，默认使用 viewer.camera.positionWC）
+ * @returns boolean 若为 true 表示位于正面可见半球，false 表示位于地球背面遮挡区
  */
 const isPositionFacingCamera = (
   position: Cesium.Cartesian3,
   cameraPosition?: Cesium.Cartesian3
 ): boolean => {
   if (!viewer) return true
+
+  // 1. 获取相机世界坐标（若未传参则取当前相机的 positionWC）
   const camPos = cameraPosition ?? viewer.camera.positionWC
+
+  // 2. 计算地心 (0,0,0) 指向相机的方向向量，写入复用暂存区 scratchCameraDir
   Cesium.Cartesian3.subtract(camPos, Cesium.Cartesian3.ZERO, scratchCameraDir)
+
+  // 3. 计算地心 (0,0,0) 指向目标实体的方向向量，写入复用暂存区 scratchSatelliteDir
   Cesium.Cartesian3.subtract(position, Cesium.Cartesian3.ZERO, scratchSatelliteDir)
+
+  // 4. 安全防护：若向量模长平方接近 0（如相机或目标位于地心极近处），避免除以 0 导致归一化 NaN 错误
   if (
     Cesium.Cartesian3.magnitudeSquared(scratchCameraDir) < 1e-6 ||
     Cesium.Cartesian3.magnitudeSquared(scratchSatelliteDir) < 1e-6
   ) {
     return true
   }
+
+  // 5. 将两组向量归一化为单位方向向量
   Cesium.Cartesian3.normalize(scratchCameraDir, scratchCameraDir)
   Cesium.Cartesian3.normalize(scratchSatelliteDir, scratchSatelliteDir)
+
+  // 6. 计算两方向向量的点积：dot > 0 说明夹角小于 90 度，目标位于面向相机的正面半球
   return Cesium.Cartesian3.dot(scratchCameraDir, scratchSatelliteDir) > 0
 }
 
