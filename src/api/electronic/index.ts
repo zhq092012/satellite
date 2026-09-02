@@ -507,11 +507,11 @@ export interface CommunicationAttackPlanItem {
   /**
    * 开始时间
    */
-  beginTime: string | null
+  beginTime: string
   /**
    * 结束时间
    */
-  endTime: string | null
+  endTime: string
   /**
    * 角度
    */

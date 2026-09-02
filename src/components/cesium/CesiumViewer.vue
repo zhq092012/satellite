@@ -570,7 +570,17 @@ const loadSatelliteAndStations = () => {
         show: false,
         disableDepthTestDistance: 0,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, SAT_LABEL_LOD_FAR),
-      },   
+      }, 
+      path:{
+         material: new Cesium.PolylineGlowMaterialProperty({
+      glowPower: 0.1,
+      color: Cesium.Color.YELLOW,
+    }),
+    width: 10,
+    resolution: 0.01,
+    leadTime: 1,
+    trailTime: 0.1,
+      }  
     })
     electronicNodeEntityIds.add(satEntityId)
     satelliteEntityMap.set(sat.norad, entity)

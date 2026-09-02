@@ -10,19 +10,19 @@
         <!-- 状态统计看板 -->
         <span class="badge-item">
           <span class="label">卫星总数:</span>
-          <span class="value">{{ filteredSatellites.length }} 颗</span>
+          <span class="value">{{ hasSelectedSeries ? filteredSatellites.length + ' 颗' : '-' }}</span>
         </span>
         <span class="badge-item">
           <span class="label">地面站总数:</span>
-          <span class="value">{{ totalReceiveCount }} 个</span>
+          <span class="value">{{ hasSelectedSeries ? totalReceiveCount + ' 个' : '-' }}</span>
         </span>
         <span class="badge-item alert-badge">
           <span class="label">{{ ganttLabel }}卫星:</span>
-          <span class="value danger">{{ struckSatCount }} 颗</span>
+          <span class="value danger">{{ hasSelectedSeries ? struckSatCount + ' 颗' : '-' }}</span>
         </span>
         <span class="badge-item alert-badge">
           <span class="label">{{ ganttLabel }}地面站:</span>
-          <span class="value danger">{{ struckReceiveCount }} 个</span>
+          <span class="value danger">{{ hasSelectedSeries ? struckReceiveCount + ' 个' : '-' }}</span>
         </span>
       </div>
 
@@ -71,7 +71,8 @@
             <strong class="banner-name">{{ selectedSatelliteInfo.name }}</strong>
           </div>
         </template>
-        <span v-else class="banner-empty-hint">👆 请先在整体态势中选择卫星，或在左侧列表点击卫星节点</span>
+        <span v-else-if="hasSelectedSeries" class="banner-empty-hint">👆 请先在整体态势中选择卫星，或在左侧列表点击卫星节点</span>
+        <span v-else class="banner-empty-hint">👆 请先选择卫星系列以加载甘特图</span>
       </div>
 
       <div class="banner-center">
@@ -113,7 +114,7 @@
     </div>
 
     <!-- 左-中-右 三栏主容器布局 -->
-    <div class="gantt-main-body" v-loading="loading">
+    <div v-if="hasSelectedSeries" class="gantt-main-body" v-loading="loading">
       <!-- 1. 左侧栏 (Left Sidebar): 列表索引、图例 Legend、统计 -->
       <div class="gantt-sidebar-left">
         <!-- 搜索筛选框 -->
@@ -418,6 +419,13 @@
         </div>
       </div>
     </div>
+
+    <!-- 缺省状态：未选择系列提示 -->
+    <div v-else class="gantt-empty-state">
+      <span class="empty-icon">📊</span>
+      <p class="empty-title">请先选择卫星系列</p>
+      <p class="empty-sub">未选择系列时不展示甘特图，请在上方下拉框中选择系列后开始分析</p>
+    </div>
   </div>
 </template>
 
@@ -612,14 +620,19 @@ interface ProcessedGanttRow {
   trackHeight: number
 }
 
+/** 是否已选择卫星系列（或外部传入了矩阵数据）；未选择时不渲染甘特图 */
+const hasSelectedSeries = computed<boolean>(() => !!props.matrixData || !!store.selectedSatSeries)
+
 /**
  * [功能说明]
  * 获取当前生效的 MatrixResult 矩阵数据。
  *
  * [数据来源]
  * 优先使用外部传入的 props.matrixData，若未传则使用组件内部拉取的 internalMatrixData。
+ * 必须先选择卫星系列（或提供 props.matrixData），否则返回 null 避免全量数据过载。
  */
 const currentData = computed<MatrixResult | null>(() => {
+  if (!hasSelectedSeries.value) return null
   return props.matrixData || store.matrixData || internalMatrixData.value
 })
 
@@ -640,6 +653,7 @@ const currentSeriesText = computed(() => store.selectedSatSeries || '未选择')
  * 未选中单星时显示系列全部卫星数量。
  */
 const currentSatelliteText = computed(() => {
+  if (!hasSelectedSeries.value) return '未选择'
   if (selectedSatNorad.value != null) return resolveSatName(selectedSatNorad.value)
   const data = currentData.value
   if (!data) return '未选择'
@@ -667,6 +681,15 @@ const resolveSatName = (norad: number): string => {
  */
 const fetchMatrixData = async (force = false) => {
   if (props.matrixData) return
+  if (!store.selectedSatSeries) {
+    internalMatrixData.value = null
+    selectedSatNorad.value = null
+    selectedBarId.value = null
+    selectedStationKey.value = null
+    stopPlayback()
+    loading.value = false
+    return
+  }
   loading.value = true
   try {
     const data = await store.fetchMatrixForCurrentScope(force)
@@ -690,6 +713,7 @@ const fetchMatrixData = async (force = false) => {
  */
 const loadMatrixData = async () => {
   if (props.matrixData) return
+  if (!store.selectedSatSeries) return
   if (store.matrixData) return
   await fetchMatrixData(false)
 }
@@ -728,16 +752,22 @@ watch(
   (taskId) => {
     if (!taskId) {
       store.setSelectedSatSeries('')
+      internalMatrixData.value = null
     }
   }
 )
 
 watch(seriesOptions, (options) => {
-  if (!options.length) return
-  if (!options.includes(store.selectedSatSeries)) {
-    const nextSeries = options[0]
-    store.setSelectedSatSeries(nextSeries)
-    void fetchMatrixData(true)
+  if (!options.length) {
+    if (store.selectedSatSeries) {
+      store.setSelectedSatSeries('')
+      internalMatrixData.value = null
+    }
+    return
+  }
+  if (store.selectedSatSeries && !options.includes(store.selectedSatSeries)) {
+    store.setSelectedSatSeries('')
+    internalMatrixData.value = null
   }
 })
 
@@ -748,7 +778,7 @@ watch(seriesOptions, (options) => {
 watch(
   [() => store.matrixData, () => store.selectedSatSeries, () => store.activedTask?.id, () => store.activeZhchUsageType],
   () => {
-    if (!props.matrixData && !store.matrixData) {
+    if (!props.matrixData && store.selectedSatSeries && !store.matrixData) {
       void loadMatrixData()
     }
   },
@@ -759,7 +789,15 @@ watch(
   () => store.selectedSatSeries,
   (series, prev) => {
     if (props.matrixData) return
-    if (series && series !== prev) {
+    if (!series) {
+      selectedSatNorad.value = null
+      selectedBarId.value = null
+      selectedStationKey.value = null
+      internalMatrixData.value = null
+      stopPlayback()
+      return
+    }
+    if (series !== prev) {
       selectedSatNorad.value = null
       selectedBarId.value = null
       selectedStationKey.value = null
@@ -1889,17 +1927,23 @@ const resetScale = () => {
 
 // 监听生命周期与Props变动
 onMounted(() => {
-  loadMatrixData()
+  if (hasSelectedSeries.value) {
+    loadMatrixData()
+  }
   if (taskTimeBounds.value) {
     currentPlayTs.value = taskTimeBounds.value.minTs
   }
-  nextTick(() => applySharedSatelliteSelection(true))
+  if (hasSelectedSeries.value) {
+    nextTick(() => applySharedSatelliteSelection(true))
+  }
 })
 
 onActivated(() => {
-  nextTick(() => {
-    syncGanttViewToCurrentSatelliteFirstWindow()
-  })
+  if (hasSelectedSeries.value) {
+    nextTick(() => {
+      syncGanttViewToCurrentSatelliteFirstWindow()
+    })
+  }
 })
 
 onBeforeUnmount(() => {
@@ -3242,6 +3286,39 @@ watch(playheadLeftPx, () => {
           line-height: 1.4;
         }
       }
+    }
+  }
+
+  /* 3. 未选择系列时的缺省提示视图 */
+  .gantt-empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 40px 24px;
+    text-align: center;
+    background: radial-gradient(circle at 50% 50%, #0a1326 0%, #050811 100%);
+
+    .empty-icon {
+      font-size: 42px;
+      opacity: 0.85;
+    }
+
+    .empty-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: #e2efff;
+    }
+
+    .empty-sub {
+      margin: 0;
+      max-width: 420px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #94a3b8;
     }
   }
 }
