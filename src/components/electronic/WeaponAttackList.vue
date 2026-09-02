@@ -26,8 +26,8 @@
       <div class="header-right">
         <!-- 视图模式切换 Tab -->
         <el-radio-group v-model="activeViewTab" size="small" class="view-switch-radio">
-          <el-radio-button value="card">📋 窗口卡片</el-radio-button>
           <el-radio-button value="snake">S型打击时序流</el-radio-button>
+          <el-radio-button value="card">📋 窗口卡片</el-radio-button>
         </el-radio-group>
 
         <el-input v-model="searchKeyword" placeholder="请输入搜索信息" prefix-icon="Search" clearable size="small"
@@ -361,7 +361,7 @@ const props = withDefaults(defineProps<Props>(), {
 const store = useLayoutStore()
 
 /** 当前激活的视图 Tab ('card': 卡片表格, 'snake': S型打击时序流) */
-const activeViewTab = ref<'card' | 'snake'>('card')
+const activeViewTab = ref<'card' | 'snake'>('snake')
 
 /** S型时序流程：每行卡片列数（默认4列） */
 const snakeCols = ref<number>(4)
