@@ -480,7 +480,7 @@ const openThreatDetail = async (sat: SatListItem) => {
     /** 卫星威胁度详情接口响应。 */
     const res = await getSatelliteThreatInfo({
       norad: sat.norad,
-      series: selectedSeries.value || '侦察',
+      series: '侦察',
       taskId,
     })
     if (res.code === 200 && res.data?.length) {
