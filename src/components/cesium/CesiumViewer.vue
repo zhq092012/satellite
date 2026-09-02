@@ -322,12 +322,60 @@ const TRANSMISSION_LINK_LINE_COLOR = Cesium.Color.fromCssColorString('#F5E6A3').
 const SAT_LABEL_LOD_NEAR = 6000000
 /** 卫星标签远距离 LOD 上限（米），超过后隐藏标签 */
 const SAT_LABEL_LOD_FAR = 12000000
+/** 卫星图标 (Billboard) 最大可见距离（米），近处显示图标，超过此距离后切换为 Point 点 */
+const SAT_BILLBOARD_MAX_DISTANCE = 10000000
 /** 高亮/选中卫星标签最大可见距离（米） */
 const SAT_LABEL_HIGHLIGHT_MAX_DISTANCE = 20000000
 /** 地面站/数据中心标签近距离 LOD 上限（米） */
 const GROUND_LABEL_LOD_NEAR = 6000000
 /** 地面站/数据中心链路高亮标签最大可见距离（米） */
 const GROUND_LABEL_HIGHLIGHT_MAX_DISTANCE = 20000000
+/** 地面站/数据中心图标 (Billboard) 最大可见距离（米），近处显示图标，超过此距离切换为三角/正方形几何图形 */
+const GROUND_BILLBOARD_MAX_DISTANCE = 8000000
+/** 我方武器图标 (Billboard) 最大可见距离（米），近处显示图标，超过此距离切换为菱形几何图形 */
+const WEAPON_BILLBOARD_MAX_DISTANCE = 8000000
+
+/**
+ * 生成以经纬度为中心的等边三角形 PolygonHierarchy（用于地面站远距离展示）
+ */
+const createTriangleHierarchy = (lon: number, lat: number, size = 0.65): Cesium.PolygonHierarchy => {
+  return new Cesium.PolygonHierarchy(
+    Cesium.Cartesian3.fromDegreesArray([
+      lon, lat + size,
+      lon + size * 0.866, lat - size * 0.5,
+      lon - size * 0.866, lat - size * 0.5,
+    ])
+  )
+}
+
+/**
+ * 生成以经纬度为中心的正方形 PolygonHierarchy（用于数据中心远距离展示）
+ */
+const createSquareHierarchy = (lon: number, lat: number, size = 0.55): Cesium.PolygonHierarchy => {
+  return new Cesium.PolygonHierarchy(
+    Cesium.Cartesian3.fromDegreesArray([
+      lon - size, lat - size,
+      lon + size, lat - size,
+      lon + size, lat + size,
+      lon - size, lat + size,
+    ])
+  )
+}
+
+/**
+ * 生成以经纬度为中心的菱形 PolygonHierarchy（用于我方武器远距离展示）
+ */
+const createDiamondHierarchy = (lon: number, lat: number, size = 0.65): Cesium.PolygonHierarchy => {
+  return new Cesium.PolygonHierarchy(
+    Cesium.Cartesian3.fromDegreesArray([
+      lon, lat + size,
+      lon + size, lat,
+      lon, lat - size,
+      lon - size, lat,
+    ])
+  )
+}
+
 /** 武器标签近距离 LOD 上限（米） */
 const WEAPON_LABEL_LOD_NEAR = 6000000
 /** 当前渲染的卫星实体映射（NORAD → Entity） */
@@ -490,6 +538,12 @@ const loadSatelliteAndStations = () => {
       const resolveColor = () => (isNodeHighlighted() ? highlightColor : Cesium.Color.WHITE)
       const resolveLabelColor = () => (isNodeHighlighted() ? highlightColor : Cesium.Color.CYAN)
 
+      const defaultShapeColor = isReceive
+        ? Cesium.Color.fromCssColorString('#38bdf8')
+        : Cesium.Color.fromCssColorString('#c084fc')
+      const resolveShapeColor = () => (isNodeHighlighted() ? highlightColor : defaultShapeColor)
+
+      // 单一实体：近距离显示真实图标 Billboard (<= 8,000 km)，远距离切换显示 Polygon 几何图形 (> 8,000 km)
       const infraEntity = viewer.entities.add({
         id: entityId,
         position,
@@ -501,6 +555,17 @@ const loadSatelliteAndStations = () => {
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           disableDepthTestDistance: 0,
           heightReference: Cesium.HeightReference.NONE,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, GROUND_BILLBOARD_MAX_DISTANCE),
+        },
+        polygon: {
+          hierarchy: isReceive
+            ? createTriangleHierarchy(node.longitude, node.latitude)
+            : createSquareHierarchy(node.longitude, node.latitude),
+          material: new Cesium.ColorMaterialProperty(
+            new Cesium.CallbackProperty(() => resolveShapeColor(), false) as unknown as Cesium.Property
+          ),
+          height: node.altitude || 0,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(GROUND_BILLBOARD_MAX_DISTANCE, Number.MAX_VALUE),
         },
         label: {
           text: labelText,
@@ -555,8 +620,14 @@ const loadSatelliteAndStations = () => {
         height: new Cesium.CallbackProperty(() => (isSatHighlighted() ? 32 : 24), false) as unknown as Cesium.Property,
         disableDepthTestDistance: 0,
         show: true,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, SAT_BILLBOARD_MAX_DISTANCE),
       },
-
+      point: {
+        pixelSize: new Cesium.CallbackProperty(() => (isSatHighlighted() ? 10 : 8), false) as unknown as Cesium.Property,
+        color: new Cesium.CallbackProperty(() => (isSatHighlighted() ? Cesium.Color.YELLOW : satColor), false) as unknown as Cesium.Property,
+        disableDepthTestDistance: 0,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(SAT_BILLBOARD_MAX_DISTANCE, Number.MAX_VALUE),
+      },
       label: {
         text: buildSatelliteLabelText(sat.norad, sat.name),
         font: 'bold 12px sans-serif',
@@ -571,15 +642,15 @@ const loadSatelliteAndStations = () => {
         disableDepthTestDistance: 0,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, SAT_LABEL_LOD_FAR),
       }, 
-      path:{
-         material: new Cesium.PolylineGlowMaterialProperty({
-      glowPower: 0.1,
-      color: Cesium.Color.YELLOW,
-    }),
-    width: 10,
-    resolution: 0.01,
-    leadTime: 1,
-    trailTime: 0.1,
+      path: {
+        material: new Cesium.PolylineGlowMaterialProperty({
+          glowPower: 0.1,
+          color: Cesium.Color.YELLOW,
+        }),
+        width: 10,
+        resolution: 0.01,
+        leadTime: 1,
+        trailTime: 0.1,
       }  
     })
     electronicNodeEntityIds.add(satEntityId)
@@ -850,6 +921,8 @@ const renderWeaponsOnCesium = () => {
     const position = Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 0)
     // const rangeMeters = Math.max(10000, Number(weapon.range ?? 0) * 1000)
     const weaponType = weapon.type
+
+    // 单一实体：近距离显示真实武器图标 Billboard (<= 8,000 km)，远距离切换显示菱形 Polygon (> 8,000 km)
     const entity = viewer.entities.add({
       id: weaponId,
       name: weapon.name,
@@ -864,6 +937,13 @@ const renderWeaponsOnCesium = () => {
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         disableDepthTestDistance: 0,
         heightReference: Cesium.HeightReference.NONE,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, WEAPON_BILLBOARD_MAX_DISTANCE),
+      },
+      polygon: {
+        hierarchy: createDiamondHierarchy(weapon.longitude, weapon.latitude),
+        material: new Cesium.ColorMaterialProperty(OUR_WEAPON_DEFAULT_COLOR),
+        height: 0,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(WEAPON_BILLBOARD_MAX_DISTANCE, Number.MAX_VALUE),
       },
       label: {
         text: `${weapon.name} (${weapon.type || '武器'})`,
@@ -890,7 +970,6 @@ const renderWeaponsOnCesium = () => {
         ${weapon.satellite_type ? `<p style="margin: 4px 0;"><strong>适用目标:</strong> ${weapon.satellite_type}</p>` : ''}
       </div>`,
     })
-
     newEntities.push(entity)
 
     ourWeaponStyleCache.set(weaponId, {
@@ -1145,6 +1224,16 @@ const updateSatelliteVisuals = () => {
       }
       if (entity.billboard.height instanceof Cesium.ConstantProperty) {
         entity.billboard.height.setValue(targetBillboardSize)
+      }
+    }
+    if (entity.point) {
+      const targetPointColor = forced ? Cesium.Color.YELLOW : satColor
+      const targetPointSize = forced ? 10 : 8
+      if (entity.point.color instanceof Cesium.ConstantProperty) {
+        entity.point.color.setValue(targetPointColor)
+      }
+      if (entity.point.pixelSize instanceof Cesium.ConstantProperty) {
+        entity.point.pixelSize.setValue(targetPointSize)
       }
     }
     if (entity.label) {
@@ -1412,7 +1501,7 @@ function handleViewerClickEvent() {
 
     // 检测是否点击了敌方地面接收站或数据中心 3D 实体
     if (rawEntityId.startsWith('infra-node-')) {
-      const cleanId = rawEntityId.replace(/-(ring|frustum)$/, '')
+      const cleanId = rawEntityId.replace(/-(ring|frustum|lod-shape)$/, '')
       const infraMatch = infrastructureNodes.value.find((node) => `infra-node-${node.type}-${node.id}` === cleanId)
       if (infraMatch) {
         store.setSelectedInfrastructureNode(infraMatch)
