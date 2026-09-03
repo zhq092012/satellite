@@ -139,7 +139,7 @@ class HttpRequest {
         } else if (error.request) {
           ElMessage.error('网络错误，请检查您的网络连接')
         } else {
-          ElMessage.error(`请求错误：${error.message}`)
+          console.error(`请求错误：${error.message}`)
         }
 
         return Promise.reject(error)

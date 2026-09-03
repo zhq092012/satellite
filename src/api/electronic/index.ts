@@ -610,6 +610,16 @@ export interface SatelliteThreatInfo {
     /** 剩余工作寿命 */
     remainLifetimeIndicator: number
   }
+  /** 通信带宽指标（通信卫星专用） */
+  txBandwidth?: number
+  /** 同时服务用户数指标（通信卫星专用） */
+  txUserNum?: number
+  /** 高轨通信卫星定点位置（通信卫星专用） */
+  txFixedPosition?: number | null
+  /** 通信覆盖重数指标（通信卫星专用） */
+  txCoverage?: number
+  /** 通信重访周期（通信卫星专用） */
+  txCycle?: number
   /** 成像分辨率 */
   zhchResolution: number
   /** 成像幅宽 */

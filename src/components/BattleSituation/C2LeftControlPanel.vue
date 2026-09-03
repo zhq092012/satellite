@@ -166,26 +166,50 @@
                 <span class="param-label">载荷类型</span>
                 <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.sat_type || '--' }}</span>
               </div>
-              <div class="param-item">
-                <span class="param-label">成像分辨率</span>
-                <span class="param-value">{{ threatInfo.zhchResolution ?? '--' }}</span>
-              </div>
-              <div class="param-item">
-                <span class="param-label">成像幅宽</span>
-                <span class="param-value">{{ threatInfo.zhchSwathWidth ?? '--' }}</span>
-              </div>
-              <div class="param-item">
-                <span class="param-label">重访周期</span>
-                <span class="param-value">{{ threatInfo.zhchCycle ?? '--' }}</span>
-              </div>
-              <div class="param-item">
-                <span class="param-label">降交点地方时</span>
-                <span class="param-value">{{ threatInfo.zhchLtdn ?? '--' }}</span>
-              </div>
-              <div class="param-item">
-                <span class="param-label">定点位置（高轨卫星）</span>
-                <span class="param-value">{{ threatInfo.zhchFixedPosition ?? '--' }}</span>
-              </div>
+              <template v-if="isThreatDialogCommSat">
+                <div class="param-item">
+                  <span class="param-label">通信带宽</span>
+                  <span class="param-value">{{ threatInfo.txBandwidth ?? '--' }}</span>
+                </div>
+                <div class="param-item">
+                  <span class="param-label">同时服务用户数</span>
+                  <span class="param-value">{{ threatInfo.txUserNum ?? '--' }}</span>
+                </div>
+                <div class="param-item">
+                  <span class="param-label">定点位置</span>
+                  <span class="param-value">{{ threatInfo.txFixedPosition ?? '--' }}</span>
+                </div>
+                <div class="param-item">
+                  <span class="param-label">覆盖重数</span>
+                  <span class="param-value">{{ threatInfo.txCoverage ?? '--' }}</span>
+                </div>
+                <div class="param-item">
+                  <span class="param-label">通信周期</span>
+                  <span class="param-value">{{ threatInfo.txCycle ?? '--' }}</span>
+                </div>
+              </template>
+              <template v-else>
+                <div class="param-item">
+                  <span class="param-label">成像分辨率</span>
+                  <span class="param-value">{{ threatInfo.zhchResolution ?? '--' }}</span>
+                </div>
+                <div class="param-item">
+                  <span class="param-label">成像幅宽</span>
+                  <span class="param-value">{{ threatInfo.zhchSwathWidth ?? '--' }}</span>
+                </div>
+                <div class="param-item">
+                  <span class="param-label">重访周期</span>
+                  <span class="param-value">{{ threatInfo.zhchCycle ?? '--' }}</span>
+                </div>
+                <div class="param-item">
+                  <span class="param-label">降交点地方时</span>
+                  <span class="param-value">{{ threatInfo.zhchLtdn ?? '--' }}</span>
+                </div>
+                <div class="param-item">
+                  <span class="param-label">定点位置（高轨卫星）</span>
+                  <span class="param-value">{{ threatInfo.zhchFixedPosition ?? '--' }}</span>
+                </div>
+              </template>
               <div class="param-item">
                 <span class="param-label">在轨状态</span>
                 <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.orbitStatusIndicator ?? '--' }}</span>
@@ -267,6 +291,21 @@ const selectedSeries = computed({
 
 /** STARLINK 系列使用覆盖率替代链路时长作为列表指标。 */
 const isStarlinkSeries = computed(() => selectedSeries.value === 'STARLINK')
+
+/**
+ * 判断卫星是否应按通信卫星处理威胁度详情。
+ * 当前系列为 STARLINK，或卫星名称以 STARLINK 开头时视为通信卫星。
+ *
+ * @param satName 卫星名称
+ * @returns 是否为通信卫星
+ */
+const isCommThreatSatellite = (satName?: string | null): boolean => {
+  if (selectedSeries.value === 'STARLINK') return true
+  return !!satName && satName.toUpperCase().startsWith('STARLINK')
+}
+
+/** 当前威胁度弹窗中的卫星是否为通信卫星 */
+const isThreatDialogCommSat = computed(() => isCommThreatSatellite(threatDialogSat.value?.name))
 
 /** 方案接口请求中（系列列表尚未返回） */
 const planLoading = computed(() => store.zhchPlanLoading)
@@ -487,7 +526,7 @@ const openThreatDetail = async (sat: SatListItem) => {
     /** 卫星威胁度详情接口响应。 */
     const res = await getSatelliteThreatInfo({
       norad: sat.norad,
-      series: '侦察',
+      series: isCommThreatSatellite(sat.name) ? '通信' : '侦察',
       taskId,
     })
     if (res.code === 200 && res.data?.length) {
