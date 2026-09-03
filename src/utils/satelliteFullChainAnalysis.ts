@@ -183,12 +183,120 @@ const mergeSatelliteTransitWindows = (
 }
 
 /**
+ * 单份矩阵的 O(1) 查找索引，避免 STARLINK 等大规模系列反复 `.find()` / `.includes()`。
+ */
+export interface MatrixLookupIndex {
+  /** 打击前卫星矩阵，按 NORAD 索引。 */
+  initByNorad: Map<number, NonNullable<MatrixResult['initMatrixList']>[number]>
+  /** 打击后卫星矩阵，按 NORAD 索引。 */
+  postByNorad: Map<number, NonNullable<MatrixResult['satelliteMatrixList']>[number]>
+  /** NORAD → 卫星名称。 */
+  satNameMap: Map<number, string>
+  /** 中继卫星 NORAD 集合。 */
+  relayNoradSet: Set<number>
+  /** 观测星 NORAD → 中继关系。 */
+  relayByFrom: Map<number, NonNullable<NonNullable<MatrixResult['relayRelation']>['relations']>[number]>
+  /** NORAD → 过境时效。 */
+  timeEffectByNorad: Map<number, NonNullable<MatrixResult['timeEffects']>[number]>
+}
+
+/** 按矩阵对象缓存的查找索引。 */
+const matrixIndexCache = new WeakMap<MatrixResult, MatrixLookupIndex>()
+/** 按矩阵对象缓存的全系列传输链路。 */
+const seriesLinksCache = new WeakMap<MatrixResult, SatelliteTransmissionLink[]>()
+/** 按矩阵对象缓存的单星传输链路。 */
+const satLinksCache = new WeakMap<MatrixResult, Map<number, SatelliteTransmissionLink[]>>()
+
+/**
+ * 构建或读取矩阵查找索引。
+ *
+ * @param matrix 算法矩阵
+ * @returns 可复用的 O(1) 索引
+ */
+export const getMatrixLookupIndex = (matrix: MatrixResult): MatrixLookupIndex => {
+  const cached = matrixIndexCache.get(matrix)
+  if (cached) return cached
+
+  const initByNorad = new Map<number, NonNullable<MatrixResult['initMatrixList']>[number]>()
+  const postByNorad = new Map<number, NonNullable<MatrixResult['satelliteMatrixList']>[number]>()
+  const satNameMap = new Map<number, string>()
+  ;(matrix.initMatrixList || []).forEach((sat) => {
+    if (!sat?.norad) return
+    initByNorad.set(sat.norad, sat)
+    if (sat.name) satNameMap.set(sat.norad, sat.name)
+  })
+  ;(matrix.satelliteMatrixList || []).forEach((sat) => {
+    if (!sat?.norad) return
+    postByNorad.set(sat.norad, sat)
+    if (sat.name) satNameMap.set(sat.norad, sat.name)
+  })
+
+  const relayNoradSet = new Set<number>(matrix.relayRelation?.relayList || [])
+  const relayByFrom = new Map<number, NonNullable<NonNullable<MatrixResult['relayRelation']>['relations']>[number]>()
+  ;(matrix.relayRelation?.relations || []).forEach((rel) => {
+    const from = Number(rel.from)
+    if (Number.isFinite(from)) relayByFrom.set(from, rel)
+  })
+
+  const timeEffectByNorad = new Map<number, NonNullable<MatrixResult['timeEffects']>[number]>()
+  ;(matrix.timeEffects || []).forEach((item) => {
+    if (item?.norad) timeEffectByNorad.set(item.norad, item)
+  })
+
+  const index: MatrixLookupIndex = {
+    initByNorad,
+    postByNorad,
+    satNameMap,
+    relayNoradSet,
+    relayByFrom,
+    timeEffectByNorad,
+  }
+  matrixIndexCache.set(matrix, index)
+  return index
+}
+
+/**
+ * 读取单星链路缓存表。
+ *
+ * @param matrix 算法矩阵
+ * @returns NORAD → 链路列表
+ */
+const getOrCreateSatLinkCache = (matrix: MatrixResult): Map<number, SatelliteTransmissionLink[]> => {
+  const cached = satLinksCache.get(matrix)
+  if (cached) return cached
+  const next = new Map<number, SatelliteTransmissionLink[]>()
+  satLinksCache.set(matrix, next)
+  return next
+}
+
+/**
+ * 将 Worker / 预计算得到的全系列链路写入缓存，供后续 computed 直接命中。
+ *
+ * @param matrix 算法矩阵
+ * @param links 已计算的传输链路
+ */
+export const seedSeriesTransmissionLinksCache = (
+  matrix: MatrixResult,
+  links: SatelliteTransmissionLink[]
+): void => {
+  seriesLinksCache.set(matrix, links)
+}
+
+/**
+ * 当前矩阵是否已缓存全系列传输链路。
+ *
+ * @param matrix 算法矩阵
+ * @returns 是否命中缓存
+ */
+export const hasSeriesTransmissionLinksCache = (matrix: MatrixResult): boolean => seriesLinksCache.has(matrix)
+
+/**
  * 查找观测卫星对应的中继关系
  * @param matrix 算法矩阵
  * @param norad 观测卫星 NORAD
  */
 const findRelayRelation = (matrix: MatrixResult, norad: number) =>
-  matrix.relayRelation?.relations?.find((r) => Number(r.from) === norad || String(r.from) === String(norad))
+  getMatrixLookupIndex(matrix).relayByFrom.get(norad)
 
 /**
  * 合并指定 NORAD 卫星的全部过境窗口
@@ -196,8 +304,9 @@ const findRelayRelation = (matrix: MatrixResult, norad: number) =>
  * @param norad 卫星 NORAD
  */
 const getMergedWindowsForNorad = (matrix: MatrixResult, norad: number): Record<string, any>[] => {
-  const initSat = matrix.initMatrixList?.find((s) => s.norad === norad)
-  const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
+  const index = getMatrixLookupIndex(matrix)
+  const initSat = index.initByNorad.get(norad)
+  const postSat = index.postByNorad.get(norad)
   return mergeSatelliteTransitWindows(
     (initSat?.initWindows || []) as Record<string, any>[],
     (postSat?.stationWindows || []) as Record<string, any>[]
@@ -215,7 +324,7 @@ const resolveWindowReceive = (
     return { receiveId: receiveId || receiveName || '', receiveName: receiveName || receiveId || '' }
   }
 
-  const timeEffect = matrix.timeEffects?.find((item) => item.norad === norad)
+  const timeEffect = getMatrixLookupIndex(matrix).timeEffectByNorad.get(norad)
   if (timeEffect?.receiveName) {
     const relationData = getRelationData(matrix, false)
     const matched = relationData.receiveObjList?.find((rec) => rec.receiveName === timeEffect.receiveName)
@@ -291,9 +400,10 @@ const appendRelayDownlinkCandidates = (
 }
 
 const enumerateChainCandidates = (matrix: MatrixResult, norad: number, usePostStrike: boolean): ChainCandidate[] => {
-  const satNameMap = buildSatNameMap(matrix)
-  const initSat = matrix.initMatrixList?.find((s) => s.norad === norad)
-  const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
+  const index = getMatrixLookupIndex(matrix)
+  const satNameMap = index.satNameMap
+  const initSat = index.initByNorad.get(norad)
+  const postSat = index.postByNorad.get(norad)
   const satName = postSat?.name || initSat?.name || `Sat-${norad}`
 
   if (usePostStrike && (!postSat || postSat.satelliteStatus === 1)) return []
@@ -458,7 +568,7 @@ export const getSatelliteRelatedEdgeIds = (matrix: MatrixResult, norad: number):
  */
 export const isRelaySatellite = (matrix: MatrixResult, norad: number, satType?: string): boolean => {
   if ((satType || '').includes('中继')) return true
-  return (matrix.relayRelation?.relayList || []).includes(norad)
+  return getMatrixLookupIndex(matrix).relayNoradSet.has(norad)
 }
 
 /**
@@ -476,13 +586,13 @@ export const listSourceSatelliteNoradsForRelay = (matrix: MatrixResult, relayNor
 
 /** 普通侦察卫星 NORAD 列表（不含中继） */
 export const listNormalSatelliteNorads = (matrix: MatrixResult): number[] => {
+  const index = getMatrixLookupIndex(matrix)
   const norads = new Set<number>()
-  ;(matrix.initMatrixList || []).forEach((s) => {
-    if (!isRelaySatellite(matrix, s.norad, s.satType)) norads.add(s.norad)
-  })
-  ;(matrix.satelliteMatrixList || []).forEach((s) => {
-    if (!isRelaySatellite(matrix, s.norad, s.satType)) norads.add(s.norad)
-  })
+  const addIfNormal = (sat: { norad: number; satType?: string }) => {
+    if (!isRelaySatellite(matrix, sat.norad, sat.satType)) norads.add(sat.norad)
+  }
+  index.initByNorad.forEach(addIfNormal)
+  index.postByNorad.forEach(addIfNormal)
   return Array.from(norads)
 }
 
@@ -962,24 +1072,31 @@ export const collectSatelliteTransmissionLinks = (
 ): SatelliteTransmissionLink[] => {
   if (!matrix || !norad) return []
 
+  const cache = getOrCreateSatLinkCache(matrix)
+  const cached = cache.get(norad)
+  if (cached) return cached
+
   if (isRelaySatellite(matrix, norad)) {
-    return collectRelaySatelliteTransmissionLinks(matrix, norad)
+    const relayLinks = collectRelaySatelliteTransmissionLinks(matrix, norad)
+    cache.set(norad, relayLinks)
+    return relayLinks
   }
 
-  const initSat = matrix.initMatrixList?.find((s) => s.norad === norad)
-  const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
+  const index = getMatrixLookupIndex(matrix)
+  const initSat = index.initByNorad.get(norad)
+  const postSat = index.postByNorad.get(norad)
   const satName = postSat?.name || initSat?.name || `Sat-${norad}`
   const windows = mergeSatelliteTransitWindows(
     (initSat?.initWindows || []) as Record<string, any>[],
     (postSat?.stationWindows || []) as Record<string, any>[]
   )
-  const satNameMap = buildSatNameMap(matrix)
+  const satNameMap = index.satNameMap
   const links: SatelliteTransmissionLink[] = []
   const relayRel = findRelayRelation(matrix, norad)
   const relayNorad = relayRel ? Number(relayRel.to) : null
-  const relayPostSat = relayNorad ? matrix.satelliteMatrixList?.find((s) => s.norad === relayNorad) : undefined
+  const relayPostSat = relayNorad ? index.postByNorad.get(relayNorad) : undefined
 
-  windows.forEach((win, index) => {
+  windows.forEach((win, winIndex) => {
     const receive = resolveWindowReceive(matrix, norad, win)
     if (!receive) return
 
@@ -1051,7 +1168,7 @@ export const collectSatelliteTransmissionLinks = (
     const finishTs = relayEndTs ? Math.max(relayEndTs, groundEndTs) : groundEndTs
 
     links.push({
-      id: `${norad}-${receiveId}-${groundStart}-${index}`,
+      id: `${norad}-${receiveId}-${groundStart}-${winIndex}`,
       nodes,
       receiveName,
       receiveId,
@@ -1137,10 +1254,12 @@ export const collectSatelliteTransmissionLinks = (
     })
   }
 
-  return links.sort((a, b) => {
+  const sortedLinks = links.sort((a, b) => {
     if (a.transmitStartMs !== b.transmitStartMs) return a.transmitStartMs - b.transmitStartMs
     return a.receiveName.localeCompare(b.receiveName, 'zh-CN')
   })
+  cache.set(norad, sortedLinks)
+  return sortedLinks
 }
 
 /**
@@ -1151,14 +1270,19 @@ export const collectSatelliteTransmissionLinks = (
  */
 export const collectSeriesTransmissionLinks = (matrix: MatrixResult | null): SatelliteTransmissionLink[] => {
   if (!matrix) return []
+  const cached = seriesLinksCache.get(matrix)
+  if (cached) return cached
+
   const links: SatelliteTransmissionLink[] = []
   listNormalSatelliteNorads(matrix).forEach((norad) => {
     links.push(...collectSatelliteTransmissionLinks(matrix, norad))
   })
-  return links.sort((a, b) => {
+  const sorted = links.sort((a, b) => {
     if (a.transmitStartMs !== b.transmitStartMs) return a.transmitStartMs - b.transmitStartMs
     return a.receiveName.localeCompare(b.receiveName, 'zh-CN')
   })
+  seriesLinksCache.set(matrix, sorted)
+  return sorted
 }
 
 /**
@@ -1358,14 +1482,17 @@ export const collectMatrixOverviewStats = (matrix: MatrixResult | null, scopeLab
     })
   })
 
-  const chainStats = collectNetworkChainStats(matrix)
+  const cachedLinks = seriesLinksCache.get(matrix)
+  const possibleLinkCount = cachedLinks
+    ? cachedLinks.length
+    : (matrix.initMatrixList || []).reduce((sum, sat) => sum + (sat.initWindows?.length || 0), 0)
 
   return {
     satelliteCount: satelliteIds.size,
     receiveCount: relationData?.receiveObjList?.length || 0,
     stationCount: relationData?.stationObjList?.length || 0,
     weaponCount: weaponNames.size,
-    possibleLinkCount: chainStats.totalCount,
+    possibleLinkCount,
     scopeLabel: scopeLabel || matrix.series || '全部系列',
   }
 }

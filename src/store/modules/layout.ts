@@ -7,6 +7,7 @@ import {
   type ZhchPlanResp,
 } from '@/api/electronic'
 import { mergeMatrixResults } from '@/utils/satelliteFullChainAnalysis'
+import { prefetchSeriesTransmissionLinks } from '@/utils/prefetchTransmissionLinks'
 import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 
@@ -145,9 +146,7 @@ export const useLayoutStore = defineStore('layout-store', {
       return (plan?.levelSeriesEntities || []).map((entity) => entity.series)
     },
     // 从 battle.area 中解析 lonlats 并计算战场区域边界包围盒
-    battleAreaBounds(
-      state
-    ): {
+    battleAreaBounds(state): {
       min_lat: number
       max_lat: number
       min_lng: number
@@ -451,17 +450,19 @@ export const useLayoutStore = defineStore('layout-store', {
             return this.matrixData
           }
 
-          const { token, scopeKey, queryKey: activeQueryKey, taskId: activeTaskId } =
-            this.beginMatrixFetch()
+          const { token, scopeKey, queryKey: activeQueryKey, taskId: activeTaskId } = this.beginMatrixFetch()
           try {
             if (!this.isMatrixFetchCurrent(token)) {
               return this.matrixData
             }
 
-            const matrix = this.resolveMatrixFromZhchPlan(
-              plan,
-              this.selectedSatSeries || undefined
-            )
+            const matrix = this.resolveMatrixFromZhchPlan(plan, this.selectedSatSeries || undefined)
+            if (matrix) {
+              await prefetchSeriesTransmissionLinks(matrix)
+            }
+            if (!this.isMatrixFetchCurrent(token)) {
+              return this.matrixData
+            }
             return this.applyMatrixResult(token, scopeKey, activeTaskId, activeQueryKey, matrix)
           } finally {
             this.finishMatrixFetch(token)

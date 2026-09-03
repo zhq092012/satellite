@@ -42,63 +42,71 @@
         <span class="norad-tag">NORAD {{ selectedNorad }}</span>
       </div>
 
-      <el-scrollbar class="link-scroll">
-        <div v-for="item in filteredLinkItems" :key="item.id"
-          :ref="(el) => setLinkCardRef(item.id, el as HTMLElement | null)" class="link-card" :class="[
+      <div class="link-scroll">
+        <VirtualScrollList
+          ref="linkVirtualListRef"
+          :items="filteredLinkItems"
+          :item-height="isStarlinkSeries ? 136 : 156"
+          item-key="id"
+        >
+        <template #default="{ item }">
+          <div class="link-card" :class="[
             { active: selectedLinkId === item.id, struck: item.struck, ok: !item.struck },
             item.rank ? `rank-card--${item.rank}` : ''
           ]" @click="handleSelect(item)">
-          <div class="link-card-top">
-            <div class="link-path">
-              <template v-for="(node, idx) in item.nodes" :key="`${item.id}-${idx}`">
-                <span class="path-node" :class="[`path-node--${node.layer}`, { 'path-node--struck': node.struck }]">
-                  <span class="path-icon">{{ node.icon }}</span>
-                  <span class="path-name">{{ node.name }}</span>
+            <div class="link-card-top">
+              <div class="link-path">
+                <template v-for="(node, idx) in item.nodes" :key="`${item.id}-${idx}`">
+                  <span class="path-node" :class="[`path-node--${node.layer}`, { 'path-node--struck': node.struck }]">
+                    <span class="path-icon">{{ node.icon }}</span>
+                    <span class="path-name">{{ node.name }}</span>
+                  </span>
+                  <span v-if="idx < item.nodes.length - 1" class="path-arrow">→</span>
+                </template>
+              </div>
+              <div class="link-card-badges">
+                <span v-if="item.rank && item.rank <= 3" class="rank-mini-tag" :class="`rank-mini-tag--${item.rank}`">
+                  {{ getRankMedal(item.rank) }} TOP {{ item.rank }}
                 </span>
-                <span v-if="idx < item.nodes.length - 1" class="path-arrow">→</span>
-              </template>
+                <span class="status-badge" :class="item.struck ? 'struck' : 'ok'">
+                  {{ item.interferenceStatus }}
+                </span>
+              </div>
             </div>
-            <div class="link-card-badges">
-              <span v-if="item.rank && item.rank <= 3" class="rank-mini-tag" :class="`rank-mini-tag--${item.rank}`">
-                {{ getRankMedal(item.rank) }} TOP {{ item.rank }}
-              </span>
-              <span class="status-badge" :class="item.struck ? 'struck' : 'ok'">
-                {{ item.interferenceStatus }}
-              </span>
-            </div>
-          </div>
 
-          <div class="link-meta">
-            <div class="meta-row-two-col">
-              <span class="meta-line meta-line--time">
-                <span class="meta-key">传输</span>
-                <span class="meta-val">{{ item.transmitTime }}</span>
+            <div class="link-meta">
+              <div class="meta-row-two-col">
+                <span class="meta-line meta-line--time">
+                  <span class="meta-key">传输</span>
+                  <span class="meta-val">{{ item.transmitTime }}</span>
+                </span>
+                <span v-if="item.totalScore != null" class="score-mini-pill" title="基于威胁度、时效、孤立度与中继计算的优先级得分">
+                  评分 {{ item.totalScore }}分
+                </span>
+              </div>
+              <span v-if="isStarlinkSeries" class="meta-line meta-line--coverage">
+                <span class="meta-key">覆盖率</span>
+                <span class="meta-val">{{ formatCoverage(item.coverage) }}</span>
               </span>
-              <span v-if="item.totalScore != null" class="score-mini-pill" title="基于威胁度、时效、孤立度与中继计算的优先级得分">
-                评分 {{ item.totalScore }}分
+              <template v-else>
+                <span v-if="item.struck" class="meta-line meta-line--strike-target">
+                  <span class="meta-key">打击</span>
+                  <span class="meta-val">{{ item.struckDetailText }}</span>
+                </span>
+                <span v-if="item.weaponNames" class="meta-line meta-line--weapon">
+                  <span class="meta-key">武器</span>
+                  <span class="meta-val">{{ item.weaponNames }}</span>
+                </span>
+              </template>
+              <span v-if="item.delayMin > 0" class="meta-line meta-line--delay">
+                <span class="meta-key">延迟</span>
+                <span class="meta-val">+{{ item.delayMin }} 分钟</span>
               </span>
             </div>
-            <span v-if="isStarlinkSeries" class="meta-line meta-line--coverage">
-              <span class="meta-key">覆盖率</span>
-              <span class="meta-val">{{ formatCoverage(item.coverage) }}</span>
-            </span>
-            <template v-else>
-              <span v-if="item.struck" class="meta-line meta-line--strike-target">
-                <span class="meta-key">打击</span>
-                <span class="meta-val">{{ item.struckDetailText }}</span>
-              </span>
-              <span v-if="item.weaponNames" class="meta-line meta-line--weapon">
-                <span class="meta-key">武器</span>
-                <span class="meta-val">{{ item.weaponNames }}</span>
-              </span>
-            </template>
-            <span v-if="item.delayMin > 0" class="meta-line meta-line--delay">
-              <span class="meta-key">延迟</span>
-              <span class="meta-val">+{{ item.delayMin }} 分钟</span>
-            </span>
           </div>
-        </div>
-      </el-scrollbar>
+        </template>
+      </VirtualScrollList>
+      </div>
     </template>
   </aside>
 </template>
@@ -106,6 +114,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import type { MatrixResult } from '@/api/electronic'
+import VirtualScrollList from '@/components/common/VirtualScrollList.vue'
 import {
   collectSatelliteTransmissionLinks,
   collectSeriesTransmissionLinks,
@@ -294,18 +303,8 @@ const handleSelect = (item: LinkListItem) => {
   emit('select-link', nextId)
 }
 
-/** 链路卡片 DOM 引用，用于选中后滚动定位 */
-const linkCardRefs = new Map<string, HTMLElement>()
-
-/**
- * 记录链路卡片 DOM 引用
- * @param linkId 链路 ID
- * @param el 卡片元素
- */
-const setLinkCardRef = (linkId: string, el: HTMLElement | null) => {
-  if (el) linkCardRefs.set(linkId, el)
-  else linkCardRefs.delete(linkId)
-}
+/** 虚拟链路列表实例，用于选中后滚动定位 */
+const linkVirtualListRef = ref<{ scrollToKey: (key: string | number | null | undefined) => void } | null>(null)
 
 /** 选中链路时自动滚动到可视区域 */
 watch(
@@ -313,7 +312,7 @@ watch(
   (linkId) => {
     if (!linkId) return
     nextTick(() => {
-      linkCardRefs.get(linkId)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      linkVirtualListRef.value?.scrollToKey(linkId)
     })
   }
 )
@@ -411,22 +410,13 @@ watch(
 }
 
 .link-scroll {
+  position: relative;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 
-  :deep(.atlas-app-scrollbar__bar.is-vertical) {
-    right: 0;
-    width: 6px;
-  }
-
-  :deep(.atlas-app-scrollbar__thumb) {
-    background: rgba(0, 225, 255, 0.28);
-    border-radius: 4px;
-  }
-
-  :deep(.atlas-app-scrollbar__view) {
-    padding: 0 10px 4px 0;
-    box-sizing: border-box;
+  :deep(.virtual-scroll-list__item) {
+    padding-bottom: 8px;
   }
 }
 
@@ -435,8 +425,9 @@ watch(
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
+  height: 100%;
   padding: 10px 10px 10px 12px;
-  margin-bottom: 6px;
+  margin-bottom: 0;
   border-radius: 6px;
   background: rgba(18, 32, 54, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.08);

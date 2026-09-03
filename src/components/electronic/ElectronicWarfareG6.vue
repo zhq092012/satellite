@@ -214,12 +214,6 @@ interface StarlinkCoverageHeatCell {
   timeLabel: string
   bracket: string
   satelliteCount: number
-  satellites: Array<{
-    name: string
-    norad: number
-    beforeCoverage: number | null
-    afterCoverage: number | null
-  }>
 }
 
 interface StarlinkCoverageSnapshot {
@@ -229,6 +223,12 @@ interface StarlinkCoverageSnapshot {
   afterCoverage: number | null
   transitionTime: number
 }
+
+/** 热力图 tooltip 明细，不写入 echarts option，避免 894 星对象塞进图表数据。 */
+const starlinkHeatTooltipMap = new Map<
+  string,
+  Array<{ name: string; norad: number; beforeCoverage: number | null; afterCoverage: number | null }>
+>()
 
 /** 覆盖率从高到低划分为 25 个等级，每档 4%。 */
 const STARLINK_COVERAGE_BRACKETS = Array.from({ length: 25 }, (_, index) => {
@@ -282,6 +282,7 @@ const starlinkCoverageHeatCells = computed<StarlinkCoverageHeatCell[]>(() => {
     })
 
   const cellMap = new Map<string, StarlinkCoverageHeatCell>()
+  starlinkHeatTooltipMap.clear()
   timeLabels.forEach((timeLabel, timeIndex) => {
     const sliceTime = taskStart + timeIndex * intervalMs
     satellites.forEach((satellite) => {
@@ -290,15 +291,21 @@ const starlinkCoverageHeatCells = computed<StarlinkCoverageHeatCell[]>(() => {
         : satellite.afterCoverage ?? satellite.beforeCoverage!
       const bracket = getCoverageBracket(coverage)
       const key = `${timeLabel}|${bracket}`
-      const cell = cellMap.get(key) || { timeLabel, bracket, satelliteCount: 0, satellites: [] }
+      const cell = cellMap.get(key) || { timeLabel, bracket, satelliteCount: 0 }
       cell.satelliteCount += 1
-      cell.satellites.push({
-        name: satellite.satelliteName,
-        norad: satellite.norad,
-        beforeCoverage: satellite.beforeCoverage,
-        afterCoverage: satellite.afterCoverage,
-      })
       cellMap.set(key, cell)
+      const tooltipItems = starlinkHeatTooltipMap.get(key) || []
+      if (tooltipItems.length < 20) {
+        tooltipItems.push({
+          name: satellite.satelliteName,
+          norad: satellite.norad,
+          beforeCoverage: satellite.beforeCoverage,
+          afterCoverage: satellite.afterCoverage,
+        })
+        starlinkHeatTooltipMap.set(key, tooltipItems)
+      } else {
+        starlinkHeatTooltipMap.set(key, tooltipItems)
+      }
     })
   })
 
@@ -705,11 +712,22 @@ const destroyStarlinkCoverageHeatmap = () => {
   }
 }
 
-/** 渲染 STARLINK 卫星链路覆盖率热力图。 */
-const renderStarlinkCoverageHeatmap = () => {
-  if (!isStarlinkSeries.value || !starlinkHeatmapRef.value) return
+/**
+ * 渲染 STARLINK 卫星链路覆盖率热力图。
+ * 系列刚从 G6 切过来时容器可能尚未挂载或宽高为 0，调用方应据此重试。
+ *
+ * @returns 是否已成功绑定到当前 DOM 并完成绘制
+ */
+const renderStarlinkCoverageHeatmap = (): boolean => {
+  if (!isStarlinkSeries.value || !starlinkHeatmapRef.value) return false
   const container = starlinkHeatmapRef.value
-  if (!container.clientWidth || !container.clientHeight) return
+  if (!container.clientWidth || !container.clientHeight) return false
+
+  // v-if 会销毁旧容器；残留的 ECharts 实例仍指向已卸载 DOM，必须重建
+  const boundDom = starlinkCoverageChart?.getDom?.()
+  if (starlinkCoverageChart && boundDom !== container) {
+    destroyStarlinkCoverageHeatmap()
+  }
 
   if (!starlinkCoverageChart) {
     starlinkCoverageChart = echarts.init(container)
@@ -717,7 +735,7 @@ const renderStarlinkCoverageHeatmap = () => {
 
   const cells = starlinkCoverageHeatCells.value
   const timeLabels = Array.from(new Set(cells.map((cell) => cell.timeLabel)))
-  const heatmapData = cells.map((cell) => [cell.timeLabel, cell.bracket, cell.satelliteCount, cell] as const)
+  const heatmapData = cells.map((cell) => [cell.timeLabel, cell.bracket, cell.satelliteCount] as const)
   const maxSatelliteCount = Math.max(1, ...cells.map((cell) => cell.satelliteCount))
 
   starlinkCoverageChart.setOption({
@@ -731,15 +749,16 @@ const renderStarlinkCoverageHeatmap = () => {
       trigger: 'item',
       confine: true,
       extraCssText: 'max-height: 280px; overflow-y: auto;',
-      formatter: (params: { data?: readonly [string, string, number, StarlinkCoverageHeatCell] }) => {
+      formatter: (params: { data?: readonly [string, string, number] }) => {
         const point = params.data
         if (!point) return '暂无覆盖率数据'
-        const cell = point[3]
-        const satelliteLines = cell.satellites.slice(0, 20).map((satellite) =>
+        const [timeLabel, bracket, satelliteCount] = point
+        const satellites = starlinkHeatTooltipMap.get(`${timeLabel}|${bracket}`) || []
+        const satelliteLines = satellites.map((satellite) =>
           `${satellite.name} (${satellite.norad})：${satellite.beforeCoverage ?? '--'}% → ${satellite.afterCoverage ?? '--'}%`
         )
-        const remaining = cell.satellites.length - satelliteLines.length
-        return `时间片：${cell.timeLabel}<br>覆盖率梯队：${cell.bracket}<br>卫星数量：${cell.satelliteCount} 颗<br><br>${satelliteLines.join('<br>')}${remaining > 0 ? `<br>另有 ${remaining} 颗卫星` : ''}`
+        const remaining = Math.max(0, satelliteCount - satelliteLines.length)
+        return `时间片：${timeLabel}<br>覆盖率梯队：${bracket}<br>卫星数量：${satelliteCount} 颗<br><br>${satelliteLines.join('<br>')}${remaining > 0 ? `<br>另有 ${remaining} 颗卫星` : ''}`
       },
     },
     grid: { left: 58, right: 14, top: 36, bottom: 48, containLabel: false },
@@ -781,6 +800,7 @@ const renderStarlinkCoverageHeatmap = () => {
     }],
   }, true)
   starlinkCoverageChart.resize()
+  return true
 }
 
 const resetGraphViewport = () => {
@@ -871,9 +891,13 @@ const scheduleGraphRefresh = (attempt = 0) => {
   nextTick(() => {
     if (isStarlinkSeries.value) {
       destroyGraphInstance()
-      renderStarlinkCoverageHeatmap()
+      const rendered = renderStarlinkCoverageHeatmap()
+      if (!rendered && attempt < 24) {
+        window.setTimeout(() => scheduleGraphRefresh(attempt + 1), 50)
+      }
       return
     }
+    destroyStarlinkCoverageHeatmap()
     const { width, height } = getGraphStageSize()
     if ((!width || !height) && attempt < 24) {
       window.setTimeout(() => scheduleGraphRefresh(attempt + 1), 50)
@@ -1118,6 +1142,7 @@ const clearTopoWorkspace = () => {
   selectedTimelinePoint.value = null
   selectedNodeInfo.value = null
   destroyGraphInstance()
+  destroyStarlinkCoverageHeatmap()
 }
 
 /**
@@ -1198,6 +1223,7 @@ watch(
       resetTopoSelectionForSeriesChange()
       matrixData.value = null
       destroyGraphInstance()
+      destroyStarlinkCoverageHeatmap()
       void fetchMatrixData(true)
     }
   },
@@ -2479,6 +2505,22 @@ onActivated(() => {
   }
   if (!store.matrixData) {
     void fetchMatrixData(true)
+    return
+  }
+
+  const sameMatrix = matrixData.value === store.matrixData
+  const hasVisual = isStarlinkSeries.value
+    ? !!starlinkCoverageChart
+    : !!(graph && !graph.get('destroyed'))
+  if (sameMatrix && hasVisual) {
+    nextTick(() => {
+      if (isStarlinkSeries.value) {
+        const rendered = renderStarlinkCoverageHeatmap()
+        if (!rendered) scheduleGraphRefresh()
+        return
+      }
+      handleResize()
+    })
     return
   }
   syncMatrixFromStoreAndRebuild()

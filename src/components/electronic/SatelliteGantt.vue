@@ -155,39 +155,50 @@
         </div>
 
         <!-- 卫星与接收站层次索引树/列表 -->
-        <div class="sat-tree-list" ref="satTreeListRef">
+        <div class="sat-tree-list">
           <div class="tree-header">卫星节点 ({{ filteredSatellites.length }})</div>
-          <div v-for="sat in filteredSatellites" :key="sat.norad" class="sat-tree-item" :class="{
-            'is-sat-struck': sat.satelliteStatus === 1,
-            'is-selected': selectedSatNorad === sat.norad,
-          }" :ref="(el) => setSatTreeItemRef(sat.norad, el as Element | null)" @click="selectSatelliteRow(sat)">
-            <div class="sat-item-header">
-              <span class="sat-name-text" :title="sat.name">{{ sat.name }}</span>
-              <span class="sat-status-tag" :class="sat.satelliteStatus === 1 ? 'tag-danger' : 'tag-success'">
-                {{ sat.satelliteStatus === 1 ? '卫星被干扰' : '正常' }}
-              </span>
-            </div>
+          <div class="sat-tree-virtual-wrap">
+            <VirtualScrollList
+              ref="satTreeVirtualRef"
+              :items="filteredSatellites"
+              :item-height="SAT_TREE_ITEM_BASE_HEIGHT"
+              :get-item-height="getSatTreeItemHeight"
+              item-key="norad"
+            >
+              <template #default="{ item: sat }">
+                <div class="sat-tree-item" :class="{
+                  'is-sat-struck': sat.satelliteStatus === 1,
+                  'is-selected': selectedSatNorad === sat.norad,
+                }" @click="selectSatelliteRow(sat)">
+                  <div class="sat-item-header">
+                    <span class="sat-name-text" :title="sat.name">{{ sat.name }}</span>
+                    <span class="sat-status-tag" :class="sat.satelliteStatus === 1 ? 'tag-danger' : 'tag-success'">
+                      {{ sat.satelliteStatus === 1 ? '卫星被干扰' : '正常' }}
+                    </span>
+                  </div>
 
-            <!-- 关联接收站过境窗口摘要列表 -->
-            <div class="sat-windows-sublist">
-              <div v-for="win in resolveSatelliteStationWindows(sat)" :key="win.receiveId + '-' + (win.sourceSatName || '') + '-' + win.peakWindow"
-                class="win-sub-item" :class="{
-                  'is-win-struck': win.strikeStatus === 1,
-                  'is-win-selected': isStationWindowSelected(sat.norad, win),
-                }" @click.stop="selectStationWindow(sat, win)">
-                <span class="sub-rec-name" :title="win.sourceSatName && win.sourceSatName !== sat.name ? `${win.sourceSatName} → ${win.receiveName}` : win.receiveName">
-                  <template v-if="win.sourceSatName && win.sourceSatName !== sat.name">
-                    🛰️ {{ win.sourceSatName }} → 📡 {{ win.receiveName }}
-                  </template>
-                  <template v-else>
-                    📡 {{ win.receiveName }}
-                  </template>
-                </span>
-                <span class="sub-win-time">{{
-                  win.peakWindow.length >= 16 ? win.peakWindow.substring(11, 16) : win.peakWindow
-                }}</span>
-              </div>
-            </div>
+                  <div class="sat-windows-sublist">
+                    <div v-for="win in getSatelliteStationWindows(sat)" :key="win.receiveId + '-' + (win.sourceSatName || '') + '-' + win.peakWindow"
+                      class="win-sub-item" :class="{
+                        'is-win-struck': win.strikeStatus === 1,
+                        'is-win-selected': isStationWindowSelected(sat.norad, win),
+                      }" @click.stop="selectStationWindow(sat, win)">
+                      <span class="sub-rec-name" :title="win.sourceSatName && win.sourceSatName !== sat.name ? `${win.sourceSatName} → ${win.receiveName}` : win.receiveName">
+                        <template v-if="win.sourceSatName && win.sourceSatName !== sat.name">
+                          🛰️ {{ win.sourceSatName }} → 📡 {{ win.receiveName }}
+                        </template>
+                        <template v-else>
+                          📡 {{ win.receiveName }}
+                        </template>
+                      </span>
+                      <span class="sub-win-time">{{
+                        win.peakWindow.length >= 16 ? win.peakWindow.substring(11, 16) : win.peakWindow
+                      }}</span>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </VirtualScrollList>
           </div>
         </div>
       </div>
@@ -202,7 +213,7 @@
               </div>
               <div class="timeline-ticks-container" :style="timelineTrackStyle">
                 <div v-for="tick in timelineTicks" :key="tick.timeStr" class="time-tick-item"
-                  :class="{ 'is-current-tick': tick.isCurrent }" :style="{ left: tick.leftPx + 'px' }">
+                  :class="{ 'is-current-tick': tick.leftPx === playheadLeftPx }" :style="{ left: tick.leftPx + 'px' }">
                   <span class="tick-line"></span>
                   <span class="tick-text">{{ tick.label }}</span>
                 </div>
@@ -210,11 +221,19 @@
               </div>
             </div>
 
-            <div class="gantt-rows-container">
-              <div v-for="ganttRow in processedGanttRows" :key="ganttRow.rowKey" class="gantt-sat-row-group" :class="{
-                'row-sat-struck': ganttRow.satelliteStatus === 1,
-                'is-row-selected': selectedSatNorad === ganttRow.norad,
-              }" :ref="(el) => setGanttRowRef(ganttRow.norad, el as Element | null)">
+            <div class="gantt-rows-container" :style="{ height: ganttRowsTotalHeight + 'px' }">
+              <div class="gantt-rows-window" :style="{ transform: `translateY(${visibleGanttOffsetY}px)` }">
+              <div
+                v-for="(ganttRow, visIdx) in visibleGanttRows"
+                :key="ganttRow.rowKey"
+                class="gantt-sat-row-group"
+                :class="{
+                  'row-sat-struck': ganttRow.satelliteStatus === 1,
+                  'is-row-selected': selectedSatNorad === ganttRow.norad,
+                  'is-row-even': (visibleGanttStartIndex + visIdx) % 2 === 1,
+                }"
+                :style="{ height: getGanttRowHeight(ganttRow) + 'px' }"
+              >
                 <div class="row-label-col" @click.stop="handleGanttRowLabelClick(ganttRow)">
                   <div class="sat-label-block">
                     <div class="sat-main-label">
@@ -249,10 +268,7 @@
                   </div>
                 </div>
 
-                <div class="row-timeline-track" :style="[timelineTrackStyle, { height: ganttRow.trackHeight + 'px' }]">
-                  <div v-for="tick in timelineTicks" :key="'grid-' + ganttRow.rowKey + tick.timeStr"
-                    class="track-grid-line" :class="{ 'is-current-grid': tick.isCurrent }"
-                    :style="{ left: tick.leftPx + 'px' }"></div>
+                <div class="row-timeline-track" :style="[timelineTrackStyle, trackGridStyle, { height: ganttRow.trackHeight + 'px' }]">
                   <div class="gantt-playhead-line" :style="{ left: playheadLeftPx + 'px' }"></div>
 
                   <div v-for="bar in ganttRow.bars" :key="bar.id" class="gantt-bar-item" :class="[
@@ -274,6 +290,7 @@
                     </div>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
           </div>
@@ -434,6 +451,7 @@ import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch, nextTick
 import { type MatrixResult, type SatelliteMatrix, type StationWindow, type Weapon, type CommucationMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
 import { collectSatelliteTransmissionLinks, listNormalSatelliteNorads } from '@/utils/satelliteFullChainAnalysis'
+import VirtualScrollList from '@/components/common/VirtualScrollList.vue'
 
 defineOptions({
   name: 'SatelliteGantt',
@@ -474,45 +492,41 @@ const selectedBarId = ref<string | null>(null)
 const selectedStationKey = ref<string | null>(null)
 
 const scrollContainerRef = ref<HTMLDivElement | null>(null)
-const satTreeListRef = ref<HTMLDivElement | null>(null)
+const satTreeVirtualRef = ref<{ scrollToKey: (key: string | number | null | undefined) => void } | null>(null)
 const playbackTrackRef = ref<HTMLDivElement | null>(null)
 const isDraggingPlayhead = ref(false)
-const ganttRowRefs = new Map<number, HTMLElement>()
-const satTreeItemRefs = new Map<number, HTMLElement>()
 
-const setGanttRowRef = (norad: number, el: Element | null) => {
-  if (el) ganttRowRefs.set(norad, el as HTMLElement)
-  else ganttRowRefs.delete(norad)
-}
-
-const setSatTreeItemRef = (norad: number, el: Element | null) => {
-  if (el) satTreeItemRefs.set(norad, el as HTMLElement)
-  else satTreeItemRefs.delete(norad)
-}
-
+/**
+ * 将指定卫星行滚入甘特图可视区（按虚拟列表前缀高度定位）。
+ *
+ * @param norad 卫星 NORAD
+ */
 const scrollToSatRow = (norad: number) => {
   nextTick(() => {
-    const rowEl = ganttRowRefs.get(norad)
-    rowEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    const index = processedGanttRows.value.findIndex((row) => row.norad === norad)
+    if (index < 0 || !scrollContainerRef.value) return
+    const rowTop = GANTT_TIMELINE_HEADER_HEIGHT + getGanttRowOffset(index)
+    const rowHeight = getGanttRowHeight(processedGanttRows.value[index])
+    const container = scrollContainerRef.value
+    const viewTop = container.scrollTop
+    const viewBottom = viewTop + container.clientHeight
+    if (rowTop < viewTop + GANTT_TIMELINE_HEADER_HEIGHT || rowTop + rowHeight > viewBottom) {
+      container.scrollTo({
+        top: Math.max(0, rowTop - GANTT_TIMELINE_HEADER_HEIGHT - 8),
+        behavior: 'smooth',
+      })
+    }
   })
 }
 
+/**
+ * 将左侧卫星树滚到指定 NORAD。
+ *
+ * @param norad 卫星 NORAD
+ */
 const scrollToSatTreeItem = (norad: number) => {
   nextTick(() => {
-    const itemEl = satTreeItemRefs.get(norad)
-    const container = satTreeListRef.value
-    if (!itemEl) return
-
-    if (container) {
-      const containerRect = container.getBoundingClientRect()
-      const itemRect = itemEl.getBoundingClientRect()
-      const offset = itemRect.top - containerRect.top + container.scrollTop
-      const scrollTop = offset - container.clientHeight / 2 + itemEl.offsetHeight / 2
-      container.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' })
-      return
-    }
-
-    itemEl.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    satTreeVirtualRef.value?.scrollToKey(norad)
   })
 }
 
@@ -520,6 +534,18 @@ const scrollToSatTreeItem = (norad: number) => {
 const TICK_STEP_OPTIONS = [15, 30, 60, 300, 600] as const
 const DEFAULT_TICK_STEP_INDEX = 3
 const PIXELS_PER_TICK = 80
+/** 甘特图顶部时间轴高度，虚拟行计算可视范围时需扣掉 */
+const GANTT_TIMELINE_HEADER_HEIGHT = 40
+/** 甘特行最小高度，避免空窗口行被压扁 */
+const GANTT_ROW_MIN_HEIGHT = 72
+/** 甘特行上下额外渲染行数 */
+const GANTT_ROW_OVERSCAN = 4
+/** 左侧卫星树卡片基础高度（不含过境窗口行） */
+const SAT_TREE_ITEM_BASE_HEIGHT = 52
+/** 左侧卫星树单条过境窗口行高 */
+const SAT_TREE_WINDOW_ROW_HEIGHT = 28
+/** 左侧卫星树卡片间距，计入虚拟行高 */
+const SAT_TREE_ITEM_GAP = 8
 const BAR_LINE_HEIGHT = 13
 const BAR_PADDING_Y = 10
 const BAR_PADDING_X = 16
@@ -619,6 +645,9 @@ interface ProcessedGanttRow {
   maxLanes: number
   trackHeight: number
 }
+
+/** 空过境条列表，避免 getRowActiveTransits 每次分配新数组 */
+const EMPTY_GANTT_BARS: ProcessedGanttBar[] = []
 
 /** 是否已选择卫星系列（或外部传入了矩阵数据）；未选择时不渲染甘特图 */
 const hasSelectedSeries = computed<boolean>(() => !!props.matrixData || !!store.selectedSatSeries)
@@ -820,7 +849,7 @@ const filteredSatellites = computed<SatelliteMatrix[]>(() => {
   return list.filter((sat) => {
     const matchSatName = sat.name.toLowerCase().includes(kw) || String(sat.norad).includes(kw)
     const matchRec =
-      resolveSatelliteStationWindows(sat).some((w) => w.receiveName.toLowerCase().includes(kw)) ||
+      (satelliteWindowsByNorad.value.get(sat.norad) || []).some((w) => w.receiveName.toLowerCase().includes(kw)) ||
       sat.stationWindows?.some((w) => w.receiveName.toLowerCase().includes(kw))
     const matchWeapon =
       sat.weapons?.some((w) => w.name.toLowerCase().includes(kw)) ||
@@ -842,7 +871,7 @@ const selectedSatelliteInfo = computed(() => {
     name: sat.name,
     satType: sat.satType || '',
     struck: 'satelliteStatus' in sat ? sat.satelliteStatus === 1 : false,
-    windowCount: resolveSatelliteStationWindows(sat as SatelliteMatrix).length,
+    windowCount: satelliteWindowsByNorad.value.get(norad)?.length || 0,
   }
 })
 
@@ -988,6 +1017,11 @@ const timelineTrackStyle = computed(() => ({
   flex: '0 0 auto',
 }))
 
+/** 行内竖向网格：用 CSS 重复渐变代替每行复制全部刻度 DOM */
+const trackGridStyle = computed(() => ({
+  backgroundImage: `repeating-linear-gradient(to right, rgba(148, 163, 184, 0.16) 0px, rgba(148, 163, 184, 0.16) 1px, transparent 1px, transparent ${PIXELS_PER_TICK}px)`,
+}))
+
 /**
  * [功能说明]
  * 当前时间轴刻度步长（秒）。
@@ -1124,6 +1158,41 @@ const resolveSatelliteStationWindows = (sat: SatelliteMatrix): (StationWindow & 
     }
   }
   return sat.stationWindows || []
+}
+
+/**
+ * 按 NORAD 预计算过境窗口，避免模板与过滤对 894 颗星反复调用链路枚举。
+ */
+const satelliteWindowsByNorad = computed(() => {
+  const map = new Map<number, ReturnType<typeof resolveSatelliteStationWindows>>()
+  const list = currentData.value?.satelliteMatrixList || []
+  list.forEach((sat) => {
+    map.set(sat.norad, resolveSatelliteStationWindows(sat))
+  })
+  return map
+})
+
+/**
+ * 读取预计算的卫星过境窗口。
+ *
+ * @param sat 卫星矩阵项
+ * @returns 过境窗口列表
+ */
+const getSatelliteStationWindows = (
+  sat: SatelliteMatrix
+): ReturnType<typeof resolveSatelliteStationWindows> => {
+  return satelliteWindowsByNorad.value.get(sat.norad) || []
+}
+
+/**
+ * 左侧卫星树虚拟行高：基础卡片 + 过境窗口行 + 间距。
+ *
+ * @param sat 卫星矩阵项
+ * @returns 行高（px）
+ */
+const getSatTreeItemHeight = (sat: SatelliteMatrix): number => {
+  const windowCount = getSatelliteStationWindows(sat).length
+  return SAT_TREE_ITEM_BASE_HEIGHT + windowCount * SAT_TREE_WINDOW_ROW_HEIGHT + SAT_TREE_ITEM_GAP
 }
 
 /**
@@ -1517,8 +1586,7 @@ const buildBarsForWindows = (
  * @returns 当前时刻活跃的甘特条列表
  */
 const getRowActiveTransits = (row: ProcessedGanttRow): ProcessedGanttBar[] => {
-  const ts = currentPlayTs.value
-  return row.bars.filter((bar) => isBarOverlappingPlayheadGrid(bar, ts))
+  return activeTransitsByNorad.value.get(row.norad) || EMPTY_GANTT_BARS
 }
 
 /**
@@ -1566,34 +1634,118 @@ const processedGanttRows = computed<ProcessedGanttRow[]>(() => {
 })
 
 /**
+ * 甘特行虚拟列表使用的高度（轨道高度与标签列下限取大）。
+ *
+ * @param row 甘特行
+ * @returns 行高（px）
+ */
+const getGanttRowHeight = (row: ProcessedGanttRow): number =>
+  Math.max(row.trackHeight, GANTT_ROW_MIN_HEIGHT) + 1
+
+/** 甘特行前缀高度，offsets[i] 为前 i 行总高 */
+const ganttRowOffsets = computed(() => {
+  const rows = processedGanttRows.value
+  const offsets = new Array<number>(rows.length + 1)
+  offsets[0] = 0
+  for (let i = 0; i < rows.length; i += 1) {
+    offsets[i + 1] = offsets[i] + getGanttRowHeight(rows[i])
+  }
+  return offsets
+})
+
+/**
+ * 读取第 index 行相对行容器顶部的偏移。
+ *
+ * @param index 行下标
+ * @returns 偏移 px
+ */
+const getGanttRowOffset = (index: number): number => {
+  const offsets = ganttRowOffsets.value
+  if (!offsets.length) return 0
+  return offsets[Math.max(0, Math.min(index, offsets.length - 1))] || 0
+}
+
+/** 甘特行总高度，撑开纵向滚动 */
+const ganttRowsTotalHeight = computed(() => ganttRowOffsets.value[processedGanttRows.value.length] || 0)
+
+const ganttScrollTop = ref(0)
+const ganttViewportHeight = ref(0)
+
+/**
+ * 在前缀和中查找可视起始行。
+ *
+ * @param offsets 前缀高度
+ * @param top 相对行容器的 scroll 位置
+ * @returns 起始下标
+ */
+const findGanttStartIndex = (offsets: number[], top: number): number => {
+  let low = 0
+  let high = Math.max(0, offsets.length - 2)
+  while (low < high) {
+    const mid = (low + high) >> 1
+    if (offsets[mid + 1] <= top) low = mid + 1
+    else high = mid
+  }
+  return low
+}
+
+/** 当前需要挂载的甘特行窗口 */
+const visibleGanttRange = computed(() => {
+  const rows = processedGanttRows.value
+  const count = rows.length
+  if (!count) return { start: 0, end: 0, offsetY: 0 }
+
+  const offsets = ganttRowOffsets.value
+  const rowScrollTop = Math.max(0, ganttScrollTop.value)
+  const start = Math.max(0, findGanttStartIndex(offsets, rowScrollTop) - GANTT_ROW_OVERSCAN)
+  const viewBottom = rowScrollTop + Math.max(ganttViewportHeight.value - GANTT_TIMELINE_HEADER_HEIGHT, 1)
+  let end = start
+  while (end < count && offsets[end] < viewBottom) end += 1
+  end = Math.min(count, end + GANTT_ROW_OVERSCAN)
+  return { start, end, offsetY: offsets[start] || 0 }
+})
+
+const visibleGanttRows = computed(() => {
+  const { start, end } = visibleGanttRange.value
+  return processedGanttRows.value.slice(start, end)
+})
+
+const visibleGanttStartIndex = computed(() => visibleGanttRange.value.start)
+const visibleGanttOffsetY = computed(() => visibleGanttRange.value.offsetY)
+
+/** 同步甘特图纵向视口，供虚拟行计算使用 */
+const syncGanttViewport = () => {
+  const el = scrollContainerRef.value
+  if (!el) {
+    ganttScrollTop.value = 0
+    ganttViewportHeight.value = 0
+    return
+  }
+  ganttScrollTop.value = el.scrollTop
+  ganttViewportHeight.value = el.clientHeight
+}
+
+/**
  * [功能说明]
  * 计算生成顶部时间轴刻度列表。
  */
 const timelineTicks = computed<
-  { label: string; timeStr: string; leftPx: number; percent: number; isCurrent: boolean }[]
+  { label: string; timeStr: string; leftPx: number; percent: number }[]
 >(() => {
   const { minTs, maxTs } = timeBounds.value
   const totalSec = maxTs - minTs
   if (totalSec <= 0) return []
 
-  const ticks: { label: string; timeStr: string; leftPx: number; percent: number; isCurrent: boolean }[] =
-    []
+  const ticks: { label: string; timeStr: string; leftPx: number; percent: number }[] = []
   const stepSec = tickStepSec.value
-  // 与 snapToGrid / jumpPlayheadByGrid 一致：以任务起点 minTs 为刻度锚点
   const startTs = minTs
-  const currentSnapped = snapToGrid(currentPlayTs.value)
 
   for (let ts = startTs; ts <= maxTs; ts += stepSec) {
-    const label = formatTimelineTickLabel(ts, stepSec)
-    const leftPx = tsToLeftPx(ts)
-    const percent = tsToPercent(ts)
-
     ticks.push({
-      label,
+      label: formatTimelineTickLabel(ts, stepSec),
       timeStr: new Date(ts * 1000).toISOString(),
-      leftPx,
-      percent,
-      isCurrent: ts === currentSnapped,
+      leftPx: tsToLeftPx(ts),
+      percent: tsToPercent(ts),
     })
   }
 
@@ -1614,6 +1766,17 @@ const barsAtPlayhead = computed<ProcessedGanttBar[]>(() => {
     }
   }
   return result
+})
+
+/** 按卫星聚合当前时刻过境条，避免模板对每一行做 filter */
+const activeTransitsByNorad = computed(() => {
+  const map = new Map<number, ProcessedGanttBar[]>()
+  for (const bar of barsAtPlayhead.value) {
+    const list = map.get(bar.satNorad)
+    if (list) list.push(bar)
+    else map.set(bar.satNorad, [bar])
+  }
+  return map
 })
 
 const playheadBarIdSet = computed(() => new Set(barsAtPlayhead.value.map((bar) => bar.id)))
@@ -1925,6 +2088,43 @@ const resetScale = () => {
   tickStepIndex.value = DEFAULT_TICK_STEP_INDEX
 }
 
+let ganttScrollBound = false
+let ganttResizeObserver: ResizeObserver | null = null
+
+/** 甘特工作区滚动时同步虚拟行视口 */
+const handleGanttWorkspaceScroll = () => {
+  syncGanttViewport()
+}
+
+/** 绑定甘特图纵向滚动与尺寸监听 */
+const bindGanttWorkspaceScroll = () => {
+  const el = scrollContainerRef.value
+  if (!el) {
+    syncGanttViewport()
+    return
+  }
+  if (!ganttScrollBound) {
+    el.addEventListener('scroll', handleGanttWorkspaceScroll, { passive: true })
+    ganttScrollBound = true
+    if (typeof ResizeObserver !== 'undefined') {
+      ganttResizeObserver = new ResizeObserver(() => syncGanttViewport())
+      ganttResizeObserver.observe(el)
+    }
+  }
+  syncGanttViewport()
+}
+
+/** 解绑甘特图滚动监听 */
+const unbindGanttWorkspaceScroll = () => {
+  const el = scrollContainerRef.value
+  if (el && ganttScrollBound) {
+    el.removeEventListener('scroll', handleGanttWorkspaceScroll)
+  }
+  ganttScrollBound = false
+  ganttResizeObserver?.disconnect()
+  ganttResizeObserver = null
+}
+
 // 监听生命周期与Props变动
 onMounted(() => {
   if (hasSelectedSeries.value) {
@@ -1934,19 +2134,24 @@ onMounted(() => {
     currentPlayTs.value = taskTimeBounds.value.minTs
   }
   if (hasSelectedSeries.value) {
-    nextTick(() => applySharedSatelliteSelection(true))
+    nextTick(() => {
+      bindGanttWorkspaceScroll()
+      applySharedSatelliteSelection(true)
+    })
   }
 })
 
 onActivated(() => {
   if (hasSelectedSeries.value) {
     nextTick(() => {
+      bindGanttWorkspaceScroll()
       syncGanttViewToCurrentSatelliteFirstWindow()
     })
   }
 })
 
 onBeforeUnmount(() => {
+  unbindGanttWorkspaceScroll()
   stopPlayback()
   isDraggingPlayhead.value = false
 })
@@ -1980,6 +2185,13 @@ watch(
   () => [currentData.value, store.selectedAnalysisNorad] as const,
   () => {
     nextTick(() => applySharedSatelliteSelection())
+  }
+)
+
+watch(
+  () => processedGanttRows.value.length,
+  () => {
+    nextTick(bindGanttWorkspaceScroll)
   }
 )
 
@@ -2553,20 +2765,35 @@ watch(playheadLeftPx, () => {
 
       .sat-tree-list {
         flex: 1;
-        overflow-y: auto;
         display: flex;
         flex-direction: column;
-        gap: 8px;
         min-height: 0;
+        overflow: hidden;
 
         .tree-header {
+          flex-shrink: 0;
           font-size: 13px;
           font-weight: 600;
           color: #64748b;
           text-transform: uppercase;
+          margin-bottom: 8px;
+        }
+
+        .sat-tree-virtual-wrap {
+          position: relative;
+          flex: 1;
+          min-height: 0;
+          overflow: hidden;
+
+          :deep(.virtual-scroll-list__item) {
+            padding-bottom: 8px;
+          }
         }
 
         .sat-tree-item {
+          box-sizing: border-box;
+          height: 100%;
+          overflow: hidden;
           background-color: #1a2336;
           border: 1px solid #27354e;
           border-radius: 6px;
@@ -2739,14 +2966,24 @@ watch(playheadLeftPx, () => {
 
         /* 甘特行 Rows 容器 */
         .gantt-rows-container {
-          display: flex;
-          flex-direction: column;
+          position: relative;
+          width: 100%;
+
+          .gantt-rows-window {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            will-change: transform;
+          }
 
           .gantt-sat-row-group {
             display: flex;
+            overflow: hidden;
             border-bottom: 1px solid #1e293b;
             background-color: #0b1120;
             position: relative;
+            box-sizing: border-box;
 
             &.row-sat-struck {
               box-shadow: inset 3px 0 0 #ef4444;
@@ -2770,7 +3007,7 @@ watch(playheadLeftPx, () => {
               box-shadow: inset 3px 0 0 #38bdf8;
             }
 
-            &:nth-child(even) {
+            &.is-row-even {
               background-color: #0d1527;
             }
 
@@ -2928,6 +3165,7 @@ watch(playheadLeftPx, () => {
             .row-timeline-track {
               position: relative;
               min-height: 52px;
+              overflow: hidden;
 
               .track-grid-line {
                 position: absolute;

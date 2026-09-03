@@ -82,54 +82,62 @@
       </div>
 
       <div class="asset-scroll-list">
-        <div v-for="(sat, index) in satList" :key="sat.norad" class="asset-card" :class="{
-          'card-active': selectedNorad === sat.norad,
-          'card-relay': sat.isRelay,
-          'card-threat-rank-1': index === 0 && isTopRankEligible(sat),
-          'card-threat-rank-2': index === 1 && isTopRankEligible(sat),
-          'card-threat-rank-3': index === 2 && isTopRankEligible(sat),
-        }" @click="handleSelectSatellite(sat.norad)">
-          <div class="card-top">
-            <span class="sat-name">
-              🛰️<strong>{{ sat.name }}</strong>
-              <span v-if="sat.isRelay" class="relay-tag">中继</span>
-            </span>
-            <span v-if="sortMode === 'threat'" class="metric-highlight"
-              :class="sat.threatScore != null ? getThreatLevelClass(sat.threatScore) : 'threat-unknown'">
-              威胁度 {{ sat.threatScore != null ? formatThreatScore(sat.threatScore) : '--' }}
-            </span>
-            <span v-else class="metric-highlight metric-duration">
-              {{ isStarlinkSeries ? '覆盖率' : '链路时长' }}
-              {{ isStarlinkSeries ? formatCoverage(sat.coverage) : (sat.timeEffect ?
-                formatDuration(sat.timeEffect.duration) : '--') }}
-            </span>
-          </div>
-          <div class="card-meta-row" v-if="sat.satType || sat.usage || sat.orbitType != null">
-            <span v-if="sat.satType" class="meta-tag tag-type" title="卫星类型">
-              {{ sat.satType }}
-            </span>
-            <span v-if="sat.usage" class="meta-tag tag-usage" title="用途">
-              {{ sat.usage }}
-            </span>
-            <span v-if="sat.orbitType != null" class="meta-tag tag-orbit" title="轨道类型">
-              {{ orbitTypeLabel(sat.orbitType) }}
-            </span>
-          </div>
-          <div class="card-time-row" v-if="sortMode === 'transTime'">
-            <span>开始 {{ sat.timeEffect ? formatTransTime(sat.timeEffect.beginTime) : '--' }}</span>
-            <span>结束 {{ sat.timeEffect ? formatTransTime(sat.timeEffect.endTime) : '--' }}</span>
-          </div>
-          <div class="card-footer" @click.stop>
-            <span class="click-hint" v-if="selectedNorad === sat.norad">✓ 已选择分析</span>
-            <el-button v-if="sortMode === 'threat'" class="detail-btn" size="small" link type="primary"
-              @click="openThreatDetail(sat)">
-              查看详情
-            </el-button>
-            <el-button v-else class="detail-btn" size="small" link type="primary" @click="openTopoAnalysis(sat)">
-              查看详情
-            </el-button>
-          </div>
-        </div>
+        <VirtualScrollList
+          :items="satList"
+          :item-height="sortMode === 'transTime' ? 196 : 160"
+          item-key="norad"
+        >
+          <template #default="{ item: sat, index }">
+            <div class="asset-card" :class="{
+              'card-active': selectedNorad === sat.norad,
+              'card-relay': sat.isRelay,
+              'card-threat-rank-1': index === 0 && isTopRankEligible(sat),
+              'card-threat-rank-2': index === 1 && isTopRankEligible(sat),
+              'card-threat-rank-3': index === 2 && isTopRankEligible(sat),
+            }" @click="handleSelectSatellite(sat.norad)">
+              <div class="card-top">
+                <span class="sat-name">
+                  🛰️<strong>{{ sat.name }}</strong>
+                  <span v-if="sat.isRelay" class="relay-tag">中继</span>
+                </span>
+                <span v-if="sortMode === 'threat'" class="metric-highlight"
+                  :class="sat.threatScore != null ? getThreatLevelClass(sat.threatScore) : 'threat-unknown'">
+                  威胁度 {{ sat.threatScore != null ? formatThreatScore(sat.threatScore) : '--' }}
+                </span>
+                <span v-else class="metric-highlight metric-duration">
+                  {{ isStarlinkSeries ? '覆盖率' : '链路时长' }}
+                  {{ isStarlinkSeries ? formatCoverage(sat.coverage) : (sat.timeEffect ?
+                    formatDuration(sat.timeEffect.duration) : '--') }}
+                </span>
+              </div>
+              <div class="card-meta-row" v-if="sat.satType || sat.usage || sat.orbitType != null">
+                <span v-if="sat.satType" class="meta-tag tag-type" title="卫星类型">
+                  {{ sat.satType }}
+                </span>
+                <span v-if="sat.usage" class="meta-tag tag-usage" title="用途">
+                  {{ sat.usage }}
+                </span>
+                <span v-if="sat.orbitType != null" class="meta-tag tag-orbit" title="轨道类型">
+                  {{ orbitTypeLabel(sat.orbitType) }}
+                </span>
+              </div>
+              <div class="card-time-row" v-if="sortMode === 'transTime'">
+                <span>开始 {{ sat.timeEffect ? formatTransTime(sat.timeEffect.beginTime) : '--' }}</span>
+                <span>结束 {{ sat.timeEffect ? formatTransTime(sat.timeEffect.endTime) : '--' }}</span>
+              </div>
+              <div class="card-footer" @click.stop>
+                <span class="click-hint" v-if="selectedNorad === sat.norad">✓ 已选择分析</span>
+                <el-button v-if="sortMode === 'threat'" class="detail-btn" size="small" link type="primary"
+                  @click="openThreatDetail(sat)">
+                  查看详情
+                </el-button>
+                <el-button v-else class="detail-btn" size="small" link type="primary" @click="openTopoAnalysis(sat)">
+                  查看详情
+                </el-button>
+              </div>
+            </div>
+          </template>
+        </VirtualScrollList>
       </div>
     </div>
 
@@ -262,6 +270,7 @@ import {
   type SatelliteThreatInfo,
 } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
+import VirtualScrollList from '@/components/common/VirtualScrollList.vue'
 /** 组件接收的矩阵数据及当前选中卫星信息。 */
 const props = defineProps<{
   /** 算法矩阵响应式数据 */
@@ -691,6 +700,7 @@ const selectedSatelliteName = computed(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   padding: 12px;
   box-sizing: border-box;
   background: rgba(8, 15, 26, 0.88);
@@ -1169,24 +1179,26 @@ const selectedSatelliteName = computed(() => {
 }
 
 .asset-scroll-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  position: relative;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
 
-  &::-webkit-scrollbar {
-    width: 4px;
+  :deep(.virtual-scroll-list) {
+    padding-right: 2px;
   }
 
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 225, 255, 0.25);
-    border-radius: 4px;
+  :deep(.virtual-scroll-list__item) {
+    padding-bottom: 16px;
   }
 }
 
 .asset-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
   padding: 8px 10px;
   border-radius: 6px;
   background: rgba(18, 32, 54, 0.8);
@@ -1209,7 +1221,7 @@ const selectedSatelliteName = computed(() => {
   &.card-threat-rank-1 {
     border-color: rgba(239, 68, 68, 0.85);
     background: rgba(239, 68, 68, 0.14);
-    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.22);
 
     .metric-highlight {
       color: #fecaca !important;
@@ -1221,7 +1233,7 @@ const selectedSatelliteName = computed(() => {
   &.card-threat-rank-2 {
     border-color: rgba(249, 115, 22, 0.75);
     background: rgba(249, 115, 22, 0.12);
-    box-shadow: 0 0 8px rgba(249, 115, 22, 0.22);
+    box-shadow: 0 0 6px rgba(249, 115, 22, 0.18);
 
     .metric-highlight {
       color: #fed7aa !important;
@@ -1243,6 +1255,7 @@ const selectedSatelliteName = computed(() => {
   }
 
   .card-top {
+    flex-shrink: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1313,6 +1326,7 @@ const selectedSatelliteName = computed(() => {
   }
 
   .card-meta-row {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -1361,6 +1375,7 @@ const selectedSatelliteName = computed(() => {
   }
 
   .card-time-row {
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -1373,6 +1388,7 @@ const selectedSatelliteName = computed(() => {
   }
 
   .card-footer {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;

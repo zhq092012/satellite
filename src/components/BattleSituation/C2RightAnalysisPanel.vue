@@ -64,25 +64,38 @@
         </div>
 
         <div class="link-section-scroll">
-          <template v-if="top3PriorityLinks.length">
-            <div class="subsection-header">
-              <span class="subsection-title">🎯 优先推荐 TOP 3</span>
-            </div>
-            <div class="transmission-link-list transmission-link-list--top">
-              <div v-for="item in top3PriorityLinks" :key="item.link.id" class="transmission-link-card" :class="[
-                {
-                  active: selectedTransmissionLinkId === item.link.id,
-                  blocked: item.link.blocked,
-                },
-                `priority-rank-${item.priority.rank}`,
-              ]" role="button" tabindex="0" @click="handleLinkCardClick(item.link)"
-                @keydown.enter.prevent="handleLinkCardClick(item.link)">
+          <VirtualScrollList
+            v-if="displayLinkItems.length"
+            :items="displayLinkItems"
+            :item-height="OTHER_LINK_ITEM_HEIGHT"
+            :get-item-height="getDisplayLinkItemHeight"
+            item-key="id"
+          >
+            <template #default="{ item }">
+              <div
+                class="transmission-link-card"
+                :class="[
+                  {
+                    active: selectedTransmissionLinkId === item.link.id,
+                    blocked: item.link.blocked,
+                  },
+                  item.priority ? `priority-rank-${item.priority.rank}` : '',
+                ]"
+                role="button"
+                tabindex="0"
+                @click="handleLinkCardClick(item.link)"
+                @keydown.enter.prevent="handleLinkCardClick(item.link)"
+              >
                 <div class="link-card-header">
                   <div class="link-title-left">
-                    <span class="link-index">链路 {{ item.priority.rank }}</span>
-                    <span class="rank-badge" :class="`rank-badge--${item.priority.rank}`">
-                      {{ getRankMedal(item.priority.rank) }} TOP {{ item.priority.rank }} ({{ item.priority.totalScore
-                      }}分)
+                    <span class="link-index">链路 {{ item.displayIndex }}</span>
+                    <span
+                      v-if="item.priority"
+                      class="rank-badge"
+                      :class="`rank-badge--${item.priority.rank}`"
+                    >
+                      {{ getRankMedal(item.priority.rank) }} TOP {{ item.priority.rank }}
+                      ({{ item.priority.totalScore }}分)
                     </span>
                   </div>
                   <div class="link-metrics-row">
@@ -90,7 +103,6 @@
                       <span class="link-metric-label">{{ primaryLinkMetricLabel }}</span>
                       <strong>{{ formatPrimaryLinkMetric(item.link) }}</strong>
                     </div>
-
                   </div>
                 </div>
 
@@ -105,7 +117,7 @@
                   </template>
                 </div>
 
-                <div class="priority-reason-tip">
+                <div v-if="item.priority" class="priority-reason-tip">
                   <span class="reason-icon">💡</span>
                   <span class="reason-text">{{ item.priority.reason }}</span>
                 </div>
@@ -117,55 +129,10 @@
                   <strong class="link-meta-val">{{ item.link.transmitTime }}</strong>
                 </div>
               </div>
-            </div>
-          </template>
+            </template>
+          </VirtualScrollList>
 
-          <template v-if="otherTransmissionLinks.length">
-            <div v-if="top3PriorityLinks.length" class="subsection-header subsection-header--rest">
-              <span class="subsection-title">其他链路</span>
-              <span class="subsection-count">{{ otherTransmissionLinks.length }} 条</span>
-            </div>
-            <div class="transmission-link-list">
-              <div v-for="(link, idx) in otherTransmissionLinks" :key="link.id" class="transmission-link-card" :class="{
-                active: selectedTransmissionLinkId === link.id,
-                blocked: link.blocked,
-              }" role="button" tabindex="0" @click="handleLinkCardClick(link)"
-                @keydown.enter.prevent="handleLinkCardClick(link)">
-                <div class="link-card-header">
-                  <div class="link-title-left">
-                    <span class="link-index">链路 {{ idx + top3PriorityLinks.length + 1 }}</span>
-                  </div>
-                  <div class="link-metrics-row">
-                    <div class="link-metric-card">
-                      <span class="link-metric-label">{{ primaryLinkMetricLabel }}</span>
-                      <strong>{{ formatPrimaryLinkMetric(link) }}</strong>
-                    </div>
-
-                  </div>
-                </div>
-
-                <div class="link-flow-row">
-                  <template v-for="(node, nodeIdx) in link.nodes" :key="link.id + '-' + node.layer + node.id">
-                    <div class="flow-node">
-                      <span class="flow-node-icon">{{ node.icon }}</span>
-                      <span class="flow-node-name" :title="node.name">{{ node.name }}</span>
-                      <span class="flow-node-layer">{{ chainLayerLabel(node.layer) }}</span>
-                    </div>
-                    <span v-if="nodeIdx < link.nodes.length - 1" class="flow-arrow">→</span>
-                  </template>
-                </div>
-
-                <div v-if="link.blocked" class="link-blocked-tip">{{ link.blockedReason }}</div>
-
-                <div class="link-meta-row">
-                  <span class="link-meta-label">传输时间</span>
-                  <strong class="link-meta-val">{{ link.transmitTime }}</strong>
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <div v-if="!transmissionLinks.length" class="empty-link-box">
+          <div v-else class="empty-link-box">
             {{ selectedSatelliteNorad != null ? '该卫星暂无关联传输链路' : '当前范围内暂无可枚举链路' }}
           </div>
         </div>
@@ -184,6 +151,7 @@ import { useRouter } from 'vue-router'
 import { type MatrixResult } from '@/api/electronic'
 import { getAllWeapons } from '@/api/dashboard'
 import { useLayoutStore } from '@/store/modules/layout'
+import VirtualScrollList from '@/components/common/VirtualScrollList.vue'
 import {
   collectMatrixOverviewStats,
   collectSatelliteTransmissionLinks,
@@ -191,9 +159,29 @@ import {
   rankTransmissionLinksByPriority,
   STARLINK_PRIORITY_WEIGHTS,
   type ChainNode,
+  type LinkPriorityMetrics,
   type SatelliteTransmissionLink,
   type PrioritizedTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
+
+/**
+ * 右侧面板统一链路列表项：TOP 3 带优先级，其余为普通链路。
+ */
+interface DisplayTransmissionLinkItem {
+  /** 链路稳定 id，供虚拟列表作 key */
+  id: string
+  /** 原始传输链路 */
+  link: SatelliteTransmissionLink
+  /** 列表展示序号，从 1 开始 */
+  displayIndex: number
+  /** TOP 3 优先级信息；非推荐链路为 null */
+  priority: LinkPriorityMetrics | null
+}
+
+/** 普通链路卡片行高（含间距），单位 px */
+const OTHER_LINK_ITEM_HEIGHT = 188
+/** TOP 3 推荐卡片行高（含推荐理由与间距），单位 px */
+const TOP_LINK_ITEM_HEIGHT = 292
 
 const router = useRouter()
 const store = useLayoutStore()
@@ -310,16 +298,38 @@ const prioritizedLinks = computed<PrioritizedTransmissionLink[]>(() => {
   )
 })
 
-/** 优先级 TOP 1-3 推荐链路 */
-const top3PriorityLinks = computed(() => prioritizedLinks.value.slice(0, 3))
+/**
+ * TOP 3 与其余链路拼成一条列表：推荐卡在前，其余保持原排序且不重复。
+ */
+const displayLinkItems = computed<DisplayTransmissionLinkItem[]>(() => {
+  const top3 = prioritizedLinks.value.slice(0, 3)
+  const topIds = new Set(top3.map((item) => item.link.id))
+  const items: DisplayTransmissionLinkItem[] = top3.map((item, index) => ({
+    id: item.link.id,
+    link: item.link,
+    displayIndex: index + 1,
+    priority: item.priority,
+  }))
+  transmissionLinks.value.forEach((link) => {
+    if (topIds.has(link.id)) return
+    items.push({
+      id: link.id,
+      link,
+      displayIndex: items.length + 1,
+      priority: null,
+    })
+  })
+  return items
+})
 
-/** TOP 3 链路 ID 集合，用于从下方列表中排除重复展示 */
-const top3LinkIdSet = computed(() => new Set(top3PriorityLinks.value.map((item) => item.link.id)))
-
-/** 除 TOP 3 外的其余传输链路（保持原有排序） */
-const otherTransmissionLinks = computed(() =>
-  transmissionLinks.value.filter((link) => !top3LinkIdSet.value.has(link.id))
-)
+/**
+ * 虚拟列表按条目取行高：推荐卡更高，普通卡沿用紧凑高度。
+ *
+ * @param item 统一链路展示项
+ * @returns 行高（px）
+ */
+const getDisplayLinkItemHeight = (item: DisplayTransmissionLinkItem): number =>
+  item.priority ? TOP_LINK_ITEM_HEIGHT : OTHER_LINK_ITEM_HEIGHT
 
 /** 格式化卫星覆盖率。 */
 const formatCoverage = (coverage: number | undefined): string => {
@@ -588,67 +598,20 @@ onMounted(() => {
 }
 
 .link-section-scroll {
+  position: relative;
   flex: 1;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding-right: 4px;
-  scrollbar-gutter: stable;
+  overflow: hidden;
 
-  &::-webkit-scrollbar {
-    width: 6px;
+  :deep(.virtual-scroll-list__item) {
+    padding-bottom: 8px;
   }
 
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 225, 255, 0.28);
-    border-radius: 4px;
+  .transmission-link-card {
+    box-sizing: border-box;
+    height: 100%;
+    overflow: hidden;
   }
-}
-
-.transmission-link-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-
-  &--top {
-    margin-bottom: 4px;
-  }
-}
-
-.subsection-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: rgba(234, 179, 8, 0.08);
-  border: 1px solid rgba(234, 179, 8, 0.22);
-
-  &--rest {
-    margin-top: 10px;
-    background: rgba(56, 189, 248, 0.06);
-    border-color: rgba(56, 189, 248, 0.2);
-  }
-
-  .subsection-title {
-    font-size: 12px;
-    font-weight: 800;
-    color: #fef08a;
-  }
-
-  .subsection-count {
-    font-size: 11px;
-    padding: 1px 8px;
-    border-radius: 10px;
-    background: rgba(56, 189, 248, 0.15);
-    color: #38bdf8;
-  }
-}
-
-.subsection-header--rest .subsection-title {
-  color: #7dd3fc;
 }
 
 .transmission-link-card {
@@ -756,6 +719,10 @@ onMounted(() => {
 
     .reason-text {
       text-align: left;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
   }
 }
