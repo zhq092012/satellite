@@ -28,19 +28,12 @@
           </span>
         </div>
         <div class="series-search-bar">
-          <el-input
-            v-model="seriesSearchKey"
-            size="small"
-            placeholder="搜索系列名称..."
-            clearable
-            :prefix-icon="Search"
-            class="series-search-input"
-          />
+          <el-input v-model="seriesSearchKey" size="small" placeholder="搜索系列名称..." clearable :prefix-icon="Search"
+            class="series-search-input" />
         </div>
         <div class="series-list">
-          <div v-if="!seriesSearchKey.trim() || '全部系列'.includes(seriesSearchKey.trim())"
-            class="series-item" :class="{ active: !selectedSeries, disabled: matrixMerging }"
-            @click="selectSeries('')">
+          <div v-if="!seriesSearchKey.trim() || '全部系列'.includes(seriesSearchKey.trim())" class="series-item"
+            :class="{ active: !selectedSeries, disabled: matrixMerging }" @click="selectSeries('')">
             <span class="series-icon"></span>
             <span class="series-name">全部系列</span>
             <span class="series-status">{{ !selectedSeries ? '✓ 已筛选' : '点击筛选' }}</span>
@@ -51,7 +44,8 @@
             <span class="series-name">{{ series }}</span>
             <span class="series-status">{{ selectedSeries === series ? '✓ 已筛选' : '点击筛选' }}</span>
           </div>
-          <div v-if="filteredSeriesOptions.length === 0 && (seriesSearchKey.trim() && !'全部系列'.includes(seriesSearchKey.trim()))"
+          <div
+            v-if="filteredSeriesOptions.length === 0 && (seriesSearchKey.trim() && !'全部系列'.includes(seriesSearchKey.trim()))"
             class="series-search-empty">
             无匹配系列
           </div>
@@ -82,7 +76,7 @@
             按威胁度
           </button>
           <button class="sort-btn" :class="{ active: sortMode === 'transTime' }" @click="sortMode = 'transTime'">
-            按链路时长
+            {{ isStarlinkSeries ? '按覆盖率' : '按链路时长' }}
           </button>
         </div>
       </div>
@@ -105,7 +99,9 @@
               威胁度 {{ sat.threatScore != null ? formatThreatScore(sat.threatScore) : '--' }}
             </span>
             <span v-else class="metric-highlight metric-duration">
-              链路时长 {{ sat.timeEffect ? formatDuration(sat.timeEffect.duration) : '--' }}
+              {{ isStarlinkSeries ? '覆盖率' : '链路时长' }}
+              {{ isStarlinkSeries ? formatCoverage(sat.coverage) : (sat.timeEffect ?
+                formatDuration(sat.timeEffect.duration) : '--') }}
             </span>
           </div>
           <div class="card-meta-row" v-if="sat.satType || sat.usage || sat.orbitType != null">
@@ -269,6 +265,9 @@ const selectedSeries = computed({
   set: (val: string) => store.setSelectedSatSeries(val),
 })
 
+/** STARLINK 系列使用覆盖率替代链路时长作为列表指标。 */
+const isStarlinkSeries = computed(() => selectedSeries.value === 'STARLINK')
+
 /** 方案接口请求中（系列列表尚未返回） */
 const planLoading = computed(() => store.zhchPlanLoading)
 
@@ -369,6 +368,8 @@ interface SatListItem {
   threatScore: number | null
   /** 过境链路信息，暂无链路时为空。 */
   timeEffect: SatTimeEffectInfo | null
+  /** 打击后的卫星覆盖率（百分比）。 */
+  coverage: number | null
 }
 
 /** 卫星资产列表的排序模式。 */
@@ -440,6 +441,12 @@ const formatDuration = (duration: number | null | undefined): string => {
   /** 按展示精度处理后的链路时长。 */
   const rounded = Number.isInteger(duration) ? duration : Number(duration.toFixed(1))
   return `${rounded} 分钟`
+}
+
+/** 将覆盖率格式化为百分比文本。 */
+const formatCoverage = (coverage: number | null | undefined): string => {
+  if (coverage == null || Number.isNaN(coverage)) return '--'
+  return `${Number(coverage.toFixed(2))}%`
 }
 
 /**
@@ -537,6 +544,7 @@ const parseTransTimeTs = (timeStr: string | null | undefined): number => {
  */
 const isTopRankEligible = (sat: SatListItem): boolean => {
   if (sortMode.value === 'threat') return sat.threatScore != null
+  if (isStarlinkSeries.value) return sat.coverage != null
   return sat.timeEffect != null
 }
 
@@ -589,6 +597,7 @@ const satList = computed<SatListItem[]>(() => {
       isRelay,
       threatScore: threatMap.get(s.norad) ?? null,
       timeEffect: timeEffectMap.get(s.norad) ?? null,
+      coverage: s.coverage ?? null,
     })
   })
   satMatrixList.forEach((s: SatelliteMatrix) => {
@@ -604,6 +613,7 @@ const satList = computed<SatListItem[]>(() => {
       isRelay,
       threatScore: threatMap.get(s.norad) ?? existing?.threatScore ?? null,
       timeEffect: timeEffectMap.get(s.norad) ?? existing?.timeEffect ?? null,
+      coverage: s.coverage ?? existing?.coverage ?? null,
     })
   })
 
@@ -613,6 +623,9 @@ const satList = computed<SatListItem[]>(() => {
   // 根据当前排序模式进行排序
   if (sortMode.value === 'transTime') {
     return list.sort((a, b) => {
+      if (isStarlinkSeries.value) {
+        return (b.coverage ?? -Infinity) - (a.coverage ?? -Infinity)
+      }
       /** 两颗卫星的链路持续时长。 */
       const durationA = a.timeEffect?.duration ?? Infinity
       const durationB = b.timeEffect?.duration ?? Infinity

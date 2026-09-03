@@ -201,7 +201,11 @@ const getLayerY = (layer: number): number => getLayerYRatio(layer) * graphStageH
 
 const formatLayerTop = (layer: number): string => `${getLayerY(layer)}px`
 
+/** STARLINK 全系列视图采用以战场为中心的环形布局。 */
+const isStarlinkSeries = computed(() => matrixData.value?.series === 'STARLINK')
+
 const layerLabelItems = computed(() => {
+  if (isStarlinkSeries.value && !selectedNorad.value) return []
   if (currentSatCategory.value === 'COMM') {
     return [
       { key: 'comm-1', icon: '🛰️', title: '通讯卫星', top: formatLayerTop(1), className: 'layer-1-item' },
@@ -584,7 +588,7 @@ const applyCachedNodePositions = (nodes: any[]) => {
   nodes.forEach((node) => {
     const cachedX = nodeLayoutCache.get(String(node.id))
     if (cachedX !== undefined) node.x = cachedX
-    if (node.layer) node.y = getLayerY(node.layer)
+    if (node.layer && !node.customPosition) node.y = getLayerY(node.layer)
   })
 }
 
@@ -768,6 +772,8 @@ const buildTopoNode = (opts: {
   kind: TopoNodeKind
   x: number
   layer: number
+  /** 自定义纵坐标，用于 STARLINK 环形布局。 */
+  y?: number
   struck?: boolean
   /** 是否在节点下方显示名称 */
   showLabel?: boolean
@@ -804,7 +810,8 @@ const buildTopoNode = (opts: {
     kind: opts.kind,
     layer: opts.layer,
     x: opts.x,
-    y: getLayerY(opts.layer),
+    y: opts.y ?? getLayerY(opts.layer),
+    customPosition: opts.y != null,
     type: TOPO_NODE_SHAPE[opts.kind],
     size: TOPO_NODE_SIZE[opts.kind],
     anchorPoints: [
@@ -1777,14 +1784,49 @@ const buildSeriesCommGraph = () => {
   receiveNodeCount.value = 1
   stationNodeCount.value = 0
 
+  const isStarlink = data.series === 'STARLINK'
+  const containerH = getGraphStageSize().height
+  const centerX = containerW / 2
+  const centerY = containerH / 2
+  const ringPositions = new Map<number, { x: number; y: number }>()
+
+  if (isStarlink && norads.length) {
+    const ringCount = Math.max(1, Math.ceil(Math.sqrt(norads.length / 4)))
+    const ringWeights = Array.from({ length: ringCount }, (_, index) => index + 1)
+    const totalWeight = ringWeights.reduce((sum, weight) => sum + weight, 0)
+    const ringSizes = ringWeights.map((weight) => Math.floor((norads.length * weight) / totalWeight))
+    let assigned = ringSizes.reduce((sum, size) => sum + size, 0)
+    for (let index = ringCount - 1; assigned < norads.length; index = (index - 1 + ringCount) % ringCount) {
+      ringSizes[index] += 1
+      assigned += 1
+    }
+
+    const maxRadiusX = Math.max(48, centerX - 42)
+    const maxRadiusY = Math.max(48, centerY - 42)
+    let satelliteIndex = 0
+    ringSizes.forEach((ringSize, ringIndex) => {
+      const radiusRatio = (ringIndex + 1) / (ringCount + 1)
+      const radiusX = maxRadiusX * radiusRatio
+      const radiusY = maxRadiusY * radiusRatio
+      for (let positionIndex = 0; positionIndex < ringSize; positionIndex += 1) {
+        const angle = -Math.PI / 2 + (Math.PI * 2 * positionIndex) / ringSize
+        ringPositions.set(norads[satelliteIndex], {
+          x: centerX + Math.cos(angle) * radiusX,
+          y: centerY + Math.sin(angle) * radiusY,
+        })
+        satelliteIndex += 1
+      }
+    })
+  }
+
   norads.forEach((norad, i) => {
     const initSat = data.initMatrixList?.find((s) => s.norad === norad)
     const postSat = data.satelliteMatrixList?.find((s) => s.norad === norad)
     const satName = postSat?.name || initSat?.name || `Sat-${norad}`
     const struck = postSat?.satelliteStatus === 1
     const satId = `sat-${norad}`
-    const x =
-      norads.length === 1 ? containerW / 2 : startX + (availableW / (norads.length + 1)) * (i + 1)
+    const position = ringPositions.get(norad)
+    const x = position?.x ?? (norads.length === 1 ? containerW / 2 : startX + (availableW / (norads.length + 1)) * (i + 1))
 
     nodes.push(
       buildTopoNode({
@@ -1793,22 +1835,25 @@ const buildSeriesCommGraph = () => {
         kind: 'sat',
         x,
         layer: 1,
+        y: position?.y,
         struck,
-        showLabel: true,
+        showLabel: !isStarlink,
       })
     )
 
-    const linkId = `comm-${norad}`
-    const highlighted = !selectedLinkId.value || selectedLinkId.value === linkId
-    edges.push({
-      id: `edge-comm-${norad}`,
-      linkId,
-      source: satId,
-      target: targetNodeId,
-      type: 'cubic-vertical',
-      linkStruck: struck,
-      style: buildLinkEdgeStyle(struck, highlighted),
-    })
+    if (!isStarlink) {
+      const linkId = `comm-${norad}`
+      const highlighted = !selectedLinkId.value || selectedLinkId.value === linkId
+      edges.push({
+        id: `edge-comm-${norad}`,
+        linkId,
+        source: satId,
+        target: targetNodeId,
+        type: 'cubic-vertical',
+        linkStruck: struck,
+        style: buildLinkEdgeStyle(struck, highlighted),
+      })
+    }
   })
 
   nodes.push(
@@ -1816,8 +1861,9 @@ const buildSeriesCommGraph = () => {
       id: targetNodeId,
       name: targetName,
       kind: 'target',
-      x: containerW / 2,
+      x: isStarlink ? centerX : containerW / 2,
       layer: 2,
+      y: isStarlink ? centerY : undefined,
       showLabel: true,
     })
   )

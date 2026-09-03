@@ -42,8 +42,8 @@
       </div>
 
       <el-scrollbar class="link-scroll">
-        <div v-for="item in filteredLinkItems" :key="item.id" :ref="(el) => setLinkCardRef(item.id, el as HTMLElement | null)"
-          class="link-card" :class="[
+        <div v-for="item in filteredLinkItems" :key="item.id"
+          :ref="(el) => setLinkCardRef(item.id, el as HTMLElement | null)" class="link-card" :class="[
             { active: selectedLinkId === item.id, struck: item.struck, ok: !item.struck },
             item.rank ? `rank-card--${item.rank}` : ''
           ]" @click="handleSelect(item)">
@@ -103,6 +103,7 @@ import {
   collectSatelliteTransmissionLinks,
   collectSeriesTransmissionLinks,
   rankTransmissionLinksByPriority,
+  STARLINK_PRIORITY_WEIGHTS,
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
 
@@ -160,6 +161,9 @@ const emit = defineEmits<{
 /** 搜索过滤关键词 */
 const searchKeyword = ref<string>('')
 
+/** STARLINK 链路清单按包含覆盖率的专用权重排名。 */
+const isStarlinkSeries = computed(() => props.matrixData?.series === 'STARLINK')
+
 const getRankMedal = (rank: number): string => {
   if (rank === 1) return '🥇'
   if (rank === 2) return '🥈'
@@ -198,7 +202,11 @@ const linkItems = computed<LinkListItem[]>(() => {
     ? collectSatelliteTransmissionLinks(props.matrixData, props.selectedNorad)
     : collectSeriesTransmissionLinks(props.matrixData)
 
-  const ranked = rankTransmissionLinksByPriority(props.matrixData, rawLinks)
+  const ranked = rankTransmissionLinksByPriority(
+    props.matrixData,
+    rawLinks,
+    isStarlinkSeries.value ? STARLINK_PRIORITY_WEIGHTS : undefined
+  )
 
   return ranked.map((r) => {
     const link = r.link

@@ -8,8 +8,9 @@
 
     <p class="summary-line">
       共 <span class="num-green">{{ plan.visibleWindowNum }}</span> 个过境窗口，其中
-      <span class="num-red">{{ plan.visibleWindowStrikeNum }}</span> 个被打击压制，
-      <span class="num-green">{{ plan.feedbackWindowNum }}</span> 个回传窗口。
+      <span class="num-red">{{ plan.visibleWindowStrikeNum }}</span> 个被打击压制；
+      打击前覆盖率 <span class="num-green">{{ formatCoverage(plan.beforeAvgCoverage) }}</span>，
+      打击后覆盖率 <span class="num-orange">{{ formatCoverage(plan.afterAvgCoverage) }}</span>。
     </p>
 
     <!-- 关键指标（带单位） -->
@@ -29,6 +30,14 @@
       <div class="kpi-card kpi-card--red">
         <span class="kpi-value">{{ plan.visibleWindowStrikeNum }}<em>个</em></span>
         <span class="kpi-label">压制窗口</span>
+      </div>
+      <div class="kpi-card kpi-card--green">
+        <span class="kpi-value">{{ formatCoverage(plan.beforeAvgCoverage) }}</span>
+        <span class="kpi-label">打击前覆盖率</span>
+      </div>
+      <div class="kpi-card kpi-card--orange">
+        <span class="kpi-value">{{ formatCoverage(plan.afterAvgCoverage) }}</span>
+        <span class="kpi-label">打击后覆盖率</span>
       </div>
     </div>
 
@@ -104,6 +113,12 @@ const props = defineProps<{
  */
 const highlightText = (text?: string | null) => highlightResultText(text)
 
+/** 将平均覆盖率格式化为百分比。 */
+const formatCoverage = (coverage: number | null | undefined): string => {
+  if (coverage == null || !Number.isFinite(coverage)) return '--'
+  return `${Number(coverage.toFixed(2))}%`
+}
+
 /** 打击干扰造成的延迟时长（格式：xx时xx分xx秒） */
 const interferenceDelay = computed(() =>
   formatInterferenceDelay(props.plan.beforeFirstFeedbackTime, props.plan.afterFirstFeedbackTime)
@@ -165,7 +180,7 @@ const coverageReduction = computed(() => {
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -218,6 +233,11 @@ const coverageReduction = computed(() => {
   &--red .kpi-value {
     color: #f87171;
     text-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
+  }
+
+  &--orange .kpi-value {
+    color: #fb923c;
+    text-shadow: 0 0 10px rgba(251, 146, 60, 0.5);
   }
 }
 

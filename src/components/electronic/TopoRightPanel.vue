@@ -40,16 +40,19 @@
           </div>
           <div class="weight-tags-row">
             <span class="weight-chip chip--threat">
-              <span class="chip-dot"></span>威胁度 {{ (DEFAULT_PRIORITY_WEIGHTS.threat * 100).toFixed(0) }}%
+              <span class="chip-dot"></span>威胁度 {{ (activePriorityWeights.threat * 100).toFixed(0) }}%
+            </span>
+            <span v-if="isStarlinkSeries" class="weight-chip chip--coverage">
+              <span class="chip-dot"></span>覆盖率 {{ (activePriorityWeights.coverage! * 100).toFixed(0) }}%
             </span>
             <span class="weight-chip chip--time">
-              <span class="chip-dot"></span>时效 {{ (DEFAULT_PRIORITY_WEIGHTS.earlyTime * 100).toFixed(0) }}%
+              <span class="chip-dot"></span>时效 {{ (activePriorityWeights.earlyTime * 100).toFixed(0) }}%
             </span>
             <span class="weight-chip chip--iso">
-              <span class="chip-dot"></span>孤立度 {{ (DEFAULT_PRIORITY_WEIGHTS.isolation * 100).toFixed(0) }}%
+              <span class="chip-dot"></span>孤立度 {{ (activePriorityWeights.isolation * 100).toFixed(0) }}%
             </span>
             <span class="weight-chip chip--relay">
-              <span class="chip-dot"></span>中继 {{ (DEFAULT_PRIORITY_WEIGHTS.relay * 100).toFixed(0) }}%
+              <span class="chip-dot"></span>中继 {{ (activePriorityWeights.relay * 100).toFixed(0) }}%
             </span>
           </div>
         </div>
@@ -105,6 +108,16 @@
                 <span class="dim-score">{{ item.priority.threatScoreRaw.toFixed(0) }}分</span>
               </div>
 
+              <div v-if="isStarlinkSeries" class="dim-item">
+                <span class="dim-label">🌐 卫星覆盖</span>
+                <div class="dim-val-bar">
+                  <div class="dim-fill dim-fill--coverage" :style="{ width: `${item.priority.coverageNorm * 100}%` }">
+                  </div>
+                </div>
+                <span class="dim-score">{{ item.priority.coverageRaw == null ? '--' :
+                  `${Number(item.priority.coverageRaw.toFixed(2))}%` }}</span>
+              </div>
+
               <div class="dim-item">
                 <span class="dim-label">⏱️ 传输时效</span>
                 <div class="dim-val-bar">
@@ -149,6 +162,10 @@
                   <li>
                     <strong class="point-label">目标威胁：</strong>
                     <span>{{ item.priority.reasonDetails.threatText }}</span>
+                  </li>
+                  <li v-if="isStarlinkSeries && item.priority.reasonDetails.coverageText">
+                    <strong class="point-label">卫星覆盖：</strong>
+                    <span>{{ item.priority.reasonDetails.coverageText }}</span>
                   </li>
                   <li>
                     <strong class="point-label">传输窗口：</strong>
@@ -293,6 +310,7 @@ import {
   rankTransmissionLinksByPriority,
   resolveLinkStrikeTarget,
   DEFAULT_PRIORITY_WEIGHTS,
+  STARLINK_PRIORITY_WEIGHTS,
   type PrioritizedTransmissionLink,
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
@@ -362,6 +380,14 @@ const emit = defineEmits<{
 /** 当前激活的面板视图：'priority' 为 TOP 3 优先推荐，'detail' 为详细参数 */
 const activeTab = ref<'priority' | 'detail'>('priority')
 
+/** STARLINK 拓扑推荐将覆盖率作为最高权重指标。 */
+const isStarlinkSeries = computed(() => props.matrixData?.series === 'STARLINK')
+
+/** 当前系列生效的链路推荐权重。 */
+const activePriorityWeights = computed(() =>
+  isStarlinkSeries.value ? STARLINK_PRIORITY_WEIGHTS : DEFAULT_PRIORITY_WEIGHTS
+)
+
 /** 监听选中节点变化：若用户点击了特定节点，则自动切到详情视图 */
 watch(
   () => [props.selectedNodeId, props.selectedNodeLayer] as const,
@@ -389,7 +415,7 @@ const prioritizedLinks = computed<PrioritizedTransmissionLink[]>(() => {
     ? collectSatelliteTransmissionLinks(data, props.selectedNorad)
     : collectSeriesTransmissionLinks(data)
 
-  return rankTransmissionLinksByPriority(data, rawLinks, DEFAULT_PRIORITY_WEIGHTS)
+  return rankTransmissionLinksByPriority(data, rawLinks, activePriorityWeights.value)
 })
 
 /** 前三条优先级最高的推荐链路 */
@@ -823,6 +849,10 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
       background: #f87171;
     }
 
+    &.chip--coverage .chip-dot {
+      background: #22d3ee;
+    }
+
     &.chip--time .chip-dot {
       background: #fbbf24;
     }
@@ -1077,6 +1107,10 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
 
         &--threat {
           background: linear-gradient(90deg, #f87171, #ef4444);
+        }
+
+        &--coverage {
+          background: linear-gradient(90deg, #22d3ee, #0891b2);
         }
 
         &--time {

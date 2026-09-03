@@ -69,38 +69,28 @@
               <span class="subsection-title">🎯 优先推荐 TOP 3</span>
             </div>
             <div class="transmission-link-list transmission-link-list--top">
-              <div
-                v-for="item in top3PriorityLinks"
-                :key="item.link.id"
-                class="transmission-link-card"
-                :class="[
-                  {
-                    active: selectedTransmissionLinkId === item.link.id,
-                    blocked: item.link.blocked,
-                  },
-                  `priority-rank-${item.priority.rank}`,
-                ]"
-                role="button"
-                tabindex="0"
-                @click="handleLinkCardClick(item.link)"
-                @keydown.enter.prevent="handleLinkCardClick(item.link)"
-              >
+              <div v-for="item in top3PriorityLinks" :key="item.link.id" class="transmission-link-card" :class="[
+                {
+                  active: selectedTransmissionLinkId === item.link.id,
+                  blocked: item.link.blocked,
+                },
+                `priority-rank-${item.priority.rank}`,
+              ]" role="button" tabindex="0" @click="handleLinkCardClick(item.link)"
+                @keydown.enter.prevent="handleLinkCardClick(item.link)">
                 <div class="link-card-header">
                   <div class="link-title-left">
                     <span class="link-index">链路 {{ item.priority.rank }}</span>
                     <span class="rank-badge" :class="`rank-badge--${item.priority.rank}`">
-                      {{ getRankMedal(item.priority.rank) }} TOP {{ item.priority.rank }} ({{ item.priority.totalScore }}分)
+                      {{ getRankMedal(item.priority.rank) }} TOP {{ item.priority.rank }} ({{ item.priority.totalScore
+                      }}分)
                     </span>
                   </div>
                   <div class="link-metrics-row">
                     <div class="link-metric-card">
-                      <span class="link-metric-label">链路时长</span>
-                      <strong>{{ formatElapsedTime(item.link.transmitEndMs - item.link.transmitStartMs) }}</strong>
+                      <span class="link-metric-label">{{ primaryLinkMetricLabel }}</span>
+                      <strong>{{ formatPrimaryLinkMetric(item.link) }}</strong>
                     </div>
-                    <div class="link-metric-card">
-                      <span class="link-metric-label">链路时延</span>
-                      <strong>{{ formatElapsedTime(item.link.transmitEndMs - taskStartMs) }}</strong>
-                    </div>
+
                   </div>
                 </div>
 
@@ -136,32 +126,21 @@
               <span class="subsection-count">{{ otherTransmissionLinks.length }} 条</span>
             </div>
             <div class="transmission-link-list">
-              <div
-                v-for="(link, idx) in otherTransmissionLinks"
-                :key="link.id"
-                class="transmission-link-card"
-                :class="{
-                  active: selectedTransmissionLinkId === link.id,
-                  blocked: link.blocked,
-                }"
-                role="button"
-                tabindex="0"
-                @click="handleLinkCardClick(link)"
-                @keydown.enter.prevent="handleLinkCardClick(link)"
-              >
+              <div v-for="(link, idx) in otherTransmissionLinks" :key="link.id" class="transmission-link-card" :class="{
+                active: selectedTransmissionLinkId === link.id,
+                blocked: link.blocked,
+              }" role="button" tabindex="0" @click="handleLinkCardClick(link)"
+                @keydown.enter.prevent="handleLinkCardClick(link)">
                 <div class="link-card-header">
                   <div class="link-title-left">
                     <span class="link-index">链路 {{ idx + top3PriorityLinks.length + 1 }}</span>
                   </div>
                   <div class="link-metrics-row">
                     <div class="link-metric-card">
-                      <span class="link-metric-label">链路时长</span>
-                      <strong>{{ formatElapsedTime(link.transmitEndMs - link.transmitStartMs) }}</strong>
+                      <span class="link-metric-label">{{ primaryLinkMetricLabel }}</span>
+                      <strong>{{ formatPrimaryLinkMetric(link) }}</strong>
                     </div>
-                    <div class="link-metric-card">
-                      <span class="link-metric-label">链路时延</span>
-                      <strong>{{ formatElapsedTime(link.transmitEndMs - taskStartMs) }}</strong>
-                    </div>
+
                   </div>
                 </div>
 
@@ -210,6 +189,7 @@ import {
   collectSatelliteTransmissionLinks,
   collectSeriesTransmissionLinks,
   rankTransmissionLinksByPriority,
+  STARLINK_PRIORITY_WEIGHTS,
   type ChainNode,
   type SatelliteTransmissionLink,
   type PrioritizedTransmissionLink,
@@ -218,13 +198,6 @@ import {
 const router = useRouter()
 const store = useLayoutStore()
 
-/** 当前任务起始时间戳，用于计算链路时延。 */
-const taskStartMs = computed(() => {
-  const beginDate = store.activedTask?.beginDate
-  if (!beginDate) return 0
-  const timestamp = new Date(beginDate.replace(/-/g, '/')).getTime()
-  return Number.isNaN(timestamp) ? 0 : timestamp
-})
 
 /** 将毫秒时长格式化为小时和分钟。 */
 const formatElapsedTime = (durationMs: number): string => {
@@ -268,6 +241,21 @@ const activeMatrix = computed<MatrixResult | null>(() => props.matrixData)
 
 /** 统计范围文案 */
 const scopeLabel = computed(() => (store.selectedSatSeries ? store.selectedSatSeries : '全部系列'))
+
+/** STARLINK 系列的链路首要指标使用卫星覆盖率。 */
+const isStarlinkSeries = computed(() => store.selectedSatSeries === 'STARLINK')
+
+/** 链路卡片首个指标名称。 */
+const primaryLinkMetricLabel = computed(() => (isStarlinkSeries.value ? '覆盖率' : '链路时长'))
+
+/** 按 NORAD 编号索引的打击后卫星覆盖率。 */
+const coverageByNorad = computed(() =>
+  new Map(
+    (activeMatrix.value?.satelliteMatrixList || [])
+      .filter((satellite) => Number.isFinite(satellite.coverage))
+      .map((satellite) => [satellite.norad, satellite.coverage!])
+  )
+)
 
 /** 矩阵概览统计（不含我方武器数量） */
 const overviewStats = computed(() => collectMatrixOverviewStats(activeMatrix.value, scopeLabel.value))
@@ -315,7 +303,11 @@ const transmissionLinks = computed<SatelliteTransmissionLink[]>(() => {
 const prioritizedLinks = computed<PrioritizedTransmissionLink[]>(() => {
   const matrix = activeMatrix.value
   if (!matrix || !transmissionLinks.value.length) return []
-  return rankTransmissionLinksByPriority(matrix, transmissionLinks.value)
+  return rankTransmissionLinksByPriority(
+    matrix,
+    transmissionLinks.value,
+    isStarlinkSeries.value ? STARLINK_PRIORITY_WEIGHTS : undefined
+  )
 })
 
 /** 优先级 TOP 1-3 推荐链路 */
@@ -328,6 +320,22 @@ const top3LinkIdSet = computed(() => new Set(top3PriorityLinks.value.map((item) 
 const otherTransmissionLinks = computed(() =>
   transmissionLinks.value.filter((link) => !top3LinkIdSet.value.has(link.id))
 )
+
+/** 格式化卫星覆盖率。 */
+const formatCoverage = (coverage: number | undefined): string => {
+  if (coverage == null || !Number.isFinite(coverage)) return '--'
+  return `${Number(coverage.toFixed(2))}%`
+}
+
+/** 根据当前系列格式化链路卡片首个指标。 */
+const formatPrimaryLinkMetric = (link: SatelliteTransmissionLink): string => {
+  if (!isStarlinkSeries.value) {
+    return formatElapsedTime(link.transmitEndMs - link.transmitStartMs)
+  }
+  const sourceSatellite = link.nodes.find((node) => node.layer === 'SAT')
+  const norad = Number(sourceSatellite?.id)
+  return formatCoverage(coverageByNorad.value.get(norad))
+}
 
 const getRankMedal = (rank: number): string => {
   if (rank === 1) return '🥇'

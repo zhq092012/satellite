@@ -1,9 +1,4 @@
-import type {
-  MatrixResult,
-  StationRelationList,
-  Weapon,
-  WeaponAttackRecord,
-} from '@/api/electronic'
+import type { MatrixResult, StationRelationList, Weapon, WeaponAttackRecord } from '@/api/electronic'
 
 export interface ChainNode {
   layer: 'SAT' | 'RELAY' | 'RECEIVE' | 'STATION'
@@ -112,7 +107,12 @@ export type WindowTimeLike = {
 }
 
 const getWindowStartStr = (win?: WindowTimeLike | Record<string, any> | null): string =>
-  win ? (win as WindowTimeLike).peakWindow || (win as WindowTimeLike).startWindow || (win as WindowTimeLike).beginWindow || '' : ''
+  win
+    ? (win as WindowTimeLike).peakWindow ||
+      (win as WindowTimeLike).startWindow ||
+      (win as WindowTimeLike).beginWindow ||
+      ''
+    : ''
 
 const getWindowEndStr = (win?: WindowTimeLike | Record<string, any> | null): string =>
   (win as WindowTimeLike)?.endWindow || ''
@@ -128,8 +128,8 @@ const windowsOverlapMs = (startA: string, endA: string, startB: string, endB: st
 
 const buildSatNameMap = (matrix: MatrixResult): Map<number, string> => {
   const map = new Map<number, string>()
-    ; (matrix.initMatrixList || []).forEach((s) => map.set(s.norad, s.name))
-    ; (matrix.satelliteMatrixList || []).forEach((s) => map.set(s.norad, s.name))
+  ;(matrix.initMatrixList || []).forEach((s) => map.set(s.norad, s.name))
+  ;(matrix.satelliteMatrixList || []).forEach((s) => map.set(s.norad, s.name))
   return map
 }
 
@@ -150,30 +150,35 @@ const buildReceiveToStations = (
   const blockedStation = new Set(
     (relationData.stationObjList || []).filter((s) => usePostStrike && s.stationStatus === 1).map((s) => s.stationId)
   )
-  const stationMap = new Map((relationData.stationObjList || []).map((s) => [s.stationId, s.stationName || s.stationId]))
+  const stationMap = new Map(
+    (relationData.stationObjList || []).map((s) => [s.stationId, s.stationName || s.stationId])
+  )
 
   const map = new Map<string, { stationId: string; stationName: string }[]>()
-    ; (relationData.relations || []).forEach((rel) => {
-      if (blockedReceive.has(rel.from) || blockedStation.has(rel.to)) return
-      const list = map.get(rel.from) || []
-      list.push({
-        stationId: rel.to,
-        stationName: stationMap.get(rel.to) || rel.to,
-      })
-      map.set(rel.from, list)
+  ;(relationData.relations || []).forEach((rel) => {
+    if (blockedReceive.has(rel.from) || blockedStation.has(rel.to)) return
+    const list = map.get(rel.from) || []
+    list.push({
+      stationId: rel.to,
+      stationName: stationMap.get(rel.to) || rel.to,
     })
+    map.set(rel.from, list)
+  })
   return map
 }
 
-const mergeSatelliteTransitWindows = (initWindows: Record<string, any>[] = [], stationWindows: Record<string, any>[] = []) => {
+const mergeSatelliteTransitWindows = (
+  initWindows: Record<string, any>[] = [],
+  stationWindows: Record<string, any>[] = []
+) => {
   const map = new Map<string, Record<string, any>>()
-    ;[...initWindows, ...stationWindows].forEach((win) => {
-      const key = `${win.receiveId || win.receiveName || ''}-${getWindowStartStr(win)}-${getWindowEndStr(win)}`
-      const existing = map.get(key)
-      if (!existing || (Number(win.strikeStatus) === 1 && Number(existing.strikeStatus) !== 1)) {
-        map.set(key, win)
-      }
-    })
+  ;[...initWindows, ...stationWindows].forEach((win) => {
+    const key = `${win.receiveId || win.receiveName || ''}-${getWindowStartStr(win)}-${getWindowEndStr(win)}`
+    const existing = map.get(key)
+    if (!existing || (Number(win.strikeStatus) === 1 && Number(existing.strikeStatus) !== 1)) {
+      map.set(key, win)
+    }
+  })
   return Array.from(map.values())
 }
 
@@ -183,9 +188,7 @@ const mergeSatelliteTransitWindows = (initWindows: Record<string, any>[] = [], s
  * @param norad 观测卫星 NORAD
  */
 const findRelayRelation = (matrix: MatrixResult, norad: number) =>
-  matrix.relayRelation?.relations?.find(
-    (r) => Number(r.from) === norad || String(r.from) === String(norad)
-  )
+  matrix.relayRelation?.relations?.find((r) => Number(r.from) === norad || String(r.from) === String(norad))
 
 /**
  * 合并指定 NORAD 卫星的全部过境窗口
@@ -267,7 +270,7 @@ const appendRelayDownlinkCandidates = (
     if (!groundStartTs || !groundEndTs) return
 
     stationLinks.forEach(({ stationId, stationName }) => {
-      ; (ctx.relayRel.visibilityWindows || []).forEach((vis) => {
+      ;(ctx.relayRel.visibilityWindows || []).forEach((vis) => {
         if (!windowsOverlapMs(vis.beginWindow, vis.endWindow, groundStart, groundEnd)) return
         const relayEndTs = parseTimeToMs(vis.endWindow || vis.beginWindow)
         if (!relayEndTs) return
@@ -287,11 +290,7 @@ const appendRelayDownlinkCandidates = (
   })
 }
 
-const enumerateChainCandidates = (
-  matrix: MatrixResult,
-  norad: number,
-  usePostStrike: boolean
-): ChainCandidate[] => {
+const enumerateChainCandidates = (matrix: MatrixResult, norad: number, usePostStrike: boolean): ChainCandidate[] => {
   const satNameMap = buildSatNameMap(matrix)
   const initSat = matrix.initMatrixList?.find((s) => s.norad === norad)
   const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
@@ -299,9 +298,7 @@ const enumerateChainCandidates = (
 
   if (usePostStrike && (!postSat || postSat.satelliteStatus === 1)) return []
 
-  const windows: Record<string, any>[] = usePostStrike
-    ? postSat?.stationWindows || []
-    : initSat?.initWindows || []
+  const windows: Record<string, any>[] = usePostStrike ? postSat?.stationWindows || [] : initSat?.initWindows || []
 
   const relationData = getRelationData(matrix, usePostStrike)
   const receiveToStations = buildReceiveToStations(relationData, usePostStrike)
@@ -332,9 +329,7 @@ const enumerateChainCandidates = (
     const receiveName = win.receiveName || receiveObj?.receiveName || receiveId
 
     stationLinks.forEach(({ stationId, stationName }) => {
-      const baseNodes: ChainNode[] = [
-        { layer: 'SAT', id: String(norad), name: satName, icon: '🛰️' },
-      ]
+      const baseNodes: ChainNode[] = [{ layer: 'SAT', id: String(norad), name: satName, icon: '🛰️' }]
 
       // 直连路径：卫星 → 地面站 → 数据中心
       candidates.push({
@@ -350,7 +345,7 @@ const enumerateChainCandidates = (
 
       // 中继路径：卫星 → 中继 → 地面站 → 数据中心
       if (relayRel && relayNorad) {
-        ; (relayRel.visibilityWindows || []).forEach((vis) => {
+        ;(relayRel.visibilityWindows || []).forEach((vis) => {
           if (!windowsOverlapMs(vis.beginWindow, vis.endWindow, groundStart, groundEnd)) return
           const relayEndTs = parseTimeToMs(vis.endWindow || vis.beginWindow)
           if (!relayEndTs) return
@@ -439,7 +434,7 @@ export const getSatelliteRelatedEdgeIds = (matrix: MatrixResult, norad: number):
 
   const relationLists = [matrix.initRelationList, matrix.stationRelationList].filter(Boolean)
   relationLists.forEach((relData) => {
-    ; (relData?.relations || []).forEach((rel) => {
+    ;(relData?.relations || []).forEach((rel) => {
       if (receiveIds.has(rel.from)) {
         ids.add(`edge-${rel.from}-${rel.to}`)
       }
@@ -482,12 +477,12 @@ export const listSourceSatelliteNoradsForRelay = (matrix: MatrixResult, relayNor
 /** 普通侦察卫星 NORAD 列表（不含中继） */
 export const listNormalSatelliteNorads = (matrix: MatrixResult): number[] => {
   const norads = new Set<number>()
-    ; (matrix.initMatrixList || []).forEach((s) => {
-      if (!isRelaySatellite(matrix, s.norad, s.satType)) norads.add(s.norad)
-    })
-    ; (matrix.satelliteMatrixList || []).forEach((s) => {
-      if (!isRelaySatellite(matrix, s.norad, s.satType)) norads.add(s.norad)
-    })
+  ;(matrix.initMatrixList || []).forEach((s) => {
+    if (!isRelaySatellite(matrix, s.norad, s.satType)) norads.add(s.norad)
+  })
+  ;(matrix.satelliteMatrixList || []).forEach((s) => {
+    if (!isRelaySatellite(matrix, s.norad, s.satType)) norads.add(s.norad)
+  })
   return Array.from(norads)
 }
 
@@ -504,31 +499,27 @@ export const collectPostStrikePrimaryEdgeIds = (matrix: MatrixResult): Set<strin
 }
 
 /** 指定时刻被干扰的链路边 ID（用于时间轴打击点标红） */
-export const collectJamStrikeEdgeIdsAtTime = (
-  matrix: MatrixResult,
-  norad: number,
-  atMs: number
-): Set<string> => {
+export const collectJamStrikeEdgeIdsAtTime = (matrix: MatrixResult, norad: number, atMs: number): Set<string> => {
   const ids = new Set<string>()
   const satId = `sat-${norad}`
   const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
   const receiveIds = new Set<string>()
 
-    ; (postSat?.stationWindows || []).forEach((win) => {
-      if (win.strikeStatus !== 1) return
-      const start = parseTimeToMs(getWindowStartStr(win))
-      const end = parseTimeToMs(win.endWindow || '')
-      if (!start || atMs < start || atMs > (end || start)) return
-      const recId = win.receiveId
-      if (!recId) return
-      receiveIds.add(recId)
-      ids.add(`edge-${satId}-${recId}`)
-      ids.add(`edge-sat-${norad}-${recId}`)
-    })
+  ;(postSat?.stationWindows || []).forEach((win) => {
+    if (win.strikeStatus !== 1) return
+    const start = parseTimeToMs(getWindowStartStr(win))
+    const end = parseTimeToMs(win.endWindow || '')
+    if (!start || atMs < start || atMs > (end || start)) return
+    const recId = win.receiveId
+    if (!recId) return
+    receiveIds.add(recId)
+    ids.add(`edge-${satId}-${recId}`)
+    ids.add(`edge-sat-${norad}-${recId}`)
+  })
 
   const relationLists = [matrix.initRelationList, matrix.stationRelationList].filter(Boolean)
   relationLists.forEach((relData) => {
-    ; (relData?.relations || []).forEach((rel) => {
+    ;(relData?.relations || []).forEach((rel) => {
       if (receiveIds.has(rel.from)) {
         ids.add(`edge-${rel.from}-${rel.to}`)
       }
@@ -565,9 +556,7 @@ export const analyzeSatelliteChainAtTime = (
   }
   if (!matrix || !norad || !atMs) return empty
 
-  const candidates = enumerateChainCandidates(matrix, norad, usePostStrike).filter((c) =>
-    isChainActiveAtMs(c, atMs)
-  )
+  const candidates = enumerateChainCandidates(matrix, norad, usePostStrike).filter((c) => isChainActiveAtMs(c, atMs))
   const best = pickEarliestChain(candidates)
   if (!best) return empty
 
@@ -617,9 +606,7 @@ export const resolveChainForTimelineMarker = (
   }
 
   const postChain = analyzeSatelliteFullChain(matrix, norad, true)
-  const usePostStrike =
-    markerType === 'task_end' ||
-    (!!postChain.finishTimestamp && atMs >= postChain.finishTimestamp)
+  const usePostStrike = markerType === 'task_end' || (!!postChain.finishTimestamp && atMs >= postChain.finishTimestamp)
   return analyzeSatelliteChainAtTime(matrix, norad, atMs, usePostStrike)
 }
 /**
@@ -707,9 +694,7 @@ export const resolveStationPassChain = (
   const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
   const satName = postSat?.name || initSat?.name || `Sat-${norad}`
   const windows = [...(postSat?.stationWindows || []), ...(initSat?.initWindows || [])]
-  const matched = windows.filter(
-    (win) => win.receiveId === receiveKey || win.receiveName === receiveKey
-  )
+  const matched = windows.filter((win) => win.receiveId === receiveKey || win.receiveName === receiveKey)
   const win =
     matched.find((item) => {
       const start = parseTimeToMs(getWindowStartStr(item))
@@ -727,10 +712,7 @@ export const resolveStationPassChain = (
 
   const receiveId = win.receiveId || receiveKey
   const receiveName = win.receiveName || receiveId
-  const finishTs =
-    parseTimeToMs(getWindowEndStr(win) || '') ||
-    parseTimeToMs(getWindowStartStr(win)) ||
-    atMs
+  const finishTs = parseTimeToMs(getWindowEndStr(win) || '') || parseTimeToMs(getWindowStartStr(win)) || atMs
 
   const relationData = getRelationData(matrix, false)
   const receiveToStations = buildReceiveToStations(relationData, false)
@@ -742,9 +724,7 @@ export const resolveStationPassChain = (
 
   const relayRel = findRelayRelation(matrix, norad)
   const relayNorad = relayRel ? Number(relayRel.to) : null
-  const relayPostSat = relayNorad
-    ? matrix.satelliteMatrixList?.find((s) => s.norad === relayNorad)
-    : undefined
+  const relayPostSat = relayNorad ? matrix.satelliteMatrixList?.find((s) => s.norad === relayNorad) : undefined
   const groundStart = getWindowStartStr(win)
   const groundEnd = getWindowEndStr(win)
   let relayWindow = (relayRel?.visibilityWindows || []).find((vis) =>
@@ -754,10 +734,7 @@ export const resolveStationPassChain = (
     const relayGroundWindows = getMergedWindowsForNorad(matrix, relayNorad)
     for (const relayGroundWin of relayGroundWindows) {
       const relayReceive = resolveWindowReceive(matrix, relayNorad, relayGroundWin)
-      if (
-        !relayReceive ||
-        (relayReceive.receiveId !== receiveId && relayReceive.receiveName !== receiveName)
-      ) {
+      if (!relayReceive || (relayReceive.receiveId !== receiveId && relayReceive.receiveName !== receiveName)) {
         continue
       }
       const relayGroundStart = getWindowStartStr(relayGroundWin)
@@ -772,14 +749,8 @@ export const resolveStationPassChain = (
     }
   }
   const usesRelay = !!(relayRel && relayNorad && relayWindow)
-  const struck = isTransmissionLinkStruck(
-    win as Record<string, any>,
-    postSat,
-    usesRelay ? relayPostSat : undefined
-  )
-  const delayMin =
-    Number((win as { delayMin?: number }).delayMin) ||
-    (struck ? Number(postSat?.delayMin) || 0 : 0)
+  const struck = isTransmissionLinkStruck(win as Record<string, any>, postSat, usesRelay ? relayPostSat : undefined)
+  const delayMin = Number((win as { delayMin?: number }).delayMin) || (struck ? Number(postSat?.delayMin) || 0 : 0)
 
   if (!station) {
     return {
@@ -886,51 +857,50 @@ const resolveWeaponsForWindow = (
   const weaponMap = new Map<string, string | undefined>()
 
   if (windowStruck) {
-    ; (win.weapons || []).forEach((w: Weapon) => weaponMap.set(w.name, w.type))
+    ;(win.weapons || []).forEach((w: Weapon) => weaponMap.set(w.name, w.type))
     const receiveId = win.receiveId as string | undefined
     const receiveName = win.receiveName as string | undefined
-      ; (matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string }) => {
-        const matchedById = !!plan.targetId && !!receiveId && plan.targetId === receiveId
-        const matchedByName =
-          !!plan.target && (!!receiveName ? plan.target === receiveName : plan.target === receiveId)
-        if (matchedById || matchedByName) {
-          weaponMap.set(plan.weaponName, plan.weaponType)
-        }
-      })
+    ;(matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string }) => {
+      const matchedById = !!plan.targetId && !!receiveId && plan.targetId === receiveId
+      const matchedByName = !!plan.target && (!!receiveName ? plan.target === receiveName : plan.target === receiveId)
+      if (matchedById || matchedByName) {
+        weaponMap.set(plan.weaponName, plan.weaponType)
+      }
+    })
   }
 
   if (satStruck) {
-    ; (postSat?.weapons || []).forEach((w: Weapon) => {
+    ;(postSat?.weapons || []).forEach((w: Weapon) => {
       if (!weaponMap.has(w.name)) weaponMap.set(w.name, w.type)
     })
     const satNorad = postSat?.norad
     const satName = postSat?.name
-      ; (matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string; targetType?: string }) => {
-        const matchedByNorad = !!plan.targetId && !!satNorad && String(plan.targetId) === String(satNorad)
-        const matchedByName = !!plan.target && !!satName && plan.target === satName
-        const targetIsSatellite =
-          !plan.targetType || plan.targetType.includes('卫星') || plan.targetType.toUpperCase() === 'SAT'
-        if ((matchedByNorad || matchedByName) && (targetIsSatellite || matchedByNorad)) {
-          weaponMap.set(plan.weaponName, plan.weaponType)
-        }
-      })
+    ;(matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string; targetType?: string }) => {
+      const matchedByNorad = !!plan.targetId && !!satNorad && String(plan.targetId) === String(satNorad)
+      const matchedByName = !!plan.target && !!satName && plan.target === satName
+      const targetIsSatellite =
+        !plan.targetType || plan.targetType.includes('卫星') || plan.targetType.toUpperCase() === 'SAT'
+      if ((matchedByNorad || matchedByName) && (targetIsSatellite || matchedByNorad)) {
+        weaponMap.set(plan.weaponName, plan.weaponType)
+      }
+    })
   }
 
   if (relayStruck) {
-    ; (relayPostSat?.weapons || []).forEach((w: Weapon) => {
+    ;(relayPostSat?.weapons || []).forEach((w: Weapon) => {
       if (!weaponMap.has(w.name)) weaponMap.set(w.name, w.type)
     })
     const relayNorad = relayPostSat?.norad
     const relayName = relayPostSat?.name
-      ; (matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string; targetType?: string }) => {
-        const matchedByNorad = !!plan.targetId && !!relayNorad && String(plan.targetId) === String(relayNorad)
-        const matchedByName = !!plan.target && !!relayName && plan.target === relayName
-        const targetIsRelay =
-          !plan.targetType || plan.targetType.includes('中继') || plan.targetType.toUpperCase() === 'RELAY'
-        if ((matchedByNorad || matchedByName) && (targetIsRelay || matchedByNorad)) {
-          weaponMap.set(plan.weaponName, plan.weaponType)
-        }
-      })
+    ;(matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string; targetType?: string }) => {
+      const matchedByNorad = !!plan.targetId && !!relayNorad && String(plan.targetId) === String(relayNorad)
+      const matchedByName = !!plan.target && !!relayName && plan.target === relayName
+      const targetIsRelay =
+        !plan.targetType || plan.targetType.includes('中继') || plan.targetType.toUpperCase() === 'RELAY'
+      if ((matchedByNorad || matchedByName) && (targetIsRelay || matchedByNorad)) {
+        weaponMap.set(plan.weaponName, plan.weaponType)
+      }
+    })
   }
 
   if (struck && !weaponMap.size) {
@@ -964,9 +934,7 @@ export const collectRelaySatelliteTransmissionLinks = (
 
   sourceNorads.forEach((sourceNorad) => {
     collectSatelliteTransmissionLinks(matrix, sourceNorad).forEach((link) => {
-      const usesThisRelay = link.nodes.some(
-        (node) => node.layer === 'RELAY' && Number(node.id) === relayNorad
-      )
+      const usesThisRelay = link.nodes.some((node) => node.layer === 'RELAY' && Number(node.id) === relayNorad)
       if (!usesThisRelay) return
       const key = chainPathKey(link.nodes)
       if (seen.has(key)) return
@@ -1009,9 +977,7 @@ export const collectSatelliteTransmissionLinks = (
   const links: SatelliteTransmissionLink[] = []
   const relayRel = findRelayRelation(matrix, norad)
   const relayNorad = relayRel ? Number(relayRel.to) : null
-  const relayPostSat = relayNorad
-    ? matrix.satelliteMatrixList?.find((s) => s.norad === relayNorad)
-    : undefined
+  const relayPostSat = relayNorad ? matrix.satelliteMatrixList?.find((s) => s.norad === relayNorad) : undefined
 
   windows.forEach((win, index) => {
     const receive = resolveWindowReceive(matrix, norad, win)
@@ -1081,9 +1047,7 @@ export const collectSatelliteTransmissionLinks = (
       win,
       usesRelay ? relayPostSat : undefined
     )
-    const relayEndTs = relayWindow
-      ? parseTimeToMs(relayWindow.endWindow || relayWindow.beginWindow)
-      : 0
+    const relayEndTs = relayWindow ? parseTimeToMs(relayWindow.endWindow || relayWindow.beginWindow) : 0
     const finishTs = relayEndTs ? Math.max(relayEndTs, groundEndTs) : groundEndTs
 
     links.push({
@@ -1142,12 +1106,7 @@ export const collectSatelliteTransmissionLinks = (
         }) || {}
 
       const strikeTarget = resolveLinkStrikeTarget(relayGroundWin, postSat, relayPostSat)
-      const { weaponNames, weaponType } = resolveWeaponsForWindow(
-        matrix,
-        postSat,
-        relayGroundWin,
-        relayPostSat
-      )
+      const { weaponNames, weaponType } = resolveWeaponsForWindow(matrix, postSat, relayGroundWin, relayPostSat)
       const delayMin =
         Number(relayGroundWin.delayMin) ||
         (strikeTarget.struck ? Number(relayPostSat?.delayMin) || Number(postSat?.delayMin) || 0 : 0)
@@ -1251,9 +1210,7 @@ export const collectNetworkChainStats = (matrix: MatrixResult | null): NetworkCh
   return {
     totalCount: totalKeys.size,
     remainingCount: remaining.size,
-    remainingChains: Array.from(remaining.values()).sort(
-      (a, b) => (a.finishTimestamp || 0) - (b.finishTimestamp || 0)
-    ),
+    remainingChains: Array.from(remaining.values()).sort((a, b) => (a.finishTimestamp || 0) - (b.finishTimestamp || 0)),
   }
 }
 
@@ -1278,7 +1235,7 @@ export interface MatrixOverviewStats {
  * @param items 待合并数组
  * @param keyFn 唯一键提取函数
  */
-const mergeUniqueBy = <T,>(items: T[], keyFn: (item: T) => string): T[] => {
+const mergeUniqueBy = <T>(items: T[], keyFn: (item: T) => string): T[] => {
   const map = new Map<string, T>()
   items.forEach((item) => map.set(keyFn(item), item))
   return Array.from(map.values())
@@ -1333,8 +1290,9 @@ export const mergeMatrixResults = (matrices: MatrixResult[]): MatrixResult | nul
   return {
     attackPlanList: valid.flatMap((matrix) => matrix.attackPlanList || []),
     battleMatrixList: valid.flatMap((matrix) => matrix.battleMatrixList || []),
-    initMatrixList: mergeUniqueBy(valid.flatMap((matrix) => matrix.initMatrixList || []), (item) =>
-      String(item.norad)
+    initMatrixList: mergeUniqueBy(
+      valid.flatMap((matrix) => matrix.initMatrixList || []),
+      (item) => String(item.norad)
     ),
     initRelationList: mergeRelationList(
       valid.map((matrix) => matrix.initRelationList || { receiveObjList: [], stationObjList: [], relations: [] })
@@ -1347,9 +1305,19 @@ export const mergeMatrixResults = (matrices: MatrixResult[]): MatrixResult | nul
       valid.map((matrix) => matrix.stationRelationList || { receiveObjList: [], stationObjList: [], relations: [] })
     ),
     relayRelation: mergeRelayRelations(valid.map((matrix) => matrix.relayRelation)),
-    series: valid.map((matrix) => matrix.series).filter(Boolean).join(' / ') || '全部系列',
-    threatSats: mergeUniqueBy(valid.flatMap((matrix) => matrix.threatSats || []), (item) => String(item.norad)),
-    timeEffects: mergeUniqueBy(valid.flatMap((matrix) => matrix.timeEffects || []), (item) => String(item.norad)),
+    series:
+      valid
+        .map((matrix) => matrix.series)
+        .filter(Boolean)
+        .join(' / ') || '全部系列',
+    threatSats: mergeUniqueBy(
+      valid.flatMap((matrix) => matrix.threatSats || []),
+      (item) => String(item.norad)
+    ),
+    timeEffects: mergeUniqueBy(
+      valid.flatMap((matrix) => matrix.timeEffects || []),
+      (item) => String(item.norad)
+    ),
   }
 }
 
@@ -1359,10 +1327,7 @@ export const mergeMatrixResults = (matrices: MatrixResult[]): MatrixResult | nul
  * @param scopeLabel 统计范围展示文案
  * @returns 概览统计结果
  */
-export const collectMatrixOverviewStats = (
-  matrix: MatrixResult | null,
-  scopeLabel?: string
-): MatrixOverviewStats => {
+export const collectMatrixOverviewStats = (matrix: MatrixResult | null, scopeLabel?: string): MatrixOverviewStats => {
   if (!matrix) {
     return {
       satelliteCount: 0,
@@ -1375,8 +1340,8 @@ export const collectMatrixOverviewStats = (
   }
 
   const satelliteIds = new Set<number>()
-    ; (matrix.initMatrixList || []).forEach((sat) => satelliteIds.add(sat.norad))
-    ; (matrix.satelliteMatrixList || []).forEach((sat) => satelliteIds.add(sat.norad))
+  ;(matrix.initMatrixList || []).forEach((sat) => satelliteIds.add(sat.norad))
+  ;(matrix.satelliteMatrixList || []).forEach((sat) => satelliteIds.add(sat.norad))
 
   const relationData =
     matrix.initRelationList?.receiveObjList?.length || matrix.initRelationList?.stationObjList?.length
@@ -1384,14 +1349,14 @@ export const collectMatrixOverviewStats = (
       : matrix.stationRelationList
 
   const weaponNames = new Set<string>()
-    ; (matrix.attackPlanList || []).forEach((plan) => {
-      if (plan.weaponName) weaponNames.add(plan.weaponName)
+  ;(matrix.attackPlanList || []).forEach((plan) => {
+    if (plan.weaponName) weaponNames.add(plan.weaponName)
+  })
+  ;(matrix.satelliteMatrixList || []).forEach((sat) => {
+    ;(sat.weapons || []).forEach((weapon: Weapon) => {
+      if (weapon.name) weaponNames.add(weapon.name)
     })
-    ; (matrix.satelliteMatrixList || []).forEach((sat) => {
-      ; (sat.weapons || []).forEach((weapon: Weapon) => {
-        if (weapon.name) weaponNames.add(weapon.name)
-      })
-    })
+  })
 
   const chainStats = collectNetworkChainStats(matrix)
 
@@ -1459,28 +1424,22 @@ export const collectSatelliteJamWeapons = (
 
   struckWindows.forEach((win) => {
     const targetName = win.receiveName || win.receiveId
-      ; (win.weapons || []).forEach((w: Weapon) => {
-        addWeapon(w.name, w.type, targetName, '接收站', 'window')
-      })
+    ;(win.weapons || []).forEach((w: Weapon) => {
+      addWeapon(w.name, w.type, targetName, '接收站', 'window')
+    })
   })
 
   if (postSat?.satelliteStatus === 1 && !receiveKey) {
-    ; (postSat.weapons || []).forEach((w: Weapon) => {
+    ;(postSat.weapons || []).forEach((w: Weapon) => {
       addWeapon(w.name, w.type, satName, '卫星', 'satellite')
     })
   }
 
-  ; (matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string }) => {
+  ;(matrix.attackPlanList || []).forEach((plan: WeaponAttackRecord & { targetId?: string }) => {
     const matchedById = !!plan.targetId && struckReceiveIds.has(plan.targetId)
     const matchedByName = !!plan.target && struckReceiveNames.has(plan.target)
     if (!matchedById && !matchedByName) return
-    addWeapon(
-      plan.weaponName,
-      plan.weaponType,
-      plan.target,
-      mapTargetType(plan.targetType || ''),
-      'attackPlan'
-    )
+    addWeapon(plan.weaponName, plan.weaponType, plan.target, mapTargetType(plan.targetType || ''), 'attackPlan')
   })
 
   if (!aggs.size && struckWindows.length) {
@@ -1530,6 +1489,10 @@ export interface LinkPriorityMetrics {
   threatScoreRaw: number
   /** 卫星威胁度归一化得分 [0, 1] */
   threatScoreNorm: number
+  /** 卫星覆盖率原始值（百分比） */
+  coverageRaw: number | null
+  /** 卫星覆盖率归一化得分 [0, 1] */
+  coverageNorm: number
   /** 传输开始时间戳 (毫秒) */
   transmitStartMs: number
   /** 传输开始时效归一化得分 [0, 1] (越早越接近 1.0) */
@@ -1551,6 +1514,7 @@ export interface LinkPriorityMetrics {
   /** 原因分项结构 */
   reasonDetails: {
     threatText: string
+    coverageText?: string
     timeText: string
     isolationText: string
     relayText: string
@@ -1579,6 +1543,8 @@ export interface PriorityWeights {
   isolation: number
   /** 中继优先权重，默认 0.15 */
   relay: number
+  /** 卫星覆盖率权重；未配置时不参与评分 */
+  coverage?: number
 }
 
 /**
@@ -1595,12 +1561,22 @@ export const DEFAULT_PRIORITY_WEIGHTS: PriorityWeights = {
   relay: 0.15,
 }
 
+/** STARLINK 链路推荐权重：覆盖率为首要评估指标。 */
+export const STARLINK_PRIORITY_WEIGHTS: PriorityWeights = {
+  threat: 0.25,
+  coverage: 0.45,
+  earlyTime: 0.15,
+  isolation: 0.1,
+  relay: 0.05,
+}
+
 /**
- * 依据四维指标计算传输链路优先级并归一化：
+ * 依据多维指标计算传输链路优先级并归一化：
  * 1. 卫星威胁度最高 (权重 35%)
- * 2. 最早开始传输 (权重 25%)
- * 3. 优先孤立链路，没有可复用链路 (权重 25%)
- * 4. 优先中继卫星，其次普通卫星 (权重 15%)
+ * 2. 卫星覆盖率（仅配置 coverage 权重时参与）
+ * 3. 最早开始传输 (权重 25%)
+ * 4. 优先孤立链路，没有可复用链路 (权重 25%)
+ * 5. 优先中继卫星，其次普通卫星 (权重 15%)
  *
  * @param matrix 算法矩阵数据
  * @param links 待评估的传输链路列表 (可为全系列或单星链路)
@@ -1616,14 +1592,22 @@ export const rankTransmissionLinksByPriority = (
 
   // 1. 构建 NORAD -> 威胁度映射
   const threatMap = new Map<number, number>()
-    ; (matrix.threatSats || []).forEach((item) => {
-      const raw = Number(item.threatScore)
-      if (Number.isFinite(raw)) {
-        threatMap.set(item.norad, raw <= 1 ? raw * 100 : raw)
-      }
-    })
+  ;(matrix.threatSats || []).forEach((item) => {
+    const raw = Number(item.threatScore)
+    if (Number.isFinite(raw)) {
+      threatMap.set(item.norad, raw <= 1 ? raw * 100 : raw)
+    }
+  })
 
-  // 2. 统计每颗源卫星拥有的链路总数 (用于计算孤立度/无复用度)
+  // 2. 构建 NORAD -> 打击后覆盖率映射
+  const coverageMap = new Map<number, number>()
+  ;(matrix.satelliteMatrixList || []).forEach((item) => {
+    if (Number.isFinite(item.coverage)) {
+      coverageMap.set(item.norad, item.coverage!)
+    }
+  })
+
+  // 3. 统计每颗源卫星拥有的链路总数 (用于计算孤立度/无复用度)
   const satLinkCountMap = new Map<number, number>()
   links.forEach((link) => {
     const satNode = link.nodes.find((n) => n.layer === 'SAT')
@@ -1639,6 +1623,7 @@ export const rankTransmissionLinksByPriority = (
     satNorad: number | null
     satName: string
     threatRaw: number
+    coverageRaw: number | null
     startMs: number
     linkCount: number
     isRelay: boolean
@@ -1649,6 +1634,7 @@ export const rankTransmissionLinksByPriority = (
     const satNorad = satNode ? Number(satNode.id) : null
     const satName = satNode ? satNode.name : `Sat-${satNorad || ''}`
     const threatRaw = (satNorad != null ? threatMap.get(satNorad) : null) ?? 50
+    const coverageRaw = satNorad != null ? (coverageMap.get(satNorad) ?? null) : null
     const startMs = link.transmitStartMs || parseTimeToMs(link.transmitTime.split('~')[0]?.trim())
     const linkCount = (satNorad != null ? satLinkCountMap.get(satNorad) : null) ?? 1
     const isRelay = link.nodes.some((n) => n.layer === 'RELAY')
@@ -1658,6 +1644,7 @@ export const rankTransmissionLinksByPriority = (
       satNorad,
       satName,
       threatRaw,
+      coverageRaw,
       startMs,
       linkCount,
       isRelay,
@@ -1665,13 +1652,23 @@ export const rankTransmissionLinksByPriority = (
   })
 
   // 4. 计算极值以进行归一化
-  let minThreat = Infinity, maxThreat = -Infinity
-  let minStart = Infinity, maxStart = -Infinity
-  let minLinkCount = Infinity, maxLinkCount = -Infinity
+  let minThreat = Infinity,
+    maxThreat = -Infinity
+  let minCoverage = Infinity,
+    maxCoverage = -Infinity
+  let minStart = Infinity,
+    maxStart = -Infinity
+  let minLinkCount = Infinity,
+    maxLinkCount = -Infinity
 
   featureList.forEach((f) => {
     if (f.threatRaw < minThreat) minThreat = f.threatRaw
     if (f.threatRaw > maxThreat) maxThreat = f.threatRaw
+
+    if (f.coverageRaw != null) {
+      if (f.coverageRaw < minCoverage) minCoverage = f.coverageRaw
+      if (f.coverageRaw > maxCoverage) maxCoverage = f.coverageRaw
+    }
 
     if (f.startMs < minStart) minStart = f.startMs
     if (f.startMs > maxStart) maxStart = f.startMs
@@ -1680,12 +1677,26 @@ export const rankTransmissionLinksByPriority = (
     if (f.linkCount > maxLinkCount) maxLinkCount = f.linkCount
   })
 
-  if (!Number.isFinite(minThreat)) { minThreat = 0; maxThreat = 100 }
-  if (!Number.isFinite(minStart)) { minStart = 0; maxStart = 0 }
-  if (!Number.isFinite(minLinkCount)) { minLinkCount = 1; maxLinkCount = 1 }
+  if (!Number.isFinite(minThreat)) {
+    minThreat = 0
+    maxThreat = 100
+  }
+  if (!Number.isFinite(minCoverage)) {
+    minCoverage = 0
+    maxCoverage = 100
+  }
+  if (!Number.isFinite(minStart)) {
+    minStart = 0
+    maxStart = 0
+  }
+  if (!Number.isFinite(minLinkCount)) {
+    minLinkCount = 1
+    maxLinkCount = 1
+  }
 
   // 5. 逐个归一化并计算加权总分
-  const totalWeight = weights.threat + weights.earlyTime + weights.isolation + weights.relay || 1.0
+  const coverageWeight = weights.coverage ?? 0
+  const totalWeight = weights.threat + coverageWeight + weights.earlyTime + weights.isolation + weights.relay || 1.0
 
   const scoredList: PrioritizedTransmissionLink[] = featureList.map((f) => {
     // 5.1 威胁度归一化 [0, 1]
@@ -1696,13 +1707,22 @@ export const rankTransmissionLinksByPriority = (
       threatNorm = Math.min(Math.max(f.threatRaw / 100, 0), 1)
     }
 
-    // 5.2 传输最早时间归一化 [0, 1]（越早越接近 1.0）
+    // 5.2 覆盖率归一化 [0, 1]
+    let coverageNorm = 0
+    if (f.coverageRaw != null) {
+      coverageNorm =
+        maxCoverage > minCoverage
+          ? (f.coverageRaw - minCoverage) / (maxCoverage - minCoverage)
+          : Math.min(Math.max(f.coverageRaw / 100, 0), 1)
+    }
+
+    // 5.3 传输最早时间归一化 [0, 1]（越早越接近 1.0）
     let earlyTimeNorm = 1.0
     if (maxStart > minStart) {
       earlyTimeNorm = (maxStart - f.startMs) / (maxStart - minStart)
     }
 
-    // 5.3 孤立度归一化 [0, 1]（链路越少越孤立，1条链路为最孤立）
+    // 5.4 孤立度归一化 [0, 1]（链路越少越孤立，1条链路为最孤立）
     let isolationNorm = 1.0
     if (maxLinkCount > minLinkCount) {
       isolationNorm = (maxLinkCount - f.linkCount) / (maxLinkCount - minLinkCount)
@@ -1710,12 +1730,13 @@ export const rankTransmissionLinksByPriority = (
       isolationNorm = f.linkCount === 1 ? 1.0 : 1 / f.linkCount
     }
 
-    // 5.4 中继优先级归一化 [0, 1]
+    // 5.5 中继优先级归一化 [0, 1]
     const relayNorm = f.isRelay ? 1.0 : 0.2
 
-    // 5.5 加权总分 (0 - 100)
+    // 5.6 加权总分 (0 - 100)
     const weightedSum =
       (weights.threat * threatNorm +
+        coverageWeight * coverageNorm +
         weights.earlyTime * earlyTimeNorm +
         weights.isolation * isolationNorm +
         weights.relay * relayNorm) /
@@ -1723,7 +1744,7 @@ export const rankTransmissionLinksByPriority = (
 
     const totalScore = Number((weightedSum * 100).toFixed(1))
 
-    // 5.6 生成分项与综合原因
+    // 5.7 生成分项与综合原因
     const reasonTags: string[] = []
     const timeStr = f.link.transmitTime.split('~')[0]?.trim() || f.link.transmitTime
 
@@ -1733,6 +1754,16 @@ export const rankTransmissionLinksByPriority = (
       threatText = `源卫星【${f.satName}】威胁度高达 ${f.threatRaw.toFixed(0)} 分，属于高价值情报节点`
     } else {
       threatText = `源卫星【${f.satName}】威胁度评分为 ${f.threatRaw.toFixed(0)} 分`
+    }
+
+    let coverageText = ''
+    if (coverageWeight > 0) {
+      if (f.coverageRaw == null) {
+        coverageText = '该卫星暂无覆盖率数据，未获得覆盖率评分'
+      } else {
+        reasonTags.push(`覆盖率(${Number(f.coverageRaw.toFixed(2))}%)`)
+        coverageText = `源卫星【${f.satName}】当前覆盖率为 ${Number(f.coverageRaw.toFixed(2))}%，作为 STARLINK 链路优先指标重点评估`
+      }
     }
 
     let timeText = ''
@@ -1764,13 +1795,15 @@ export const rankTransmissionLinksByPriority = (
       relayText = `直接下传至地面接收站`
     }
 
-    const reason = `${threatText}；${timeText}；${isolationText}；${relayText}。`
+    const reason = [threatText, coverageText, timeText, isolationText, relayText].filter(Boolean).join('；') + '。'
 
     return {
       link: f.link,
       priority: {
         threatScoreRaw: f.threatRaw,
         threatScoreNorm: Number(threatNorm.toFixed(3)),
+        coverageRaw: f.coverageRaw,
+        coverageNorm: Number(coverageNorm.toFixed(3)),
         transmitStartMs: f.startMs,
         earlyTimeNorm: Number(earlyTimeNorm.toFixed(3)),
         satelliteLinkCount: f.linkCount,
@@ -1782,6 +1815,7 @@ export const rankTransmissionLinksByPriority = (
         reason,
         reasonDetails: {
           threatText,
+          coverageText: coverageText || undefined,
           timeText,
           isolationText,
           relayText,
@@ -1809,4 +1843,3 @@ export const rankTransmissionLinksByPriority = (
 
   return scoredList
 }
-
