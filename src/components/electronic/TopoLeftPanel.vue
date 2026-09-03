@@ -8,7 +8,8 @@
 
     <!-- 搜索筛选框 -->
     <div class="sidebar-search-box">
-      <el-input v-model="searchKeyword" placeholder="搜索卫星/接收站/武器..." size="small" clearable>
+      <el-input v-model="searchKeyword" :placeholder="isStarlinkSeries ? '搜索卫星/接收站...' : '搜索卫星/接收站/武器...'" size="small"
+        clearable>
         <template #prefix>
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -77,14 +78,20 @@
                 评分 {{ item.totalScore }}分
               </span>
             </div>
-            <span v-if="item.struck" class="meta-line meta-line--strike-target">
-              <span class="meta-key">打击</span>
-              <span class="meta-val">{{ item.struckDetailText }}</span>
+            <span v-if="isStarlinkSeries" class="meta-line meta-line--coverage">
+              <span class="meta-key">覆盖率</span>
+              <span class="meta-val">{{ formatCoverage(item.coverage) }}</span>
             </span>
-            <span v-if="item.weaponNames" class="meta-line meta-line--weapon">
-              <span class="meta-key">武器</span>
-              <span class="meta-val">{{ item.weaponNames }}</span>
-            </span>
+            <template v-else>
+              <span v-if="item.struck" class="meta-line meta-line--strike-target">
+                <span class="meta-key">打击</span>
+                <span class="meta-val">{{ item.struckDetailText }}</span>
+              </span>
+              <span v-if="item.weaponNames" class="meta-line meta-line--weapon">
+                <span class="meta-key">武器</span>
+                <span class="meta-val">{{ item.weaponNames }}</span>
+              </span>
+            </template>
             <span v-if="item.delayMin > 0" class="meta-line meta-line--delay">
               <span class="meta-key">延迟</span>
               <span class="meta-val">+{{ item.delayMin }} 分钟</span>
@@ -143,6 +150,8 @@ interface LinkListItem {
   rank?: number
   /** 优先级评分 */
   totalScore?: number
+  /** 源卫星打击后覆盖率（百分比） */
+  coverage: number | null
 }
 
 const props = defineProps<{
@@ -170,6 +179,10 @@ const getRankMedal = (rank: number): string => {
   if (rank === 3) return '🥉'
   return ''
 }
+
+/** 将卫星覆盖率格式化为百分比。 */
+const formatCoverage = (coverage: number | null): string =>
+  coverage == null || !Number.isFinite(coverage) ? '--' : `${Number(coverage.toFixed(2))}%`
 
 /**
  * 将链路节点层级映射为样式类名
@@ -243,6 +256,7 @@ const linkItems = computed<LinkListItem[]>(() => {
       delayMin: link.delayMin,
       rank: priority.rank,
       totalScore: priority.totalScore,
+      coverage: priority.coverageRaw,
     }
   })
 })
@@ -586,7 +600,7 @@ watch(
 
     .meta-key {
       flex-shrink: 0;
-      width: 32px;
+      width: 40px;
       color: #64748b;
     }
 
