@@ -449,32 +449,32 @@ const buildUniqueConnections = (
   const seen = new Set<string>()
   const items: DetailConnectionItem[] = []
 
-  relations.forEach((rel) => {
-    const key = `${rel.from}->${rel.to}`
-    if (seen.has(key)) return
-    seen.add(key)
+    ; (relations ?? []).forEach((rel) => {
+      const key = `${rel.from}->${rel.to}`
+      if (seen.has(key)) return
+      seen.add(key)
 
-    if (mode === 'receive-down') {
-      const st = relationData.stationObjList?.find((s) => s.stationId === rel.to)
+      if (mode === 'receive-down') {
+        const st = relationData.stationObjList?.find((s) => s.stationId === rel.to)
+        items.push({
+          icon: '💻',
+          layerLabel: '数据中心',
+          name: st?.stationName || rel.to,
+          layer: 'station',
+          direction: 'down',
+        })
+        return
+      }
+
+      const rec = relationData.receiveObjList?.find((r) => r.receiveId === rel.from)
       items.push({
-        icon: '💻',
-        layerLabel: '数据中心',
-        name: st?.stationName || rel.to,
-        layer: 'station',
-        direction: 'down',
+        icon: '📡',
+        layerLabel: '地面站',
+        name: rec?.receiveName || rel.from,
+        layer: 'receive',
+        direction: 'up',
       })
-      return
-    }
-
-    const rec = relationData.receiveObjList?.find((r) => r.receiveId === rel.from)
-    items.push({
-      icon: '📡',
-      layerLabel: '地面站',
-      name: rec?.receiveName || rel.from,
-      layer: 'receive',
-      direction: 'up',
     })
-  })
 
   return items
 }

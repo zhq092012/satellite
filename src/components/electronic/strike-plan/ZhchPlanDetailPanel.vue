@@ -59,6 +59,10 @@
           <span class="row-label">干扰造成延迟：</span>
           <span class="feedback-time feedback-time--delay">{{ interferenceDelay }}</span>
         </div>
+        <div class="feedback-row">
+          <span class="row-label">覆盖率减少：</span>
+          <span class="feedback-time feedback-time--coverage">{{ coverageReduction }}</span>
+        </div>
       </div>
     </div>
 
@@ -104,6 +108,14 @@ const highlightText = (text?: string | null) => highlightResultText(text)
 const interferenceDelay = computed(() =>
   formatInterferenceDelay(props.plan.beforeFirstFeedbackTime, props.plan.afterFirstFeedbackTime)
 )
+
+/** 覆盖率变化：打击后平均覆盖率减去打击前平均覆盖率 */
+const coverageReduction = computed(() => {
+  const before = props.plan.beforeAvgCoverage
+  const after = props.plan.afterAvgCoverage
+  if (!Number.isFinite(before) || !Number.isFinite(after)) return '--'
+  return `${(after - before).toFixed(2)}%`
+})
 </script>
 
 <style lang="scss" scoped>
@@ -284,6 +296,7 @@ const interferenceDelay = computed(() =>
   font-weight: 800;
   word-break: break-all;
 
+  &--coverage,
   &--before {
     color: #4ade80;
   }

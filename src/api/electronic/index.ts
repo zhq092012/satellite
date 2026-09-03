@@ -110,14 +110,16 @@ export interface InitMatrix {
   battleWindow?: string | null
   /** 卫星高度（km） */
   height?: number
+  /** 打击前覆盖率（百分比） */
+  coverage?: number
   /** 卫星过境时间窗口列表 */
   initWindows: InitWindow[]
 }
 
 export interface StationRelationList {
-  receiveObjList: ReceiveObj[] // 接收站列表
-  stationObjList: StationObj[] // 中心站列表
-  relations: RelationMap[] // 站与站之间的拓扑关联映射
+  receiveObjList?: ReceiveObj[] // 接收站列表；无关系数据时接口可能省略
+  stationObjList?: StationObj[] // 中心站列表；无关系数据时接口可能省略
+  relations?: RelationMap[] // 站与站之间的拓扑关联映射；无关系数据时接口可能省略
 }
 /**
  * [类型用途]
@@ -153,11 +155,11 @@ export interface RelayRelationMap {
  */
 export interface RelayRelation {
   /** 中继卫星 NORAD 编号数组 */
-  relayList: number[]
+  relayList?: number[]
   /** 普通/观测卫星 NORAD 编号数组 */
-  satelliteList: number[]
+  satelliteList?: number[]
   /** 星间中继拓扑链路映射列表 */
-  relations: RelayRelationMap[]
+  relations?: RelayRelationMap[]
 }
 
 /**
@@ -222,6 +224,8 @@ export interface SatelliteMatrix {
   weapons: Weapon[]
   /** 卫星高度（km） */
   height: number
+  /** 打击后覆盖率（百分比） */
+  coverage?: number
   /** 打击后各接收站过境窗口列表 */
   stationWindows: StationWindow[]
 }
@@ -697,6 +701,10 @@ export interface ZhchPlanResp {
   beforeFirstFeedbackTime: string
   /** 打击后最早回传窗口（含时间与卫星->接收站描述） */
   afterFirstFeedbackTime: string
+  /** 打击前平均覆盖率（百分比） */
+  beforeAvgCoverage: number
+  /** 打击后平均覆盖率（百分比） */
+  afterAvgCoverage: number
   /** 涉及的侦察卫星数量 */
   satNum: number
   /** 涉及的可用地面站（接收站）数量 */
