@@ -931,6 +931,13 @@ const showTransmissionLink = (link: SatelliteTransmissionLink | null) => {
   })
   selectedTransmissionLinkNodeKeys.value = nextKeys
 
+  // STARLINK 地球只抽样 Top N，选中链路时把沿途卫星/中继补进 Primitive，避免虚线终点没有图标
+  link.nodes.forEach((node) => {
+    if (node.layer !== 'SAT' && node.layer !== 'RELAY') return
+    const norad = Number(node.id)
+    if (Number.isFinite(norad)) ensureSatellitePrimitiveVisible(norad)
+  })
+
   // 2. 创建折线实体（静态坐标，仅在点击时计算一次）
   const time = viewer.clock.currentTime
   for (let i = 0; i < link.nodes.length - 1; i++) {
@@ -1831,7 +1838,9 @@ const resetHighlightSatellites = () => {
 const ensureSatellitePrimitiveVisible = (norad: number): SatellitePrimitiveVisual | undefined => {
   const existing = satellitePrimitiveMap.get(norad)
   if (existing) return existing
-  const sat = matrixSatMap.value.get(norad)
+  const sat =
+    matrixSatMap.value.get(norad) ||
+    (props.matrixData?.satelliteMatrixList || []).find((item) => item.norad === norad)
   if (!sat) return undefined
   addSatellitePrimitive(sat)
   remainingGlobeSats = remainingGlobeSats.filter((item) => item.norad !== norad)

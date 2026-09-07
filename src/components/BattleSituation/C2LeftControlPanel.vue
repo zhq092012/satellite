@@ -82,11 +82,7 @@
       </div>
 
       <div class="asset-scroll-list">
-        <VirtualScrollList
-          :items="satList"
-          :item-height="sortMode === 'transTime' ? 196 : 160"
-          item-key="norad"
-        >
+        <VirtualScrollList :items="satList" :item-height="sortMode === 'transTime' ? 160 : 120" item-key="norad">
           <template #default="{ item: sat, index }">
             <div class="asset-card" :class="{
               'card-active': selectedNorad === sat.norad,

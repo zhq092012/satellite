@@ -54,6 +54,7 @@
             <ZhchPlanDetailPanel
               :plan="getPlanByType(usageType)!"
               :show-series-link-timeline="selectedUsageTypes.length === 1"
+              :compact-kpi="selectedUsageTypes.length >= 3"
             />
           </div>
           <div v-else class="empty-container small">

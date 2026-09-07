@@ -13,8 +13,8 @@
       打击后覆盖率 <span class="num-orange">{{ formatCoverage(plan.afterAvgCoverage) }}</span>。
     </p>
 
-    <!-- 关键指标（带单位） -->
-    <div class="kpi-grid">
+    <!-- 关键指标（带单位）；三方案并排时缩小数字避免挤叠 -->
+    <div class="kpi-grid" :class="{ 'kpi-grid--compact': compactKpi }">
       <div class="kpi-card kpi-card--cyan">
         <span class="kpi-value">{{ plan.satNum }}<em>颗</em></span>
         <span class="kpi-label">侦察卫星</span>
@@ -105,6 +105,8 @@ const props = defineProps<{
   plan: ZhchPlanResp
   /** 是否展示系列链路通断时序（多方案对比时不展示） */
   showSeriesLinkTimeline?: boolean
+  /** 三方案并排时缩小 KPI 数字字号，单方案保持原尺寸 */
+  compactKpi?: boolean
 }>()
 
 /**
@@ -182,6 +184,27 @@ const coverageReduction = computed(() => {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
+
+  &--compact {
+    gap: 6px;
+
+    .kpi-card {
+      padding: 10px 4px;
+
+      .kpi-value {
+        font-size: 16px;
+
+        em {
+          font-size: 11px;
+        }
+      }
+
+      .kpi-label {
+        margin-top: 4px;
+        font-size: 11px;
+      }
+    }
+  }
 }
 
 .kpi-card {

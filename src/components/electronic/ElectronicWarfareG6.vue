@@ -77,6 +77,9 @@
 
           <div class="topo-graph-stack">
             <div class="graph-stage" ref="graphStageRef">
+              <div v-if="isStarshieldSeries && !isStarlinkSeries" class="starshield-link-filter-note">
+                由于卫星数量多，只显示未受干扰的链路
+              </div>
               <div v-if="!isStarlinkSeries" class="graph-layer-labels">
                 <div v-for="item in layerLabelItems" :key="item.key" class="graph-layer-label" :class="item.className"
                   :style="{ top: item.top }">
@@ -209,6 +212,16 @@ const formatLayerTop = (layer: number): string => `${getLayerY(layer)}px`
 
 /** STARLINK 全系列视图采用以战场为中心的环形布局。 */
 const isStarlinkSeries = computed(() => matrixData.value?.series === 'STARLINK')
+
+/**
+ * 是否为星盾（Starshield）系列。
+ * 系列名可能是中文「星盾」或英文 STARSHIELD / Starshield。
+ */
+const isStarshieldSeries = computed(() => {
+  const series = String(matrixData.value?.series || store.selectedSatSeries || '')
+  const normalized = series.toUpperCase()
+  return series.includes('星盾') || normalized.includes('STARSHIELD')
+})
 
 interface StarlinkCoverageHeatCell {
   timeLabel: string
@@ -583,41 +596,13 @@ watch(seriesOptions, (options) => {
 const matrixData = ref<MatrixResult | null>(null)
 
 /**
- * [功能说明]
- * 根据算法矩阵数据或当前选中的卫星系列，自动推导出卫星分类类别 ('COMM' | 'RECON')。
- *
- * [处理规则]
- * 1. 优先提取 matrixData 中携带的 satCategory / category / func_type 属性。
- * 2. 检查 initMatrixList 中首个卫星节点的 satType 是否包含 "通信"/"通讯"/"COMM"。
- * 3. 检查 store.selectedSatSeries 系列名称中是否包含 "通信"/"通讯"/"COMM"。
- * 4. 若以上条件均不满足，默认判定为侦察卫星 'RECON'。
+ * 拓扑分类：仅 STARLINK 为通信卫星（覆盖率热力图），其余系列一律按侦察卫星四层拓扑绘制。
  *
  * @returns FuncType 对应的分类标识 ('COMM' | 'RECON')
  */
 const currentSatCategory = computed<FuncType>(() => {
-  const data = matrixData.value as
-    | (MatrixResult & { satCategory?: string; category?: string; func_type?: string })
-    | null
-  if (data) {
-    if (data.satCategory) return data.satCategory as FuncType
-    if (data.category) return data.category as FuncType
-    if (data.func_type) return data.func_type as FuncType
-
-    if (Array.isArray(data.initMatrixList) && data.initMatrixList.length > 0) {
-      const firstSat = data.initMatrixList[0]
-      const satType = firstSat?.satType || ''
-      if (satType.includes('通信') || satType.includes('通讯') || satType.toUpperCase().includes('COMM')) {
-        return 'COMM'
-      }
-    }
-  }
-
-  const series = store.selectedSatSeries || ''
-  if (series.includes('通信') || series.includes('通讯') || series.toUpperCase().includes('COMM')) {
-    return 'COMM'
-  }
-
-  return 'RECON'
+  const series = matrixData.value?.series || store.selectedSatSeries || ''
+  return series === 'STARLINK' ? 'COMM' : 'RECON'
 })
 
 // [变量用途]
@@ -1666,12 +1651,62 @@ const LINK_COLOR_STRUCK = '#94a3b8'
 
 /**
  * 将链路节点映射为 G6 图节点 ID
+ *
  * @param node 链路节点
  * @returns G6 节点 ID
  */
 const resolveChainNodeGraphId = (node: ChainNode): string => {
   if (node.layer === 'SAT' || node.layer === 'RELAY') return `sat-${node.id}`
   return node.id
+}
+
+/**
+ * 收集当前拓扑视图使用的传输链路（与建图口径一致）。
+ *
+ * @returns 当前图中的链路列表
+ */
+const collectCurrentTopoLinks = (): SatelliteTransmissionLink[] => {
+  const data = matrixData.value
+  if (!data) return []
+  if (selectedNorad.value != null) {
+    if (isRelaySatellite(data, selectedNorad.value)) {
+      return collectRelaySatelliteTransmissionLinks(data, selectedNorad.value)
+    }
+    return collectSatelliteTransmissionLinks(data, selectedNorad.value)
+  }
+  return getTopologyLinksForDisplay(collectSeriesTransmissionLinks(data))
+}
+
+/**
+ * 选中链路各跳的图边键 `source->target`。
+ *
+ * @returns hop 键集合
+ */
+const getSelectedLinkHopKeys = (): Set<string> => {
+  const keys = new Set<string>()
+  const linkId = selectedLinkId.value
+  if (!linkId) return keys
+  const link = collectCurrentTopoLinks().find((item) => item.id === linkId)
+  if (!link) return keys
+  for (let i = 0; i < link.nodes.length - 1; i += 1) {
+    keys.add(`${resolveChainNodeGraphId(link.nodes[i])}->${resolveChainNodeGraphId(link.nodes[i + 1])}`)
+  }
+  return keys
+}
+
+/**
+ * 选中链路沿途节点的图 ID。
+ *
+ * @returns 节点 ID 集合
+ */
+const getSelectedLinkNodeIds = (): Set<string> => {
+  const ids = new Set<string>()
+  const linkId = selectedLinkId.value
+  if (!linkId) return ids
+  const link = collectCurrentTopoLinks().find((item) => item.id === linkId)
+  if (!link) return ids
+  link.nodes.forEach((node) => ids.add(resolveChainNodeGraphId(node)))
+  return ids
 }
 
 /**
@@ -1693,11 +1728,18 @@ const buildLinkEdgeStyle = (struck: boolean, highlighted: boolean) => {
 }
 
 /**
- * 大规模非 STARLINK 系列仅展示未被打击链路，避免拓扑边过于密集。
+ * 筛选拓扑图实际绘制的链路。
+ * 星盾系列因卫星数量多，始终只展示未受干扰（未被打击）的链路；
+ * 其他大规模非 STARLINK 系列在链路数超过 50 时同样过滤。
+ * @param links 当前系列/选中卫星的全部传输链路
+ * @returns 用于绘制拓扑边的链路子集
  */
 const getTopologyLinksForDisplay = (links: SatelliteTransmissionLink[]): SatelliteTransmissionLink[] => {
-  if (matrixData.value?.series === 'STARLINK' || links.length <= 50) return links
-  return links.filter((link) => !link.struck)
+  if (matrixData.value?.series === 'STARLINK') return links
+  if (isStarshieldSeries.value || links.length > 50) {
+    return links.filter((link) => !link.struck)
+  }
+  return links
 }
 
 /**
@@ -1901,7 +1943,7 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
     stationPlaced.add(st.id)
   })
 
-  const renderedEdgePairs = new Set<string>()
+  const renderedEdges = new Map<string, Record<string, unknown>>()
   links.forEach((link) => {
     const highlighted = selectedLinkId.value === link.id
     for (let i = 0; i < link.nodes.length - 1; i++) {
@@ -1909,11 +1951,18 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
       const target = resolveChainNodeGraphId(link.nodes[i + 1])
       if (!nodeSet.has(source) || !nodeSet.has(target)) continue
       const edgePairKey = `${source}->${target}`
-      if (renderedEdgePairs.has(edgePairKey)) continue
-      renderedEdgePairs.add(edgePairKey)
-      const edgeId = `edge-${link.id}-${i}`
-      edges.push({
-        id: edgeId,
+      const existing = renderedEdges.get(edgePairKey)
+      if (existing) {
+        // 多条链路复用同一跳时，选中链路夺回高亮，避免只亮卫星→中继
+        if (highlighted) {
+          existing.linkId = link.id
+          existing.linkStruck = link.struck
+          existing.style = buildLinkEdgeStyle(link.struck, true)
+        }
+        continue
+      }
+      const edge = {
+        id: `edge-${link.id}-${i}`,
         linkId: link.id,
         source,
         target,
@@ -1922,7 +1971,9 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
         type: 'cubic-vertical',
         linkStruck: link.struck,
         style: buildLinkEdgeStyle(link.struck, highlighted),
-      })
+      }
+      renderedEdges.set(edgePairKey, edge)
+      edges.push(edge)
     }
   })
 
@@ -2050,7 +2101,8 @@ const buildSeriesCommGraph = () => {
   const targetNodeId = 'target-area'
   const targetName = store.battle?.name || '战场目标区域'
   const seriesLinks = collectSeriesTransmissionLinks(data)
-  const shouldHideStruckLinks = data.series !== 'STARLINK' && seriesLinks.length > 50
+  const shouldHideStruckLinks =
+    data.series !== 'STARLINK' && (isStarshieldSeries.value || seriesLinks.length > 50)
 
   satNodeCount.value = norads.length
   receiveNodeCount.value = 1
@@ -2389,18 +2441,21 @@ const updateGraphHighlightState = () => {
   if (!graph || graph.get('destroyed')) return
 
   if (selectedLinkId.value) {
+    const hopKeys = getSelectedLinkHopKeys()
+    const pathNodeIds = getSelectedLinkNodeIds()
     graph.getNodes().forEach((node: any) => {
-      graph.setItemState(node, 'selected', false)
-      graph.setItemState(node, 'inactive', false)
-      graph.setItemState(node, 'highlight', false)
+      const id = String(node.get('id'))
+      const onPath = pathNodeIds.has(id)
+      graph.setItemState(node, 'selected', onPath)
+      graph.setItemState(node, 'inactive', !onPath)
+      graph.setItemState(node, 'highlight', onPath)
       graph.setItemState(node, 'active', false)
     })
     graph.getEdges().forEach((edge: any) => {
       const model = edge.getModel()
-      const linkId = String(model.linkId || '')
-      const struck = !!model.linkStruck
-      const highlighted = linkId === selectedLinkId.value
-      graph.updateItem(edge, { style: buildLinkEdgeStyle(struck, highlighted) })
+      const hopKey = `${model.source}->${model.target}`
+      const highlighted = hopKeys.has(hopKey) || String(model.linkId || '') === selectedLinkId.value
+      graph.updateItem(edge, { style: buildLinkEdgeStyle(!!model.linkStruck, highlighted) })
       graph.setItemState(edge, 'highlight', highlighted)
       graph.setItemState(edge, 'inactive', false)
       graph.setItemState(edge, 'active', false)
@@ -2938,6 +2993,25 @@ onUnmounted(() => {
   width: 132px;
   z-index: 5;
   pointer-events: none;
+}
+
+.starshield-link-filter-note {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 6;
+  max-width: 320px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  color: #fde68a;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: left;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 .graph-layer-label {
