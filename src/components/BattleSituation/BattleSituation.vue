@@ -160,7 +160,7 @@ const clearTransmissionLinkSelection = () => {
   selectedTransmissionLinkId.value = null
   selectedTransmissionLink.value = null
   cesiumViewerRef.value?.clearTransmissionLinkOverlay?.()
-  cesiumViewerRef.value?.markBattle()
+  cesiumViewerRef.value?.flyToBattleView?.()
   syncGlobeTimeMode()
 }
 

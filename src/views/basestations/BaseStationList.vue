@@ -38,15 +38,9 @@
       </el-table>
 
       <div class="pager">
-        <el-pagination
-          v-model:current-page="page.pageNum"
-          v-model:page-size="page.pageSize"
-          :total="totalElements"
-          @current-change="loadStations"
-          @size-change="loadStations"
-          layout="total, prev, pager, next, sizes"
-          :page-sizes="[10, 20, 50, 100]"
-        />
+        <el-pagination v-model:current-page="page.pageNum" v-model:page-size="page.pageSize" :total="totalElements"
+          @current-change="loadStations" @size-change="loadStations" layout="total, prev, pager, next, sizes"
+          :page-sizes="[10, 20, 50, 100]" />
       </div>
     </section>
 
@@ -77,7 +71,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="经纬度" prop="latLon">
-              <el-input v-model.trim="form.latLon" placeholder="请输入经纬度，格式：经度,纬度" />
+              <el-input v-model.trim="form.latLon" placeholder="经度,纬度" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -192,7 +186,7 @@ function handleSearch() {
 }
 
 function resetQuery() {
-  ;(queryForm.name = ''), (queryForm.type = '')
+  ; (queryForm.name = ''), (queryForm.type = '')
   page.pageNum = 1
   loadStations()
 }
@@ -256,6 +250,7 @@ onMounted(async () => {
   padding: 16px;
   border-radius: 8px;
 }
+
 .hero-card {
   display: flex;
   align-items: stretch;

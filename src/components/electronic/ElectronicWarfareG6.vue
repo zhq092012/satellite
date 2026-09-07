@@ -224,17 +224,35 @@ const isStarshieldSeries = computed(() => {
 })
 
 interface StarlinkCoverageHeatCell {
+  /** 时间片横轴标签 */
   timeLabel: string
+  /** 覆盖率梯队纵轴标签 */
   bracket: string
+  /** 落入该时间片×梯队的卫星数量 */
   satelliteCount: number
 }
 
 interface StarlinkCoverageSnapshot {
+  /** 卫星名称 */
   satelliteName: string
+  /** 卫星 NORAD */
   norad: number
+  /** 打击前覆盖率（initMatrixList.coverage） */
   beforeCoverage: number | null
+  /** 打击后覆盖率（satelliteMatrixList.coverage） */
   afterCoverage: number | null
+  /** 该星从打击前覆盖率切换到打击后覆盖率的时刻 */
   transitionTime: number
+}
+
+/** STARLINK 热力图一次计算的结果，含打击前后分界。 */
+interface StarlinkCoverageHeatModel {
+  /** 热力单元格 */
+  cells: StarlinkCoverageHeatCell[]
+  /** 横轴时间片标签，从早到晚 */
+  timeLabels: string[]
+  /** 多数卫星发生覆盖率切换的时间片；无法判定时为 null */
+  strikeSplitLabel: string | null
 }
 
 /** 热力图 tooltip 明细，不写入 echarts option，避免 894 星对象塞进图表数据。 */
@@ -273,10 +291,11 @@ const formatHeatmapCoverage = (value: number | null | undefined): string => {
   return `${value.toFixed(3)}%`
 }
 
-/** STARLINK 卫星覆盖率在任务时间片中的梯队分布。 */
-const starlinkCoverageHeatCells = computed<StarlinkCoverageHeatCell[]>(() => {
+/** STARLINK 卫星覆盖率在任务时间片中的梯队分布（打击前/后按过境时刻切换）。 */
+const starlinkCoverageHeatModel = computed<StarlinkCoverageHeatModel>(() => {
+  const empty: StarlinkCoverageHeatModel = { cells: [], timeLabels: [], strikeSplitLabel: null }
   const data = matrixData.value
-  if (!data || data.series !== 'STARLINK') return []
+  if (!data || data.series !== 'STARLINK') return empty
 
   const taskStart = minTimestamp.value
   const taskEnd = Math.max(maxTimestamp.value, taskStart + 30 * 60 * 1000)
@@ -293,7 +312,11 @@ const starlinkCoverageHeatCells = computed<StarlinkCoverageHeatCell[]>(() => {
       const beforeCoverage = Number.isFinite(initialSatellite?.coverage) ? initialSatellite!.coverage! : null
       const afterCoverage = Number.isFinite(satellite.coverage) ? satellite.coverage! : null
       if (beforeCoverage == null && afterCoverage == null) return
-      const transitionTimes = (satellite.stationWindows || [])
+      const strikeWindows = (satellite.stationWindows || []).filter(
+        (window) => window.strikeStatus === 1 || window.chainStrikeStatus === 1
+      )
+      const windowPool = strikeWindows.length ? strikeWindows : (satellite.stationWindows || [])
+      const transitionTimes = windowPool
         .map((window) => parseToTimestamp(window.peakWindow))
         .filter((timestamp) => timestamp > 0)
       satellites.push({
@@ -333,7 +356,29 @@ const starlinkCoverageHeatCells = computed<StarlinkCoverageHeatCell[]>(() => {
     })
   })
 
-  return Array.from(cellMap.values())
+  const changedTimes = satellites
+    .filter((satellite) => {
+      if (satellite.beforeCoverage == null || satellite.afterCoverage == null) return false
+      return Math.abs(satellite.beforeCoverage - satellite.afterCoverage) > 0.01
+    })
+    .map((satellite) => satellite.transitionTime)
+    .sort((a, b) => a - b)
+
+  let strikeSplitLabel: string | null = null
+  if (changedTimes.length && timeLabels.length) {
+    const medianTime = changedTimes[Math.floor(changedTimes.length / 2)]
+    const splitIndex = Math.min(
+      timeLabels.length - 1,
+      Math.max(0, Math.round((medianTime - taskStart) / intervalMs))
+    )
+    strikeSplitLabel = timeLabels[splitIndex] ?? null
+  }
+
+  return {
+    cells: Array.from(cellMap.values()),
+    timeLabels,
+    strikeSplitLabel,
+  }
 })
 
 const layerLabelItems = computed(() => {
@@ -729,17 +774,22 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
     starlinkCoverageChart = echarts.init(container)
   }
 
-  const cells = starlinkCoverageHeatCells.value
-  const timeLabels = Array.from(new Set(cells.map((cell) => cell.timeLabel)))
+  const { cells, timeLabels, strikeSplitLabel } = starlinkCoverageHeatModel.value
   const heatmapData = cells.map((cell) => [cell.timeLabel, cell.bracket, cell.satelliteCount] as const)
   const maxSatelliteCount = Math.max(1, ...cells.map((cell) => cell.satelliteCount))
+  const lastTimeLabel = timeLabels[timeLabels.length - 1]
+  const firstTimeLabel = timeLabels[0]
 
   starlinkCoverageChart.setOption({
     title: {
       text: 'STARLINK 时间片 × 覆盖率梯队分布',
+      subtext: strikeSplitLabel
+        ? '色块在过境/打击后从「打击前覆盖率」切到「打击后覆盖率」；橙虚线为主要切换时刻'
+        : '色块颜色表示该时间片落入该覆盖率梯队的卫星数量；悬停可看打击前后覆盖率',
       left: 16,
-      top: 6,
+      top: 4,
       textStyle: { color: '#67e8f9', fontSize: 12, fontWeight: 700 },
+      subtextStyle: { color: '#94a3b8', fontSize: 10 },
     },
     tooltip: {
       trigger: 'item',
@@ -760,7 +810,7 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
         const [timeLabel, bracket, satelliteCount] = point
         const satellites = starlinkHeatTooltipMap.get(`${timeLabel}|${bracket}`) || []
         const satelliteLines = satellites.map((satellite) =>
-          `${satellite.name} (${satellite.norad})：${formatHeatmapCoverage(satellite.beforeCoverage)} → ${formatHeatmapCoverage(satellite.afterCoverage)}`
+          `${satellite.name} (${satellite.norad})：打击前 ${formatHeatmapCoverage(satellite.beforeCoverage)} → 打击后 ${formatHeatmapCoverage(satellite.afterCoverage)}`
         )
         const remaining = Math.max(0, satelliteCount - satelliteLines.length)
         return [
@@ -774,7 +824,7 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
         ].join('')
       },
     },
-    grid: { left: 58, right: 14, top: 36, bottom: 48, containLabel: false },
+    grid: { left: 58, right: 46, top: 52, bottom: 48, containLabel: false },
     xAxis: {
       type: 'category',
       name: '',
@@ -795,10 +845,18 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
       splitArea: { show: true, areaStyle: { color: ['rgba(14, 28, 48, 0.46)', 'rgba(8, 15, 26, 0.46)'] } },
     },
     visualMap: {
-      show: false,
+      show: true,
+      type: 'continuous',
       min: 0,
       max: maxSatelliteCount,
       dimension: 2,
+      orient: 'vertical',
+      right: 6,
+      top: 'middle',
+      itemWidth: 8,
+      itemHeight: 88,
+      text: ['多', '少'],
+      textStyle: { color: '#94a3b8', fontSize: 10 },
       inRange: { color: ['#102a43', '#1890ff', '#52c41a', '#faad14', '#ff4d4f'] },
     },
     graphic: cells.length
@@ -810,6 +868,46 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
       label: { show: false },
       itemStyle: { borderColor: 'rgba(8, 15, 26, 0.9)', borderWidth: 1 },
       emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(34, 211, 238, 0.75)' } },
+      markLine: strikeSplitLabel
+        ? {
+            silent: true,
+            symbol: 'none',
+            animation: false,
+            lineStyle: { color: '#fb923c', width: 2, type: 'dashed' },
+            label: {
+              formatter: '打击切换',
+              color: '#fdba74',
+              fontSize: 11,
+              fontWeight: 700,
+            },
+            data: [{ xAxis: strikeSplitLabel }],
+          }
+        : undefined,
+      markArea: strikeSplitLabel && firstTimeLabel && lastTimeLabel
+        ? {
+            silent: true,
+            data: [
+              [
+                {
+                  name: '打击前',
+                  xAxis: firstTimeLabel,
+                  itemStyle: { color: 'rgba(34, 197, 94, 0.08)' },
+                  label: { color: '#86efac', fontSize: 11, fontWeight: 700, position: 'insideTopLeft' },
+                },
+                { xAxis: strikeSplitLabel },
+              ],
+              [
+                {
+                  name: '打击后',
+                  xAxis: strikeSplitLabel,
+                  itemStyle: { color: 'rgba(249, 115, 22, 0.10)' },
+                  label: { color: '#fdba74', fontSize: 11, fontWeight: 700, position: 'insideTopRight' },
+                },
+                { xAxis: lastTimeLabel },
+              ],
+            ],
+          }
+        : undefined,
     }],
   }, true)
   starlinkCoverageChart.resize()

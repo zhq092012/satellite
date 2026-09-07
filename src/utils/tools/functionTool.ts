@@ -166,6 +166,13 @@ export function buildSegmentedTrack(
 // 标记战场
 export function markBattleArea(viewer: Cesium.Viewer, battle: BattleForm | null, orbit_altitude_km: number = 20000000) {
   if (!viewer || (viewer as any).isDestroyed?.() || battle === null) return
+
+  /** 先清掉旧战场面，避免每次 markBattle 再叠加一份 Polygon/Polyline 几何体 */
+  const staleBattleEntities = viewer.entities.values.filter((entity) =>
+    String(entity.id ?? '').startsWith('battle-area-')
+  )
+  staleBattleEntities.forEach((entity) => viewer.entities.remove(entity))
+
   let entitys: EntityCollection = new EntityCollection()
   // 用于计算整体视野的 BoundingSphere（包含所有圆与多边形）
   let combinedBS: Cesium.BoundingSphere | null = null
@@ -200,6 +207,7 @@ export function markBattleArea(viewer: Cesium.Viewer, battle: BattleForm | null,
 
       // 生成正式闭合多边形
       const entity = viewer.entities.add({
+        id: `battle-area-${polygon.name || 'poly'}-${entitys.values.length}`,
         polygon: {
           hierarchy: new Cesium.PolygonHierarchy(points),
           material: new Cesium.ColorMaterialProperty(Cesium.Color.ORANGE.withAlpha(0.3)),

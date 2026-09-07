@@ -62,11 +62,8 @@
               <el-table-column label="算法计算进度" width="180">
                 <template #default="scope">
                   <div v-if="getTaskProgress(scope.row)" class="progress-box">
-                    <el-progress
-                      :percentage="getTaskProgressPercent(getTaskProgress(scope.row))"
-                      :status="isTaskProgressComplete(getTaskProgress(scope.row)) ? 'success' : ''"
-                      :stroke-width="6"
-                    />
+                    <el-progress :percentage="getTaskProgressPercent(getTaskProgress(scope.row))"
+                      :status="isTaskProgressComplete(getTaskProgress(scope.row)) ? 'success' : ''" :stroke-width="6" />
                   </div>
                   <span v-else class="text-muted">未开始或未获取</span>
                 </template>
@@ -74,17 +71,12 @@
               <el-table-column label="操作" width="160" fixed="right" align="center">
                 <template #default="scope">
                   <div class="table-action-group">
-                    <el-button
-                      type="success"
-                      icon="Edit"
-                      size="small"
-                      plain
-                      round
-                      @click="handleEditTask(scope.row, battle)"
-                    >
+                    <el-button type="success" icon="Edit" size="small" plain round
+                      @click="handleEditTask(scope.row, battle)">
                       修改
                     </el-button>
-                    <el-button type="danger" icon="Delete" size="small" plain round @click="handleDeleteTask(scope.row)">
+                    <el-button type="danger" icon="Delete" size="small" plain round
+                      @click="handleDeleteTask(scope.row)">
                       删除
                     </el-button>
                   </div>
@@ -108,12 +100,8 @@
         <el-form-item label="" v-if="battleForm.createAreaMode === '多边形'">
           <el-button type="primary" @click="addPolygonArea" size="small"> 新增区域 </el-button>
         </el-form-item>
-        <div
-          v-show="battleForm.createAreaMode === '多边形'"
-          v-for="[idx, area] in store.battlePolygonMap"
-          :key="idx"
-          class="polygon-area-item"
-        >
+        <div v-show="battleForm.createAreaMode === '多边形'" v-for="[idx, area] in store.battlePolygonMap" :key="idx"
+          class="polygon-area-item">
           <el-form-item label="区域名称">
             <div class="area-name-row">
               <el-input v-model="area.name" placeholder="区域名称" />
@@ -147,33 +135,19 @@
         </el-form-item>
 
         <el-form-item label="时间限制" prop="beginDate">
-          <el-date-picker
-            v-model="taskDatePickValue"
-            type="datetimerange"
-            start-placeholder="开始时间"
-            end-placeholder="结束时间"
-            value-format="YYYY-MM-DD HH:mm"
-            format="YYYY-MM-DD HH:mm"
-          />
+          <el-date-picker v-model="taskDatePickValue" type="datetimerange" start-placeholder="开始时间"
+            end-placeholder="结束时间" value-format="YYYY-MM-DD HH:mm" format="YYYY-MM-DD HH:mm" />
         </el-form-item>
 
         <el-form-item label="红方" prop="meCountry">
-          <el-select
-            v-model="taskForm.meCountryShow"
-            multiple
-            placeholder="请选择红方国家"
-            @change="taskForm.meCountry = taskForm.meCountryShow.join(',')"
-          >
+          <el-select v-model="taskForm.meCountryShow" multiple placeholder="请选择红方国家"
+            @change="taskForm.meCountry = taskForm.meCountryShow.join(',')">
             <el-option v-for="item in taskCountrys" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
         <el-form-item label="蓝方" prop="enemyCountry">
-          <el-select
-            v-model="taskForm.enemyCountryShow"
-            multiple
-            placeholder="请选择蓝方国家"
-            @change="taskForm.enemyCountry = taskForm.enemyCountryShow.join(',')"
-          >
+          <el-select v-model="taskForm.enemyCountryShow" multiple placeholder="请选择蓝方国家"
+            @change="taskForm.enemyCountry = taskForm.enemyCountryShow.join(',')">
             <el-option v-for="item in taskCountrys" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
@@ -196,40 +170,19 @@
           </el-table-column>
           <el-table-column prop="startTime" label="开始时间" width="200">
             <template #default="scope">
-              <el-date-picker
-                v-model="scope.row.startTime"
-                @change="validateStartTime(scope.row)"
-                type="datetime"
-                placeholder="开始时间"
-                format="YYYY-MM-DD HH:mm"
-                value-format="YYYY-MM-DD HH:mm"
-                style="width: 100%"
-              />
+              <el-date-picker v-model="scope.row.startTime" @change="validateStartTime(scope.row)" type="datetime"
+                placeholder="开始时间" format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DD HH:mm" style="width: 100%" />
             </template>
           </el-table-column>
           <el-table-column prop="endTime" label="结束时间" width="200">
             <template #default="scope">
-              <el-date-picker
-                v-model="scope.row.endTime"
-                @change="validateEndTime(scope.row)"
-                type="datetime"
-                placeholder="结束时间"
-                format="YYYY-MM-DD HH:mm"
-                value-format="YYYY-MM-DD HH:mm"
-                style="width: 100%"
-              />
+              <el-date-picker v-model="scope.row.endTime" @change="validateEndTime(scope.row)" type="datetime"
+                placeholder="结束时间" format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DD HH:mm" style="width: 100%" />
             </template>
           </el-table-column>
           <el-table-column prop="sateType" label="卫星类型" min-width="220">
             <template #default="scope">
-              <el-select
-                v-model="scope.row.sateTypeShow"
-                placeholder="选择类型"
-                multiple
-                collapse-tags
-                collapse-tags-tooltip
-                style="width: 100%"
-              >
+              <el-select v-model="scope.row.sateTypeShow" placeholder="选择类型" multiple style="width: 100%">
                 <el-option v-for="item in taskSateTypes" :key="item" :label="item" :value="item" />
               </el-select>
             </template>
@@ -312,7 +265,8 @@ const activeNames = ref<number[]>([])
 
 /** 国家/地区和阶段配置下拉数据源 */
 const taskCountrys = ref<string[]>([])
-const taskSateTypes = ref<string[]>(['通信', '导航', '遥感', '侦察', '气象', '科学', '其他'])
+/** 作战阶段可选卫星类型（与评估报告、杀伤链一致） */
+const taskSateTypes = ref<string[]>(['导弹预警', '侦察', '通信', '导航', '太空目标监视与攻防'])
 const targetOptions = ref<string[]>([])
 
 /** 弹窗状态及标题 */
@@ -885,7 +839,7 @@ const handleEditTask = async (task: TaskForm, battle: BattleForm) => {
 
     jsonTable.forEach((step) => {
       step.sateTypeShow = step.sateType ? step.sateType.split(',') : []
-      ;(step as BattleSegmentRow).autoGenerated = jsonTable.length === 1 || isDefaultFourSteps
+        ; (step as BattleSegmentRow).autoGenerated = jsonTable.length === 1 || isDefaultFourSteps
     })
 
     if (jsonTable.length === 1 && task.beginDate && task.endDate) {
@@ -1073,6 +1027,7 @@ onMounted(async () => {
 
           .expand-icon {
             transition: transform 0.25s ease;
+
             &.is-expanded {
               transform: rotate(90deg);
             }
@@ -1171,6 +1126,7 @@ onMounted(async () => {
   :deep(.atlas-app-table) {
     th.el-table__cell {
       padding: 8px 6px;
+
       .cell {
         white-space: nowrap;
         overflow: visible;
@@ -1180,6 +1136,7 @@ onMounted(async () => {
 
     td.el-table__cell {
       padding: 6px 6px;
+
       .cell {
         padding-left: 4px;
         padding-right: 4px;

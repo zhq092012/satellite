@@ -239,6 +239,7 @@ const clearViewer = () => {
   }
   viewer.entities.removeAll()
   destroySatellitePrimitiveCollections()
+  destroyTransmissionLinkPolylineCollection()
 
   // 3. 恢复渲染循环和时钟动画（仅当 viewer 未被销毁时）
   if (!viewer.isDestroyed()) {
@@ -303,8 +304,10 @@ let cachedSatelliteList: SatelliteData[] | null = null
 
 // 存储电子信息网络基础设施实体 ID (地面站、中心云站)
 const electronicNodeEntityIds = new Set<string>()
-/** 态势分析选中的传输链路边实体 ID 集合 */
+/** 态势分析选中的传输链路边实体 ID 集合（兼容旧 Entity 折线残留） */
 const transmissionLinkEntityIds = new Set<string>()
+/** 传输链路折线集合残留（旧实现会写入 scene.primitives，清除时必须拆掉以免材质 type 为空停渲染） */
+let transmissionLinkPolylineCollection: Cesium.PolylineCollection | null = null
 /** 当前选中的传输链路包含的节点匹配 Key（用于高亮该链路上的天基/地面实体） */
 const selectedTransmissionLinkNodeKeys = ref<Set<string>>(new Set())
 /** 传输链路高亮线颜色：淡黄色虚线 */
@@ -376,6 +379,19 @@ interface SatellitePrimitiveVisual {
   point: Cesium.PointPrimitive
   /** 名称标签 */
   label: Cesium.Label
+}
+
+/**
+ * 写入地球卫星 Primitive 所需的最小字段。
+ * InitMatrix 与 SatelliteMatrix 均包含这些属性，坐标仍按 NORAD 查 TLE。
+ */
+interface GlobeSatellitePrimitiveSource {
+  /** 卫星 NORAD 编号 */
+  norad: number
+  /** 卫星名称 */
+  name: string
+  /** 卫星类型；部分卫星可能为 null */
+  satType?: string | null
 }
 
 /** 当前渲染的卫星 Primitive 映射 */
@@ -472,12 +488,10 @@ const pickSatellitesForGlobe = (
 /**
  * 向 Primitive 集合写入一颗卫星。
  *
- * @param sat 矩阵卫星
+ * @param sat 矩阵卫星（InitMatrix 或 SatelliteMatrix 均可）
  * @returns 是否写入成功
  */
-const addSatellitePrimitive = (
-  sat: NonNullable<MatrixResult['initMatrixList']>[number]
-): boolean => {
+const addSatellitePrimitive = (sat: GlobeSatellitePrimitiveSource): boolean => {
   if (!viewer || viewer.isDestroyed() || !sat?.norad || satellitePrimitiveMap.has(sat.norad)) return false
   ensureSatellitePrimitiveCollections()
   if (!satBillboardCollection || !satPointCollection || !satLabelCollection) return false
@@ -681,6 +695,7 @@ const clearElectronicInfrastructureNodes = () => {
   if (!viewer || viewer.isDestroyed()) return
 
   clearTransmissionLinkOverlay()
+  destroyTransmissionLinkPolylineCollection()
 
   satelliteEntityMap.clear()
   satelliteSatrecCache.clear()
@@ -818,16 +833,73 @@ const loadSatelliteAndStations = () => {
 }
 
 /**
+ * 销毁传输链路 PolylineCollection，释放 Primitive 显存。
+ */
+const destroyTransmissionLinkPolylineCollection = () => {
+  if (!transmissionLinkPolylineCollection) return
+  if (viewer && !viewer.isDestroyed() && !transmissionLinkPolylineCollection.isDestroyed()) {
+    viewer.scene.primitives.remove(transmissionLinkPolylineCollection)
+  }
+  transmissionLinkPolylineCollection = null
+}
+
+/**
+ * 在主线程把两点插值为有上限的测地线，避免 GEODESIC Entity 在 Worker 里生成海量顶点。
+ * @param start 起点 ECEF
+ * @param end 终点 ECEF
+ * @returns 折线顶点（含端点），最多 25 个
+ */
+const buildBoundedGeodesicPositions = (
+  start: Cesium.Cartesian3,
+  end: Cesium.Cartesian3
+): Cesium.Cartesian3[] => {
+  const ellipsoid = Cesium.Ellipsoid.WGS84
+  const startCarto = ellipsoid.cartesianToCartographic(start)
+  const endCarto = ellipsoid.cartesianToCartographic(end)
+  if (!startCarto || !endCarto) {
+    return [Cesium.Cartesian3.clone(start), Cesium.Cartesian3.clone(end)]
+  }
+
+  const geodesic = new Cesium.EllipsoidGeodesic(startCarto, endCarto, ellipsoid)
+  let surfaceDistance = 0
+  try {
+    surfaceDistance = geodesic.surfaceDistance
+  } catch {
+    return [Cesium.Cartesian3.clone(start), Cesium.Cartesian3.clone(end)]
+  }
+  if (!Number.isFinite(surfaceDistance) || surfaceDistance < 20000) {
+    return [Cesium.Cartesian3.clone(start), Cesium.Cartesian3.clone(end)]
+  }
+
+  /** 按地表距离取样，最长跨地球也限制在 24 段，防止 Worker 级顶点爆炸 */
+  const segmentCount = Math.min(24, Math.max(2, Math.ceil(surfaceDistance / 500000)))
+  const positions: Cesium.Cartesian3[] = []
+  try {
+    for (let i = 0; i <= segmentCount; i++) {
+      const fraction = i / segmentCount
+      const carto = geodesic.interpolateUsingFraction(fraction)
+      carto.height = startCarto.height + (endCarto.height - startCarto.height) * fraction
+      positions.push(ellipsoid.cartographicToCartesian(carto))
+    }
+  } catch {
+    return [Cesium.Cartesian3.clone(start), Cesium.Cartesian3.clone(end)]
+  }
+  return positions
+}
+
+/**
  * 清除态势分析选中的传输链路连线及节点高亮。
  */
 const clearTransmissionLinkOverlay = () => {
   selectedTransmissionLinkNodeKeys.value.clear()
+  destroyTransmissionLinkPolylineCollection()
   if (!viewer || viewer.isDestroyed()) return
   transmissionLinkEntityIds.forEach((entityId) => {
     const entity = viewer.entities.getById(entityId)
     if (entity) viewer.entities.remove(entity)
   })
   transmissionLinkEntityIds.clear()
+  viewer.scene.requestRender()
 }
 
 /**
@@ -882,6 +954,8 @@ const flyToLinkBoundingSphere = (link: SatelliteTransmissionLink | null) => {
   })
 
   if (!positions.length) return
+
+  viewer.camera.cancelFlight()
 
   const boundingSphere = Cesium.BoundingSphere.fromPoints(positions)
 
@@ -938,7 +1012,9 @@ const showTransmissionLink = (link: SatelliteTransmissionLink | null) => {
     if (Number.isFinite(norad)) ensureSatellitePrimitiveVisible(norad)
   })
 
-  // 2. 创建折线实体（静态坐标，仅在点击时计算一次）
+  // 2. 用 Entity 折线绘制：主线程限段测地线 + ArcType.NONE，避免 GEODESIC Worker 顶点爆炸；
+  //    不使用 PolylineCollection + PolylineDash（该材质在 Collection 上 material.type 为空，会停掉渲染）
+  destroyTransmissionLinkPolylineCollection()
   const time = viewer.clock.currentTime
   for (let i = 0; i < link.nodes.length - 1; i++) {
     const startNode = link.nodes[i]
@@ -947,18 +1023,22 @@ const showTransmissionLink = (link: SatelliteTransmissionLink | null) => {
     const initialEnd = resolveChainNodePosition(endNode, time)
     if (!initialStart || !initialEnd) continue
 
-    const entityId = `transmission-link-${link.id}-${i}`
+    const entityId = `transmission-link-overlay-${i}`
+    const existing = viewer.entities.getById(entityId)
+    if (existing) viewer.entities.remove(existing)
+
     viewer.entities.add({
       id: entityId,
       show: true,
       polyline: {
-        positions: new Cesium.ConstantProperty([initialStart, initialEnd]),
+        positions: buildBoundedGeodesicPositions(initialStart, initialEnd),
         width: 3,
         material: new Cesium.PolylineDashMaterialProperty({
           color: TRANSMISSION_LINK_LINE_COLOR,
           dashLength: 18,
         }),
-        arcType: Cesium.ArcType.GEODESIC,
+        arcType: Cesium.ArcType.NONE,
+        clampToGround: false,
       },
     })
     transmissionLinkEntityIds.add(entityId)
@@ -1812,6 +1892,31 @@ function markBattle() {
   markBattleArea(viewer, store.battle)
 }
 
+/**
+ * 仅将相机飞回已缓存的战场俯视视角，不重复添加战场多边形（避免 Entity 几何体泄漏）。
+ */
+const flyToBattleView = () => {
+  if (!viewer || viewer.isDestroyed()) return
+  viewer.camera.cancelFlight()
+  const destination = store.battleCenterCartensian
+  const orientation = store.battleCenterOritentation
+  if (destination) {
+    viewer.camera.flyTo({
+      destination,
+      orientation: orientation
+        ? {
+            heading: orientation.heading,
+            pitch: orientation.pitch,
+            roll: orientation.roll,
+          }
+        : { heading: 0, pitch: -Cesium.Math.toRadians(90), roll: 0 },
+      duration: 1.5,
+    })
+    return
+  }
+  markBattle()
+}
+
 // [常量] 选中卫星高亮 3D 轨迹 Entity ID
 const HIGHLIGHT_TRAIL_ENTITY_ID = 'selected-sat-orbit-trail'
 
@@ -1978,6 +2083,7 @@ onBeforeUnmount(() => {
   satellitePositionPropertyCache.clear()
   satelliteTleCache.clear()
   cachedSatelliteList = null
+  destroyTransmissionLinkPolylineCollection()
 
   if (viewer) {
     if (!viewer.isDestroyed()) {
@@ -2039,6 +2145,7 @@ defineExpose({
   clearViewer,
   clearElectronicInfrastructureNodes,
   markBattle,
+  flyToBattleView,
   highlightSatellite,
   pauseClockAnimation,
   startTleOrbitAnimation,
