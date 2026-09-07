@@ -45,7 +45,10 @@
       <div
         v-else
         class="plan-columns"
-        :class="{ 'plan-columns--single': selectedUsageTypes.length === 1 }"
+        :class="{
+          'plan-columns--single': selectedUsageTypes.length === 1,
+          'plan-columns--compare': selectedUsageTypes.length > 1,
+        }"
         :style="{ gridTemplateColumns: `repeat(${selectedUsageTypes.length}, minmax(0, 1fr))` }"
       >
         <div v-for="usageType in selectedUsageTypes" :key="usageType" class="plan-column">
@@ -55,6 +58,7 @@
               :plan="getPlanByType(usageType)!"
               :show-series-link-timeline="selectedUsageTypes.length === 1"
               :compact-kpi="selectedUsageTypes.length >= 3"
+              :align-blocks="selectedUsageTypes.length > 1"
             />
           </div>
           <div v-else class="empty-container small">
@@ -286,6 +290,29 @@ watch(
 
   &--single {
     grid-template-columns: 1fr !important;
+  }
+
+  /**
+   * 多方案并排：同一行块（概要 / 打击前 / 打击后 / 地面站）共用三列中的最大高度。
+   */
+  &--compare {
+    align-items: stretch;
+    column-gap: 14px;
+    row-gap: 16px;
+
+    .plan-column {
+      display: grid;
+      grid-template-rows: subgrid;
+      grid-row: span 8;
+      overflow: hidden;
+    }
+
+    .column-content {
+      display: grid;
+      grid-template-rows: subgrid;
+      grid-row: span 7;
+      min-width: 0;
+    }
   }
 }
 

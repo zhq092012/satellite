@@ -1,5 +1,5 @@
 <template>
-  <div class="zhch-plan-detail">
+  <div class="zhch-plan-detail" :class="{ 'zhch-plan-detail--align': alignBlocks }">
     <!-- 1. 计算结果总览 -->
     <div class="result-header">
       <h2 class="result-title">计算结果</h2>
@@ -47,7 +47,7 @@
       <p class="block-text large" v-html="highlightText(plan.summary)"></p>
     </div>
 
-    <div class="compare-section">
+    <div class="compare-section" :class="{ 'compare-section--align': alignBlocks }">
       <div class="text-block">
         <div class="block-head block-head--before">① 打击前计算结果</div>
         <p class="block-text large" v-html="highlightText(plan.beforeResult)"></p>
@@ -107,6 +107,8 @@ const props = defineProps<{
   showSeriesLinkTimeline?: boolean
   /** 三方案并排时缩小 KPI 数字字号，单方案保持原尺寸 */
   compactKpi?: boolean
+  /** 多方案对比时与其它列按块对齐高度 */
+  alignBlocks?: boolean
 }>()
 
 /**
@@ -144,6 +146,22 @@ const coverageReduction = computed(() => {
   max-width: 100%;
   min-width: 0;
   overflow: hidden;
+
+  &--align {
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-row: span 7;
+    min-height: 0;
+    gap: 0;
+
+    .result-header,
+    .summary-line,
+    .kpi-grid {
+      height: 100%;
+      box-sizing: border-box;
+      padding-bottom: 10px;
+    }
+  }
 }
 
 .result-header {
@@ -268,6 +286,10 @@ const coverageReduction = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+
+  &--align {
+    display: contents;
+  }
 }
 
 .text-block {
@@ -275,6 +297,18 @@ const coverageReduction = computed(() => {
   border-radius: 8px;
   border: 1px solid rgba(79, 147, 221, 0.25);
   background: rgba(14, 28, 48, 0.6);
+
+  .zhch-plan-detail--align & {
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+
+    .block-text {
+      flex: 1;
+    }
+  }
 
   .block-head {
     font-size: 17px;
@@ -359,6 +393,11 @@ const coverageReduction = computed(() => {
   border-radius: 10px;
   border: 1px solid rgba(251, 191, 36, 0.35);
   background: linear-gradient(180deg, rgba(40, 30, 10, 0.5) 0%, rgba(14, 28, 48, 0.8) 100%);
+
+  .zhch-plan-detail--align & {
+    height: 100%;
+    box-sizing: border-box;
+  }
 
   .card-title {
     font-size: 18px;

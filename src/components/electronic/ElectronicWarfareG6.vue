@@ -611,6 +611,11 @@ const syncTopoSelectionFromStore = () => {
     handleSelectSatellite(null)
     return
   }
+  // 从「查看详情」跳入时即使 NORAD 未变，也必须清空上次残留的链路高亮，否则其余边会被压成近白色
+  if (focusNorad != null) {
+    handleSelectSatellite(focusNorad)
+    return
+  }
   if (norad != null && selectedNorad.value !== norad) {
     handleSelectSatellite(norad)
     return
@@ -782,7 +787,7 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
 
   starlinkCoverageChart.setOption({
     title: {
-      text: 'STARLINK 时间片 × 覆盖率梯队分布',
+      text: '',
       subtext: strikeSplitLabel
         ? '色块在过境/打击后从「打击前覆盖率」切到「打击后覆盖率」；橙虚线为主要切换时刻'
         : '色块颜色表示该时间片落入该覆盖率梯队的卫星数量；悬停可看打击前后覆盖率',
@@ -870,43 +875,43 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
       emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(34, 211, 238, 0.75)' } },
       markLine: strikeSplitLabel
         ? {
-            silent: true,
-            symbol: 'none',
-            animation: false,
-            lineStyle: { color: '#fb923c', width: 2, type: 'dashed' },
-            label: {
-              formatter: '打击切换',
-              color: '#fdba74',
-              fontSize: 11,
-              fontWeight: 700,
-            },
-            data: [{ xAxis: strikeSplitLabel }],
-          }
+          silent: true,
+          symbol: 'none',
+          animation: false,
+          lineStyle: { color: '#fb923c', width: 2, type: 'dashed' },
+          label: {
+            formatter: '',
+            color: '#fdba74',
+            fontSize: 11,
+            fontWeight: 700,
+          },
+          data: [{ xAxis: strikeSplitLabel }],
+        }
         : undefined,
       markArea: strikeSplitLabel && firstTimeLabel && lastTimeLabel
         ? {
-            silent: true,
-            data: [
-              [
-                {
-                  name: '打击前',
-                  xAxis: firstTimeLabel,
-                  itemStyle: { color: 'rgba(34, 197, 94, 0.08)' },
-                  label: { color: '#86efac', fontSize: 11, fontWeight: 700, position: 'insideTopLeft' },
-                },
-                { xAxis: strikeSplitLabel },
-              ],
-              [
-                {
-                  name: '打击后',
-                  xAxis: strikeSplitLabel,
-                  itemStyle: { color: 'rgba(249, 115, 22, 0.10)' },
-                  label: { color: '#fdba74', fontSize: 11, fontWeight: 700, position: 'insideTopRight' },
-                },
-                { xAxis: lastTimeLabel },
-              ],
+          silent: true,
+          data: [
+            [
+              {
+                name: '',
+                xAxis: firstTimeLabel,
+                itemStyle: { color: 'rgba(34, 197, 94, 0.08)' },
+                label: { color: '#86efac', fontSize: 11, fontWeight: 700, position: 'insideTopLeft' },
+              },
+              { xAxis: strikeSplitLabel },
             ],
-          }
+            [
+              {
+                name: '',
+                xAxis: strikeSplitLabel,
+                itemStyle: { color: 'rgba(249, 115, 22, 0.10)' },
+                label: { color: '#fdba74', fontSize: 11, fontWeight: 700, position: 'insideTopRight' },
+              },
+              { xAxis: lastTimeLabel },
+            ],
+          ],
+        }
         : undefined,
     }],
   }, true)
@@ -1721,7 +1726,9 @@ const highlightActiveElements = () => {
 
   graph.getEdges().forEach((edge: any) => {
     graph.setItemState(edge, 'active', false)
+    if (selectedLinkId.value) return
     graph.setItemState(edge, 'highlight', false)
+    paintEdgeAfterStates(edge, false)
   })
 
   graph.getNodes().forEach((node: any) => {
@@ -1818,11 +1825,44 @@ const buildLinkEdgeStyle = (struck: boolean, highlighted: boolean) => {
   return {
     stroke: struck ? LINK_COLOR_STRUCK : LINK_COLOR_NORMAL,
     lineWidth: highlighted ? 3.5 : struck ? 2 : 2.5,
-    lineDash: struck ? [6, 4] : undefined,
-    opacity: dimmed ? 0.22 : 1,
+    // 空数组用于清掉 G6 状态残留的虚线，避免未打击边也呈白色虚线
+    lineDash: struck ? [6, 4] : [],
+    opacity: dimmed ? 0.55 : 1,
     shadowColor: highlighted ? LINK_COLOR_NORMAL : undefined,
     shadowBlur: highlighted ? 12 : 0,
   }
+}
+
+/**
+ * 在 G6 状态切换之后重刷边样式。
+ * G6 4 关闭 highlight/inactive 时会把描边还原成 defaultEdge（浅灰/白），必须再写回打击配色。
+ *
+ * @param edge G6 边实例
+ * @param highlighted 是否为当前选中路径
+ */
+const paintEdgeAfterStates = (edge: any, highlighted: boolean) => {
+  if (!graph || graph.get('destroyed') || !edge) return
+  const model = edge.getModel() || {}
+  graph.updateItem(edge, { style: buildLinkEdgeStyle(!!model.linkStruck, highlighted) })
+}
+
+/**
+ * 在 G6 状态切换之后重刷节点填充/描边，避免还原成默认白底圆点。
+ *
+ * @param node G6 节点实例
+ */
+const paintNodeAfterStates = (node: any) => {
+  if (!graph || graph.get('destroyed') || !node) return
+  const model = node.getModel() || {}
+  if (!model.style) return
+  const states: string[] = typeof node.getStates === 'function' ? node.getStates() : []
+  const inactive = states.includes('inactive')
+  graph.updateItem(node, {
+    style: {
+      ...model.style,
+      opacity: inactive ? 0.55 : 1,
+    },
+  })
 }
 
 /**
@@ -2357,6 +2397,19 @@ const initOrUpdateGraph = () => {
       },
       defaultNode: {
         type: 'circle',
+        style: {
+          fill: '#092638',
+          stroke: '#00e1ff',
+          lineWidth: 2,
+        },
+      },
+      defaultEdge: {
+        type: 'cubic-vertical',
+        style: {
+          stroke: LINK_COLOR_NORMAL,
+          lineWidth: 2.5,
+          opacity: 1,
+        },
       },
       nodeStateStyles: {
         active: {
@@ -2378,11 +2431,24 @@ const initOrUpdateGraph = () => {
           opacity: 0.75,
         },
       },
+      edgeStateStyles: {
+        highlight: {
+          lineWidth: 3.5,
+          shadowBlur: 12,
+        },
+        inactive: {
+          opacity: 0.55,
+        },
+        active: {
+          lineWidth: 3,
+        },
+      },
     })
     graph.data(data)
     graph.render()
     resetGraphViewport()
     setupGraphTooltip(graph)
+    updateGraphHighlightState()
 
     graph.on('node:click', (evt: any) => {
       const nodeItem = evt.item
@@ -2428,8 +2494,8 @@ const initOrUpdateGraph = () => {
     })
   } else {
     graph.changeSize(width, height)
+    // changeData 内部已 render；再次 render 会把 originStyle 重置为 G6 默认浅灰边
     graph.changeData(data)
-    graph.render()
     resetGraphViewport()
     updateGraphHighlightState()
   }
@@ -2519,14 +2585,14 @@ const applySatelliteScopeHighlight = () => {
     graph.setItemState(node, 'inactive', false)
     graph.setItemState(node, 'highlight', false)
     graph.setItemState(node, 'active', false)
+    paintNodeAfterStates(node)
   })
 
   graph.getEdges().forEach((edge: any) => {
-    const model = edge.getModel()
-    graph.updateItem(edge, { style: buildLinkEdgeStyle(!!model.linkStruck, false) })
     graph.setItemState(edge, 'highlight', false)
     graph.setItemState(edge, 'inactive', false)
     graph.setItemState(edge, 'active', false)
+    paintEdgeAfterStates(edge, false)
   })
 
   highlightActiveElements()
@@ -2548,15 +2614,16 @@ const updateGraphHighlightState = () => {
       graph.setItemState(node, 'inactive', !onPath)
       graph.setItemState(node, 'highlight', onPath)
       graph.setItemState(node, 'active', false)
+      paintNodeAfterStates(node)
     })
     graph.getEdges().forEach((edge: any) => {
       const model = edge.getModel()
       const hopKey = `${model.source}->${model.target}`
       const highlighted = hopKeys.has(hopKey) || String(model.linkId || '') === selectedLinkId.value
-      graph.updateItem(edge, { style: buildLinkEdgeStyle(!!model.linkStruck, highlighted) })
       graph.setItemState(edge, 'highlight', highlighted)
       graph.setItemState(edge, 'inactive', false)
       graph.setItemState(edge, 'active', false)
+      paintEdgeAfterStates(edge, highlighted)
     })
     return
   }
@@ -2572,6 +2639,7 @@ const updateGraphHighlightState = () => {
       graph.setItemState(node, 'inactive', !focus)
       graph.setItemState(node, 'highlight', id === receiveId)
       graph.setItemState(node, 'active', false)
+      paintNodeAfterStates(node)
     })
     graph.getEdges().forEach((edge: any) => {
       const model = edge.getModel()
@@ -2581,10 +2649,10 @@ const updateGraphHighlightState = () => {
         (source === satId && target === receiveId) ||
         source === receiveId ||
         target === receiveId
-      graph.updateItem(edge, { style: buildLinkEdgeStyle(!!model.linkStruck, onReceivePath) })
       graph.setItemState(edge, 'highlight', onReceivePath)
       graph.setItemState(edge, 'inactive', !onReceivePath)
       graph.setItemState(edge, 'active', false)
+      paintEdgeAfterStates(edge, onReceivePath)
     })
     return
   }
@@ -2596,11 +2664,13 @@ const updateGraphHighlightState = () => {
       graph.setItemState(node, 'inactive', id !== satId)
       graph.setItemState(node, 'highlight', false)
       graph.setItemState(node, 'active', false)
+      paintNodeAfterStates(node)
     })
     graph.getEdges().forEach((edge: any) => {
       graph.setItemState(edge, 'inactive', false)
       graph.setItemState(edge, 'active', false)
       graph.setItemState(edge, 'highlight', false)
+      paintEdgeAfterStates(edge, false)
     })
     return
   }
@@ -2625,14 +2695,14 @@ const updateGraphHighlightState = () => {
       graph.setItemState(node, 'inactive', true)
       graph.setItemState(node, 'active', false)
     }
+    paintNodeAfterStates(node)
   })
 
   graph.getEdges().forEach((edge: any) => {
-    const model = edge.getModel()
-    graph.updateItem(edge, { style: buildLinkEdgeStyle(!!model.linkStruck, false) })
     graph.setItemState(edge, 'highlight', false)
     graph.setItemState(edge, 'inactive', false)
     graph.setItemState(edge, 'active', false)
+    paintEdgeAfterStates(edge, false)
   })
 }
 

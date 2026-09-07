@@ -1185,7 +1185,7 @@ const selectedSatelliteName = computed(() => {
   }
 
   :deep(.virtual-scroll-list__item) {
-    padding-bottom: 16px;
+    padding-bottom: 10px;
   }
 }
 

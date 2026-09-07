@@ -43,69 +43,65 @@
       </div>
 
       <div class="link-scroll">
-        <VirtualScrollList
-          ref="linkVirtualListRef"
-          :items="filteredLinkItems"
-          :item-height="isStarlinkSeries ? 136 : 156"
-          item-key="id"
-        >
-        <template #default="{ item }">
-          <div class="link-card" :class="[
-            { active: selectedLinkId === item.id, struck: item.struck, ok: !item.struck },
-            item.rank ? `rank-card--${item.rank}` : ''
-          ]" @click="handleSelect(item)">
-            <div class="link-card-top">
-              <div class="link-path">
-                <template v-for="(node, idx) in item.nodes" :key="`${item.id}-${idx}`">
-                  <span class="path-node" :class="[`path-node--${node.layer}`, { 'path-node--struck': node.struck }]">
-                    <span class="path-icon">{{ node.icon }}</span>
-                    <span class="path-name">{{ node.name }}</span>
+        <VirtualScrollList ref="linkVirtualListRef" :items="filteredLinkItems"
+          :item-height="isStarlinkSeries ? 136 : 170" item-key="id">
+          <template #default="{ item }">
+            <div class="link-card" :class="[
+              { active: selectedLinkId === item.id, struck: item.struck, ok: !item.struck },
+              item.rank ? `rank-card--${item.rank}` : ''
+            ]" @click="handleSelect(item)">
+              <div class="link-card-top">
+                <div class="link-path">
+                  <template v-for="(node, idx) in item.nodes" :key="`${item.id}-${idx}`">
+                    <span class="path-node" :class="[`path-node--${node.layer}`, { 'path-node--struck': node.struck }]">
+                      <span class="path-icon">{{ node.icon }}</span>
+                      <span class="path-name">{{ node.name }}</span>
+                    </span>
+                    <span v-if="idx < item.nodes.length - 1" class="path-arrow">→</span>
+                  </template>
+                </div>
+                <div class="link-card-badges">
+                  <span v-if="item.rank && item.rank <= 3" class="rank-mini-tag" :class="`rank-mini-tag--${item.rank}`">
+                    {{ getRankMedal(item.rank) }} TOP {{ item.rank }}
                   </span>
-                  <span v-if="idx < item.nodes.length - 1" class="path-arrow">→</span>
-                </template>
+                  <span class="status-badge" :class="item.struck ? 'struck' : 'ok'">
+                    {{ item.interferenceStatus }}
+                  </span>
+                </div>
               </div>
-              <div class="link-card-badges">
-                <span v-if="item.rank && item.rank <= 3" class="rank-mini-tag" :class="`rank-mini-tag--${item.rank}`">
-                  {{ getRankMedal(item.rank) }} TOP {{ item.rank }}
-                </span>
-                <span class="status-badge" :class="item.struck ? 'struck' : 'ok'">
-                  {{ item.interferenceStatus }}
-                </span>
-              </div>
-            </div>
 
-            <div class="link-meta">
-              <div class="meta-row-two-col">
-                <span class="meta-line meta-line--time">
-                  <span class="meta-key">传输</span>
-                  <span class="meta-val">{{ item.transmitTime }}</span>
+              <div class="link-meta">
+                <div class="meta-row-two-col">
+                  <span class="meta-line meta-line--time">
+                    <span class="meta-key">传输</span>
+                    <span class="meta-val">{{ item.transmitTime }}</span>
+                  </span>
+                  <span v-if="item.totalScore != null" class="score-mini-pill" title="基于威胁度、时效、孤立度与中继计算的优先级得分">
+                    评分 {{ item.totalScore }}分
+                  </span>
+                </div>
+                <span v-if="isStarlinkSeries" class="meta-line meta-line--coverage">
+                  <span class="meta-key">覆盖率</span>
+                  <span class="meta-val">{{ formatCoverage(item.coverage) }}</span>
                 </span>
-                <span v-if="item.totalScore != null" class="score-mini-pill" title="基于威胁度、时效、孤立度与中继计算的优先级得分">
-                  评分 {{ item.totalScore }}分
+                <template v-else>
+                  <span v-if="item.struck" class="meta-line meta-line--strike-target">
+                    <span class="meta-key">打击</span>
+                    <span class="meta-val">{{ item.struckDetailText }}</span>
+                  </span>
+                  <span v-if="item.weaponNames" class="meta-line meta-line--weapon">
+                    <span class="meta-key">武器</span>
+                    <span class="meta-val">{{ item.weaponNames }}</span>
+                  </span>
+                </template>
+                <span v-if="item.delayMin > 0" class="meta-line meta-line--delay">
+                  <span class="meta-key">延迟</span>
+                  <span class="meta-val">+{{ item.delayMin }} 分钟</span>
                 </span>
               </div>
-              <span v-if="isStarlinkSeries" class="meta-line meta-line--coverage">
-                <span class="meta-key">覆盖率</span>
-                <span class="meta-val">{{ formatCoverage(item.coverage) }}</span>
-              </span>
-              <template v-else>
-                <span v-if="item.struck" class="meta-line meta-line--strike-target">
-                  <span class="meta-key">打击</span>
-                  <span class="meta-val">{{ item.struckDetailText }}</span>
-                </span>
-                <span v-if="item.weaponNames" class="meta-line meta-line--weapon">
-                  <span class="meta-key">武器</span>
-                  <span class="meta-val">{{ item.weaponNames }}</span>
-                </span>
-              </template>
-              <span v-if="item.delayMin > 0" class="meta-line meta-line--delay">
-                <span class="meta-key">延迟</span>
-                <span class="meta-val">+{{ item.delayMin }} 分钟</span>
-              </span>
             </div>
-          </div>
-        </template>
-      </VirtualScrollList>
+          </template>
+        </VirtualScrollList>
       </div>
     </template>
   </aside>
