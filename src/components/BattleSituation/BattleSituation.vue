@@ -154,12 +154,13 @@ const syncGlobeTimeMode = () => {
 }
 
 /**
- * 清除传输链路选中态，并恢复地图连线与时间轴播放。
+ * 清除传输链路选中态，恢复地图连线、时间轴播放，并将相机飞回战场原始视角。
  */
 const clearTransmissionLinkSelection = () => {
   selectedTransmissionLinkId.value = null
   selectedTransmissionLink.value = null
   cesiumViewerRef.value?.clearTransmissionLinkOverlay?.()
+  cesiumViewerRef.value?.markBattle()
   syncGlobeTimeMode()
 }
 

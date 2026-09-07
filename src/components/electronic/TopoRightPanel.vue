@@ -799,6 +799,10 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   }
 }
 
+:deep(.atlas-app-scrollbar__view) {
+  padding-right: 10px;
+}
+
 .priority-scroll,
 .detail-scroll {
   flex: 1;

@@ -58,42 +58,32 @@
             <span class="link-section-title">可能传输链路</span>
             <span class="link-section-count">{{ transmissionLinks.length }} 条</span>
           </div>
-          <span class="link-section-hint">
-            {{ selectedSatelliteNorad != null ? '按过境开始时间升序' : '打击前全路径枚举' }}
-          </span>
+          <button
+            type="button"
+            class="clear-link-btn"
+            :disabled="!selectedTransmissionLinkId"
+            @click.stop="handleClearSelectedLink"
+          >
+            清除选择的链路
+          </button>
         </div>
 
         <div class="link-section-scroll">
-          <VirtualScrollList
-            v-if="displayLinkItems.length"
-            :items="displayLinkItems"
-            :item-height="OTHER_LINK_ITEM_HEIGHT"
-            :get-item-height="getDisplayLinkItemHeight"
-            item-key="id"
-          >
+          <VirtualScrollList v-if="displayLinkItems.length" :items="displayLinkItems"
+            :item-height="OTHER_LINK_ITEM_HEIGHT" :get-item-height="getDisplayLinkItemHeight" item-key="id">
             <template #default="{ item }">
-              <div
-                class="transmission-link-card"
-                :class="[
-                  {
-                    active: selectedTransmissionLinkId === item.link.id,
-                    blocked: item.link.blocked,
-                  },
-                  item.priority ? `priority-rank-${item.priority.rank}` : '',
-                ]"
-                role="button"
-                tabindex="0"
-                @click="handleLinkCardClick(item.link)"
-                @keydown.enter.prevent="handleLinkCardClick(item.link)"
-              >
+              <div class="transmission-link-card" :class="[
+                {
+                  active: selectedTransmissionLinkId === item.link.id,
+                  blocked: item.link.blocked,
+                },
+                item.priority ? `priority-rank-${item.priority.rank}` : '',
+              ]" role="button" tabindex="0" @click="handleLinkCardClick(item.link)"
+                @keydown.enter.prevent="handleLinkCardClick(item.link)">
                 <div class="link-card-header">
                   <div class="link-title-left">
                     <span class="link-index">链路 {{ item.displayIndex }}</span>
-                    <span
-                      v-if="item.priority"
-                      class="rank-badge"
-                      :class="`rank-badge--${item.priority.rank}`"
-                    >
+                    <span v-if="item.priority" class="rank-badge" :class="`rank-badge--${item.priority.rank}`">
                       {{ getRankMedal(item.priority.rank) }} TOP {{ item.priority.rank }}
                       ({{ item.priority.totalScore }}分)
                     </span>
@@ -119,7 +109,13 @@
 
                 <div v-if="item.priority" class="priority-reason-tip">
                   <span class="reason-icon">💡</span>
-                  <span class="reason-text">{{ item.priority.reason }}</span>
+                  <el-tooltip placement="left" :show-after="200" trigger="hover"
+                    popper-class="c2-priority-reason-tooltip">
+                    <template #content>
+                      <div class="reason-tooltip-body">{{ item.priority.reason }}</div>
+                    </template>
+                    <span class="reason-text">{{ item.priority.reason }}</span>
+                  </el-tooltip>
                 </div>
 
                 <div v-if="item.link.blocked" class="link-blocked-tip">{{ item.link.blockedReason }}</div>
@@ -181,7 +177,7 @@ interface DisplayTransmissionLinkItem {
 /** 普通链路卡片行高（含间距），单位 px */
 const OTHER_LINK_ITEM_HEIGHT = 188
 /** TOP 3 推荐卡片行高（含推荐理由与间距），单位 px */
-const TOP_LINK_ITEM_HEIGHT = 292
+const TOP_LINK_ITEM_HEIGHT = 260
 
 const router = useRouter()
 const store = useLayoutStore()
@@ -378,6 +374,12 @@ const handleLinkCardClick = (link: SatelliteTransmissionLink) => {
     return
   }
   emit('select-transmission-link', link)
+}
+
+/** 清除当前选中的传输链路（地图连线与卡片高亮一并取消）。 */
+const handleClearSelectedLink = () => {
+  if (!props.selectedTransmissionLinkId) return
+  emit('select-transmission-link', null)
 }
 
 onMounted(() => {
@@ -592,9 +594,28 @@ onMounted(() => {
   color: #38bdf8;
 }
 
-.link-section-hint {
+.clear-link-btn {
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(64, 242, 255, 0.35);
+  background: rgba(8, 18, 32, 0.85);
+  color: #7dd3fc;
   font-size: 11px;
-  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    border-color: rgba(64, 242, 255, 0.55);
+    background: rgba(64, 242, 255, 0.12);
+    color: #e0faff;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
 }
 
 .link-section-scroll {
@@ -638,18 +659,6 @@ onMounted(() => {
 
   &.blocked {
     border-style: dashed;
-  }
-
-  &.priority-rank-1 {
-    border-left: 3px solid #eab308;
-  }
-
-  &.priority-rank-2 {
-    border-left: 3px solid #38bdf8;
-  }
-
-  &.priority-rank-3 {
-    border-left: 3px solid #fb923c;
   }
 
   .link-card-header {
@@ -717,12 +726,20 @@ onMounted(() => {
       margin-top: 1px;
     }
 
+    :deep(.el-tooltip__trigger) {
+      flex: 1;
+      min-width: 0;
+      display: block;
+    }
+
     .reason-text {
       text-align: left;
       display: -webkit-box;
       -webkit-line-clamp: 3;
+      line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
+      cursor: help;
     }
   }
 }
@@ -870,5 +887,24 @@ onMounted(() => {
   padding: 16px 12px;
   font-size: 12px;
   color: #94a3b8;
+}
+</style>
+
+<style lang="scss">
+.c2-priority-reason-tooltip {
+  max-width: 360px !important;
+  padding: 10px 12px !important;
+  background: rgba(10, 18, 32, 0.96) !important;
+  border: 1px solid rgba(0, 225, 255, 0.28) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+
+  .reason-tooltip-body {
+    font-size: 12px;
+    line-height: 1.65;
+    color: #e2efff;
+    text-align: left;
+    white-space: normal;
+    word-break: break-word;
+  }
 }
 </style>
