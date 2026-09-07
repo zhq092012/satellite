@@ -281,7 +281,7 @@
 
                         <!-- 打击向量指示 (能量光束/攻击角度) -->
                         <div class="strike-vector-arrow">
-                          <span class="vector-angle">{{ step.angle }}°</span>
+                          <span class="vector-angle">仰角 {{ step.angle }}°</span>
                           <div class="vector-line">
                             <span class="vector-beam"></span>
                             <span class="vector-head">▶</span>
@@ -1951,10 +1951,11 @@ const getTargetIcon = (cat?: PlanTargetCategory | string) => {
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            min-width: 50px;
+            min-width: 64px;
 
             .vector-angle {
               font-size: 11px;
+              white-space: nowrap;
               font-weight: 700;
               color: #fbbf24;
               margin-bottom: 2px;
@@ -2027,6 +2028,11 @@ const getTargetIcon = (cat?: PlanTargetCategory | string) => {
       flex-shrink: 0;
       position: relative;
       z-index: 2;
+
+      /* 第二排从右往左：三角在短横线左侧（流向的前方） */
+      &.connector--rtl {
+        flex-direction: row-reverse;
+      }
 
       .connector-line {
         flex: 1;

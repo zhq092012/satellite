@@ -249,6 +249,17 @@ const formatHeatmapTime = (timestamp: number): string => {
   return `${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+/**
+ * 将覆盖率格式化为保留三位小数的百分比文案。
+ *
+ * @param value 覆盖率原始值，可能为空
+ * @returns 如 `77.778%`；无效值返回 `--`
+ */
+const formatHeatmapCoverage = (value: number | null | undefined): string => {
+  if (value == null || !Number.isFinite(value)) return '--'
+  return `${value.toFixed(3)}%`
+}
+
 /** STARLINK 卫星覆盖率在任务时间片中的梯队分布。 */
 const starlinkCoverageHeatCells = computed<StarlinkCoverageHeatCell[]>(() => {
   const data = matrixData.value
@@ -747,18 +758,35 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
     },
     tooltip: {
       trigger: 'item',
-      confine: true,
-      extraCssText: 'max-height: 280px; overflow-y: auto;',
+      confine: false,
+      backgroundColor: 'rgba(8, 15, 26, 0.96)',
+      borderColor: 'rgba(234, 179, 8, 0.55)',
+      borderWidth: 1,
+      padding: [10, 12],
+      textStyle: {
+        color: '#e2e8f0',
+        fontSize: 12,
+        align: 'left',
+      },
+      extraCssText: 'text-align: left; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); overflow: visible;',
       formatter: (params: { data?: readonly [string, string, number] }) => {
         const point = params.data
         if (!point) return '暂无覆盖率数据'
         const [timeLabel, bracket, satelliteCount] = point
         const satellites = starlinkHeatTooltipMap.get(`${timeLabel}|${bracket}`) || []
         const satelliteLines = satellites.map((satellite) =>
-          `${satellite.name} (${satellite.norad})：${satellite.beforeCoverage ?? '--'}% → ${satellite.afterCoverage ?? '--'}%`
+          `${satellite.name} (${satellite.norad})：${formatHeatmapCoverage(satellite.beforeCoverage)} → ${formatHeatmapCoverage(satellite.afterCoverage)}`
         )
         const remaining = Math.max(0, satelliteCount - satelliteLines.length)
-        return `时间片：${timeLabel}<br>覆盖率梯队：${bracket}<br>卫星数量：${satelliteCount} 颗<br><br>${satelliteLines.join('<br>')}${remaining > 0 ? `<br>另有 ${remaining} 颗卫星` : ''}`
+        return [
+          `<div style="text-align:left;line-height:1.55">`,
+          `时间片：${timeLabel}<br>`,
+          `覆盖率梯队：${bracket}<br>`,
+          `卫星数量：${satelliteCount} 颗`,
+          satelliteLines.length ? `<br><br>${satelliteLines.join('<br>')}` : '',
+          remaining > 0 ? `<br>另有 ${remaining} 颗卫星` : '',
+          `</div>`,
+        ].join('')
       },
     },
     grid: { left: 58, right: 14, top: 36, bottom: 48, containLabel: false },
