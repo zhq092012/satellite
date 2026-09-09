@@ -108,7 +108,7 @@ export const buildSatelliteTimelineModel = (
 
   if (!matrix || !norad) return emptyModel
 
-  const links = collectSatelliteTransmissionLinks(matrix, norad)
+  const links = collectSatelliteTransmissionLinks(matrix, norad, taskEndMs)
   let firstTransmitMs: number | null = null
 
   links.forEach((link, orderIndex) => {

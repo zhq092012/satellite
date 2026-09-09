@@ -120,11 +120,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import type { MatrixResult } from '@/api/electronic'
+import { useLayoutStore } from '@/store/modules/layout'
 import VirtualScrollList from '@/components/common/VirtualScrollList.vue'
 import {
   collectSatelliteTransmissionLinks,
   collectSeriesTransmissionLinks,
   rankTransmissionLinksByPriority,
+  resolveTaskEndMs,
   STARLINK_PRIORITY_WEIGHTS,
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
@@ -187,6 +189,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select-link', linkId: string | null): void
 }>()
+
+const store = useLayoutStore()
+/** 当前任务结束毫秒，与拓扑过站延迟算法共用。 */
+const taskEndMs = computed(() => resolveTaskEndMs(store.activedTask?.endDate))
 
 /** 搜索过滤关键词 */
 const searchKeyword = ref<string>('')
@@ -271,8 +277,8 @@ const linkItems = computed<LinkListItem[]>(() => {
   if (!props.matrixData) return []
   const matrix = props.matrixData
   const rawLinks = props.selectedNorad
-    ? collectSatelliteTransmissionLinks(matrix, props.selectedNorad)
-    : collectSeriesTransmissionLinks(matrix)
+    ? collectSatelliteTransmissionLinks(matrix, props.selectedNorad, taskEndMs.value)
+    : collectSeriesTransmissionLinks(matrix, taskEndMs.value)
 
   const ranked = rankTransmissionLinksByPriority(
     matrix,

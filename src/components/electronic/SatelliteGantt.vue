@@ -433,13 +433,15 @@
 import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch, nextTick } from 'vue'
 import { type MatrixResult, type SatelliteMatrix, type StationWindow, type Weapon, type CommucationMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
-import { collectSatelliteTransmissionLinks, listNormalSatelliteNorads } from '@/utils/satelliteFullChainAnalysis'
+import { collectSatelliteTransmissionLinks, listNormalSatelliteNorads, resolveTaskEndMs } from '@/utils/satelliteFullChainAnalysis'
 import VirtualScrollList from '@/components/common/VirtualScrollList.vue'
 
 defineOptions({
   name: 'SatelliteGantt',
 })
 const store = useLayoutStore()
+/** 当前任务结束毫秒，用于过站分段延迟。 */
+const taskEndMs = computed(() => resolveTaskEndMs(store.activedTask?.endDate))
 // [类型定义]
 // 组件接收的 Props 参数类型
 interface SatelliteGanttProps {
@@ -1121,7 +1123,7 @@ const isReconMatrix = (matrix: MatrixResult | CommucationMatrix | null | undefin
 const resolveSatelliteStationWindows = (sat: SatelliteMatrix): (StationWindow & { sourceSatName?: string; relayName?: string })[] => {
   const matrix = currentData.value
   if (isReconMatrix(matrix)) {
-    const links = collectSatelliteTransmissionLinks(matrix, sat.norad)
+    const links = collectSatelliteTransmissionLinks(matrix, sat.norad, taskEndMs.value)
     if (links.length > 0) {
       return links.map((link) => {
         const sourceSatNode = link.nodes.find((node) => node.layer === 'SAT')
@@ -1205,7 +1207,7 @@ const buildWindowEntriesFromRaw = (sat: any) => {
  * @returns 甘特窗口条目列表
  */
 const buildWindowEntriesFromLinks = (sat: SatelliteMatrix, matrix: MatrixResult) => {
-  const links = collectSatelliteTransmissionLinks(matrix, sat.norad)
+  const links = collectSatelliteTransmissionLinks(matrix, sat.norad, taskEndMs.value)
   return links
     .map((link, idx) => {
       const start = Math.floor(link.transmitStartMs / 1000)

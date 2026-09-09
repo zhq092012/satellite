@@ -44,6 +44,7 @@ import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
 import {
   collectSatelliteTransmissionLinks,
+  resolveTaskEndMs,
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
@@ -281,7 +282,7 @@ const scheduleFlyToSelectedSatellite = (norad: number) => {
     if (!viewer) return
 
     const matrix = store.matrixData
-    const links = collectSatelliteTransmissionLinks(matrix, norad)
+    const links = collectSatelliteTransmissionLinks(matrix, norad, resolveTaskEndMs(store.activedTask?.endDate))
 
     if (links && links.length > 0) {
       viewer.highlightSatellite({ norad_id: String(norad) }, true)

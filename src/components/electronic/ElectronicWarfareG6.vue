@@ -145,7 +145,7 @@ import type { FuncType } from '@/types/electronic'
 import TopoLeftPanel from '@/components/electronic/TopoLeftPanel.vue'
 import TopoRightPanel from '@/components/electronic/TopoRightPanel.vue'
 import ElectronicMissionTimeline from '@/components/electronic/ElectronicMissionTimeline.vue'
-import { type TimelineChainMarkerType, collectRelaySatelliteTransmissionLinks, collectSatelliteTransmissionLinks, collectSeriesTransmissionLinks, findTransmissionLinkById, isRelaySatellite, listNormalSatelliteNorads, listSourceSatelliteNoradsForRelay, type ChainNode, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
+import { type TimelineChainMarkerType, buildSatellitePassDelayMap, collectRelaySatelliteTransmissionLinks, collectSatelliteTransmissionLinks, collectSeriesTransmissionLinks, findTransmissionLinkById, isRelaySatellite, listNormalSatelliteNorads, listSourceSatelliteNoradsForRelay, lookupStationPassDelayMin, resolveTaskEndMs, type ChainNode, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 
 defineOptions({
   name: 'ElectronicWarfareG6',
@@ -172,6 +172,38 @@ const taskTimeRange = computed(() => {
   if (!task?.beginDate || !task?.endDate) return null
   return { start: task.beginDate, end: task.endDate }
 })
+
+/** 当前任务结束毫秒，用于过站分段延迟（末站 = taskEnd − peak）。 */
+const taskEndMs = computed(() => resolveTaskEndMs(store.activedTask?.endDate))
+
+/**
+ * 收集单星传输链路（带任务结束时间，与左侧列表/详情 delayMin 同口径）。
+ *
+ * @param data 算法矩阵
+ * @param norad 卫星 NORAD
+ * @returns 传输链路列表
+ */
+const collectTopoSatLinks = (data: MatrixResult, norad: number): SatelliteTransmissionLink[] =>
+  collectSatelliteTransmissionLinks(data, norad, taskEndMs.value)
+
+/**
+ * 收集中继星传输链路（带任务结束时间）。
+ *
+ * @param data 算法矩阵
+ * @param relayNorad 中继星 NORAD
+ * @returns 传输链路列表
+ */
+const collectTopoRelayLinks = (data: MatrixResult, relayNorad: number): SatelliteTransmissionLink[] =>
+  collectRelaySatelliteTransmissionLinks(data, relayNorad, taskEndMs.value)
+
+/**
+ * 收集全系列传输链路（带任务结束时间）。
+ *
+ * @param data 算法矩阵
+ * @returns 传输链路列表
+ */
+const collectTopoSeriesLinks = (data: MatrixResult): SatelliteTransmissionLink[] =>
+  collectSeriesTransmissionLinks(data, taskEndMs.value)
 
 // G6 画布容器 DOM ref
 const g6Container = ref<HTMLDivElement | null>(null)
@@ -514,7 +546,7 @@ const handleSelectLink = (linkId: string | null) => {
     return
   }
 
-  const link = findTransmissionLinkById(matrixData.value, linkId)
+  const link = findTransmissionLinkById(matrixData.value, linkId, undefined, taskEndMs.value)
   const satNorad = resolveLinkSourceNorad(link)
 
   selectedLinkId.value = linkId
@@ -570,7 +602,7 @@ const syncTimelineForReceive = (receiveId: string) => {
   const norad = selectedNorad.value
   const data = matrixData.value
   if (!norad || !data) return
-  const link = collectSatelliteTransmissionLinks(data, norad).find((item) => item.receiveId === receiveId)
+  const link = collectTopoSatLinks(data, norad).find((item) => item.receiveId === receiveId)
   if (!link) return
   selectedTimelinePoint.value = {
     ms: link.transmitStartMs,
@@ -1670,6 +1702,7 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
   const satMatrixList = data.satelliteMatrixList || []
   satMatrixList.forEach((sat: any) => {
     const windows = sat.stationWindows || sat.initWindows || []
+    const delayMap = buildSatellitePassDelayMap(data, sat.norad, taskEndMs.value)
     windows.forEach((win: any, index: number) => {
       const startStr = win.peakWindow || win.startWindow || win.beginWindow || ''
       const endStr = win.endWindow || ''
@@ -1692,7 +1725,7 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
         startTimestamp: startTs,
         endTimestamp: endTs,
         strikeStatus: strikeVal,
-        delayMin: win.delayMin || sat.delayMin,
+        delayMin: lookupStationPassDelayMin(delayMap, recId, startTs, endTs),
         weapons: win.weapons || sat.weapons,
       })
     })
@@ -1863,11 +1896,11 @@ const collectCurrentTopoLinks = (): SatelliteTransmissionLink[] => {
   if (!data) return []
   if (selectedNorad.value != null) {
     if (isRelaySatellite(data, selectedNorad.value)) {
-      return collectRelaySatelliteTransmissionLinks(data, selectedNorad.value)
+      return collectTopoRelayLinks(data, selectedNorad.value)
     }
-    return collectSatelliteTransmissionLinks(data, selectedNorad.value)
+    return collectTopoSatLinks(data, selectedNorad.value)
   }
-  return getTopologyLinksForDisplay(collectSeriesTransmissionLinks(data))
+  return getTopologyLinksForDisplay(collectTopoSeriesLinks(data))
 }
 
 /**
@@ -2037,11 +2070,10 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
             name: n.name,
             earliestMs: link.transmitStartMs,
             receiveStruck: link.receiveStruck || existing?.receiveStruck || false,
-            delayMin: link.delayMin || existing?.delayMin || 0,
+            delayMin: link.delayMin,
           })
-        } else {
-          if (link.receiveStruck) existing.receiveStruck = true
-          if (link.delayMin > existing.delayMin) existing.delayMin = link.delayMin
+        } else if (link.receiveStruck) {
+          existing.receiveStruck = true
         }
       }
       if (n.layer === 'RELAY') {
@@ -2217,7 +2249,7 @@ const buildReconGraphFromLinks = (norads: number[], links: SatelliteTransmission
 const buildFocusedSatelliteGraph = (norad: number) => {
   const data = matrixData.value!
   if (isRelaySatellite(data, norad)) {
-    const links = collectRelaySatelliteTransmissionLinks(data, norad)
+    const links = collectTopoRelayLinks(data, norad)
     const sourceNoradsFromLinks = Array.from(
       new Set(
         links
@@ -2232,7 +2264,7 @@ const buildFocusedSatelliteGraph = (norad: number) => {
       : listSourceSatelliteNoradsForRelay(data, norad)
     return buildReconGraphFromLinks(sourceNorads, links)
   }
-  return buildReconGraphFromLinks([norad], collectSatelliteTransmissionLinks(data, norad))
+  return buildReconGraphFromLinks([norad], collectTopoSatLinks(data, norad))
 }
 
 /**
@@ -2241,7 +2273,7 @@ const buildFocusedSatelliteGraph = (norad: number) => {
  */
 const buildSeriesReconGraph = () => {
   const data = matrixData.value!
-  const links = getTopologyLinksForDisplay(collectSeriesTransmissionLinks(data))
+  const links = getTopologyLinksForDisplay(collectTopoSeriesLinks(data))
   const linkedNorads = new Set(
     links
       .map((link) => Number(link.nodes.find((node) => node.layer === 'SAT')?.id))
@@ -2328,7 +2360,7 @@ const buildSeriesCommGraph = () => {
   const norads = listNormalSatelliteNorads(data)
   const targetNodeId = 'target-area'
   const targetName = store.battle?.name || '战场目标区域'
-  const seriesLinks = collectSeriesTransmissionLinks(data)
+  const seriesLinks = collectTopoSeriesLinks(data)
   const shouldHideStruckLinks =
     data.series !== 'STARLINK' && (isStarshieldSeries.value || seriesLinks.length > 50)
 

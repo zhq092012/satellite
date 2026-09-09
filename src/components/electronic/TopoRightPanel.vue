@@ -303,12 +303,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { MatrixResult, StationRelationList } from '@/api/electronic'
+import { useLayoutStore } from '@/store/modules/layout'
 import {
+  buildSatellitePassDelayMap,
   collectSatelliteTransmissionLinks,
   collectSeriesTransmissionLinks,
   findTransmissionLinkById,
+  lookupStationPassDelayMin,
+  parseTimeToMs,
   rankTransmissionLinksByPriority,
   resolveLinkStrikeTarget,
+  resolveTaskEndMs,
   DEFAULT_PRIORITY_WEIGHTS,
   STARLINK_PRIORITY_WEIGHTS,
   type PrioritizedTransmissionLink,
@@ -377,6 +382,10 @@ const emit = defineEmits<{
   (e: 'select-link', linkId: string | null): void
 }>()
 
+const store = useLayoutStore()
+/** 当前任务结束毫秒，与过站分段延迟算法共用。 */
+const taskEndMs = computed(() => resolveTaskEndMs(store.activedTask?.endDate))
+
 /** 当前激活的面板视图：'priority' 为 TOP 3 优先推荐，'detail' 为详细参数 */
 const activeTab = ref<'priority' | 'detail'>('priority')
 
@@ -412,8 +421,8 @@ const prioritizedLinks = computed<PrioritizedTransmissionLink[]>(() => {
   if (!data) return []
 
   const rawLinks = props.selectedNorad
-    ? collectSatelliteTransmissionLinks(data, props.selectedNorad)
-    : collectSeriesTransmissionLinks(data)
+    ? collectSatelliteTransmissionLinks(data, props.selectedNorad, taskEndMs.value)
+    : collectSeriesTransmissionLinks(data, taskEndMs.value)
 
   return rankTransmissionLinksByPriority(data, rawLinks, activePriorityWeights.value)
 })
@@ -678,7 +687,7 @@ const detail = computed<NodeDetailView | null>(() => {
   const weaponIndex = buildAttackPlanWeaponIndex(data)
 
   if (props.selectedLinkId) {
-    const link = findTransmissionLinkById(data, props.selectedLinkId, props.selectedNorad)
+    const link = findTransmissionLinkById(data, props.selectedLinkId, props.selectedNorad, taskEndMs.value)
     if (!link) return null
     const linkNodes: DetailLinkNode[] = link.nodes.map((n) => {
       const layer = mapLinkLayer(n.layer)
@@ -736,11 +745,17 @@ const detail = computed<NodeDetailView | null>(() => {
     const sat = postSat || initSat
     if (!sat) return null
 
+    const delayMap = buildSatellitePassDelayMap(data, norad, taskEndMs.value)
     const windows = (postSat?.stationWindows || []).map((win) => ({
       title: win.receiveName || win.receiveId || '地面站',
       timeText: `${getWindowStart(win)} ~ ${getWindowEnd(win) || getWindowStart(win)}`,
       struck: win.strikeStatus === 1,
-      delayMin: Number(win.delayMin) || 0,
+      delayMin: lookupStationPassDelayMin(
+        delayMap,
+        win.receiveId || win.receiveName || '',
+        parseTimeToMs(getWindowStart(win)),
+        parseTimeToMs(getWindowEnd(win) || '') || undefined
+      ),
       weapons: resolveDetailWeapons(
         data,
         weaponIndex,
@@ -767,7 +782,6 @@ const detail = computed<NodeDetailView | null>(() => {
       metaRows: [
         { label: 'NORAD', value: String(norad) },
         ...buildStarlinkCoverageRows(data, norad),
-        { label: '链路延迟', value: `${postSat?.delayMin ?? 0} 分钟` },
         { label: '过境窗口', value: `${windows.length} 个` },
       ],
       windows,
@@ -783,7 +797,9 @@ const detail = computed<NodeDetailView | null>(() => {
   if (receive || props.selectedNodeLayer === 'receive') {
     const recObj = receive || relationData.receiveObjList?.find((r) => r.receiveId === nodeId)
     const focusedLinks = props.selectedNorad
-      ? collectSatelliteTransmissionLinks(data, props.selectedNorad).filter((link) => link.receiveId === nodeId)
+      ? collectSatelliteTransmissionLinks(data, props.selectedNorad, taskEndMs.value).filter(
+          (link) => link.receiveId === nodeId
+        )
       : []
 
     const windows: DetailWindowItem[] = focusedLinks.length
@@ -813,12 +829,18 @@ const detail = computed<NodeDetailView | null>(() => {
           ; (sat.stationWindows || []).forEach((win) => {
             if (win.receiveId !== nodeId && win.receiveName !== recObj?.receiveName) return
             const strikeTarget = resolveLinkStrikeTarget(win, sat)
+            const passDelayMap = buildSatellitePassDelayMap(data, sat.norad, taskEndMs.value)
             windows.push({
               subjectLabel: '关联卫星',
               title: sat.name,
               timeText: `${getWindowStart(win)} ~ ${getWindowEnd(win) || getWindowStart(win)}`,
               struck: strikeTarget.struck,
-              delayMin: Number(win.delayMin) || 0,
+              delayMin: lookupStationPassDelayMin(
+                passDelayMap,
+                win.receiveId || win.receiveName || '',
+                parseTimeToMs(getWindowStart(win)),
+                parseTimeToMs(getWindowEnd(win) || '') || undefined
+              ),
               weapons: resolveDetailWeapons(
                 data,
                 weaponIndex,

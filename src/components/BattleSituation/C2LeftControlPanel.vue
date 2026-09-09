@@ -76,7 +76,7 @@
             按威胁度
           </button>
           <button class="sort-btn" :class="{ active: sortMode === 'transTime' }" @click="sortMode = 'transTime'">
-            {{ isStarlinkSeries ? '按打击前覆盖率' : '按链路时长' }}
+            {{ isStarlinkSeries ? '按打击前覆盖率' : '按首次过站时延' }}
           </button>
         </div>
       </div>
@@ -101,7 +101,7 @@
                   威胁度 {{ sat.threatScore != null ? formatThreatScore(sat.threatScore) : '--' }}
                 </span>
                 <span v-else class="metric-highlight metric-duration">
-                  {{ isStarlinkSatellite(sat) ? '打击前覆盖率' : '链路时长' }}
+                  {{ isStarlinkSatellite(sat) ? '打击前覆盖率' : '首次过站时延' }}
                   {{ isStarlinkSatellite(sat) ? formatCoverage(sat.beforeCoverage) : (sat.timeEffect ?
                     formatDuration(sat.timeEffect.duration) : '--') }}
                 </span>

@@ -234,7 +234,7 @@ interface GlobePassSegment {
 
 const passSegments = computed<GlobePassSegment[]>(() => {
   if (!props.matrixData || !props.selectedNorad || !taskStartMs.value || !taskEndMs.value) return []
-  const links = collectSatelliteTransmissionLinks(props.matrixData, props.selectedNorad)
+  const links = collectSatelliteTransmissionLinks(props.matrixData, props.selectedNorad, taskEndMs.value)
   return links
     .map((link) => ({
       startMs: clampMs(link.transmitStartMs, taskStartMs.value, taskEndMs.value),
@@ -261,7 +261,7 @@ interface GlobePassMarker {
 
 const passMarkers = computed<GlobePassMarker[]>(() => {
   if (!props.matrixData || !props.selectedNorad || !taskStartMs.value || !taskEndMs.value) return []
-  const links = collectSatelliteTransmissionLinks(props.matrixData, props.selectedNorad)
+  const links = collectSatelliteTransmissionLinks(props.matrixData, props.selectedNorad, taskEndMs.value)
   const usedLanes = new Map<number, number>()
 
   const allocLane = (percent: number): number => {

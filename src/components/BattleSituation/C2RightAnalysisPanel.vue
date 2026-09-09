@@ -149,6 +149,7 @@ import {
   collectSatelliteTransmissionLinks,
   collectSeriesTransmissionLinks,
   rankTransmissionLinksByPriority,
+  resolveTaskEndMs,
   STARLINK_PRIORITY_WEIGHTS,
   type ChainNode,
   type LinkPriorityMetrics,
@@ -177,6 +178,8 @@ const TOP_LINK_ITEM_HEIGHT = 260
 
 const router = useRouter()
 const store = useLayoutStore()
+/** 当前任务结束毫秒，用于过站分段延迟。 */
+const taskEndMs = computed(() => resolveTaskEndMs(store.activedTask?.endDate))
 
 
 /** 将毫秒时长格式化为小时和分钟。 */
@@ -289,10 +292,10 @@ const transmissionLinks = computed<SatelliteTransmissionLink[]>(() => {
 
   const norad = props.selectedSatelliteNorad
   if (norad != null) {
-    return collectSatelliteTransmissionLinks(matrix, norad)
+    return collectSatelliteTransmissionLinks(matrix, norad, taskEndMs.value)
   }
 
-  return collectSeriesTransmissionLinks(matrix)
+  return collectSeriesTransmissionLinks(matrix, taskEndMs.value)
 })
 
 /**

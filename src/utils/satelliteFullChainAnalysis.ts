@@ -93,12 +93,6 @@ export const parseTimeToMs = (timeStr: string): number => {
   return Number.isNaN(ts) ? 0 : ts
 }
 
-const formatTimestampMs = (ts: number): string => {
-  const d = new Date(ts)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-}
-
 export type WindowTimeLike = {
   peakWindow?: string
   startWindow?: string
@@ -116,6 +110,175 @@ const getWindowStartStr = (win?: WindowTimeLike | Record<string, any> | null): s
 
 const getWindowEndStr = (win?: WindowTimeLike | Record<string, any> | null): string =>
   (win as WindowTimeLike)?.endWindow || ''
+
+/**
+ * 将任务结束时间解析为毫秒。无效时返回 undefined，此时末站无下一窗口则延迟为 0。
+ *
+ * @param endDate 任务结束时间（activedTask.endDate）
+ * @returns 任务结束毫秒时间戳；无法解析时为 undefined
+ */
+export const resolveTaskEndMs = (endDate?: string | null): number | undefined => {
+  if (!endDate) return undefined
+  const ms = parseTimeToMs(endDate)
+  return ms || undefined
+}
+
+/**
+ * 链路/系列缓存键中的任务结束时间片段。
+ *
+ * @param taskEndMs 任务结束毫秒
+ * @returns 缓存键片段；未传入时为空串
+ */
+const taskEndCacheKey = (taskEndMs?: number | null): string =>
+  taskEndMs != null && Number.isFinite(taskEndMs) && taskEndMs > 0 ? String(taskEndMs) : ''
+
+/**
+ * 毫秒差转为过站延迟分钟（一位小数）；非正则 0。
+ *
+ * @param deltaMs 下一站 peak（或任务结束）相对本站 peak 的毫秒差
+ * @returns 延迟分钟数
+ */
+const msToDelayMin = (deltaMs: number): number => {
+  if (!Number.isFinite(deltaMs) || deltaMs <= 0) return 0
+  return Number((deltaMs / 60000).toFixed(1))
+}
+
+/**
+ * 过站延迟查找键：地面站 + peakWindow，并列窗口再拼 endWindow。
+ *
+ * @param receiveId 地面站 ID
+ * @param peakMs 过站开始毫秒
+ * @param endMs 过站结束毫秒
+ * @returns 稳定键
+ */
+export const stationPassDelayKey = (receiveId: string, peakMs: number, endMs?: number): string =>
+  `${receiveId}|${peakMs}|${endMs || peakMs}`
+
+/**
+ * 从延迟表读取某一过站窗口的 delayMin。
+ *
+ * @param delayMap buildSatellitePassDelayMap 的结果
+ * @param receiveId 地面站 ID
+ * @param peakMs 过站开始毫秒
+ * @param endMs 过站结束毫秒（可选，用于并列窗口消歧）
+ * @returns 延迟分钟数，未命中为 0
+ */
+export const lookupStationPassDelayMin = (
+  delayMap: Map<string, number>,
+  receiveId: string,
+  peakMs: number,
+  endMs?: number
+): number => {
+  if (!receiveId || !peakMs) return 0
+  const exact = delayMap.get(stationPassDelayKey(receiveId, peakMs, endMs || peakMs))
+  if (exact != null) return exact
+  const prefix = `${receiveId}|${peakMs}|`
+  for (const [key, val] of delayMap) {
+    if (key.startsWith(prefix)) return val
+  }
+  return 0
+}
+
+/** 参与过站延迟排序的窗口快照。 */
+interface PassDelayWindowItem {
+  /** 地面站 ID。 */
+  receiveId: string
+  /** peakWindow 毫秒。 */
+  peakMs: number
+  /** endWindow 毫秒，缺省时等于 peakMs。 */
+  endMs: number
+  /** 该站是否被打（strikeStatus === 1）。 */
+  receiveStruck: boolean
+}
+
+/**
+ * 按 peakWindow 升序排列过站窗口；并列再比 endWindow、receiveId，避免 0/负延迟。
+ *
+ * @param items 过站窗口快照
+ * @returns 排序后的同一数组
+ */
+const sortPassDelayWindows = (items: PassDelayWindowItem[]): PassDelayWindowItem[] =>
+  items.sort((a, b) => {
+    if (a.peakMs !== b.peakMs) return a.peakMs - b.peakMs
+    if (a.endMs !== b.endMs) return a.endMs - b.endMs
+    return a.receiveId.localeCompare(b.receiveId, 'zh-CN')
+  })
+
+/**
+ * 按本星过站时间序与打击情形，为每个过站窗口计算分段 delayMin。
+ *
+ * - 卫星被打（含卫星+地面站）：每站都计延迟。
+ * - 只打部分地面站：未打站为 0；被打站计延迟。
+ * - 下一站永远取时间序上的下一个窗口，不跳过被打站。
+ * - 无下一窗口且传入 taskEndMs 时：delay = taskEnd − 当前 peak。
+ *
+ * @param matrix 算法矩阵
+ * @param norad 卫星 NORAD
+ * @param taskEndMs 当前任务结束时间；未传则末站无下一窗口时延迟为 0
+ * @returns receiveId|peak|end → delayMin
+ */
+export const buildSatellitePassDelayMap = (
+  matrix: MatrixResult | null,
+  norad: number,
+  taskEndMs?: number | null
+): Map<string, number> => {
+  const map = new Map<string, number>()
+  if (!matrix || !norad) return map
+
+  const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
+  const initSat = matrix.initMatrixList?.find((s) => s.norad === norad)
+  const satelliteStruck = postSat?.satelliteStatus === 1
+  const sourceWindows = (postSat?.stationWindows?.length
+    ? postSat.stationWindows
+    : initSat?.initWindows || []) as Record<string, any>[]
+
+  const items: PassDelayWindowItem[] = []
+  sourceWindows.forEach((win) => {
+    const peakRaw = getWindowStartStr(win)
+    const peakStart = peakRaw.includes('~') ? peakRaw.split('~')[0].trim() : peakRaw
+    const peakMs = parseTimeToMs(peakStart)
+    if (!peakMs) return
+    const endMs = parseTimeToMs(getWindowEndStr(win) || '') || peakMs
+    items.push({
+      receiveId: String(win.receiveId || win.receiveName || ''),
+      peakMs,
+      endMs,
+      receiveStruck: Number(win.strikeStatus) === 1,
+    })
+  })
+  sortPassDelayWindows(items)
+
+  const boundedTaskEnd =
+    taskEndMs != null && Number.isFinite(taskEndMs) && taskEndMs > 0 ? taskEndMs : null
+
+  items.forEach((cur, index) => {
+    const key = stationPassDelayKey(cur.receiveId, cur.peakMs, cur.endMs)
+    const chargeDelay = satelliteStruck || cur.receiveStruck
+    if (!chargeDelay) {
+      map.set(key, 0)
+      return
+    }
+    const next = items[index + 1]
+    const hasNextInTask = !!next && (boundedTaskEnd == null || next.peakMs < boundedTaskEnd)
+    if (hasNextInTask) {
+      map.set(key, msToDelayMin(next.peakMs - cur.peakMs))
+      return
+    }
+    if (boundedTaskEnd != null && boundedTaskEnd > cur.peakMs) {
+      map.set(key, msToDelayMin(boundedTaskEnd - cur.peakMs))
+      return
+    }
+    map.set(key, 0)
+  })
+
+  return map
+}
+
+const formatTimestampMs = (ts: number): string => {
+  const d = new Date(ts)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
 
 const windowsOverlapMs = (startA: string, endA: string, startB: string, endB: string): boolean => {
   const aStart = parseTimeToMs(startA)
@@ -202,10 +365,20 @@ export interface MatrixLookupIndex {
 
 /** 按矩阵对象缓存的查找索引。 */
 const matrixIndexCache = new WeakMap<MatrixResult, MatrixLookupIndex>()
-/** 按矩阵对象缓存的全系列传输链路。 */
-const seriesLinksCache = new WeakMap<MatrixResult, SatelliteTransmissionLink[]>()
-/** 按矩阵对象缓存的单星传输链路。 */
-const satLinksCache = new WeakMap<MatrixResult, Map<number, SatelliteTransmissionLink[]>>()
+/** 按矩阵对象缓存的全系列传输链路（内层 key 含 taskEndMs）。 */
+const seriesLinksCache = new WeakMap<MatrixResult, Map<string, SatelliteTransmissionLink[]>>()
+/** 按矩阵对象缓存的单星传输链路（内层 key 为 norad|taskEnd）。 */
+const satLinksCache = new WeakMap<MatrixResult, Map<string, SatelliteTransmissionLink[]>>()
+
+/**
+ * 单星链路缓存键：NORAD + 任务结束时间。
+ *
+ * @param norad 卫星 NORAD
+ * @param taskEndMs 任务结束毫秒
+ * @returns 缓存键
+ */
+const satLinkCacheKey = (norad: number, taskEndMs?: number | null): string =>
+  `${norad}|${taskEndCacheKey(taskEndMs)}`
 
 /**
  * 构建或读取矩阵查找索引。
@@ -259,13 +432,27 @@ export const getMatrixLookupIndex = (matrix: MatrixResult): MatrixLookupIndex =>
  * 读取单星链路缓存表。
  *
  * @param matrix 算法矩阵
- * @returns NORAD → 链路列表
+ * @returns 缓存键 → 链路列表
  */
-const getOrCreateSatLinkCache = (matrix: MatrixResult): Map<number, SatelliteTransmissionLink[]> => {
+const getOrCreateSatLinkCache = (matrix: MatrixResult): Map<string, SatelliteTransmissionLink[]> => {
   const cached = satLinksCache.get(matrix)
   if (cached) return cached
-  const next = new Map<number, SatelliteTransmissionLink[]>()
+  const next = new Map<string, SatelliteTransmissionLink[]>()
   satLinksCache.set(matrix, next)
+  return next
+}
+
+/**
+ * 读取全系列链路缓存表（按 taskEnd 分桶）。
+ *
+ * @param matrix 算法矩阵
+ * @returns taskEnd 键 → 链路列表
+ */
+const getOrCreateSeriesLinkCache = (matrix: MatrixResult): Map<string, SatelliteTransmissionLink[]> => {
+  const cached = seriesLinksCache.get(matrix)
+  if (cached) return cached
+  const next = new Map<string, SatelliteTransmissionLink[]>()
+  seriesLinksCache.set(matrix, next)
   return next
 }
 
@@ -274,12 +461,14 @@ const getOrCreateSatLinkCache = (matrix: MatrixResult): Map<number, SatelliteTra
  *
  * @param matrix 算法矩阵
  * @param links 已计算的传输链路
+ * @param taskEndMs 计算这些链路时使用的任务结束时间
  */
 export const seedSeriesTransmissionLinksCache = (
   matrix: MatrixResult,
-  links: SatelliteTransmissionLink[]
+  links: SatelliteTransmissionLink[],
+  taskEndMs?: number | null
 ): void => {
-  seriesLinksCache.set(matrix, links)
+  getOrCreateSeriesLinkCache(matrix).set(taskEndCacheKey(taskEndMs), links)
 }
 
 /**
@@ -288,7 +477,10 @@ export const seedSeriesTransmissionLinksCache = (
  * @param matrix 算法矩阵
  * @returns 是否命中缓存
  */
-export const hasSeriesTransmissionLinksCache = (matrix: MatrixResult): boolean => seriesLinksCache.has(matrix)
+export const hasSeriesTransmissionLinksCache = (matrix: MatrixResult): boolean => {
+  const cached = seriesLinksCache.get(matrix)
+  return !!cached && cached.size > 0
+}
 
 /**
  * 查找观测卫星对应的中继关系
@@ -776,12 +968,52 @@ const formatDelayText = (delayMin: number, struck: boolean): string => {
   return '未造成额外延迟'
 }
 
+/**
+ * 按过站序列算法回写链路 delayMin / delayText（不改路径，仅改延迟）。
+ * 用于 Worker 预热缓存命中后补上 taskEnd。
+ *
+ * @param matrix 算法矩阵
+ * @param links 已有传输链路
+ * @param taskEndMs 任务结束毫秒
+ * @returns 带新延迟的链路副本
+ */
+const applyStationPassDelaysToLinks = (
+  matrix: MatrixResult,
+  links: SatelliteTransmissionLink[],
+  taskEndMs?: number | null
+): SatelliteTransmissionLink[] => {
+  const delayMaps = new Map<number, Map<string, number>>()
+  return links.map((link) => {
+    const satNode = link.nodes.find((node) => node.layer === 'SAT')
+    const norad = satNode ? Number(satNode.id) : 0
+    if (!norad) return link
+    let delayMap = delayMaps.get(norad)
+    if (!delayMap) {
+      delayMap = buildSatellitePassDelayMap(matrix, norad, taskEndMs)
+      delayMaps.set(norad, delayMap)
+    }
+    const delayMin = lookupStationPassDelayMin(
+      delayMap,
+      link.receiveId,
+      link.transmitStartMs,
+      link.transmitEndMs
+    )
+    if (delayMin === link.delayMin) return link
+    return {
+      ...link,
+      delayMin,
+      delayText: formatDelayText(delayMin, link.struck),
+    }
+  })
+}
+
 /** 按当前过境站解析打击前全链路：卫星 → (中继) → 地面站 → 数据中心 */
 export const resolveStationPassChain = (
   matrix: MatrixResult | null,
   norad: number,
   receiveKey: string | null | undefined,
-  atMs: number
+  atMs: number,
+  taskEndMs?: number | null
 ): StationPassAnalysis => {
   const emptyChain: FullChainResult = {
     finishTime: null,
@@ -860,7 +1092,12 @@ export const resolveStationPassChain = (
   }
   const usesRelay = !!(relayRel && relayNorad && relayWindow)
   const struck = isTransmissionLinkStruck(win as Record<string, any>, postSat, usesRelay ? relayPostSat : undefined)
-  const delayMin = Number((win as { delayMin?: number }).delayMin) || (struck ? Number(postSat?.delayMin) || 0 : 0)
+  const delayMin = lookupStationPassDelayMin(
+    buildSatellitePassDelayMap(matrix, norad, taskEndMs),
+    receiveId,
+    parseTimeToMs(getWindowStartStr(win)),
+    parseTimeToMs(getWindowEndStr(win) || '') || undefined
+  )
 
   if (!station) {
     return {
@@ -1030,11 +1267,13 @@ const resolveWeaponsForWindow = (
  *
  * @param matrix 算法矩阵数据
  * @param relayNorad 中继卫星 NORAD 编号
+ * @param taskEndMs 当前任务结束时间，用于观测星过站延迟
  * @returns 按传输开始时间升序排列的链路列表
  */
 export const collectRelaySatelliteTransmissionLinks = (
   matrix: MatrixResult | null,
-  relayNorad: number
+  relayNorad: number,
+  taskEndMs?: number | null
 ): SatelliteTransmissionLink[] => {
   if (!matrix || !relayNorad) return []
 
@@ -1043,7 +1282,7 @@ export const collectRelaySatelliteTransmissionLinks = (
   const seen = new Set<string>()
 
   sourceNorads.forEach((sourceNorad) => {
-    collectSatelliteTransmissionLinks(matrix, sourceNorad).forEach((link) => {
+    collectSatelliteTransmissionLinks(matrix, sourceNorad, taskEndMs).forEach((link) => {
       const usesThisRelay = link.nodes.some((node) => node.layer === 'RELAY' && Number(node.id) === relayNorad)
       if (!usesThisRelay) return
       const key = chainPathKey(link.nodes)
@@ -1064,21 +1303,24 @@ export const collectRelaySatelliteTransmissionLinks = (
  *
  * @param matrix 算法矩阵数据
  * @param norad 卫星 NORAD 编号
+ * @param taskEndMs 当前任务结束时间；末站无下一窗口时用其计算延迟
  * @returns 按传输开始时间升序排列的链路列表
  */
 export const collectSatelliteTransmissionLinks = (
   matrix: MatrixResult | null,
-  norad: number
+  norad: number,
+  taskEndMs?: number | null
 ): SatelliteTransmissionLink[] => {
   if (!matrix || !norad) return []
 
   const cache = getOrCreateSatLinkCache(matrix)
-  const cached = cache.get(norad)
+  const cacheKey = satLinkCacheKey(norad, taskEndMs)
+  const cached = cache.get(cacheKey)
   if (cached) return cached
 
   if (isRelaySatellite(matrix, norad)) {
-    const relayLinks = collectRelaySatelliteTransmissionLinks(matrix, norad)
-    cache.set(norad, relayLinks)
+    const relayLinks = collectRelaySatelliteTransmissionLinks(matrix, norad, taskEndMs)
+    cache.set(cacheKey, relayLinks)
     return relayLinks
   }
 
@@ -1095,6 +1337,7 @@ export const collectSatelliteTransmissionLinks = (
   const relayRel = findRelayRelation(matrix, norad)
   const relayNorad = relayRel ? Number(relayRel.to) : null
   const relayPostSat = relayNorad ? index.postByNorad.get(relayNorad) : undefined
+  const passDelayMap = buildSatellitePassDelayMap(matrix, norad, taskEndMs)
 
   windows.forEach((win, winIndex) => {
     const receive = resolveWindowReceive(matrix, norad, win)
@@ -1157,7 +1400,7 @@ export const collectSatelliteTransmissionLinks = (
 
     const strikeTarget = resolveLinkStrikeTarget(win, postSat, usesRelay ? relayPostSat : undefined)
     const struck = strikeTarget.struck
-    const delayMin = Number(win.delayMin) || (struck ? Number(postSat?.delayMin) || 0 : 0)
+    const delayMin = lookupStationPassDelayMin(passDelayMap, receiveId, groundStartTs, groundEndTs)
     const { weaponNames, weaponType } = resolveWeaponsForWindow(
       matrix,
       postSat,
@@ -1224,9 +1467,12 @@ export const collectSatelliteTransmissionLinks = (
 
       const strikeTarget = resolveLinkStrikeTarget(relayGroundWin, postSat, relayPostSat)
       const { weaponNames, weaponType } = resolveWeaponsForWindow(matrix, postSat, relayGroundWin, relayPostSat)
-      const delayMin =
-        Number(relayGroundWin.delayMin) ||
-        (strikeTarget.struck ? Number(relayPostSat?.delayMin) || Number(postSat?.delayMin) || 0 : 0)
+      const delayMin = lookupStationPassDelayMin(
+        passDelayMap,
+        receiveNode.id,
+        candidate.groundStartTs,
+        candidate.groundEndTs
+      )
 
       const groundStart = formatTimestampMs(candidate.groundStartTs)
       const groundEnd = formatTimestampMs(candidate.groundEndTs)
@@ -1258,7 +1504,7 @@ export const collectSatelliteTransmissionLinks = (
     if (a.transmitStartMs !== b.transmitStartMs) return a.transmitStartMs - b.transmitStartMs
     return a.receiveName.localeCompare(b.receiveName, 'zh-CN')
   })
-  cache.set(norad, sortedLinks)
+  cache.set(cacheKey, sortedLinks)
   return sortedLinks
 }
 
@@ -1266,22 +1512,35 @@ export const collectSatelliteTransmissionLinks = (
  * 收集当前系列矩阵中全部普通卫星的传输链路（按传输开始时间升序）
  *
  * @param matrix 算法矩阵数据
+ * @param taskEndMs 当前任务结束时间，纳入缓存键并用于末站延迟
  * @returns 全系列传出链路列表
  */
-export const collectSeriesTransmissionLinks = (matrix: MatrixResult | null): SatelliteTransmissionLink[] => {
+export const collectSeriesTransmissionLinks = (
+  matrix: MatrixResult | null,
+  taskEndMs?: number | null
+): SatelliteTransmissionLink[] => {
   if (!matrix) return []
-  const cached = seriesLinksCache.get(matrix)
+  const cache = getOrCreateSeriesLinkCache(matrix)
+  const key = taskEndCacheKey(taskEndMs)
+  const cached = cache.get(key)
   if (cached) return cached
+
+  const baseCached = key ? cache.get('') : undefined
+  if (baseCached) {
+    const patched = applyStationPassDelaysToLinks(matrix, baseCached, taskEndMs)
+    cache.set(key, patched)
+    return patched
+  }
 
   const links: SatelliteTransmissionLink[] = []
   listNormalSatelliteNorads(matrix).forEach((norad) => {
-    links.push(...collectSatelliteTransmissionLinks(matrix, norad))
+    links.push(...collectSatelliteTransmissionLinks(matrix, norad, taskEndMs))
   })
   const sorted = links.sort((a, b) => {
     if (a.transmitStartMs !== b.transmitStartMs) return a.transmitStartMs - b.transmitStartMs
     return a.receiveName.localeCompare(b.receiveName, 'zh-CN')
   })
-  seriesLinksCache.set(matrix, sorted)
+  cache.set(key, sorted)
   return sorted
 }
 
@@ -1291,21 +1550,23 @@ export const collectSeriesTransmissionLinks = (matrix: MatrixResult | null): Sat
  * @param matrix 算法矩阵数据
  * @param linkId 链路唯一标识
  * @param norad 可选的卫星 NORAD，传入时仅在单星链路中查找
+ * @param taskEndMs 任务结束时间，与 delayMin 计算口径一致
  * @returns 匹配的链路，未找到时返回 null
  */
 export const findTransmissionLinkById = (
   matrix: MatrixResult | null,
   linkId: string,
-  norad?: number | null
+  norad?: number | null,
+  taskEndMs?: number | null
 ): SatelliteTransmissionLink | null => {
   if (!matrix || !linkId) return null
   if (norad != null) {
     const links = isRelaySatellite(matrix, norad)
-      ? collectRelaySatelliteTransmissionLinks(matrix, norad)
-      : collectSatelliteTransmissionLinks(matrix, norad)
+      ? collectRelaySatelliteTransmissionLinks(matrix, norad, taskEndMs)
+      : collectSatelliteTransmissionLinks(matrix, norad, taskEndMs)
     return links.find((item) => item.id === linkId) ?? null
   }
-  return collectSeriesTransmissionLinks(matrix).find((item) => item.id === linkId) ?? null
+  return collectSeriesTransmissionLinks(matrix, taskEndMs).find((item) => item.id === linkId) ?? null
 }
 
 /** 统计全网打击前通信链路数，以及打击后仍可完成的全链路 */
