@@ -51,7 +51,7 @@
     <div class="cema-workspace">
       <div v-if="hasSelectedSeries" class="topo-main-body">
         <div class="topo-side topo-side--left">
-          <TopoLeftPanel :matrix-data="matrixData" :selected-norad="selectedNorad" :selected-link-id="selectedLinkId"
+          <TopoLeftPanel :matrix-data="matrixData" :selected-norad="leftPanelNorad" :selected-link-id="selectedLinkId"
             @select-link="handleSelectLink" />
         </div>
 
@@ -77,8 +77,8 @@
 
           <div class="topo-graph-stack">
             <div class="graph-stage" ref="graphStageRef">
-              <div v-if="isStarshieldSeries && !isStarlinkSeries" class="starshield-link-filter-note">
-                由于卫星数量多，只显示未受干扰的链路
+              <div v-if="showStarshieldLinkFilterNote" class="starshield-link-filter-note">
+                {{ starshieldLinkFilterNoteText }}
               </div>
               <div v-if="!isStarlinkSeries" class="graph-layer-labels">
                 <div v-for="item in layerLabelItems" :key="item.key" class="graph-layer-label" :class="item.className"
@@ -145,7 +145,7 @@ import type { FuncType } from '@/types/electronic'
 import TopoLeftPanel from '@/components/electronic/TopoLeftPanel.vue'
 import TopoRightPanel from '@/components/electronic/TopoRightPanel.vue'
 import ElectronicMissionTimeline from '@/components/electronic/ElectronicMissionTimeline.vue'
-import { type TimelineChainMarkerType, collectRelaySatelliteTransmissionLinks, collectSatelliteTransmissionLinks, collectSeriesTransmissionLinks, isRelaySatellite, listNormalSatelliteNorads, listSourceSatelliteNoradsForRelay, type ChainNode, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
+import { type TimelineChainMarkerType, collectRelaySatelliteTransmissionLinks, collectSatelliteTransmissionLinks, collectSeriesTransmissionLinks, findTransmissionLinkById, isRelaySatellite, listNormalSatelliteNorads, listSourceSatelliteNoradsForRelay, type ChainNode, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 
 defineOptions({
   name: 'ElectronicWarfareG6',
@@ -155,6 +155,8 @@ const store = useLayoutStore()
 
 const selectedNorad = ref<number | null>(null)
 const selectedLinkId = ref<string | null>(null)
+/** 因点击左侧系列链路而临时聚焦单星；清除该链路后回到全系列「仅未受干扰」视图 */
+const focusSatFromLink = ref(false)
 const selectedReceiveId = ref<string | null>(null)
 const selectedPanelNodeId = ref<string | null>(null)
 const selectedPanelNodeLayer = ref<'sat' | 'receive' | 'station' | null>(null)
@@ -222,6 +224,23 @@ const isStarshieldSeries = computed(() => {
   const normalized = series.toUpperCase()
   return series.includes('星盾') || normalized.includes('STARSHIELD')
 })
+
+/**
+ * 大规模系列默认过滤未受干扰链路时，左侧仍展示全系列清单，避免点一条链路就收成单星列表。
+ */
+const leftPanelNorad = computed(() => (focusSatFromLink.value ? null : selectedNorad.value))
+
+/** 星盾/大规模系列拓扑过滤提示是否展示 */
+const showStarshieldLinkFilterNote = computed(
+  () => isStarshieldSeries.value && !isStarlinkSeries.value
+)
+
+/** 星盾拓扑过滤提示文案：全系列过滤 vs 单星全链路 */
+const starshieldLinkFilterNoteText = computed(() =>
+  selectedNorad.value != null
+    ? '当前显示该卫星全部过站连通（含是否受打击、延迟）'
+    : '由于卫星数量多，只显示未受干扰的链路'
+)
 
 interface StarlinkCoverageHeatCell {
   /** 时间片横轴标签 */
@@ -430,45 +449,112 @@ const handleTopoNodeSelect = (
   selectedPanelNodeLayer.value = payload.layer
 }
 
-const handleSelectLink = (linkId: string | null) => {
-  selectedLinkId.value = linkId
+/**
+ * 从传输链路节点序列解析源卫星 NORAD。
+ *
+ * @param link 传输链路，找不到时传 null
+ * @returns 源卫星 NORAD，无法解析时返回 null
+ */
+const resolveLinkSourceNorad = (link: SatelliteTransmissionLink | null): number | null => {
+  if (!link) return null
+  const satId = link.nodes.find((node) => node.layer === 'SAT')?.id
+  const norad = satId != null ? Number(satId) : NaN
+  return Number.isFinite(norad) ? norad : null
+}
+
+/**
+ * 聚焦指定卫星并刷新拓扑，可选择保留当前选中链路。
+ *
+ * @param norad 卫星 NORAD
+ * @param options.keepSelectedLink 为 true 时不清空 selectedLinkId（点左侧链路进入单星全连通）
+ */
+const applySatelliteFocus = (norad: number, options?: { keepSelectedLink?: boolean }) => {
+  selectedNorad.value = norad
+  store.setSelectedAnalysisNorad(norad)
+  if (!options?.keepSelectedLink) {
+    selectedLinkId.value = null
+    selectedReceiveId.value = null
+    selectedTimelinePoint.value = null
+  }
+  selectedPanelNodeId.value = `sat-${norad}`
+  selectedPanelNodeLayer.value = 'sat'
+  const data = matrixData.value
+  const satObj =
+    (data?.satelliteMatrixList || []).find((s) => s.norad === norad) ||
+    (data?.initMatrixList || []).find((s) => s.norad === norad)
+  const isRelay = (data?.relayRelation?.relayList || []).includes(norad)
+  selectedNodeInfo.value = {
+    id: `sat-${norad}`,
+    name: satObj?.name || `Sat-${norad}`,
+    type: isRelay ? 'relay' : 'sat',
+    norad,
+  }
   updateGraphHighlightState()
+  refreshGraphForTime()
+}
+
+/**
+ * 选择或取消选择传输链路。
+ * 星盾等大规模系列在全系列视图下只画未受干扰边；点选链路后改为聚焦该星、
+ * 画出过所有站的连通（含打击与延迟）；再次点击取消后回到过滤总图。
+ *
+ * @param linkId 链路 ID，null 表示取消选择
+ */
+const handleSelectLink = (linkId: string | null) => {
+  if (!linkId) {
+    selectedLinkId.value = null
+    selectedReceiveId.value = null
+    selectedTimelinePoint.value = null
+    if (focusSatFromLink.value) {
+      focusSatFromLink.value = false
+      handleSelectSatellite(null)
+      return
+    }
+    updateGraphHighlightState()
+    return
+  }
+
+  const link = findTransmissionLinkById(matrixData.value, linkId)
+  const satNorad = resolveLinkSourceNorad(link)
+
+  selectedLinkId.value = linkId
+  selectedReceiveId.value = link?.receiveId ?? null
+
+  if (satNorad != null && selectedNorad.value !== satNorad) {
+    // 从全系列点进来时记下标记，取消链路后才能回到「仅未受干扰」总图
+    focusSatFromLink.value = selectedNorad.value == null
+    applySatelliteFocus(satNorad, { keepSelectedLink: true })
+    return
+  }
+
+  refreshGraphForTime()
 }
 
 /**
  * 清空当前选中卫星，回到系列全部视角
  */
 const handleClearSelectedSatellite = () => {
+  focusSatFromLink.value = false
   handleSelectSatellite(null)
 }
 
 const handleSelectSatellite = (norad: number | null) => {
-  selectedNorad.value = norad
-  store.setSelectedAnalysisNorad(norad)
-  selectedLinkId.value = null
-  selectedReceiveId.value = null
-  selectedTimelinePoint.value = null
-  if (norad) {
-    selectedPanelNodeId.value = `sat-${norad}`
-    selectedPanelNodeLayer.value = 'sat'
-    const data = matrixData.value
-    const satObj =
-      (data?.satelliteMatrixList || []).find((s) => s.norad === norad) ||
-      (data?.initMatrixList || []).find((s) => s.norad === norad)
-    const isRelay = (data?.relayRelation?.relayList || []).includes(norad)
-    selectedNodeInfo.value = {
-      id: `sat-${norad}`,
-      name: satObj?.name || `Sat-${norad}`,
-      type: isRelay ? 'relay' : 'sat',
-      norad,
-    }
-  } else {
+  if (norad == null) {
+    focusSatFromLink.value = false
+    selectedNorad.value = null
+    store.setSelectedAnalysisNorad(null)
+    selectedLinkId.value = null
+    selectedReceiveId.value = null
+    selectedTimelinePoint.value = null
     selectedPanelNodeId.value = null
     selectedPanelNodeLayer.value = null
     selectedNodeInfo.value = null
+    updateGraphHighlightState()
+    refreshGraphForTime()
+    return
   }
-  updateGraphHighlightState()
-  refreshGraphForTime()
+  focusSatFromLink.value = false
+  applySatelliteFocus(norad)
 }
 
 const isStationNodeId = (nodeId: string): boolean => {
@@ -736,7 +822,7 @@ const destroyGraphInstance = () => {
 }
 
 const getGraphTopologyKey = () =>
-  `${store.selectedSatSeries}|${matrixData.value?.series ?? ''}|${selectedNorad.value ?? ''}|${selectedLinkId.value ?? ''}|${getGraphStageSize().width}|${getGraphStageSize().height}`
+  `${store.selectedSatSeries}|${matrixData.value?.series ?? ''}|${selectedNorad.value ?? ''}|${getGraphStageSize().width}|${getGraphStageSize().height}`
 
 const applyCachedNodePositions = (nodes: any[]) => {
   nodes.forEach((node) => {
@@ -1252,6 +1338,7 @@ const clearTopoWorkspace = () => {
   matrixData.value = null
   selectedNorad.value = null
   selectedLinkId.value = null
+  focusSatFromLink.value = false
   selectedReceiveId.value = null
   selectedPanelNodeId.value = null
   selectedPanelNodeLayer.value = null
@@ -1309,6 +1396,7 @@ const fetchMatrixData = async (force = false) => {
 const resetTopoSelectionForSeriesChange = () => {
   selectedNorad.value = null
   selectedLinkId.value = null
+  focusSatFromLink.value = false
   selectedReceiveId.value = null
   selectedPanelNodeId.value = null
   selectedPanelNodeLayer.value = null
@@ -1867,13 +1955,15 @@ const paintNodeAfterStates = (node: any) => {
 
 /**
  * 筛选拓扑图实际绘制的链路。
- * 星盾系列因卫星数量多，始终只展示未受干扰（未被打击）的链路；
- * 其他大规模非 STARLINK 系列在链路数超过 50 时同样过滤。
+ * 星盾等大规模系列在全系列视图下只展示未受干扰链路；
+ * 点选某条链路进入单星聚焦后不过滤，以便画出该星过所有站的连通、打击与延迟。
  * @param links 当前系列/选中卫星的全部传输链路
  * @returns 用于绘制拓扑边的链路子集
  */
 const getTopologyLinksForDisplay = (links: SatelliteTransmissionLink[]): SatelliteTransmissionLink[] => {
   if (matrixData.value?.series === 'STARLINK') return links
+  // 单星聚焦（含点左侧链路进入）展示该星全部过站连通，含受打击与延迟
+  if (selectedNorad.value != null) return links
   if (isStarshieldSeries.value || links.length > 50) {
     return links.filter((link) => !link.struck)
   }
