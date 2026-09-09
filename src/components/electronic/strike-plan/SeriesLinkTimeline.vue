@@ -18,12 +18,7 @@
       <div class="timeline-canvas" :style="{ width: model.canvasWidth + labelWidth + 'px' }">
         <div class="time-axis" :style="{ paddingLeft: labelWidth + 'px' }">
           <div class="axis-track" :style="{ width: model.canvasWidth + 'px' }">
-            <div
-              v-for="(tick, idx) in ticks"
-              :key="idx"
-              class="axis-tick"
-              :style="{ left: tick.leftPx + 'px' }"
-            >
+            <div v-for="(tick, idx) in ticks" :key="idx" class="axis-tick" :style="{ left: tick.leftPx + 'px' }">
               <span class="tick-line" />
               <span class="tick-label">{{ tick.label }}</span>
             </div>
@@ -39,75 +34,43 @@
                 {{ group.series }}
               </div>
               <div class="row-track" :style="{ width: model.canvasWidth + 'px', height: group.topTrackHeight + 'px' }">
-                <div
-                  v-for="block in group.topBlocks"
-                  :key="block.id"
-                  class="time-block"
-                  :class="[
-                    block.struck ? 'is-struck' : 'is-ok',
-                    {
-                      'is-selected': isSelected(block.id),
-                      'is-highlighted': isBlockHighlighted(block.id, group),
-                      'is-dimmed': isBlockDimmed(block.id, group),
-                    },
-                  ]"
-                  :style="blockStyle(block)"
-                  @click.stop="handleBlockClick(block)"
-                  @mouseenter="showTooltip($event, block)"
-                  @mouseleave="hideTooltip"
-                />
+                <div v-for="block in group.topBlocks" :key="block.id" class="time-block" :class="[
+                  block.struck ? 'is-struck' : 'is-ok',
+                  {
+                    'is-selected': isSelected(block.id),
+                    'is-highlighted': isBlockHighlighted(block.id, group),
+                    'is-dimmed': isBlockDimmed(block.id, group),
+                  },
+                ]" :style="blockStyle(block)" @click.stop="handleBlockClick(block)"
+                  @mouseenter="showTooltip($event, block)" @mouseleave="hideTooltip" />
               </div>
             </div>
 
-            <svg
-              class="link-svg"
-              :width="model.canvasWidth"
-              :height="group.groupHeight"
-              :style="{ left: labelWidth + 'px' }"
-            >
-              <line
-                v-for="conn in group.connections"
-                :key="conn.id"
-                :x1="conn.x1"
-                :y1="conn.y1"
-                :x2="conn.x2"
-                :y2="conn.y2"
-                class="link-line"
-                :class="{
+            <svg class="link-svg" :width="model.canvasWidth" :height="group.groupHeight"
+              :style="{ left: labelWidth + 'px' }">
+              <line v-for="conn in group.connections" :key="conn.id" :x1="conn.x1" :y1="conn.y1" :x2="conn.x2"
+                :y2="conn.y2" class="link-line" :class="{
                   'is-highlighted': isConnHighlighted(conn),
                   'is-dimmed': isConnDimmed(conn),
-                }"
-              />
+                }" />
             </svg>
 
-            <div
-              class="row row--bottom"
-              :style="{ top: group.topTrackHeight + rowGap + 'px', height: group.bottomTrackHeight + 'px' }"
-            >
+            <div class="row row--bottom"
+              :style="{ top: group.topTrackHeight + rowGap + 'px', height: group.bottomTrackHeight + 'px' }">
               <div class="row-label" :style="{ width: labelWidth + 'px' }" :title="`${group.series}·通联`">
                 {{ group.series }}·通联
               </div>
-              <div
-                class="row-track"
-                :style="{ width: model.canvasWidth + 'px', height: group.bottomTrackHeight + 'px' }"
-              >
-                <div
-                  v-for="block in group.bottomBlocks"
-                  :key="block.id"
-                  class="time-block"
-                  :class="[
-                    block.struck ? 'is-struck' : 'is-ok',
-                    {
-                      'is-selected': isSelected(block.id),
-                      'is-highlighted': isBlockHighlighted(block.id, group),
-                      'is-dimmed': isBlockDimmed(block.id, group),
-                    },
-                  ]"
-                  :style="blockStyle(block)"
-                  @click.stop="handleBlockClick(block)"
-                  @mouseenter="showTooltip($event, block)"
-                  @mouseleave="hideTooltip"
-                />
+              <div class="row-track"
+                :style="{ width: model.canvasWidth + 'px', height: group.bottomTrackHeight + 'px' }">
+                <div v-for="block in group.bottomBlocks" :key="block.id" class="time-block" :class="[
+                  block.struck ? 'is-struck' : 'is-ok',
+                  {
+                    'is-selected': isSelected(block.id),
+                    'is-highlighted': isBlockHighlighted(block.id, group),
+                    'is-dimmed': isBlockDimmed(block.id, group),
+                  },
+                ]" :style="blockStyle(block)" @click.stop="handleBlockClick(block)"
+                  @mouseenter="showTooltip($event, block)" @mouseleave="hideTooltip" />
               </div>
             </div>
           </div>
@@ -116,11 +79,7 @@
     </div>
 
     <Teleport to="body">
-      <div
-        v-if="tooltip.visible"
-        class="timeline-tooltip"
-        :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
-      >
+      <div v-if="tooltip.visible" class="timeline-tooltip" :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }">
         <div class="tooltip-title">{{ tooltip.title }}</div>
         <div v-for="(line, idx) in tooltip.lines" :key="idx" class="tooltip-line">{{ line }}</div>
       </div>
@@ -270,7 +229,6 @@ const hideTooltip = () => {
 
 <style lang="scss" scoped>
 .series-link-timeline {
-  margin-top: 8px;
   padding: 16px;
   border-radius: 10px;
   border: 1px solid rgba(0, 225, 255, 0.25);
@@ -458,13 +416,11 @@ const hideTooltip = () => {
   position: relative;
   margin-left: 0;
   background:
-    repeating-linear-gradient(
-      90deg,
+    repeating-linear-gradient(90deg,
       rgba(79, 147, 221, 0.06) 0,
       rgba(79, 147, 221, 0.06) 1px,
       transparent 1px,
-      transparent 60px
-    ),
+      transparent 60px),
     rgba(6, 12, 22, 0.55);
   border: 1px solid rgba(79, 147, 221, 0.18);
   border-radius: 4px;
@@ -504,6 +460,7 @@ const hideTooltip = () => {
   from {
     stroke-dashoffset: 9;
   }
+
   to {
     stroke-dashoffset: 0;
   }

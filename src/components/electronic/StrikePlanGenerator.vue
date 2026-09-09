@@ -294,16 +294,19 @@ watch(
 
   /**
    * 多方案并排：同一行块（概要 / 打击前 / 打击后 / 地面站）共用三列中的最大高度。
+   * 嵌套 subgrid 必须使用相同 row-gap，否则内层 gap:0 会把父级间距吃掉。
    */
   &--compare {
+    --plan-compare-row-gap: 10px;
     align-items: stretch;
     column-gap: 14px;
-    row-gap: 16px;
+    row-gap: var(--plan-compare-row-gap);
 
     .plan-column {
       display: grid;
       grid-template-rows: subgrid;
       grid-row: span 8;
+      row-gap: var(--plan-compare-row-gap);
       overflow: hidden;
     }
 
@@ -311,6 +314,7 @@ watch(
       display: grid;
       grid-template-rows: subgrid;
       grid-row: span 7;
+      row-gap: var(--plan-compare-row-gap);
       min-width: 0;
     }
   }

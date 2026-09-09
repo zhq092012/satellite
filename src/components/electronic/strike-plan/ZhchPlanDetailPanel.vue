@@ -152,14 +152,15 @@ const coverageReduction = computed(() => {
     grid-template-rows: subgrid;
     grid-row: span 7;
     min-height: 0;
-    gap: 0;
+    // 与外层 plan-columns--compare 的 --plan-compare-row-gap 保持一致；
+    // subgrid 会用自身 gap 覆盖父级 row-gap，写成 0 会导致块与块贴死。
+    gap: var(--plan-compare-row-gap, 10px);
 
     .result-header,
     .summary-line,
     .kpi-grid {
       height: 100%;
       box-sizing: border-box;
-      padding-bottom: 10px;
     }
   }
 }
@@ -304,10 +305,7 @@ const coverageReduction = computed(() => {
     display: flex;
     flex-direction: column;
     min-height: 0;
-
-    .block-text {
-      flex: 1;
-    }
+    gap: 10px;
   }
 
   .block-head {
@@ -397,6 +395,7 @@ const coverageReduction = computed(() => {
   .zhch-plan-detail--align & {
     height: 100%;
     box-sizing: border-box;
+    gap: 10px;
   }
 
   .card-title {

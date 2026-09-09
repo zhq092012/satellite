@@ -32,27 +32,14 @@
           <span class="time-span-display">{{ currentTickSpanLabel }}</span>
           <span class="zoom-label">时间刻度:</span>
           <div class="zoom-btn-group">
-            <button
-              class="zoom-btn"
-              :disabled="tickStepIndex >= TICK_STEP_OPTIONS.length - 1"
-              title="切换到更粗的时间刻度"
-              @click="zoomOut"
-            >
+            <button class="zoom-btn" :disabled="tickStepIndex >= TICK_STEP_OPTIONS.length - 1" title="切换到更粗的时间刻度"
+              @click="zoomOut">
               缩小 -
             </button>
-            <button
-              class="zoom-btn zoom-btn--val"
-              title="点击重置为默认刻度"
-              @click="resetScale"
-            >
+            <button class="zoom-btn zoom-btn--val" title="点击重置为默认刻度" @click="resetScale">
               {{ currentTickSpanShort }}
             </button>
-            <button
-              class="zoom-btn"
-              :disabled="tickStepIndex <= 0"
-              title="切换到更细的时间刻度"
-              @click="zoomIn"
-            >
+            <button class="zoom-btn" :disabled="tickStepIndex <= 0" title="切换到更细的时间刻度" @click="zoomIn">
               放大 +
             </button>
           </div>
@@ -158,13 +145,8 @@
         <div class="sat-tree-list">
           <div class="tree-header">卫星节点 ({{ filteredSatellites.length }})</div>
           <div class="sat-tree-virtual-wrap">
-            <VirtualScrollList
-              ref="satTreeVirtualRef"
-              :items="filteredSatellites"
-              :item-height="SAT_TREE_ITEM_BASE_HEIGHT"
-              :get-item-height="getSatTreeItemHeight"
-              item-key="norad"
-            >
+            <VirtualScrollList ref="satTreeVirtualRef" :items="filteredSatellites"
+              :item-height="SAT_TREE_ITEM_BASE_HEIGHT" :get-item-height="getSatTreeItemHeight" item-key="norad">
               <template #default="{ item: sat }">
                 <div class="sat-tree-item" :class="{
                   'is-sat-struck': sat.satelliteStatus === 1,
@@ -178,12 +160,14 @@
                   </div>
 
                   <div class="sat-windows-sublist">
-                    <div v-for="win in getSatelliteStationWindows(sat)" :key="win.receiveId + '-' + (win.sourceSatName || '') + '-' + win.peakWindow"
-                      class="win-sub-item" :class="{
+                    <div v-for="win in getSatelliteStationWindows(sat)"
+                      :key="win.receiveId + '-' + (win.sourceSatName || '') + '-' + win.peakWindow" class="win-sub-item"
+                      :class="{
                         'is-win-struck': win.strikeStatus === 1,
                         'is-win-selected': isStationWindowSelected(sat.norad, win),
                       }" @click.stop="selectStationWindow(sat, win)">
-                      <span class="sub-rec-name" :title="win.sourceSatName && win.sourceSatName !== sat.name ? `${win.sourceSatName} → ${win.receiveName}` : win.receiveName">
+                      <span class="sub-rec-name"
+                        :title="win.sourceSatName && win.sourceSatName !== sat.name ? `${win.sourceSatName} → ${win.receiveName}` : win.receiveName">
                         <template v-if="win.sourceSatName && win.sourceSatName !== sat.name">
                           🛰️ {{ win.sourceSatName }} → 📡 {{ win.receiveName }}
                         </template>
@@ -223,74 +207,70 @@
 
             <div class="gantt-rows-container" :style="{ height: ganttRowsTotalHeight + 'px' }">
               <div class="gantt-rows-window" :style="{ transform: `translateY(${visibleGanttOffsetY}px)` }">
-              <div
-                v-for="(ganttRow, visIdx) in visibleGanttRows"
-                :key="ganttRow.rowKey"
-                class="gantt-sat-row-group"
-                :class="{
-                  'row-sat-struck': ganttRow.satelliteStatus === 1,
-                  'is-row-selected': selectedSatNorad === ganttRow.norad,
-                  'is-row-even': (visibleGanttStartIndex + visIdx) % 2 === 1,
-                }"
-                :style="{ height: getGanttRowHeight(ganttRow) + 'px' }"
-              >
-                <div class="row-label-col" @click.stop="handleGanttRowLabelClick(ganttRow)">
-                  <div class="sat-label-block">
-                    <div class="sat-main-label">
-                      <span class="icon-sat">🛰️</span>
-                      <span class="sat-title">{{ ganttRow.name }}</span>
-                    </div>
-                    <div class="sat-meta-row">
-                      <span class="meta-label">卫星</span>
-                      <span class="status-pill" :class="ganttRow.satelliteStatus === 1 ? 'is-struck' : 'is-normal'">
-                        {{ formatStrikeStatus(ganttRow.satelliteStatus) }}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div v-if="getRowActiveTransits(ganttRow).length" class="row-active-transit">
-                    <div v-for="transit in getRowActiveTransits(ganttRow)" :key="transit.id" class="transit-card"
-                      :class="transit.strikeStatus === 1 ? 'transit-card--struck' : 'transit-card--normal'">
-                      <div class="transit-card-top">
-                        <span class="transit-station" :title="transit.receiveName">{{ transit.receiveName }}</span>
-                        <span class="meta-label">地面站</span>
-                        <span class="status-pill status-pill--sm"
-                          :class="transit.strikeStatus === 1 ? 'is-struck' : 'is-normal'">
-                          {{ formatStrikeStatus(transit.strikeStatus) }}
+                <div v-for="(ganttRow, visIdx) in visibleGanttRows" :key="ganttRow.rowKey" class="gantt-sat-row-group"
+                  :class="{
+                    'row-sat-struck': ganttRow.satelliteStatus === 1,
+                    'is-row-selected': selectedSatNorad === ganttRow.norad,
+                    'is-row-even': (visibleGanttStartIndex + visIdx) % 2 === 1,
+                  }" :style="{ height: getGanttRowHeight(ganttRow) + 'px' }">
+                  <div class="row-label-col" @click.stop="handleGanttRowLabelClick(ganttRow)">
+                    <div class="sat-label-block">
+                      <div class="sat-main-label">
+                        <span class="icon-sat">🛰️</span>
+                        <span class="sat-title">{{ ganttRow.name }}</span>
+                      </div>
+                      <div class="sat-meta-row">
+                        <span class="meta-label">卫星</span>
+                        <span class="status-pill" :class="ganttRow.satelliteStatus === 1 ? 'is-struck' : 'is-normal'">
+                          {{ formatStrikeStatus(ganttRow.satelliteStatus) }}
                         </span>
                       </div>
-                      <div class="transit-time">
-                        <span class="transit-time-val">{{ transit.peakWindowShort }}</span>
-                        <span class="transit-time-sep">~</span>
-                        <span class="transit-time-val">{{ transit.endWindowShort }}</span>
+                    </div>
+
+                    <div v-if="getRowActiveTransits(ganttRow).length" class="row-active-transit">
+                      <div v-for="transit in getRowActiveTransits(ganttRow)" :key="transit.id" class="transit-card"
+                        :class="transit.strikeStatus === 1 ? 'transit-card--struck' : 'transit-card--normal'">
+                        <div class="transit-card-top">
+                          <span class="transit-station" :title="transit.receiveName">{{ transit.receiveName }}</span>
+                          <span class="meta-label">地面站</span>
+                          <span class="status-pill status-pill--sm"
+                            :class="transit.strikeStatus === 1 ? 'is-struck' : 'is-normal'">
+                            {{ formatStrikeStatus(transit.strikeStatus) }}
+                          </span>
+                        </div>
+                        <div class="transit-time">
+                          <span class="transit-time-val">{{ transit.peakWindowShort }}</span>
+                          <span class="transit-time-sep">~</span>
+                          <span class="transit-time-val">{{ transit.endWindowShort }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="row-timeline-track"
+                    :style="[timelineTrackStyle, trackGridStyle, { height: ganttRow.trackHeight + 'px' }]">
+                    <div class="gantt-playhead-line" :style="{ left: playheadLeftPx + 'px' }"></div>
+
+                    <div v-for="bar in ganttRow.bars" :key="bar.id" class="gantt-bar-item" :class="[
+                      bar.colorStatusClass,
+                      {
+                        'is-bar-active': selectedBarId === bar.id,
+                        'is-bar-at-playhead': isBarAtPlayhead(bar),
+                      },
+                    ]" :style="{
+                      left: bar.leftPx + 'px',
+                      width: bar.widthPx + 'px',
+                      top: bar.topPx + 'px',
+                      height: bar.barHeight + 'px',
+                    }" @click.stop="handleSelectBar(bar)">
+                      <div class="bar-content" :title="bar.barTooltip">
+                        <span v-for="(line, lineIdx) in bar.barLabelLines" :key="lineIdx" class="bar-label-line">{{
+                          line
+                        }}</span>
                       </div>
                     </div>
                   </div>
                 </div>
-
-                <div class="row-timeline-track" :style="[timelineTrackStyle, trackGridStyle, { height: ganttRow.trackHeight + 'px' }]">
-                  <div class="gantt-playhead-line" :style="{ left: playheadLeftPx + 'px' }"></div>
-
-                  <div v-for="bar in ganttRow.bars" :key="bar.id" class="gantt-bar-item" :class="[
-                    bar.colorStatusClass,
-                    {
-                      'is-bar-active': selectedBarId === bar.id,
-                      'is-bar-at-playhead': isBarAtPlayhead(bar),
-                    },
-                  ]" :style="{
-                    left: bar.leftPx + 'px',
-                    width: bar.widthPx + 'px',
-                    top: bar.topPx + 'px',
-                    height: bar.barHeight + 'px',
-                  }" @click.stop="handleSelectBar(bar)">
-                    <div class="bar-content" :title="bar.barTooltip">
-                      <span v-for="(line, lineIdx) in bar.barLabelLines" :key="lineIdx" class="bar-label-line">{{
-                        line
-                      }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
               </div>
             </div>
           </div>
@@ -385,8 +365,11 @@
                 <span class="compact-val">{{ bar.sourceSatName }}</span>
               </div>
               <div class="compact-row">
-                <span class="compact-key">{{ bar.relayName && bar.relayName !== (bar.sourceSatName || bar.satName) ? '中继星' : '卫星' }}</span>
-                <span class="compact-val" :title="`NORAD: ${bar.satNorad}`">{{ (bar.relayName && bar.relayName !== (bar.sourceSatName || bar.satName)) ? bar.relayName : bar.satName }}</span>
+                <span class="compact-key">{{ bar.relayName && bar.relayName !== (bar.sourceSatName || bar.satName) ?
+                  '中继星' :
+                  '卫星' }}</span>
+                <span class="compact-val" :title="`NORAD: ${bar.satNorad}`">{{ (bar.relayName && bar.relayName !==
+                  (bar.sourceSatName || bar.satName)) ? bar.relayName : bar.satName }}</span>
                 <span class="compact-tag" :class="bar.satStatus === 1 ? 'is-danger' : 'is-success'">
                   {{ bar.satStatus === 1 ? '被干扰' : '正常' }}
                 </span>
@@ -541,9 +524,9 @@ const GANTT_ROW_MIN_HEIGHT = 72
 /** 甘特行上下额外渲染行数 */
 const GANTT_ROW_OVERSCAN = 4
 /** 左侧卫星树卡片基础高度（不含过境窗口行） */
-const SAT_TREE_ITEM_BASE_HEIGHT = 52
+const SAT_TREE_ITEM_BASE_HEIGHT = 80
 /** 左侧卫星树单条过境窗口行高 */
-const SAT_TREE_WINDOW_ROW_HEIGHT = 28
+const SAT_TREE_WINDOW_ROW_HEIGHT = 30
 /** 左侧卫星树卡片间距，计入虚拟行高 */
 const SAT_TREE_ITEM_GAP = 8
 const BAR_LINE_HEIGHT = 13
@@ -2865,9 +2848,11 @@ watch(playheadLeftPx, () => {
               border-radius: 4px;
               cursor: pointer;
               border: 1px solid transparent;
-              .sub-rec-name{
+
+              .sub-rec-name {
                 font-size: 12px;
               }
+
               &:hover {
                 color: #e2e8f0;
                 background: rgba(56, 189, 248, 0.08);
