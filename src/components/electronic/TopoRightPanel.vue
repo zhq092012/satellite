@@ -338,7 +338,7 @@ interface DetailLinkNode {
 interface DetailMetaRow {
   label: string
   value: string
-  tone?: 'time' | 'delay' | 'weapon' | 'strike' | 'neutral'
+  tone?: 'time' | 'delay' | 'weapon' | 'strike' | 'neutral' | 'coverage-before' | 'coverage-after'
 }
 
 /** 拓扑关联项 */
@@ -448,6 +448,138 @@ const getWindowStart = (win: WindowTimeFields): string =>
 
 const getWindowEnd = (win: WindowTimeFields): string => win.endWindow || ''
 
+/**
+ * 将覆盖率格式化为百分比文案。
+ *
+ * @param coverage initMatrixList / satelliteMatrixList 中的 coverage
+ * @returns 如 `88%`，无数据时为 `--`
+ */
+const formatCoverage = (coverage: number | null | undefined): string => {
+  if (coverage == null || !Number.isFinite(coverage)) return '--'
+  return `${Number(coverage.toFixed(2))}%`
+}
+
+/**
+ * 读取指定卫星的打击前、打击后覆盖率。
+ *
+ * @param data 算法矩阵
+ * @param norad 卫星 NORAD
+ * @returns 打击前取 initMatrixList.coverage，打击后取 satelliteMatrixList.coverage
+ */
+const getSatelliteCoveragePair = (
+  data: MatrixResult,
+  norad: number | null
+): { beforeCoverage: number | null; afterCoverage: number | null } => {
+  if (norad == null || !Number.isFinite(norad)) {
+    return { beforeCoverage: null, afterCoverage: null }
+  }
+  const initSat = data.initMatrixList?.find((sat) => sat.norad === norad)
+  const postSat = data.satelliteMatrixList?.find((sat) => sat.norad === norad)
+  return {
+    beforeCoverage: initSat?.coverage != null && Number.isFinite(initSat.coverage) ? initSat.coverage : null,
+    afterCoverage: postSat?.coverage != null && Number.isFinite(postSat.coverage) ? postSat.coverage : null,
+  }
+}
+
+/**
+ * STARLINK 详情中追加打击前/后覆盖率行。
+ *
+ * @param data 算法矩阵
+ * @param norad 源卫星 NORAD
+ * @returns 覆盖率元信息行；非 STARLINK 时返回空数组
+ */
+const buildStarlinkCoverageRows = (data: MatrixResult, norad: number | null): DetailMetaRow[] => {
+  if (data.series !== 'STARLINK') return []
+  const { beforeCoverage, afterCoverage } = getSatelliteCoveragePair(data, norad)
+  return [
+    { label: '打击前覆盖率', value: formatCoverage(beforeCoverage), tone: 'coverage-before' },
+    { label: '打击后覆盖率', value: formatCoverage(afterCoverage), tone: 'coverage-after' },
+  ]
+}
+
+/** attackPlanList 按目标 ID / 名称聚合后的武器索引 */
+interface AttackPlanWeaponIndex {
+  /** targetId → 武器名 */
+  byId: Map<string, Set<string>>
+  /** target 名称 → 武器名 */
+  byName: Map<string, Set<string>>
+}
+
+/**
+ * 从矩阵 attackPlanList 建立目标→武器索引。
+ *
+ * @param data 算法矩阵
+ * @returns 按 targetId、target 名称分组的武器集合
+ */
+const buildAttackPlanWeaponIndex = (data: MatrixResult): AttackPlanWeaponIndex => {
+  const byId = new Map<string, Set<string>>()
+  const byName = new Map<string, Set<string>>()
+  const add = (map: Map<string, Set<string>>, key: string, weaponName: string) => {
+    if (!key || !weaponName) return
+    const names = map.get(key) ?? new Set<string>()
+    names.add(weaponName)
+    map.set(key, names)
+  }
+  ;(data.attackPlanList || []).forEach((plan) => {
+    if (!plan.weaponName) return
+    if (plan.targetId) add(byId, String(plan.targetId), plan.weaponName)
+    if (plan.target) add(byName, plan.target, plan.weaponName)
+  })
+  return { byId, byName }
+}
+
+/**
+ * 按目标 ID/名称从 attackPlanList 索引中收集武器名称。
+ *
+ * @param index attackPlanList 武器索引
+ * @param targets 可能被打击的节点（卫星 NORAD、地面站 ID、节点名称）
+ * @returns 去重后的武器名称列表
+ */
+const collectAttackPlanWeapons = (
+  index: AttackPlanWeaponIndex,
+  targets: Array<{ id?: string | number | null; name?: string | null }>
+): string[] => {
+  const names = new Set<string>()
+  targets.forEach((target) => {
+    if (target.id != null && String(target.id) !== '') {
+      index.byId.get(String(target.id))?.forEach((name) => names.add(name))
+    }
+    if (target.name) {
+      index.byName.get(target.name)?.forEach((name) => names.add(name))
+    }
+  })
+  return Array.from(names)
+}
+
+/**
+ * 右侧详情武器展示：优先 attackPlanList；STARLINK 不回退到窗口自带 weapons。
+ *
+ * @param data 算法矩阵
+ * @param index attackPlanList 武器索引
+ * @param targets 匹配目标
+ * @param fallback 非 STARLINK 时的窗口/链路武器回退
+ * @returns 武器名称列表
+ */
+const resolveDetailWeapons = (
+  data: MatrixResult,
+  index: AttackPlanWeaponIndex,
+  targets: Array<{ id?: string | number | null; name?: string | null }>,
+  fallback: string[] = []
+): string[] => {
+  const fromPlan = collectAttackPlanWeapons(index, targets)
+  if (fromPlan.length) return fromPlan
+  if (data.series === 'STARLINK') return []
+  return fallback.filter(Boolean)
+}
+
+/**
+ * 将武器列表格式化为详情行文案。
+ *
+ * @param names 武器名称
+ * @returns 顿号拼接，空则「无」
+ */
+const formatWeaponText = (names: string[]): string => (names.length ? names.join('、') : '无')
+
 const layerLabelMap: Record<DetailLinkNode['layer'], string> = {
   sat: '卫星',
   relay: '中继',
@@ -543,6 +675,7 @@ const getLinkFlowNodes = (link: SatelliteTransmissionLink): FlowDisplayNode[] =>
 const detail = computed<NodeDetailView | null>(() => {
   const data = props.matrixData
   if (!data) return null
+  const weaponIndex = buildAttackPlanWeaponIndex(data)
 
   if (props.selectedLinkId) {
     const link = findTransmissionLinkById(data, props.selectedLinkId, props.selectedNorad)
@@ -564,6 +697,20 @@ const detail = computed<NodeDetailView | null>(() => {
     const interferenceStatus = getLinkInterferenceStatusLabel(link)
     const struckNodeNames = linkNodes.filter((n) => n.struck).map((n) => n.name).join('、')
     const struckTargetVal = struckNodeNames ? `${interferenceStatus}（${struckNodeNames}）` : '无'
+    const satNode = link.nodes.find((n) => n.layer === 'SAT')
+    const satNorad = satNode ? Number(satNode.id) : NaN
+    const receiveNode = link.nodes.find((n) => n.layer === 'RECEIVE')
+    const stationNode = link.nodes.find((n) => n.layer === 'STATION')
+    const linkWeapons = resolveDetailWeapons(
+      data,
+      weaponIndex,
+      [
+        { id: Number.isFinite(satNorad) ? satNorad : null, name: satNode?.name },
+        { id: receiveNode?.id, name: receiveNode?.name },
+        { id: stationNode?.id, name: stationNode?.name },
+      ],
+      link.weaponNames && link.weaponNames !== '未打击' ? link.weaponNames.split('、') : []
+    )
     return {
       icon: '🔗',
       name: link.nodes.map((n) => n.name).join(' → '),
@@ -574,9 +721,10 @@ const detail = computed<NodeDetailView | null>(() => {
       metaRows: [
         { label: '传输时间', value: link.transmitTime, tone: 'time' },
         { label: '完成时间', value: link.finishTime, tone: 'time' },
+        ...buildStarlinkCoverageRows(data, Number.isFinite(satNorad) ? satNorad : null),
         { label: '打击目标', value: struckTargetVal, tone: link.struck ? 'strike' : 'neutral' },
         { label: '延迟', value: link.delayText, tone: 'delay' },
-        { label: '武器', value: link.weaponNames || '无', tone: link.weaponNames ? 'weapon' : 'neutral' },
+        { label: '武器', value: formatWeaponText(linkWeapons), tone: linkWeapons.length ? 'weapon' : 'neutral' },
       ],
     }
   }
@@ -593,10 +741,23 @@ const detail = computed<NodeDetailView | null>(() => {
       timeText: `${getWindowStart(win)} ~ ${getWindowEnd(win) || getWindowStart(win)}`,
       struck: win.strikeStatus === 1,
       delayMin: Number(win.delayMin) || 0,
-      weapons: (win.weapons || []).map((w) => w.name).filter(Boolean),
+      weapons: resolveDetailWeapons(
+        data,
+        weaponIndex,
+        [
+          { id: norad, name: sat.name },
+          { id: win.receiveId, name: win.receiveName },
+        ],
+        (win.weapons || []).map((w) => w.name).filter(Boolean)
+      ),
     }))
 
-    const satWeapons = (postSat?.weapons || []).map((w) => w.name).filter(Boolean)
+    const satWeapons = resolveDetailWeapons(
+      data,
+      weaponIndex,
+      [{ id: norad, name: sat.name }],
+      (postSat?.weapons || []).map((w) => w.name).filter(Boolean)
+    )
 
     return {
       icon: '🛰️',
@@ -605,6 +766,7 @@ const detail = computed<NodeDetailView | null>(() => {
       struck: postSat?.satelliteStatus === 1,
       metaRows: [
         { label: 'NORAD', value: String(norad) },
+        ...buildStarlinkCoverageRows(data, norad),
         { label: '链路延迟', value: `${postSat?.delayMin ?? 0} 分钟` },
         { label: '过境窗口', value: `${windows.length} 个` },
       ],
@@ -625,14 +787,25 @@ const detail = computed<NodeDetailView | null>(() => {
       : []
 
     const windows: DetailWindowItem[] = focusedLinks.length
-      ? focusedLinks.map((link) => ({
-        subjectLabel: '关联卫星',
-        title: resolveSatName(data, props.selectedNorad!),
-        timeText: link.transmitTime,
-        struck: link.struck,
-        delayMin: link.delayMin,
-        weapons: link.weaponNames && link.weaponNames !== '未打击' ? link.weaponNames.split('、') : [],
-      }))
+      ? focusedLinks.map((link) => {
+        const satNode = link.nodes.find((n) => n.layer === 'SAT')
+        return {
+          subjectLabel: '关联卫星',
+          title: resolveSatName(data, props.selectedNorad!),
+          timeText: link.transmitTime,
+          struck: link.struck,
+          delayMin: link.delayMin,
+          weapons: resolveDetailWeapons(
+            data,
+            weaponIndex,
+            [
+              { id: props.selectedNorad, name: satNode?.name },
+              { id: nodeId, name: recObj?.receiveName },
+            ],
+            link.weaponNames && link.weaponNames !== '未打击' ? link.weaponNames.split('、') : []
+          ),
+        }
+      })
       : []
     if (!windows.length) {
       ; (data.satelliteMatrixList || []).forEach((sat) => {
@@ -646,7 +819,15 @@ const detail = computed<NodeDetailView | null>(() => {
               timeText: `${getWindowStart(win)} ~ ${getWindowEnd(win) || getWindowStart(win)}`,
               struck: strikeTarget.struck,
               delayMin: Number(win.delayMin) || 0,
-              weapons: (win.weapons || []).map((w) => w.name).filter(Boolean),
+              weapons: resolveDetailWeapons(
+                data,
+                weaponIndex,
+                [
+                  { id: sat.norad, name: sat.name },
+                  { id: win.receiveId, name: win.receiveName },
+                ],
+                (win.weapons || []).map((w) => w.name).filter(Boolean)
+              ),
             })
           })
       })
@@ -1401,6 +1582,16 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
 
   &--weapon .meta-val {
     color: #fdba74;
+  }
+
+  &--coverage-before .meta-val {
+    color: #4ade80;
+    font-weight: 700;
+  }
+
+  &--coverage-after .meta-val {
+    color: #fb923c;
+    font-weight: 700;
   }
 
   &--strike .meta-val {

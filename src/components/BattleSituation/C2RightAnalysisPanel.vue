@@ -58,12 +58,8 @@
             <span class="link-section-title">可能传输链路</span>
             <span class="link-section-count">{{ transmissionLinks.length }} 条</span>
           </div>
-          <button
-            type="button"
-            class="clear-link-btn"
-            :disabled="!selectedTransmissionLinkId"
-            @click.stop="handleClearSelectedLink"
-          >
+          <button type="button" class="clear-link-btn" :disabled="!selectedTransmissionLinkId"
+            @click.stop="handleClearSelectedLink">
             清除选择的链路
           </button>
         </div>
@@ -90,7 +86,7 @@
                   </div>
                   <div class="link-metrics-row">
                     <div class="link-metric-card">
-                      <span class="link-metric-label">{{ primaryLinkMetricLabel }}</span>
+                      <span class="link-metric-label">{{ linkPrimaryMetricLabel(item.link) }}</span>
                       <strong>{{ formatPrimaryLinkMetric(item.link) }}</strong>
                     </div>
                   </div>
@@ -226,16 +222,34 @@ const activeMatrix = computed<MatrixResult | null>(() => props.matrixData)
 /** 统计范围文案 */
 const scopeLabel = computed(() => (store.selectedSatSeries ? store.selectedSatSeries : '全部系列'))
 
-/** STARLINK 系列的链路首要指标使用卫星覆盖率。 */
+/** STARLINK 系列的链路首要指标使用打击前覆盖率。 */
 const isStarlinkSeries = computed(() => store.selectedSatSeries === 'STARLINK')
 
-/** 链路卡片首个指标名称。 */
-const primaryLinkMetricLabel = computed(() => (isStarlinkSeries.value ? '覆盖率' : '链路时长'))
+/**
+ * 判断链路源卫星是否属于 STARLINK（当前筛选为 STARLINK，或卫星名以 STARLINK 开头）。
+ *
+ * @param link 传输链路
+ * @returns 是否按 STARLINK 展示打击前覆盖率
+ */
+const isStarlinkLink = (link: SatelliteTransmissionLink): boolean => {
+  if (isStarlinkSeries.value) return true
+  const sourceSatellite = link.nodes.find((node) => node.layer === 'SAT')
+  return !!sourceSatellite?.name && sourceSatellite.name.toUpperCase().startsWith('STARLINK')
+}
 
-/** 按 NORAD 编号索引的打击后卫星覆盖率。 */
-const coverageByNorad = computed(() =>
+/**
+ * 链路卡片右上角指标名称。
+ *
+ * @param link 传输链路
+ * @returns STARLINK 为打击前覆盖率，其余为过站时间
+ */
+const linkPrimaryMetricLabel = (link: SatelliteTransmissionLink): string =>
+  isStarlinkLink(link) ? '打击前覆盖率' : '过站时长'
+
+/** 按 NORAD 编号索引的打击前卫星覆盖率（initMatrixList.coverage）。 */
+const beforeCoverageByNorad = computed(() =>
   new Map(
-    (activeMatrix.value?.satelliteMatrixList || [])
+    (activeMatrix.value?.initMatrixList || [])
       .filter((satellite) => Number.isFinite(satellite.coverage))
       .map((satellite) => [satellite.norad, satellite.coverage!])
   )
@@ -335,12 +349,12 @@ const formatCoverage = (coverage: number | undefined): string => {
 
 /** 根据当前系列格式化链路卡片首个指标。 */
 const formatPrimaryLinkMetric = (link: SatelliteTransmissionLink): string => {
-  if (!isStarlinkSeries.value) {
+  if (!isStarlinkLink(link)) {
     return formatElapsedTime(link.transmitEndMs - link.transmitStartMs)
   }
   const sourceSatellite = link.nodes.find((node) => node.layer === 'SAT')
   const norad = Number(sourceSatellite?.id)
-  return formatCoverage(coverageByNorad.value.get(norad))
+  return formatCoverage(beforeCoverageByNorad.value.get(norad))
 }
 
 const getRankMedal = (rank: number): string => {

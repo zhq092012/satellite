@@ -44,7 +44,7 @@
 
       <div class="link-scroll">
         <VirtualScrollList ref="linkVirtualListRef" :items="filteredLinkItems"
-          :item-height="isStarlinkSeries ? 136 : 170" item-key="id">
+          :item-height="isStarlinkSeries ? 176 : 170" item-key="id">
           <template #default="{ item }">
             <div class="link-card" :class="[
               { active: selectedLinkId === item.id, struck: item.struck, ok: !item.struck },
@@ -80,10 +80,20 @@
                     评分 {{ item.totalScore }}分
                   </span>
                 </div>
-                <span v-if="isStarlinkSeries" class="meta-line meta-line--coverage">
-                  <span class="meta-key">覆盖率</span>
-                  <span class="meta-val">{{ formatCoverage(item.coverage) }}</span>
-                </span>
+                <template v-if="isStarlinkSeries">
+                  <span class="meta-line meta-line--coverage-before">
+                    <span class="meta-key meta-key--wide">打击前覆盖率</span>
+                    <span class="meta-val">{{ formatCoverage(item.beforeCoverage) }}</span>
+                  </span>
+                  <span class="meta-line meta-line--coverage-after">
+                    <span class="meta-key meta-key--wide">打击后覆盖率</span>
+                    <span class="meta-val">{{ formatCoverage(item.afterCoverage) }}</span>
+                  </span>
+                  <span class="meta-line meta-line--weapon">
+                    <span class="meta-key meta-key--wide">打击武器</span>
+                    <span class="meta-val">{{ item.starlinkWeaponNames || '--' }}</span>
+                  </span>
+                </template>
                 <template v-else>
                   <span v-if="item.struck" class="meta-line meta-line--strike-target">
                     <span class="meta-key">打击</span>
@@ -155,8 +165,14 @@ interface LinkListItem {
   rank?: number
   /** 优先级评分 */
   totalScore?: number
-  /** 源卫星打击后覆盖率（百分比） */
+  /** 源卫星覆盖率（排名用，取打击后） */
   coverage: number | null
+  /** STARLINK 打击前覆盖率（initMatrixList.coverage） */
+  beforeCoverage: number | null
+  /** STARLINK 打击后覆盖率（satelliteMatrixList.coverage） */
+  afterCoverage: number | null
+  /** STARLINK 打击武器（attackPlanList 中命中该星/地面站的武器名） */
+  starlinkWeaponNames: string
 }
 
 const props = defineProps<{
@@ -190,6 +206,43 @@ const formatCoverage = (coverage: number | null): string =>
   coverage == null || !Number.isFinite(coverage) ? '--' : `${Number(coverage.toFixed(2))}%`
 
 /**
+ * 将有限覆盖率数字取出，非法值视为无数据。
+ *
+ * @param coverage 矩阵中的 coverage 字段
+ * @returns 覆盖率或 null
+ */
+const toCoverageValue = (coverage: number | undefined): number | null =>
+  coverage != null && Number.isFinite(coverage) ? coverage : null
+
+/**
+ * 向目标键对应的武器集合追加名称。
+ *
+ * @param map 目标 ID/名称 → 武器名集合
+ * @param key 攻击计划的 targetId 或 target
+ * @param weaponName 武器名称
+ */
+const addWeaponToTargetMap = (map: Map<string, Set<string>>, key: string, weaponName: string) => {
+  if (!key || !weaponName) return
+  const names = map.get(key) ?? new Set<string>()
+  names.add(weaponName)
+  map.set(key, names)
+}
+
+/**
+ * 合并若干武器名集合并格式化为顿号分隔文本。
+ *
+ * @param sets 可能为空的武器名集合
+ * @returns 例如「武器A2、电子干扰」，无武器时返回空串
+ */
+const joinWeaponSets = (...sets: Array<Set<string> | undefined>): string => {
+  const names = new Set<string>()
+  sets.forEach((set) => {
+    set?.forEach((name) => names.add(name))
+  })
+  return Array.from(names).join('、')
+}
+
+/**
  * 将链路节点层级映射为样式类名
  * @param layer 原始层级标识
  * @returns 样式类名
@@ -216,15 +269,40 @@ const getLinkInterferenceStatus = (link: SatelliteTransmissionLink): string => {
 /** 当前展示的全部传输链路（单星或全系列，按优先级评分降序排列 TOP 1 ~ N） */
 const linkItems = computed<LinkListItem[]>(() => {
   if (!props.matrixData) return []
+  const matrix = props.matrixData
   const rawLinks = props.selectedNorad
-    ? collectSatelliteTransmissionLinks(props.matrixData, props.selectedNorad)
-    : collectSeriesTransmissionLinks(props.matrixData)
+    ? collectSatelliteTransmissionLinks(matrix, props.selectedNorad)
+    : collectSeriesTransmissionLinks(matrix)
 
   const ranked = rankTransmissionLinksByPriority(
-    props.matrixData,
+    matrix,
     rawLinks,
     isStarlinkSeries.value ? STARLINK_PRIORITY_WEIGHTS : undefined
   )
+
+  /** NORAD → 打击前覆盖率（initMatrixList.coverage） */
+  const beforeCoverageByNorad = new Map<number, number | null>()
+  /** NORAD → 打击后覆盖率（satelliteMatrixList.coverage） */
+  const afterCoverageByNorad = new Map<number, number | null>()
+  /** 攻击计划按 targetId 聚合的武器名 */
+  const weaponsByTargetId = new Map<string, Set<string>>()
+  /** 攻击计划按目标名称聚合的武器名 */
+  const weaponsByTargetName = new Map<string, Set<string>>()
+
+  if (isStarlinkSeries.value) {
+    ;(matrix.initMatrixList || []).forEach((sat) => {
+      beforeCoverageByNorad.set(sat.norad, toCoverageValue(sat.coverage))
+    })
+    ;(matrix.satelliteMatrixList || []).forEach((sat) => {
+      afterCoverageByNorad.set(sat.norad, toCoverageValue(sat.coverage))
+    })
+    ;(matrix.attackPlanList || []).forEach((plan) => {
+      if (plan.weaponName) {
+        if (plan.targetId) addWeaponToTargetMap(weaponsByTargetId, String(plan.targetId), plan.weaponName)
+        if (plan.target) addWeaponToTargetMap(weaponsByTargetName, plan.target, plan.weaponName)
+      }
+    })
+  }
 
   return ranked.map((r) => {
     const link = r.link
@@ -249,6 +327,21 @@ const linkItems = computed<LinkListItem[]>(() => {
       ? `${interferenceStatus}（${struckNodeNames}）`
       : '全链路正常'
 
+    const satNode = link.nodes.find((n) => n.layer === 'SAT')
+    const satNorad = satNode ? Number(satNode.id) : NaN
+    const receiveNode = link.nodes.find((n) => n.layer === 'RECEIVE')
+    const stationNode = link.nodes.find((n) => n.layer === 'STATION')
+    const starlinkWeaponNames = isStarlinkSeries.value
+      ? joinWeaponSets(
+          Number.isFinite(satNorad) ? weaponsByTargetId.get(String(satNorad)) : undefined,
+          satNode?.name ? weaponsByTargetName.get(satNode.name) : undefined,
+          receiveNode ? weaponsByTargetId.get(receiveNode.id) : undefined,
+          receiveNode?.name ? weaponsByTargetName.get(receiveNode.name) : undefined,
+          stationNode ? weaponsByTargetId.get(stationNode.id) : undefined,
+          stationNode?.name ? weaponsByTargetName.get(stationNode.name) : undefined
+        )
+      : ''
+
     return {
       id: link.id,
       nodes,
@@ -262,6 +355,9 @@ const linkItems = computed<LinkListItem[]>(() => {
       rank: priority.rank,
       totalScore: priority.totalScore,
       coverage: priority.coverageRaw,
+      beforeCoverage: Number.isFinite(satNorad) ? (beforeCoverageByNorad.get(satNorad) ?? null) : null,
+      afterCoverage: Number.isFinite(satNorad) ? (afterCoverageByNorad.get(satNorad) ?? null) : null,
+      starlinkWeaponNames,
     }
   })
 })
@@ -276,7 +372,9 @@ const filteredLinkItems = computed<LinkListItem[]>(() => {
     // 匹配节点名称（卫星、中继、接收站、数据中心）
     const matchNode = item.nodes.some((node) => node.name.toLowerCase().includes(kw))
     // 匹配武器名称
-    const matchWeapon = !!item.weaponNames && item.weaponNames.toLowerCase().includes(kw)
+    const matchWeapon =
+      (!!item.weaponNames && item.weaponNames.toLowerCase().includes(kw)) ||
+      (!!item.starlinkWeaponNames && item.starlinkWeaponNames.toLowerCase().includes(kw))
     // 匹配干扰/打击状态描述
     const matchStatus =
       item.interferenceStatus.toLowerCase().includes(kw) ||
@@ -589,6 +687,10 @@ watch(
       flex-shrink: 0;
       width: 40px;
       color: #64748b;
+
+      &--wide {
+        width: 88px;
+      }
     }
 
     .meta-val {
@@ -599,6 +701,16 @@ watch(
 
     &--time .meta-val {
       color: #94a3b8;
+    }
+
+    &--coverage-before .meta-val {
+      color: #4ade80;
+      font-weight: 700;
+    }
+
+    &--coverage-after .meta-val {
+      color: #fb923c;
+      font-weight: 700;
     }
 
     &--weapon .meta-val {

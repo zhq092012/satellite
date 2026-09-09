@@ -76,13 +76,13 @@
             按威胁度
           </button>
           <button class="sort-btn" :class="{ active: sortMode === 'transTime' }" @click="sortMode = 'transTime'">
-            {{ isStarlinkSeries ? '按覆盖率' : '按链路时长' }}
+            {{ isStarlinkSeries ? '按打击前覆盖率' : '按链路时长' }}
           </button>
         </div>
       </div>
 
       <div class="asset-scroll-list">
-        <VirtualScrollList :items="satList" :item-height="sortMode === 'transTime' ? 160 : 120" item-key="norad">
+        <VirtualScrollList :items="satList" :item-height="sortMode === 'transTime' ? 170 : 120" item-key="norad">
           <template #default="{ item: sat, index }">
             <div class="asset-card" :class="{
               'card-active': selectedNorad === sat.norad,
@@ -101,8 +101,8 @@
                   威胁度 {{ sat.threatScore != null ? formatThreatScore(sat.threatScore) : '--' }}
                 </span>
                 <span v-else class="metric-highlight metric-duration">
-                  {{ isStarlinkSeries ? '覆盖率' : '链路时长' }}
-                  {{ isStarlinkSeries ? formatCoverage(sat.coverage) : (sat.timeEffect ?
+                  {{ isStarlinkSatellite(sat) ? '打击前覆盖率' : '链路时长' }}
+                  {{ isStarlinkSatellite(sat) ? formatCoverage(sat.beforeCoverage) : (sat.timeEffect ?
                     formatDuration(sat.timeEffect.duration) : '--') }}
                 </span>
               </div>
@@ -294,8 +294,20 @@ const selectedSeries = computed({
   set: (val: string) => store.setSelectedSatSeries(val),
 })
 
-/** STARLINK 系列使用覆盖率替代链路时长作为列表指标。 */
+/** STARLINK 系列使用打击前覆盖率替代链路时长作为列表指标。 */
 const isStarlinkSeries = computed(() => selectedSeries.value === 'STARLINK')
+
+/**
+ * 判断列表中的卫星是否应按 STARLINK 展示打击前覆盖率。
+ * 当前筛选为 STARLINK，或卫星名称以 STARLINK 开头时视为是。
+ *
+ * @param sat 卫星列表项
+ * @returns 是否展示打击前覆盖率
+ */
+const isStarlinkSatellite = (sat: { name?: string | null }): boolean => {
+  if (isStarlinkSeries.value) return true
+  return !!sat.name && sat.name.toUpperCase().startsWith('STARLINK')
+}
 
 /**
  * 判断卫星是否应按通信卫星处理威胁度详情。
@@ -412,8 +424,10 @@ interface SatListItem {
   threatScore: number | null
   /** 过境链路信息，暂无链路时为空。 */
   timeEffect: SatTimeEffectInfo | null
-  /** 打击后的卫星覆盖率（百分比）。 */
+  /** 打击后覆盖率（satelliteMatrixList.coverage），排序回退用。 */
   coverage: number | null
+  /** 打击前覆盖率（initMatrixList.coverage），STARLINK 列表展示用。 */
+  beforeCoverage: number | null
 }
 
 /** 卫星资产列表的排序模式。 */
@@ -588,7 +602,7 @@ const parseTransTimeTs = (timeStr: string | null | undefined): number => {
  */
 const isTopRankEligible = (sat: SatListItem): boolean => {
   if (sortMode.value === 'threat') return sat.threatScore != null
-  if (isStarlinkSeries.value) return sat.coverage != null
+  if (isStarlinkSeries.value) return sat.beforeCoverage != null || sat.coverage != null
   return sat.timeEffect != null
 }
 
@@ -642,6 +656,7 @@ const satList = computed<SatListItem[]>(() => {
       threatScore: threatMap.get(s.norad) ?? null,
       timeEffect: timeEffectMap.get(s.norad) ?? null,
       coverage: s.coverage ?? null,
+      beforeCoverage: s.coverage ?? null,
     })
   })
   satMatrixList.forEach((s: SatelliteMatrix) => {
@@ -658,6 +673,7 @@ const satList = computed<SatListItem[]>(() => {
       threatScore: threatMap.get(s.norad) ?? existing?.threatScore ?? null,
       timeEffect: timeEffectMap.get(s.norad) ?? existing?.timeEffect ?? null,
       coverage: s.coverage ?? existing?.coverage ?? null,
+      beforeCoverage: existing?.beforeCoverage ?? null,
     })
   })
 
@@ -668,7 +684,7 @@ const satList = computed<SatListItem[]>(() => {
   if (sortMode.value === 'transTime') {
     return list.sort((a, b) => {
       if (isStarlinkSeries.value) {
-        return (b.coverage ?? -Infinity) - (a.coverage ?? -Infinity)
+        return (b.beforeCoverage ?? b.coverage ?? -Infinity) - (a.beforeCoverage ?? a.coverage ?? -Infinity)
       }
       /** 两颗卫星的链路持续时长。 */
       const durationA = a.timeEffect?.duration ?? Infinity
