@@ -1,5 +1,5 @@
-import type { MatrixResult, StationRelationList, Weapon, WeaponAttackRecord } from '@/api/electronic'
 
+import type { MatrixResult, StationRelationList, Weapon, WeaponAttackRecord } from '@/api/electronic'
 export interface ChainNode {
   layer: 'SAT' | 'RELAY' | 'RECEIVE' | 'STATION'
   id: string
@@ -228,9 +228,9 @@ export const buildSatellitePassDelayMap = (
   const postSat = matrix.satelliteMatrixList?.find((s) => s.norad === norad)
   const initSat = matrix.initMatrixList?.find((s) => s.norad === norad)
   const satelliteStruck = postSat?.satelliteStatus === 1
-  const sourceWindows = (postSat?.stationWindows?.length
-    ? postSat.stationWindows
-    : initSat?.initWindows || []) as Record<string, any>[]
+  const sourceWindows = (
+    postSat?.stationWindows?.length ? postSat.stationWindows : initSat?.initWindows || []
+  ) as Record<string, any>[]
 
   const items: PassDelayWindowItem[] = []
   sourceWindows.forEach((win) => {
@@ -248,8 +248,7 @@ export const buildSatellitePassDelayMap = (
   })
   sortPassDelayWindows(items)
 
-  const boundedTaskEnd =
-    taskEndMs != null && Number.isFinite(taskEndMs) && taskEndMs > 0 ? taskEndMs : null
+  const boundedTaskEnd = taskEndMs != null && Number.isFinite(taskEndMs) && taskEndMs > 0 ? taskEndMs : null
 
   items.forEach((cur, index) => {
     const key = stationPassDelayKey(cur.receiveId, cur.peakMs, cur.endMs)
@@ -377,8 +376,7 @@ const satLinksCache = new WeakMap<MatrixResult, Map<string, SatelliteTransmissio
  * @param taskEndMs 任务结束毫秒
  * @returns 缓存键
  */
-const satLinkCacheKey = (norad: number, taskEndMs?: number | null): string =>
-  `${norad}|${taskEndCacheKey(taskEndMs)}`
+const satLinkCacheKey = (norad: number, taskEndMs?: number | null): string => `${norad}|${taskEndCacheKey(taskEndMs)}`
 
 /**
  * 构建或读取矩阵查找索引。
@@ -487,8 +485,7 @@ export const hasSeriesTransmissionLinksCache = (matrix: MatrixResult): boolean =
  * @param matrix 算法矩阵
  * @param norad 观测卫星 NORAD
  */
-const findRelayRelation = (matrix: MatrixResult, norad: number) =>
-  getMatrixLookupIndex(matrix).relayByFrom.get(norad)
+const findRelayRelation = (matrix: MatrixResult, norad: number) => getMatrixLookupIndex(matrix).relayByFrom.get(norad)
 
 /**
  * 合并指定 NORAD 卫星的全部过境窗口
@@ -992,12 +989,7 @@ const applyStationPassDelaysToLinks = (
       delayMap = buildSatellitePassDelayMap(matrix, norad, taskEndMs)
       delayMaps.set(norad, delayMap)
     }
-    const delayMin = lookupStationPassDelayMin(
-      delayMap,
-      link.receiveId,
-      link.transmitStartMs,
-      link.transmitEndMs
-    )
+    const delayMin = lookupStationPassDelayMin(delayMap, link.receiveId, link.transmitStartMs, link.transmitEndMs)
     if (delayMin === link.delayMin) return link
     return {
       ...link,
@@ -1745,7 +1737,7 @@ export const collectMatrixOverviewStats = (matrix: MatrixResult | null, scopeLab
 
   const cachedLinks = seriesLinksCache.get(matrix)
   const possibleLinkCount = cachedLinks
-    ? cachedLinks.length
+    ? cachedLinks.size
     : (matrix.initMatrixList || []).reduce((sum, sat) => sum + (sat.initWindows?.length || 0), 0)
 
   return {
