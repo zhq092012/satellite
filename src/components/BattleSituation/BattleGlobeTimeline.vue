@@ -372,46 +372,41 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
 
 <style scoped lang="scss">
 .battle-globe-timeline {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  z-index: 100;
-  padding: 10px 16px 12px 18px;
-  border-radius: 10px;
-  background: rgba(8, 14, 28, 0.94);
-  border: 1px solid rgba(0, 225, 255, 0.28);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(10px);
+  position: relative;
+  width: 100%;
+  padding: 5px 14px 4px 14px;
+  background: transparent;
+  box-sizing: border-box;
 }
 
 .timeline-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 2px;
   gap: 8px;
 
   .header-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
   }
 
   .header-title {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: #40f2ff;
     letter-spacing: 0.3px;
+    line-height: 18px;
   }
 
   .play-pause-btn {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 2px 10px;
-    height: 22px;
-    font-size: 11px;
+    gap: 4px;
+    padding: 1px 8px;
+    height: 18px;
+    font-size: 10px;
     font-weight: 600;
     color: #67e8f9;
     background: rgba(0, 225, 255, 0.1);
@@ -426,12 +421,12 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 12px;
-      height: 12px;
+      width: 10px;
+      height: 10px;
 
       .svg-icon {
-        width: 12px;
-        height: 12px;
+        width: 10px;
+        height: 10px;
       }
     }
 
@@ -470,16 +465,17 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
   .speed-control {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    height: 22px;
+    gap: 4px;
+    height: 18px;
     color: #9ec5ed;
-    font-size: 11px;
+    font-size: 10px;
     user-select: none;
   }
 
   .speed-select {
-    height: 22px;
-    padding: 0 5px;
+    height: 18px;
+    padding: 0 4px;
+    font-size: 10px;
     color: #67e8f9;
     background: rgba(0, 225, 255, 0.1);
     border: 1px solid rgba(0, 225, 255, 0.35);
@@ -501,13 +497,14 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
 
   .current-time-tag {
     margin-left: auto;
-    font-size: 11px;
+    font-size: 10px;
     font-family: monospace;
     color: #67e8f9;
-    padding: 2px 8px;
+    padding: 1px 6px;
     border-radius: 4px;
     background: rgba(0, 225, 255, 0.1);
     border: 1px solid rgba(0, 225, 255, 0.25);
+    line-height: 16px;
   }
 
   .legend-row {
@@ -517,8 +514,8 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
   }
 
   .legend-chip {
-    font-size: 10px;
-    padding: 2px 8px;
+    font-size: 9px;
+    padding: 1px 6px;
     border-radius: 4px;
     border: 1px solid transparent;
 
@@ -532,15 +529,15 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
 
 .ruler-panel {
   position: relative;
-  padding: 4px 4px 0;
+  padding: 0 2px;
   overflow: visible;
   cursor: pointer;
 }
 
 .ruler-scale {
   position: relative;
-  height: 28px;
-  margin-bottom: 2px;
+  height: 14px;
+  margin-bottom: 1px;
 
   .ruler-tick {
     position: absolute;
@@ -562,28 +559,29 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
 
     .tick-line {
       width: 1px;
-      height: 6px;
+      height: 3px;
       background: rgba(148, 163, 184, 0.45);
     }
 
     &.major .tick-line {
-      height: 10px;
+      height: 5px;
       background: rgba(148, 163, 184, 0.7);
     }
 
     .tick-label {
-      font-size: 9px;
+      font-size: 8.5px;
       color: #64748b;
-      margin-top: 2px;
+      margin-top: 1px;
       white-space: nowrap;
       font-family: Consolas, monospace;
+      transform: scale(0.95);
     }
   }
 }
 
 .timeline-track {
   position: relative;
-  height: 10px;
+  height: 6px;
   border-radius: 2px;
   overflow: hidden;
   cursor: pointer;
@@ -606,8 +604,8 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
 
 .orbit-playhead {
   position: absolute;
-  top: 30px;
-  bottom: 22px;
+  top: 15px;
+  bottom: 0;
   transform: translateX(-50%);
   z-index: 6;
   pointer-events: none;
@@ -627,20 +625,20 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
     position: absolute;
     left: 50%;
     top: -2px;
-    width: 8px;
-    height: 8px;
-    margin-left: -4px;
+    width: 6px;
+    height: 6px;
+    margin-left: -3px;
     border-radius: 50%;
     background: #22d3ee;
-    border: 2px solid #e0f2fe;
-    box-shadow: 0 0 10px rgba(34, 211, 238, 0.8);
+    border: 1.5px solid #e0f2fe;
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.8);
   }
 }
 
 .task-playhead {
   position: absolute;
-  top: 30px;
-  bottom: 22px;
+  top: 15px;
+  bottom: 0;
   transform: translateX(-50%);
   z-index: 6;
   pointer-events: none;
@@ -660,13 +658,13 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
     position: absolute;
     left: 50%;
     top: -2px;
-    width: 8px;
-    height: 8px;
-    margin-left: -4px;
+    width: 6px;
+    height: 6px;
+    margin-left: -3px;
     border-radius: 50%;
-    background: #22c55e;
-    border: 2px solid #dcfce7;
-    box-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
+    background: #22d3ee;
+    border: 1.5px solid #dcfce7;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
   }
 }
 
@@ -692,14 +690,14 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
 
 .ruler-markers {
   position: relative;
-  height: 36px;
-  margin-top: 4px;
+  height: 14px;
+  margin-top: 2px;
 }
 
 .ruler-tick-btn {
   position: absolute;
   transform: translateX(-50%);
-  padding: 6px;
+  padding: 1px;
   border: none;
   background: transparent;
   cursor: pointer;
@@ -715,23 +713,23 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
 
   .tick-square {
     display: block;
-    width: 9px;
-    height: 15px;
-    border-radius: 2px;
+    width: 6px;
+    height: 9px;
+    border-radius: 1.5px;
     background: #22c55e;
-    border: 2px solid rgba(220, 252, 231, 0.95);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    border: 1.5px solid rgba(220, 252, 231, 0.95);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
 
   &:hover .tick-square {
     transform: scale(1.2);
-    box-shadow: 0 0 10px rgba(74, 222, 128, 0.7);
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.7);
   }
 
   &.is-selected .tick-square {
     transform: scale(1.25);
-    box-shadow: 0 0 0 2px #86efac, 0 0 14px rgba(74, 222, 128, 0.85);
+    box-shadow: 0 0 0 1.5px #86efac, 0 0 12px rgba(74, 222, 128, 0.85);
     border-color: #86efac;
   }
 }
@@ -739,10 +737,11 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
 .timeline-scale {
   display: flex;
   justify-content: space-between;
-  margin-top: 8px;
-  font-size: 10px;
+  margin-top: 2px;
+  font-size: 8.5px;
   color: #64748b;
   font-family: Consolas, monospace;
+  line-height: 1;
 }
 </style>
 

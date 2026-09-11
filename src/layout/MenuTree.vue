@@ -129,33 +129,55 @@ const getIcon = (item: RouteRecordRaw): string => {
 
 .side-bar--menu--horizontal {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   background: transparent !important;
-  border-bottom: none !important;
+  border: none !important;
   height: 60px;
-  gap: 8px;
+  gap: 0;
 
   .nav-icon {
-    margin-right: 6px;
+    margin-right: 8px;
     font-size: 16px;
+  }
+
+  .disabled-menu-wrapper {
+    cursor: not-allowed;
+    display: flex;
+    align-items: stretch;
+    height: 60px;
   }
 
   :deep(.atlas-app-menu-item),
   :deep(.atlas-app-sub-menu__title) {
-    height: 38px !important;
-    line-height: 38px !important;
-    padding: 0 16px !important;
-    border-radius: 6px;
-    color: #94a3b8 !important;
-    font-size: 16px !important;
+    height: 60px !important;
+    line-height: 60px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 20px !important;
+    border-radius: 0 !important;
+    color: #cbd5e1 !important;
+    font-size: 15px !important;
     font-weight: 600 !important;
     background: transparent !important;
-    border-bottom: 2px solid transparent !important;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: 1px solid rgba(0, 225, 255, 0.15) !important;
+    border-right: 1px solid rgba(0, 225, 255, 0.15) !important;
+    margin-left: -1px;
+    box-sizing: border-box !important;
+    transition: all 0.2s ease !important;
+
+    &::after,
+    &::before {
+      display: none !important;
+    }
 
     &:hover {
       color: #00e1ff !important;
       background: rgba(0, 225, 255, 0.08) !important;
+      border-top: none !important;
+      border-bottom: none !important;
     }
 
     &.is-disabled {
@@ -169,8 +191,11 @@ const getIcon = (item: RouteRecordRaw): string => {
   :deep(.atlas-app-menu-item.is-active),
   :deep(.atlas-app-sub-menu.is-active .atlas-app-sub-menu__title) {
     color: #00e1ff !important;
-    background: linear-gradient(180deg, rgba(0, 225, 255, 0.16) 0%, rgba(0, 225, 255, 0.04) 100%) !important;
-    text-shadow: 0 0 8px rgba(0, 225, 255, 0.5);
+    background: linear-gradient(180deg, rgba(0, 225, 255, 0.2) 0%, rgba(0, 225, 255, 0.05) 100%) !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    text-shadow: 0 0 10px rgba(0, 225, 255, 0.6);
+    box-shadow: inset 0 0 16px rgba(0, 225, 255, 0.15) !important;
 
     .nav-title {
       font-weight: 700;

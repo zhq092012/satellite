@@ -1,41 +1,74 @@
 <template>
-  <div class="container">
-    <main class="main">
-      <!-- GIS 战场态势视图核心三栏布局 -->
-      <div class="battle-grid">
-        <!-- C2 敌方网络与资产拓扑左侧边栏 -->
-        <div class="battle-grid__side battle-grid__side--left">
-          <C2LeftControlPanel :matrix-data="matrixData" :selected-norad="selectedNorad"
-            @select-satellite="handleSelectSatellite" />
-        </div>
+  <div class="battle-situation-container" :class="{ 'has-expanded-timeline': !!taskTimeRange && !isTimelineCollapsed }">
+    <!-- 1. 全屏 Cesium 3D 地球底图视图 -->
+    <div class="cesium-map-layer">
+      <CesiumViewer ref="cesiumViewerRef" :matrix-data="matrixData" :selected-norad="selectedNorad"
+        @clock-tick="handleClockTick" />
+    </div>
 
-        <!-- 中间 3D Cesium 地球 -->
-        <div class="battle-grid__center">
-          <div class="battle-grid__earth">
-            <CesiumViewer ref="cesiumViewerRef" :matrix-data="matrixData" :selected-norad="selectedNorad"
-              @clock-tick="handleClockTick" />
-            <BattleGlobeTimeline v-if="taskTimeRange" :task-start="taskTimeRange.start" :task-end="taskTimeRange.end"
-              :matrix-data="matrixData" :selected-norad="selectedNorad" :force-task-mode="!!selectedTransmissionLinkId"
-              :current-time-ms="currentClockMs" :is-playing="isClockPlaying" :playback-speed="orbitPlaybackSpeed"
-              @time-change="handleTimelineTimeChange" @toggle-play="handleTogglePlay"
-              @speed-change="handleSpeedChange" />
-          </div>
-        </div>
-
-        <!-- C2 敌方数据传输与链路效能右侧边栏 -->
-        <div class="battle-grid__side battle-grid__side--right">
-          <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad"
-            :selected-transmission-link-id="selectedTransmissionLinkId"
-            @clear-satellite-selection="handleSelectSatellite(null)"
-            @select-transmission-link="handleSelectTransmissionLink" />
-        </div>
+    <!-- 2. 悬浮左侧控制面板（支持折叠/展开） -->
+    <div class="floating-panel floating-panel--left" :class="{ 'is-collapsed': isLeftCollapsed }">
+      <div class="panel-inner">
+        <C2LeftControlPanel :matrix-data="matrixData" :selected-norad="selectedNorad"
+          @select-satellite="handleSelectSatellite" />
       </div>
-    </main>
+      <!-- 折叠/展开控制按钮 -->
+      <button type="button" class="toggle-btn toggle-btn--left"
+        :title="isLeftCollapsed ? '展开左侧面板' : '收起左侧面板'"
+        @click="isLeftCollapsed = !isLeftCollapsed">
+        <el-icon class="toggle-icon">
+          <DArrowLeft v-if="!isLeftCollapsed" />
+          <DArrowRight v-else />
+        </el-icon>
+      </button>
+    </div>
+
+    <!-- 3. 悬浮右侧分析面板（支持折叠/展开） -->
+    <div class="floating-panel floating-panel--right" :class="{ 'is-collapsed': isRightCollapsed }">
+      <div class="panel-inner">
+        <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad"
+          :selected-transmission-link-id="selectedTransmissionLinkId"
+          @clear-satellite-selection="handleSelectSatellite(null)"
+          @select-transmission-link="handleSelectTransmissionLink" />
+      </div>
+      <!-- 折叠/展开控制按钮 -->
+      <button type="button" class="toggle-btn toggle-btn--right"
+        :title="isRightCollapsed ? '展开右侧面板' : '收起右侧面板'"
+        @click="isRightCollapsed = !isRightCollapsed">
+        <el-icon class="toggle-icon">
+          <DArrowRight v-if="!isRightCollapsed" />
+          <DArrowLeft v-else />
+        </el-icon>
+      </button>
+    </div>
+
+    <!-- 4. 悬浮下方时间轴（两侧留距离、圆角、半透明、支持向下折叠/展开） -->
+    <div class="floating-timeline-wrapper" :class="{ 'is-collapsed': isTimelineCollapsed }" v-if="taskTimeRange">
+      <!-- 折叠/展开控制按钮 -->
+      <button type="button" class="timeline-toggle-btn"
+        :title="isTimelineCollapsed ? '展开时间轴' : '收起时间轴'"
+        @click="isTimelineCollapsed = !isTimelineCollapsed">
+        <el-icon class="toggle-icon">
+          <ArrowUp v-if="isTimelineCollapsed" />
+          <ArrowDown v-else />
+        </el-icon>
+        <span class="btn-text">{{ isTimelineCollapsed ? '展开时间轴' : '收起时间轴' }}</span>
+      </button>
+
+      <div class="timeline-inner">
+        <BattleGlobeTimeline :task-start="taskTimeRange.start" :task-end="taskTimeRange.end"
+          :matrix-data="matrixData" :selected-norad="selectedNorad" :force-task-mode="!!selectedTransmissionLinkId"
+          :current-time-ms="currentClockMs" :is-playing="isClockPlaying" :playback-speed="orbitPlaybackSpeed"
+          @time-change="handleTimelineTimeChange" @toggle-play="handleTogglePlay"
+          @speed-change="handleSpeedChange" />
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onMounted, ref, watch } from 'vue'
+import { ArrowDown, ArrowUp, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import CesiumViewer from '@/components/cesium/CesiumViewer.vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
@@ -54,6 +87,11 @@ const store = useLayoutStore()
 
 /** [Hook 引入] 卫星档案弹窗 */
 useSatelliteProfileDialog()
+
+/** [变量说明] 左右面板及时间轴折叠状态 */
+const isLeftCollapsed = ref(false)
+const isRightCollapsed = ref(false)
+const isTimelineCollapsed = ref(false)
 
 /** [变量说明] 3D Cesium Viewer 组件实例引用 */
 const cesiumViewerRef = ref<InstanceType<typeof CesiumViewer> | null>(null)
@@ -409,87 +447,175 @@ $bs-accent-warm: #8d6f63;
 $bs-accent-cool: var(--accent-color);
 $bs-accent-line: rgba(79, 147, 221, 0.35);
 
-.container {
+.battle-situation-container {
+  position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  background-color: #0b1528;
 
-  .main {
+  /* 1. 全屏底图 Cesium 地球视图 */
+  .cesium-map-layer {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
-    display: flex;
-    flex-direction: column;
+    z-index: 1;
+    overflow: hidden;
+  }
 
-    .tabs-bar {
-      height: 36px;
+  /* 2. 悬浮面板基础通用样式 */
+  .floating-panel {
+    position: absolute;
+    top: 14px;
+    bottom: 14px; // 默认无时间轴或时间轴收起时延伸至底部
+    z-index: 10;
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+
+    .panel-inner {
+      height: 100%;
+      overflow: hidden;
+      border-radius: 8px;
+      backdrop-filter: blur(16px);
+      background: rgba(8, 20, 36, 0.88);
+      border: 1px solid rgba(0, 225, 255, 0.28);
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.6),
+        0 0 16px rgba(0, 225, 255, 0.1);
+    }
+
+    /* 折叠/展开控制按钮 */
+    .toggle-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 64px;
       display: flex;
-      justify-content: flex-end;
       align-items: center;
-      padding: 0 15px;
-      background: $bs-page-bg;
-      box-sizing: border-box;
+      justify-content: center;
+      background: rgba(10, 28, 52, 0.92);
+      border: 1px solid rgba(0, 225, 255, 0.35);
+      color: #00e1ff;
+      cursor: pointer;
+      z-index: 20;
+      transition: all 0.25s ease;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      outline: none;
 
-      .filter {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        color: $bs-text-main;
+      .toggle-icon {
         font-size: 13px;
-        padding: 4px 10px;
-        border-radius: 6px;
-        background: rgba(12, 38, 64, 0.6);
-        border: 1px solid $bs-surface-border;
+        transition: transform 0.2s ease;
+      }
 
-        .crumb {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-
-          strong {
-            color: $bs-text-strong;
-          }
-        }
-
-        .sep {
-          color: $bs-text-muted;
-        }
+      &:hover {
+        background: rgba(0, 225, 255, 0.25);
+        border-color: #00e1ff;
+        color: #ffffff;
+        box-shadow: 0 0 12px rgba(0, 225, 255, 0.5);
       }
     }
 
-    .battle-grid {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 460px 1fr 480px;
-      gap: 12px;
-      padding: 12px;
-      box-sizing: border-box;
-      background: $bs-page-bg;
+    /* 左侧面板定位与收起 */
+    &--left {
+      left: 14px;
+      width: 440px;
+
+      .toggle-btn--left {
+        right: -21px;
+        border-left: none;
+        border-radius: 0 6px 6px 0;
+      }
+
+      &.is-collapsed {
+        transform: translateX(calc(-100% - 14px));
+      }
+    }
+
+    /* 右侧面板定位与收起 */
+    &--right {
+      right: 14px;
+      width: 460px;
+
+      .toggle-btn--right {
+        left: -21px;
+        border-right: none;
+        border-radius: 6px 0 0 6px;
+      }
+
+      &.is-collapsed {
+        transform: translateX(calc(100% + 14px));
+      }
+    }
+  }
+
+  /* 当时间轴处于展开状态时，左右面板下边界退至时间轴上方（留出 10px 间距，不遮挡/不超出时间轴） */
+  &.has-expanded-timeline {
+    .floating-panel {
+      bottom: 98px;
+    }
+  }
+
+  /* 3. 悬浮下方时间轴 */
+  .floating-timeline-wrapper {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 12px;
+    z-index: 15;
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+
+    /* 折叠/展开控制按钮 */
+    .timeline-toggle-btn {
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      height: 20px;
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(10, 28, 52, 0.92);
+      border: 1px solid rgba(0, 225, 255, 0.35);
+      border-bottom: none;
+      border-radius: 5px 5px 0 0;
+      color: #00e1ff;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 0 -3px 8px rgba(0, 0, 0, 0.4);
+      outline: none;
+      z-index: 20;
+
+      .toggle-icon {
+        font-size: 11px;
+      }
+
+      &:hover {
+        background: rgba(0, 225, 255, 0.22);
+        color: #ffffff;
+        border-color: #00e1ff;
+        box-shadow: 0 0 12px rgba(0, 225, 255, 0.4);
+      }
+    }
+
+    .timeline-inner {
+      border-radius: 8px;
       overflow: hidden;
+      backdrop-filter: blur(14px);
+      background: rgba(8, 20, 36, 0.85);
+      border: 1px solid rgba(0, 225, 255, 0.28);
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.6),
+        0 0 16px rgba(0, 225, 255, 0.1);
+    }
 
-      .battle-grid__side {
-        height: 100%;
-        min-height: 0;
-        overflow: hidden;
-      }
-
-      .battle-grid__center {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        min-width: 0;
-        min-height: 0;
-        overflow: hidden;
-
-        .battle-grid__earth {
-          flex: 1;
-          height: 100%;
-          min-height: 0;
-          position: relative;
-          border-radius: 8px;
-          overflow: hidden;
-          border: 1px solid $bs-surface-border;
-          box-shadow: 0 4px 20px $bs-surface-shadow;
-        }
-      }
+    &.is-collapsed {
+      transform: translateY(calc(100% + 14px));
     }
   }
 }

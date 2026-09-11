@@ -14,17 +14,52 @@
         </div>
 
         <div class="header-right actions-bar">
-          <div class="user-panel">
-            <div class="user-avatar-box">
-              <el-avatar :size="32" icon="UserFilled" class="user-avatar" />
+          <!-- 战场与任务显示 / 切换区域 -->
+          <div class="task-status-bar">
+            <!-- 场景 A：已选择战场和任务 -->
+            <div v-if="layoutStore.battle && layoutStore.activedTask" class="task-info-badge" @click="openTaskSelector">
+              <span class="battle-name">{{ layoutStore.battle.name }}</span>
+              <span class="divider">/</span>
+              <span class="task-name">{{ layoutStore.activedTask.name }}</span>
+              <el-button type="primary" size="small" link class="switch-btn">切换任务</el-button>
             </div>
-            <div class="user-meta">
-              <span class="user-name">{{ displayUserName }}</span>
+
+            <!-- 场景 B：尚未选择战场任务，突出提醒 -->
+            <div v-else class="task-prompt-badge" @click="openTaskSelector">
+              <el-tag type="warning" effect="dark" round class="prompt-tag"> ⚠️ 尚未选择战场任务（点击选择） </el-tag>
             </div>
-            <button type="button" class="sci-logout-btn" @click="handleLogout">
-              <span>退出登录</span>
-            </button>
           </div>
+
+          <el-dropdown trigger="click" @command="handleCommand" popper-class="user-profile-popper">
+            <div class="user-trigger">
+              <span class="user-name">{{ displayUserName }}</span>
+              <el-icon class="user-arrow">
+                <ArrowDown />
+              </el-icon>
+            </div>
+            <template #dropdown>
+              <el-dropdown-menu class="user-dropdown-menu">
+                <el-dropdown-item v-if="isAdmin" command="system" class="user-menu-item">
+                  <el-icon>
+                    <Setting />
+                  </el-icon>
+                  <span>系统管理</span>
+                </el-dropdown-item>
+                <el-dropdown-item command="algorithm" class="user-menu-item">
+                  <el-icon>
+                    <DataAnalysis />
+                  </el-icon>
+                  <span>算法分析管理</span>
+                </el-dropdown-item>
+                <el-dropdown-item divided command="logout" class="user-menu-item user-logout-item">
+                  <el-icon>
+                    <SwitchButton />
+                  </el-icon>
+                  <span>退出登录</span>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
 
         <div class="header-right" v-show="route.name === 'Satellite'">
@@ -43,18 +78,60 @@
         </el-main>
       </el-scrollbar>
     </el-container>
+
+    <!-- 战场与任务选择模态弹窗 -->
+    <el-dialog v-model="selectorDialogVisible" title="选择战场与任务" width="540px" append-to-body
+      class="task-selector-dialog">
+      <div class="dialog-body" v-loading="loadingData">
+        <!-- 级联选择器 -->
+        <el-form>
+          <el-form-item>
+            <el-cascader v-model="selectedCascadeValue" :options="battleTaskOptions"
+              :props="{ expandTrigger: 'hover', value: 'id', label: 'name', children: 'children' }"
+              placeholder="请选择 战场 / 任务" style="width: 100%" filterable @change="handleCascaderChange" />
+          </el-form-item>
+        </el-form>
+
+        <!-- 战场-任务 快捷选择列表 -->
+        <div class="quick-battle-tree" v-if="battleListWithTasks.length > 0">
+          <div class="tree-title">快捷选择列表：</div>
+          <el-scrollbar max-height="260px">
+            <div v-for="battle in battleListWithTasks" :key="battle.id" class="battle-group">
+              <div class="battle-group-name">{{ battle.name }}</div>
+              <div class="task-chips">
+                <div v-for="task in battle.tasks" :key="task.id" class="task-chip"
+                  :class="{ active: layoutStore.activedTask?.id === task.id }" @click="selectBattleAndTask(battle, task)">
+                  {{ task.name }}
+                </div>
+                <div v-if="!battle.tasks || battle.tasks.length === 0" class="no-task">暂无所属任务</div>
+              </div>
+            </div>
+          </el-scrollbar>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="selectorDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!pendingSelection" @click="confirmTaskSelection"> 确认选择 </el-button>
+      </template>
+    </el-dialog>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { type RouteRecordRaw, useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { ArrowDown, DataAnalysis, Setting, SwitchButton } from '@element-plus/icons-vue'
 import MenuTree from './MenuTree.vue'
 import { logout as logoutApi, type MenuItem } from '@/api/auth'
 import { useAuthStore } from '@/store/modules/auth'
+import { useLayoutStore } from '@/store/modules/layout'
+import { getBattleList, getTaskList } from '@/api/dashboard'
+import type { BattleForm, TaskForm } from '@/types/dashboard'
 
 const authStore = useAuthStore()
+const layoutStore = useLayoutStore()
 // 获取路由实例
 const route = useRoute()
 const router = useRouter()
@@ -164,193 +241,39 @@ const homeMenu = computed<DashboardMenuNode[]>(() => [
   },
 ])
 
-const adminMenus = computed(() => {
-  const roleIsAdmin = authStore.roles.includes('admin')
-  if (!roleIsAdmin) {
-    return []
-  }
 
-  return [
-    {
-      path: '/system',
-      meta: {
-        title: '系统管理',
-        icon: 'icon-yunweizhishichouqu',
-        showInMenu: true,
-      },
-      children: [
-        {
-          path: '/system/users',
-          meta: {
-            title: '用户管理',
-            icon: 'icon-us',
-            showInMenu: true,
-          },
-          children: [],
-        },
-        {
-          path: '/system/roles',
-          meta: {
-            title: '角色管理',
-            icon: 'icon-jurassic_data',
-            showInMenu: true,
-          },
-          children: [],
-        },
-        {
-          path: '/system/menus',
-          meta: {
-            title: '菜单管理',
-            icon: 'icon-layer',
-            showInMenu: true,
-          },
-          children: [],
-        },
-        {
-          path: '/system/satellites',
-          meta: {
-            title: '卫星管理',
-            icon: 'icon-situation',
-            showInMenu: true,
-          },
-          children: [],
-        },
-        {
-          path: '/system/weapons',
-          meta: {
-            title: '武器管理',
-            icon: 'icon-sword',
-            showInMenu: true,
-            permission: 'system:weapon:list',
-          },
-          children: [],
-        },
-        {
-          path: '/system/basestations',
-          meta: {
-            title: '基站管理',
-            icon: 'icon-basestation',
-            showInMenu: true,
-            permission: 'system:basestations:list',
-          },
-          children: [],
-        },
-        {
-          path: '/system/missiles',
-          meta: {
-            title: '导弹管理',
-            icon: 'icon-missile',
-            showInMenu: true,
-            permission: 'system:missiles:list',
-          },
-          children: [],
-        },
 
-        {
-          path: '/system/missileBases',
-          meta: {
-            title: '基地管理',
-            icon: 'icon-missile-base',
-            showInMenu: true,
-            permission: 'system:missileBases:list',
-          },
-          children: [],
-        },
-        {
-          path: '/system/battles',
-          meta: {
-            title: '战场管理',
-            icon: 'icon-situation',
-            showInMenu: true,
-          },
-          children: [],
-        },
-      ],
-    },
-  ]
-})
-
-/** 算法分析管理前端静态菜单配置 */
-const algorithmMenus = computed<DashboardMenuNode[]>(() => [
-  {
-    path: '/algorithm',
-    meta: {
-      title: '算法分析管理',
-      icon: 'icon-layer',
-      showInMenu: true,
-    },
-    children: [
-      {
-        path: '/algorithm/threat',
-        meta: {
-          title: '卫星威胁分析',
-          icon: 'icon-situation',
-          showInMenu: true,
-        },
-        children: [],
-      },
-      {
-        path: '/algorithm/attackability',
-        meta: {
-          title: '可打击度分析',
-          icon: 'icon-situation',
-          showInMenu: true,
-        },
-        children: [],
-      },
-      {
-        path: '/algorithm/killchain',
-        meta: {
-          title: '杀伤链方案',
-          icon: 'icon-situation',
-          showInMenu: true,
-        },
-        children: [],
-      },
-      {
-        path: '/algorithm/evaluation',
-        meta: {
-          title: '打击结果评估',
-          icon: 'icon-situation',
-          showInMenu: true,
-        },
-        children: [],
-      },
-      {
-        path: '/algorithm/simulation',
-        meta: {
-          title: '打击方案仿真',
-          icon: 'icon-situation',
-          showInMenu: true,
-        },
-        children: [],
-      },
-    ],
-  },
-])
 
 const visibleMenus = computed<RouteRecordRaw[]>(() => {
   const backendMenus = filterMenusByPermission(buildMenuRoutes(authStore.menuTree))
-  const mergedMenus = mergeMenus(
-    mergeMenus(mergeMenus(homeMenu.value, backendMenus), filterMenusByPermission(algorithmMenus.value)),
-    filterMenusByPermission(adminMenus.value)
-  )
-  return mergedMenus as RouteRecordRaw[]
+  const mergedMenus = mergeMenus(homeMenu.value, backendMenus)
+  return mergedMenus.filter((menu) => {
+    const path = menu.path || ''
+    const title = (menu.meta as { title?: string } | undefined)?.title || ''
+    return !path.startsWith('/system') && !path.startsWith('/algorithm') && !title.includes('系统管理') && !title.includes('算法分析管理')
+  }) as RouteRecordRaw[]
 })
+
+const isAdmin = computed(() => authStore.roles.includes('admin'))
 
 const displayUserName = computed(() => {
   return authStore.userInfo?.nickname || authStore.userInfo?.username || '未登录用户'
 })
 
-const displayRoleText = computed(() => {
-  if (authStore.roles.includes('admin')) {
-    return '管理员'
+
+const handleCommand = (command: string) => {
+  if (command === 'system') {
+    router.push('/system')
+  } else if (command === 'algorithm') {
+    if (!layoutStore.activedTask) {
+      ElMessage.warning('尚未选择战场任务，请先在首页选择战场及任务！')
+      return
+    }
+    router.push('/algorithm')
+  } else if (command === 'logout') {
+    handleLogout()
   }
-  if (authStore.roles.length > 0) {
-    return authStore.roles.join(' / ')
-  }
-  return '普通用户'
-})
+}
 
 const handleLogout = async () => {
   try {
@@ -364,19 +287,135 @@ const handleLogout = async () => {
   await router.replace({ name: 'Login' })
 }
 
-onMounted(() => { })
+/** [变量说明] 任务选择弹窗显隐控制 */
+const selectorDialogVisible = ref(false)
+/** [变量说明] 战场与任务数据加载状态 */
+const loadingData = ref(false)
+/** [变量说明] 包含完整任务列表的战场数据列表 */
+const battleListWithTasks = ref<BattleForm[]>([])
+/** [变量说明] Cascader 级联选择器绑定的路径 */
+const selectedCascadeValue = ref<string[]>([])
+/** [变量说明] 暂存待确认的战场与任务 */
+const pendingSelection = ref<{ battle: BattleForm; task: TaskForm } | null>(null)
 
-onUnmounted(() => { })
+/** [计算属性说明] 转换为 Cascader 选项数据 */
+const battleTaskOptions = computed(() => {
+  return battleListWithTasks.value.map((battle) => ({
+    id: `battle_${battle.id}`,
+    name: `${battle.name}`,
+    battleObj: battle,
+    children: (battle.tasks || []).map((task) => ({
+      id: `task_${task.id}`,
+      name: `${task.name}`,
+      taskObj: task,
+      battleObj: battle,
+    })),
+  }))
+})
+
+/**
+ * [函数说明] 加载战场及其对应的关联任务列表
+ */
+const loadBattleAndTaskData = async () => {
+  loadingData.value = true
+  try {
+    const res = await getBattleList()
+    if (res.code === 200 && Array.isArray(res.data)) {
+      const list = res.data
+      await Promise.all(
+        list.map(async (battle) => {
+          if (battle.id) {
+            const taskRes = await getTaskList(battle.id)
+            if (taskRes.code === 200 && Array.isArray(taskRes.data)) {
+              battle.tasks = taskRes.data
+            }
+          }
+        })
+      )
+      battleListWithTasks.value = list
+    }
+  } catch (error) {
+    console.error('加载战场任务列表失败:', error)
+  } finally {
+    loadingData.value = false
+  }
+}
+
+/**
+ * [函数说明] 打开战场任务选择弹窗
+ */
+const openTaskSelector = async () => {
+  selectorDialogVisible.value = true
+  if (battleListWithTasks.value.length === 0) {
+    await loadBattleAndTaskData()
+  }
+}
+
+/**
+ * [函数说明] Cascader 选择变更回调
+ * @param val 选中的节点 ID 路径数组
+ */
+const handleCascaderChange = (val: any) => {
+  if (Array.isArray(val) && val.length === 2) {
+    const taskIdStr = val[1]
+    for (const battle of battleListWithTasks.value) {
+      const matchedTask = (battle.tasks || []).find((t) => `task_${t.id}` === taskIdStr)
+      if (matchedTask) {
+        pendingSelection.value = { battle, task: matchedTask }
+        break
+      }
+    }
+  }
+}
+
+/**
+ * [函数说明] 快捷芯片列表项选择任务
+ * @param battle 战场对象
+ * @param task 任务对象
+ */
+const selectBattleAndTask = (battle: BattleForm, task: TaskForm) => {
+  pendingSelection.value = { battle, task }
+  selectedCascadeValue.value = [`battle_${battle.id}`, `task_${task.id}`]
+}
+
+/**
+ * [函数说明] 确认选择并写入全局 Store
+ */
+const confirmTaskSelection = async () => {
+  if (pendingSelection.value) {
+    const { battle, task } = pendingSelection.value
+    layoutStore.setActivedBattle(battle)
+    layoutStore.setActivedTask(task)
+    selectorDialogVisible.value = false
+    ElMessage.success(`已设置当前任务：${battle.name} / ${task.name}`)
+    await layoutStore.ensureActiveZhchPlan(true)
+    await layoutStore.fetchMatrixForCurrentScope(true)
+  }
+}
+
+onMounted(async () => {
+  await loadBattleAndTaskData()
+
+  if (layoutStore.activedTask?.id) {
+    await layoutStore.ensureActiveZhchPlan(false)
+    await layoutStore.fetchMatrixForCurrentScope(false)
+  }
+
+  if (!layoutStore.battle || !layoutStore.activedTask) {
+    selectorDialogVisible.value = true
+  }
+})
+
 </script>
 
 <style lang="scss" scoped>
 .atlas-app-layout-container {
   .header-wrapper {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     justify-content: space-between;
     position: relative;
-    gap: 24px;
+    gap: 0;
     height: 60px;
     background: linear-gradient(90deg,
         rgba(8, 22, 44, 0.98) 0%,
@@ -386,13 +425,15 @@ onUnmounted(() => { })
     box-shadow:
       0 4px 20px rgba(0, 0, 0, 0.5),
       0 1px 12px rgba(0, 225, 255, 0.15);
-    padding: 0 24px;
+    padding: 0 0 0 24px;
     z-index: 100;
 
     .header-left {
       display: flex;
       align-items: center;
       flex: 0 0 auto;
+      padding-right: 20px;
+      border-right: 1px solid rgba(0, 225, 255, 0.15);
 
       .logo {
         height: 60px;
@@ -433,90 +474,155 @@ onUnmounted(() => { })
     .header-center {
       flex: 1;
       display: flex;
-      align-items: center;
+      align-items: stretch;
       justify-content: flex-start;
-      padding-left: 20px;
       min-width: 0;
+      height: 60px;
 
       :deep(.side-bar--menu--horizontal) {
         width: 100%;
+        height: 60px;
       }
     }
 
     .header-right {
       flex: 0 0 auto;
       display: flex;
-      align-items: center;
+      align-items: stretch;
+      height: 60px;
+      gap: 0;
 
-      .user-panel {
+      /* 战场与任务指示状态栏 */
+      .task-status-bar {
         display: flex;
-        align-items: center;
-        gap: 14px;
+        align-items: stretch;
+        height: 60px;
 
-        .user-avatar-box {
-          position: relative;
+        .task-info-badge {
           display: flex;
           align-items: center;
-          justify-content: center;
-          padding: 2px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, rgba(0, 225, 255, 0.6), rgba(0, 150, 255, 0.2));
-          box-shadow: 0 0 8px rgba(0, 225, 255, 0.3);
+          gap: 8px;
+          padding: 0 18px;
+          height: 60px;
+          background: transparent;
+          border: none;
+          border-left: 1px solid rgba(0, 225, 255, 0.15);
+          border-right: 1px solid rgba(0, 225, 255, 0.15);
+          border-radius: 0;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          font-size: 14px;
+          box-sizing: border-box;
 
-          .user-avatar {
-            background: #0d2744;
+          &:hover {
+            background: rgba(0, 225, 255, 0.08);
+
+            .switch-btn {
+              color: #00e1ff;
+            }
+          }
+
+          .battle-name {
+            color: #00e1ff;
+            font-weight: bold;
+          }
+
+          .divider {
+            color: #8eb3d6;
+          }
+
+          .task-name {
+            color: #ffffff;
+          }
+
+          .switch-btn {
+            margin-left: 4px;
+            color: #4f93dd;
+            font-size: 13px;
+          }
+        }
+
+        .task-prompt-badge {
+          display: flex;
+          align-items: center;
+          padding: 0 16px;
+          height: 60px;
+          border-left: 1px solid rgba(0, 225, 255, 0.15);
+          border-right: 1px solid rgba(0, 225, 255, 0.15);
+          cursor: pointer;
+
+          &:hover {
+            background: rgba(230, 162, 60, 0.1);
+          }
+
+          .prompt-tag {
+            font-size: 13px;
+            padding: 4px 12px;
+            cursor: pointer;
+          }
+        }
+      }
+
+      :deep(.atlas-app-dropdown),
+      :deep(.el-dropdown) {
+        display: flex;
+        align-items: stretch;
+        height: 60px;
+        outline: none !important;
+      }
+
+      .user-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 18px;
+        height: 60px;
+        border-radius: 0;
+        cursor: pointer;
+        user-select: none;
+        outline: none;
+        background: transparent;
+        border: none;
+        border-left: 1px solid rgba(0, 225, 255, 0.15);
+        border-right: 1px solid rgba(0, 225, 255, 0.15);
+        margin-left: -1px;
+        box-sizing: border-box;
+        transition: all 0.2s ease;
+
+        &:focus,
+        &:focus-visible {
+          outline: none !important;
+        }
+
+        .user-name {
+          font-size: 15px;
+          font-weight: 700;
+          color: #f1f7ff;
+          line-height: 1.2;
+          transition: color 0.2s ease;
+        }
+
+        .user-arrow {
+          font-size: 12px;
+          color: #7dd3fc;
+          transition: transform 0.25s ease, color 0.2s ease;
+        }
+
+        &:hover {
+          background: rgba(0, 225, 255, 0.08);
+
+          .user-name,
+          .user-arrow {
             color: #00e1ff;
           }
         }
 
-        .user-meta {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
+        &[aria-expanded="true"] {
+          background: rgba(0, 225, 255, 0.14);
 
-          .user-name {
-            font-size: 15px;
-            font-weight: 700;
-            color: #f1f7ff;
-            line-height: 1.2;
-          }
-
-          .user-role-tag {
-            font-size: 13px;
-            color: #7dd3fc;
-            background: rgba(0, 225, 255, 0.1);
-            padding: 1px 6px;
-            border-radius: 3px;
-            border: 1px solid rgba(0, 225, 255, 0.2);
-            line-height: 1.3;
-            width: fit-content;
-          }
-        }
-
-        .sci-logout-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 12px;
-          border-radius: 6px;
-          font-size: 14px;
-          font-weight: 600;
-          background: rgba(239, 68, 68, 0.12);
-          border: 1px solid rgba(239, 68, 68, 0.35);
-          color: #fca5a5;
-          cursor: pointer;
-          transition: all 0.25s ease;
-
-          &:hover {
-            background: rgba(239, 68, 68, 0.25);
-            border-color: rgba(239, 68, 68, 0.6);
-            color: #ffffff;
-            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
-            transform: translateY(-1px);
-          }
-
-          &:active {
-            transform: translateY(0);
+          .user-arrow {
+            transform: rotate(180deg);
+            color: #00e1ff;
           }
         }
       }
@@ -531,6 +637,211 @@ onUnmounted(() => { })
     padding: 0;
     width: 100%;
     overflow-x: hidden;
+  }
+}
+
+/* 用户名下拉菜单样式（Teleport 到 body，需要使用 :global） */
+:global(.user-profile-popper) {
+  background: rgba(8, 24, 48, 0.98) !important;
+  border: 1px solid rgba(0, 225, 255, 0.3) !important;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.6),
+    0 0 14px rgba(0, 225, 255, 0.15) !important;
+  backdrop-filter: blur(12px);
+  border-radius: 6px !important;
+  padding: 4px 0 !important;
+
+  .el-popper__arrow::before,
+  .atlas-app-popper__arrow::before {
+    background: rgba(8, 24, 48, 0.98) !important;
+    border: 1px solid rgba(0, 225, 255, 0.3) !important;
+  }
+
+  .el-dropdown-menu,
+  .atlas-app-dropdown-menu {
+    background: transparent !important;
+    padding: 4px 6px !important;
+    border: none !important;
+  }
+
+  .user-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #d9e9fb !important;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    .el-icon,
+    .atlas-app-icon {
+      font-size: 15px;
+      color: #00e1ff;
+      transition: color 0.2s ease;
+    }
+
+    &:hover,
+    &:focus {
+      background: rgba(0, 225, 255, 0.12) !important;
+      color: #00e1ff !important;
+      box-shadow: 0 0 10px rgba(0, 225, 255, 0.2);
+
+      .el-icon,
+      .atlas-app-icon {
+        color: #00e1ff;
+      }
+    }
+
+    &.atlas-app-dropdown-menu__item--divided,
+    &.el-dropdown-menu__item--divided {
+      margin-top: 4px;
+      border-top: 1px solid rgba(0, 225, 255, 0.15) !important;
+    }
+  }
+
+  .user-logout-item {
+    font-weight: 600;
+    color: #fca5a5 !important;
+
+    .el-icon,
+    .atlas-app-icon {
+      font-size: 15px;
+      color: #ef4444;
+      transition: color 0.2s ease;
+    }
+
+    &:hover,
+    &:focus {
+      background: rgba(239, 68, 68, 0.18) !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+
+      .el-icon,
+      .atlas-app-icon {
+        color: #ffffff;
+      }
+    }
+  }
+}
+
+/* 战场与任务选择模态框深色主题样式 */
+:deep(.task-selector-dialog) {
+  .el-dialog,
+  .atlas-app-dialog {
+    background: #0d1e36 !important;
+    border: 1px solid rgba(79, 147, 221, 0.35) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+    border-radius: 10px;
+
+    .el-dialog__header,
+    .atlas-app-dialog__header {
+      padding: 16px 20px 10px 20px;
+      border-bottom: 1px solid rgba(79, 147, 221, 0.2);
+
+      .el-dialog__title,
+      .atlas-app-dialog__title {
+        color: #ffffff !important;
+        font-size: 16px;
+        font-weight: bold;
+      }
+
+      .el-dialog__headerbtn .el-dialog__close,
+      .atlas-app-dialog__headerbtn .atlas-app-dialog__close {
+        color: #94a3b8 !important;
+
+        &:hover {
+          color: #00e1ff !important;
+        }
+      }
+    }
+
+    .el-dialog__body,
+    .atlas-app-dialog__body {
+      padding: 16px 20px;
+      color: #e2e8f0;
+    }
+
+    .el-dialog__footer,
+    .atlas-app-dialog__footer {
+      padding: 12px 20px;
+      border-top: 1px solid rgba(79, 147, 221, 0.2);
+    }
+  }
+}
+
+.dialog-body {
+  :deep(.atlas-app-form-item__label),
+  :deep(.el-form-item__label) {
+    color: #cbd5e1 !important;
+    font-weight: 500;
+  }
+
+  .quick-battle-tree {
+    margin-top: 16px;
+    border-top: 1px dashed rgba(79, 147, 221, 0.25);
+    padding-top: 14px;
+
+    .tree-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #ffffff;
+      margin-bottom: 12px;
+    }
+
+    .battle-group {
+      margin-bottom: 12px;
+      padding: 10px 14px;
+      background: rgba(16, 36, 62, 0.6);
+      border: 1px solid rgba(79, 147, 221, 0.25);
+      border-radius: 8px;
+
+      .battle-group-name {
+        font-size: 14px;
+        font-weight: bold;
+        color: #00e1ff;
+        margin-bottom: 8px;
+      }
+
+      .task-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+
+        .task-chip {
+          padding: 5px 14px;
+          font-size: 12px;
+          color: #e2e8f0;
+          background: rgba(8, 20, 36, 0.9);
+          border: 1px solid rgba(79, 147, 221, 0.3);
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.25s ease;
+
+          &:hover {
+            border-color: #00e1ff;
+            color: #00e1ff;
+            background: rgba(0, 225, 255, 0.12);
+            box-shadow: 0 0 8px rgba(0, 225, 255, 0.2);
+          }
+
+          &.active {
+            background: linear-gradient(135deg, rgba(79, 147, 221, 0.8) 0%, rgba(0, 180, 216, 0.9) 100%);
+            color: #ffffff;
+            font-weight: 600;
+            border-color: #00e1ff;
+            box-shadow: 0 0 10px rgba(0, 225, 255, 0.4);
+          }
+        }
+
+        .no-task {
+          font-size: 12px;
+          color: #64748b;
+        }
+      }
+    }
   }
 }
 </style>
