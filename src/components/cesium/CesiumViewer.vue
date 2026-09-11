@@ -164,7 +164,7 @@ const initViewer = async () => {
 
       // 创建 Cesium Viewer 实例并禁用不需要的默认控件
       viewer = new Cesium.Viewer(cesiumContainer.value, {
-        scene3DOnly: false, // 启用 3D/2D 切换（这里允许 3D 模式）
+        scene3DOnly: true, // 仅 3D 球体，跳过 2D 形态缓冲以降低场景开销
         geocoder: false, // 关闭位置搜索控件
         homeButton: false, // 关闭回到默认视角按钮
         sceneModePicker: false, // 关闭视图模式切换器
@@ -2141,43 +2141,6 @@ const refreshAfterActivate = () => {
   viewer?.scene.requestRender()
 }
 
-const currentSceneMode = ref<'3D' | '2D'>('3D')
-
-/**
- * 切换 2D / 3D 视图模式
- * @param mode '2D' | '3D'
- */
-const setSceneMode = (mode: '2D' | '3D') => {
-  if (!viewer || viewer.isDestroyed()) return
-  if (currentSceneMode.value === mode) return
-  currentSceneMode.value = mode
-
-  if (mode === '2D') {
-    if (viewer.scene.mode !== Cesium.SceneMode.SCENE2D) {
-      viewer.scene.morphTo2D(0.6)
-      const onMorphComplete = () => {
-        viewer.scene.morphComplete.removeEventListener(onMorphComplete)
-        // 2D 模式下将地图平铺填满整个窗口
-        viewer.camera.flyTo({
-          destination: Cesium.Rectangle.fromDegrees(-175, -80, 175, 80),
-          duration: 0.6,
-        })
-      }
-      viewer.scene.morphComplete.addEventListener(onMorphComplete)
-    }
-  } else {
-    if (viewer.scene.mode !== Cesium.SceneMode.SCENE3D) {
-      viewer.scene.morphTo3D(0.6)
-      const onMorphComplete = () => {
-        viewer.scene.morphComplete.removeEventListener(onMorphComplete)
-        // 3D 模式下恢复到战场全局视角
-        flyToBattleView()
-      }
-      viewer.scene.morphComplete.addEventListener(onMorphComplete)
-    }
-  }
-}
-
 defineExpose({
   clearViewer,
   clearElectronicInfrastructureNodes,
@@ -2196,8 +2159,6 @@ defineExpose({
   showTransmissionLink,
   clearTransmissionLinkOverlay,
   flyToLinkBoundingSphere,
-  setSceneMode,
-  currentSceneMode,
 })
 </script>
 <style lang="scss" scoped>

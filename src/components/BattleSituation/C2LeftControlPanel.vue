@@ -35,9 +35,9 @@
         <div class="task-filter-container">
           <!-- 搜索输入框 + 搜索按钮 -->
           <div class="task-search-row">
-            <el-input v-model="taskSearchKey" size="small" placeholder="搜索任务名称/作战目标..." clearable :prefix-icon="Search"
+            <el-input v-model="taskSearchKey" placeholder="搜索任务名称/作战目标..." clearable :prefix-icon="Search"
               class="task-search-input" @keyup.enter="handleSearch" @clear="handleSearch" />
-            <el-button type="primary" size="small" class="task-search-btn" :icon="Search" @click="handleSearch">
+            <el-button type="primary" class="task-search-btn" :icon="Search" @click="handleSearch">
               搜索
             </el-button>
           </div>
@@ -121,34 +121,31 @@
 
               <!-- 1. 指标滑块组 (Image 1) -->
               <div class="metrics-filter-group">
-                <!-- 威胁度 -->
                 <div class="metric-slider-item">
                   <div class="slider-header">
                     <span class="slider-label slider-label--threat">🛡️ 威胁度 ≥</span>
                     <span class="slider-val slider-val--threat">{{ filterThreat }}分</span>
                   </div>
-                  <el-slider v-model="filterThreat" :min="0" :max="100" :step="1" size="small"
-                    class="cyber-slider cyber-slider--threat" />
+                  <CyberMetricSlider v-model="filterThreat" :min="0" :max="100" :step="1" variant="threat"
+                    aria-label="威胁度下限" />
                 </div>
 
-                <!-- 链路延迟 -->
                 <div class="metric-slider-item">
                   <div class="slider-header">
                     <span class="slider-label slider-label--delay">📶 链路延迟 ≤</span>
-                    <span class="slider-val slider-val--delay">{{ filterDelay }}ms</span>
+                    <span class="slider-val slider-val--delay">{{ filterDelay }}分钟</span>
                   </div>
-                  <el-slider v-model="filterDelay" :min="0" :max="1000" :step="10" size="small"
-                    class="cyber-slider cyber-slider--delay" />
+                  <CyberMetricSlider v-model="filterDelay" :min="0" :max="1000" :step="10" variant="delay"
+                    aria-label="链路延迟上限" />
                 </div>
 
-                <!-- 覆盖率 -->
                 <div class="metric-slider-item">
                   <div class="slider-header">
                     <span class="slider-label slider-label--coverage">🌐 覆盖率 ≥</span>
                     <span class="slider-val slider-val--coverage">{{ filterCoverage }}%</span>
                   </div>
-                  <el-slider v-model="filterCoverage" :min="0" :max="100" :step="1" size="small"
-                    class="cyber-slider cyber-slider--coverage" />
+                  <CyberMetricSlider v-model="filterCoverage" :min="0" :max="100" :step="1" variant="coverage"
+                    aria-label="覆盖率下限" />
                 </div>
               </div>
             </div>
@@ -159,30 +156,51 @@
           <div v-for="task in filteredTaskList" :key="task.id" class="task-item-card"
             :class="{ active: store.activedTask?.id === task.id, disabled: taskSwitching }" @click="selectTask(task)">
             <div class="task-card-top">
-              <span class="task-icon">🎯</span>
               <span class="task-name" :title="task.name">{{ task.name }}</span>
-              <span class="task-status-badge">
-                {{ store.activedTask?.id === task.id ? '✓ 当前任务' : '点击切换' }}
-              </span>
+              <button type="button" class="task-edit-btn" :disabled="taskSwitching" title="修改任务"
+                @click.stop="openEditTask(task)">
+                修改任务
+              </button>
             </div>
 
-            <div class="task-card-meta" v-if="task.targetType || task.beginDate || task.description">
-              <div class="meta-tags-row" v-if="task.targetType || task.enemyCountry">
-                <span v-if="task.targetType" class="meta-tag tag-target" title="作战目标">
-                  目标: {{ task.targetType }}
-                </span>
-                <span v-if="task.enemyCountry" class="meta-tag tag-country" title="敌方国家">
-                  敌方: {{ task.enemyCountry }}
+            <div class="task-card-fields">
+              <div class="field-row">
+                <span class="field-label">作战目标</span>
+                <span class="field-val field-val--target" :title="displayTaskValue(task.targetType)">
+                  {{ displayTaskValue(task.targetType) }}
                 </span>
               </div>
-
-              <div class="meta-time-row" v-if="task.beginDate || task.endDate">
-                <span class="time-label">周期:</span>
-                <span class="time-val">{{ formatTaskDate(task.beginDate) }} ~ {{ formatTaskDate(task.endDate) }}</span>
+              <div class="field-row">
+                <span class="field-label">红方</span>
+                <span class="field-val" :title="displayTaskValue(task.meCountry)">
+                  {{ displayTaskValue(task.meCountry) }}
+                </span>
               </div>
-
-              <div class="meta-desc-row" v-if="task.description">
-                <span class="desc-text" :title="task.description">{{ task.description }}</span>
+              <div class="field-row">
+                <span class="field-label">敌方</span>
+                <span class="field-val field-val--enemy" :title="displayTaskValue(task.enemyCountry)">
+                  {{ displayTaskValue(task.enemyCountry) }}
+                </span>
+              </div>
+              <div class="field-row">
+                <span class="field-label">开始时间</span>
+                <span class="field-val field-val--time">{{ formatTaskDate(task.beginDate) }}</span>
+              </div>
+              <div class="field-row">
+                <span class="field-label">结束时间</span>
+                <span class="field-val field-val--time">{{ formatTaskDate(task.endDate) }}</span>
+              </div>
+              <div class="field-row">
+                <span class="field-label">任务概述</span>
+                <span class="field-val field-val--desc" :title="displayTaskValue(task.description)">
+                  {{ displayTaskValue(task.description) }}
+                </span>
+              </div>
+              <div class="field-row">
+                <span class="field-label">关注状态</span>
+                <span class="field-val" :class="task.focusStatus === 1 ? 'is-focus' : 'is-muted'">
+                  {{ task.focusStatus === 1 ? '已关注' : '未关注' }}
+                </span>
               </div>
             </div>
           </div>
@@ -197,6 +215,8 @@
         当前战场暂无任务数据
       </div>
     </div>
+
+    <TaskEditDialog v-model="taskEditVisible" :task="editingTask" @saved="handleTaskSaved" />
   </aside>
 </template>
 
@@ -217,6 +237,8 @@ import { getTaskList } from '@/api/dashboard'
 import type { TaskForm } from '@/types/dashboard'
 import type { MatrixResult } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
+import TaskEditDialog from '@/components/BattleSituation/TaskEditDialog.vue'
+import CyberMetricSlider from '@/components/BattleSituation/CyberMetricSlider.vue'
 
 /** 卫星五大类（创建任务时的五大类） */
 const SATELLITE_TYPES = ['侦察', '导航', '通信', '导弹预警', '空间目标监视与攻防'] as const
@@ -250,20 +272,24 @@ const taskList = ref<TaskForm[]>([])
 const taskLoading = ref(false)
 /** 任务切换中状态 */
 const taskSwitching = ref(false)
+/** 修改任务对话框是否可见 */
+const taskEditVisible = ref(false)
+/** 当前正在编辑的任务 */
+const editingTask = ref<TaskForm | null>(null)
 /** 任务快速搜索关键词 */
 const taskSearchKey = ref('')
 /** 点击搜索或回车确认的搜索词 */
 const confirmedSearchKey = ref('')
 
 /** 筛选面板是否展开（可折叠） */
-const isFilterExpanded = ref(true)
+const isFilterExpanded = ref(false)
 
 /** 任务排序方式：default(默认顺序) / time-desc(时间降序) / time-asc(时间升序) / name(任务名称) */
 const sortOrder = ref('default')
 
 /** 指标滑块筛选 (威胁度, 链路延迟, 覆盖率) */
 const filterThreat = ref(0)
-const filterDelay = ref(1000)
+const filterDelay = ref(0)
 const filterCoverage = ref(0)
 
 /** 选中的卫星类型列表（多选） */
@@ -467,10 +493,61 @@ const filteredTaskList = computed<TaskForm[]>(() => {
   return list
 })
 
-/** 格式化任务日期字符串展示 */
+/**
+ * 将任务时间格式化为「日期 + 时分秒」展示。
+ *
+ * @param dateStr 任务开始/结束时间字符串
+ * @returns `YYYY-MM-DD HH:mm:ss`；无法解析时回退为原字符串，空值显示 `--`
+ */
 const formatTaskDate = (dateStr?: string) => {
   if (!dateStr) return '--'
-  return dateStr.length > 10 ? dateStr.substring(0, 10) : dateStr
+  const ts = new Date(dateStr.replace(/-/g, '/')).getTime()
+  if (!Number.isFinite(ts) || Number.isNaN(ts)) {
+    return dateStr.trim() || '--'
+  }
+  const d = new Date(ts)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+/**
+ * 任务字段空值展示。
+ *
+ * @param value 原始文本
+ * @returns 有内容时返回原文，否则 `--`
+ */
+const displayTaskValue = (value?: string) => {
+  const text = (value || '').trim()
+  return text || '--'
+}
+
+/**
+ * 打开任务修改对话框，不切换当前任务。
+ *
+ * @param task 列表中的任务项
+ */
+const openEditTask = (task: TaskForm) => {
+  if (taskSwitching.value) return
+  editingTask.value = task
+  taskEditVisible.value = true
+}
+
+/**
+ * 任务保存成功后刷新列表；若改的是当前任务则同步 Store 并重拉矩阵。
+ *
+ * @param updated 提交后的任务数据
+ */
+const handleTaskSaved = async (updated: TaskForm) => {
+  await loadBattleTasks()
+  if (store.activedTask?.id && updated.id === store.activedTask.id) {
+    const latest = taskList.value.find((item) => item.id === updated.id) || updated
+    store.setActivedTask(latest)
+    try {
+      await store.fetchMatrixForCurrentScope(true)
+    } catch (error) {
+      console.error('刷新当前任务矩阵失败:', error)
+    }
+  }
 }
 
 /**
@@ -663,12 +740,16 @@ const selectTask = async (task: TaskForm) => {
         :deep(.task-search-input) {
           flex: 1;
           min-width: 0;
+          height: 52px;
 
+          .atlas-app-input__wrapper,
           .el-input__wrapper {
+            height: 52px;
+            min-height: 52px;
             background-color: rgba(8, 20, 36, 0.85);
             box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.25) inset;
-            border-radius: 4px;
-            padding: 1px 8px;
+            border-radius: 6px;
+            padding: 0 12px;
             transition: all 0.2s ease;
 
             &:hover {
@@ -680,25 +761,29 @@ const selectTask = async (task: TaskForm) => {
             }
           }
 
+          .atlas-app-input__inner,
           .el-input__inner {
             color: #e2efff;
-            font-size: 11px;
-            height: 26px;
-            line-height: 26px;
+            font-size: 13px;
+            height: 50px;
+            line-height: 50px;
 
             &::placeholder {
               color: rgba(158, 197, 237, 0.45);
             }
           }
 
+          .atlas-app-input__prefix,
           .el-input__prefix {
             color: #40f2ff;
-            margin-right: 4px;
+            margin-right: 6px;
+            font-size: 16px;
           }
 
+          .atlas-app-input__clear,
           .el-input__clear {
             color: #7dd3fc;
-            font-size: 12px;
+            font-size: 14px;
 
             &:hover {
               color: #ffffff;
@@ -708,16 +793,22 @@ const selectTask = async (task: TaskForm) => {
 
         .task-search-btn {
           flex-shrink: 0;
-          height: 26px;
-          padding: 0 10px;
-          font-size: 11px;
+          height: 52px !important;
+          min-height: 52px !important;
+          padding: 0 16px;
+          font-size: 13px;
           font-weight: 600;
-          border-radius: 4px;
+          border-radius: 6px;
           background: linear-gradient(135deg, rgba(0, 225, 255, 0.25), rgba(14, 116, 144, 0.45));
           border: 1px solid rgba(0, 225, 255, 0.45);
           color: #40f2ff;
           cursor: pointer;
           transition: all 0.2s ease;
+
+          .atlas-app-icon,
+          .el-icon {
+            font-size: 16px;
+          }
 
           &:hover {
             background: linear-gradient(135deg, rgba(0, 225, 255, 0.4), rgba(14, 116, 144, 0.65));
@@ -738,6 +829,7 @@ const selectTask = async (task: TaskForm) => {
         justify-content: space-between;
         margin: 2px 0 2px;
         gap: 6px;
+        font-size: 14px;
 
         .sort-box {
           display: flex;
@@ -746,21 +838,22 @@ const selectTask = async (task: TaskForm) => {
 
           .sort-icon {
             color: #00e1ff;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 700;
           }
 
           :deep(.sort-select) {
-            width: 120px;
+            width: 132px;
 
+            .atlas-app-select__wrapper,
             .el-select__wrapper {
               background-color: rgba(8, 20, 36, 0.85);
               box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.25) inset;
               border-radius: 4px;
               padding: 0 8px;
-              min-height: 26px;
-              height: 26px;
-              font-size: 11px;
+              min-height: 32px;
+              height: 32px;
+              font-size: 14px;
               color: #e2efff;
 
               &:hover {
@@ -771,11 +864,13 @@ const selectTask = async (task: TaskForm) => {
                 box-shadow: 0 0 0 1px #00e1ff inset, 0 0 6px rgba(0, 225, 255, 0.3) !important;
               }
 
+              .atlas-app-select__selected-item,
               .el-select__selected-item {
                 color: #e2efff;
-                font-size: 11px;
+                font-size: 14px;
               }
 
+              .atlas-app-select__suffix,
               .el-select__suffix {
                 color: #40f2ff;
               }
@@ -787,9 +882,9 @@ const selectTask = async (task: TaskForm) => {
           display: inline-flex;
           align-items: center;
           gap: 4px;
-          height: 26px;
+          height: 32px;
           padding: 0 10px;
-          font-size: 11px;
+          font-size: 14px;
           font-weight: 600;
           border-radius: 4px;
           background: rgba(0, 225, 255, 0.08);
@@ -799,7 +894,7 @@ const selectTask = async (task: TaskForm) => {
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
           .btn-icon {
-            font-size: 12px;
+            font-size: 14px;
           }
 
           &:hover {
@@ -823,6 +918,7 @@ const selectTask = async (task: TaskForm) => {
         gap: 10px;
         margin-top: 4px;
         padding: 10px 12px;
+        font-size: 14px;
         background: rgba(8, 18, 32, 0.88);
         border: 1px solid rgba(0, 225, 255, 0.4);
         border-radius: 6px;
@@ -842,8 +938,7 @@ const selectTask = async (task: TaskForm) => {
               display: flex;
               align-items: center;
               justify-content: space-between;
-              font-size: 11px;
-              font-weight: 600;
+              font-size: 14px;
 
               .slider-label--threat,
               .slider-val--threat {
@@ -864,66 +959,8 @@ const selectTask = async (task: TaskForm) => {
               }
             }
 
-            :deep(.cyber-slider) {
-              --el-slider-height: 4px;
-
-              .el-slider__runway {
-                height: 4px;
-                margin: 6px 0;
-                background-color: rgba(79, 147, 221, 0.25);
-                border-radius: 2px;
-              }
-
-              .el-slider__bar {
-                height: 4px;
-                border-radius: 2px;
-              }
-
-              .el-slider__button-wrapper {
-                top: -14px;
-                width: 32px;
-                height: 32px;
-              }
-
-              .el-slider__button {
-                width: 14px;
-                height: 14px;
-                border-radius: 50%;
-                box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
-              }
-
-              &.cyber-slider--threat {
-                .el-slider__bar {
-                  background: #ef4444;
-                }
-
-                .el-slider__button {
-                  background: #ef4444;
-                  border: 2px solid #fca5a5;
-                }
-              }
-
-              &.cyber-slider--delay {
-                .el-slider__bar {
-                  background: #00e1ff;
-                }
-
-                .el-slider__button {
-                  background: #00e1ff;
-                  border: 2px solid #ffffff;
-                }
-              }
-
-              &.cyber-slider--coverage {
-                .el-slider__bar {
-                  background: #f59e0b;
-                }
-
-                .el-slider__button {
-                  background: #f59e0b;
-                  border: 2px solid #fde68a;
-                }
-              }
+            .cyber-metric-slider {
+              width: 100%;
             }
           }
         }
@@ -950,14 +987,14 @@ const selectTask = async (task: TaskForm) => {
               justify-content: space-between;
 
               .group-title {
-                font-size: 11px;
+                font-size: 14px;
                 font-weight: 600;
                 color: #7dd3fc;
                 letter-spacing: 0.2px;
               }
 
               .group-clear-btn {
-                font-size: 10px;
+                font-size: 14px;
                 color: #38bdf8;
                 cursor: pointer;
                 opacity: 0.8;
@@ -980,8 +1017,8 @@ const selectTask = async (task: TaskForm) => {
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                padding: 2px 8px;
-                font-size: 11px;
+                padding: 3px 8px;
+                font-size: 14px;
                 line-height: 1.35;
                 border-radius: 4px;
                 background: rgba(18, 36, 62, 0.7);
@@ -1055,93 +1092,101 @@ const selectTask = async (task: TaskForm) => {
           align-items: center;
           gap: 8px;
 
-          .task-icon {
-            font-size: 14px;
-            flex-shrink: 0;
-          }
-
           .task-name {
             flex: 1;
             min-width: 0;
             font-weight: 600;
-            font-size: 13px;
+            font-size: 16px;
             color: #e2efff;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
           }
 
-          .task-status-badge {
+          .task-edit-btn {
             flex-shrink: 0;
-            font-size: 11px;
-            color: #64748b;
-            padding: 1px 6px;
-            border-radius: 3px;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            transition: all 0.2s ease;
+            height: 24px;
+            padding: 0 8px;
+            font-size: 14px;
+            line-height: 22px;
+            color: #7dd3fc;
+            background: rgba(0, 225, 255, 0.08);
+            border: 1px solid rgba(0, 225, 255, 0.35);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.18s ease;
+
+            &:hover {
+              color: #40f2ff;
+              border-color: #00e1ff;
+              background: rgba(0, 225, 255, 0.18);
+            }
+
+            &:disabled {
+              opacity: 0.45;
+              cursor: not-allowed;
+            }
           }
         }
 
-        .task-card-meta {
+        .task-card-fields {
           display: flex;
           flex-direction: column;
-          gap: 4px;
-          padding-left: 22px;
+          gap: 5px;
+          font-size: 14px;
+          font-weight: 600;
 
-          .meta-tags-row {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-wrap: wrap;
-
-            .meta-tag {
-              padding: 1px 6px;
-              font-size: 10px;
-              border-radius: 3px;
-
-              &.tag-target {
-                background: rgba(0, 225, 255, 0.12);
-                border: 1px solid rgba(0, 225, 255, 0.3);
-                color: #38bdf8;
-              }
-
-              &.tag-country {
-                background: rgba(244, 63, 94, 0.12);
-                border: 1px solid rgba(244, 63, 94, 0.3);
-                color: #fda4af;
-              }
-            }
+          .field-row {
+            display: grid;
+            grid-template-columns: 64px minmax(0, 1fr);
+            align-items: start;
+            column-gap: 8px;
+            min-width: 0;
           }
 
-          .meta-time-row {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 10px;
-            color: #94a3b8;
+          .field-label {
+            line-height: 1.45;
+            color: #64748b;
+            flex-shrink: 0;
 
-            .time-label {
-              color: #64748b;
-            }
-
-            .time-val {
-              font-family: Consolas, monospace;
-              color: #cbd5e1;
-            }
           }
 
-          .meta-desc-row {
-            font-size: 11px;
-            color: #94a3b8;
-            line-height: 1.4;
+          .field-val {
+            min-width: 0;
+            line-height: 1.45;
+            color: #cbd5e1;
+            word-break: break-word;
+            text-align: left;
 
-            .desc-text {
+
+            &.field-val--target {
+              color: #38bdf8;
+            }
+
+            &.field-val--enemy {
+              color: #fda4af;
+            }
+
+            &.field-val--time {
+              font-family: Consolas, 'Courier New', monospace;
+              color: #e2e8f0;
+            }
+
+            &.field-val--desc {
               display: -webkit-box;
               -webkit-line-clamp: 2;
+              line-clamp: 2;
               -webkit-box-orient: vertical;
               overflow: hidden;
-              text-overflow: ellipsis;
+              color: #94a3b8;
+            }
+
+            &.is-focus {
+              color: #fbbf24;
+            }
+
+            &.is-muted {
+              color: #64748b;
             }
           }
         }
@@ -1149,16 +1194,10 @@ const selectTask = async (task: TaskForm) => {
         &:hover {
           border-color: rgba(0, 225, 255, 0.55);
           background: rgba(24, 52, 88, 0.85);
-          transform: translateY(-1px);
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 
           .task-card-top .task-name {
             color: #ffffff;
-          }
-
-          .task-status-badge {
-            color: #38bdf8;
-            border-color: rgba(0, 225, 255, 0.3);
           }
         }
 
@@ -1170,13 +1209,6 @@ const selectTask = async (task: TaskForm) => {
           .task-card-top .task-name {
             color: #40f2ff;
             text-shadow: 0 0 8px rgba(0, 225, 255, 0.4);
-          }
-
-          .task-status-badge {
-            color: #00e1ff;
-            font-weight: 600;
-            background: rgba(0, 225, 255, 0.2);
-            border-color: #00e1ff;
           }
         }
 
@@ -1208,6 +1240,18 @@ const selectTask = async (task: TaskForm) => {
 
   to {
     transform: rotate(360deg);
+  }
+}
+</style>
+
+<style lang="scss">
+.cyber-select-popper.atlas-app-popper,
+.cyber-select-popper.el-popper {
+  font-size: 14px;
+
+  .atlas-app-select-dropdown__item,
+  .el-select-dropdown__item {
+    font-size: 14px;
   }
 }
 </style>

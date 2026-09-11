@@ -150,12 +150,12 @@ const displayLinkItems = computed<SatelliteTransmissionLink[]>(() => {
 /** NORAD -> 威胁度映射 */
 const threatMap = computed(() => {
   const map = new Map<number, number>()
-  ;(activeMatrix.value?.threatSats || []).forEach((item) => {
-    const raw = Number(item.threatScore)
-    if (Number.isFinite(raw)) {
-      map.set(item.norad, raw <= 1 ? raw * 100 : raw)
-    }
-  })
+    ; (activeMatrix.value?.threatSats || []).forEach((item) => {
+      const raw = Number(item.threatScore)
+      if (Number.isFinite(raw)) {
+        map.set(item.norad, raw <= 1 ? raw * 100 : raw)
+      }
+    })
   return map
 })
 
@@ -165,16 +165,16 @@ const coverageMap = computed(() => {
   const matrix = activeMatrix.value
   if (!matrix) return map
 
-  ;(matrix.initMatrixList || []).forEach((item) => {
-    if (Number.isFinite(item.coverage)) {
-      map.set(item.norad, item.coverage!)
-    }
-  })
-  ;(matrix.satelliteMatrixList || []).forEach((item) => {
-    if (Number.isFinite(item.coverage) && !map.has(item.norad)) {
-      map.set(item.norad, item.coverage!)
-    }
-  })
+    ; (matrix.initMatrixList || []).forEach((item) => {
+      if (Number.isFinite(item.coverage)) {
+        map.set(item.norad, item.coverage!)
+      }
+    })
+    ; (matrix.satelliteMatrixList || []).forEach((item) => {
+      if (Number.isFinite(item.coverage) && !map.has(item.norad)) {
+        map.set(item.norad, item.coverage!)
+      }
+    })
   return map
 })
 
@@ -380,7 +380,6 @@ const handleClearSelectedLink = () => {
   &:hover {
     border-color: rgba(0, 225, 255, 0.38);
     background: rgba(18, 32, 54, 0.88);
-    transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 
@@ -430,21 +429,21 @@ const handleClearSelectedLink = () => {
         gap: 2px;
         padding: 1px 6px;
         border-radius: 4px;
-        font-size: 11px;
+        font-size: 14px;
         line-height: 1.3;
+        font-weight: 700;
 
         .metric-icon {
           font-size: 10px;
         }
 
         .metric-label {
-          font-size: 9px;
           opacity: 0.75;
         }
 
         .metric-val {
           font-family: Consolas, monospace;
-          font-weight: 700;
+
         }
 
         &--threat {
