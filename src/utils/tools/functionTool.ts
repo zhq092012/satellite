@@ -164,7 +164,7 @@ export function buildSegmentedTrack(
   return { track: property, segments: segmentCartesians, segmentRanges }
 }
 // 标记战场
-export function markBattleArea(viewer: Cesium.Viewer, battle: BattleForm | null, orbit_altitude_km: number = 20000000) {
+export function markBattleArea(viewer: Cesium.Viewer, battle: BattleForm | null, orbit_altitude_km: number = 24000000) {
   if (!viewer || (viewer as any).isDestroyed?.() || battle === null) return
 
   /** 先清掉旧战场面，避免每次 markBattle 再叠加一份 Polygon/Polyline 几何体 */
@@ -241,13 +241,14 @@ export function markBattleArea(viewer: Cesium.Viewer, battle: BattleForm | null,
     const bs = combinedBS as Cesium.BoundingSphere
     if (!bs.radius || bs.radius === 0 || bs.radius < orbit_altitude_km) bs.radius = orbit_altitude_km
     try {
-      const offset = new Cesium.HeadingPitchRange(0.0, -Cesium.Math.toRadians(90.0), Math.min(bs.radius * 2, 15000000))
+      const targetAltitude = Math.max(bs.radius * 1.6, 24000000)
+      const offset = new Cesium.HeadingPitchRange(0.0, -Cesium.Math.toRadians(90.0), targetAltitude)
       viewer.camera.flyToBoundingSphere(bs, { duration: 1.5, offset })
       // 若相机视角飞到包围球，保存当前的坐标和朝向到 store 中，供其它组件使用
       const centerCarto = Cesium.Cartographic.fromCartesian(bs.center)
       const lon = Cesium.Math.toDegrees(centerCarto.longitude)
       const lat = Cesium.Math.toDegrees(centerCarto.latitude)
-      const battleCenterCartesian = Cesium.Cartesian3.fromDegrees(lon, lat, Math.min(bs.radius * 1.5, 15000000))
+      const battleCenterCartesian = Cesium.Cartesian3.fromDegrees(lon, lat, targetAltitude)
       const battleCenterOrientation = new Cesium.HeadingPitchRoll(0.0, -Cesium.Math.toRadians(90.0), 0.0)
       store.setBattleCenter(battleCenterCartesian, battleCenterOrientation)
     } catch (e) {

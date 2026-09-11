@@ -6,7 +6,32 @@
         @clock-tick="handleClockTick" />
     </div>
 
-    <!-- 2. 悬浮左侧控制面板（支持折叠/展开） -->
+    <!-- 2. 顶部中央悬浮 2D/3D 模式切换栏 -->
+    <div class="floating-view-mode-bar">
+      <button
+        type="button"
+        class="view-mode-btn"
+        :class="{ 'is-active': currentViewMode === '3D' }"
+        title="切换至 3D 球体视角"
+        @click="handleSwitchViewMode('3D')"
+      >
+        <span class="mode-icon">🌐</span>
+        <span class="mode-label">3D 视图</span>
+      </button>
+      <div class="view-mode-divider"></div>
+      <button
+        type="button"
+        class="view-mode-btn"
+        :class="{ 'is-active': currentViewMode === '2D' }"
+        title="切换至 2D 平面地图"
+        @click="handleSwitchViewMode('2D')"
+      >
+        <span class="mode-icon">🗺️</span>
+        <span class="mode-label">2D 平面</span>
+      </button>
+    </div>
+
+    <!-- 3. 悬浮左侧控制面板（支持折叠/展开） -->
     <div class="floating-panel floating-panel--left" :class="{ 'is-collapsed': isLeftCollapsed }">
       <div class="panel-inner">
         <C2LeftControlPanel :matrix-data="matrixData" :selected-norad="selectedNorad"
@@ -23,7 +48,7 @@
       </button>
     </div>
 
-    <!-- 3. 悬浮右侧分析面板（支持折叠/展开） -->
+    <!-- 4. 悬浮右侧分析面板（支持折叠/展开） -->
     <div class="floating-panel floating-panel--right" :class="{ 'is-collapsed': isRightCollapsed }">
       <div class="panel-inner">
         <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad"
@@ -42,7 +67,7 @@
       </button>
     </div>
 
-    <!-- 4. 悬浮下方时间轴（两侧留距离、圆角、半透明、支持向下折叠/展开） -->
+    <!-- 5. 悬浮下方时间轴（两侧留距离、圆角、半透明、支持向下折叠/展开） -->
     <div class="floating-timeline-wrapper" :class="{ 'is-collapsed': isTimelineCollapsed }" v-if="taskTimeRange">
       <!-- 折叠/展开控制按钮 -->
       <button type="button" class="timeline-toggle-btn"
@@ -92,6 +117,18 @@ useSatelliteProfileDialog()
 const isLeftCollapsed = ref(false)
 const isRightCollapsed = ref(false)
 const isTimelineCollapsed = ref(false)
+
+/** [变量说明] 当前视图模式（3D 球体视图 / 2D 平面地图） */
+const currentViewMode = ref<'3D' | '2D'>('3D')
+
+/**
+ * 切换 2D / 3D 视图模式
+ */
+const handleSwitchViewMode = (mode: '3D' | '2D') => {
+  if (currentViewMode.value === mode) return
+  currentViewMode.value = mode
+  cesiumViewerRef.value?.setSceneMode(mode)
+}
 
 /** [变量说明] 3D Cesium Viewer 组件实例引用 */
 const cesiumViewerRef = ref<InstanceType<typeof CesiumViewer> | null>(null)
@@ -464,7 +501,80 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
     overflow: hidden;
   }
 
-  /* 2. 悬浮面板基础通用样式 */
+  /* 2. 顶部中央悬浮 2D/3D 模式切换菜单栏 */
+  .floating-view-mode-bar {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 4px;
+    border-radius: 20px;
+    background: rgba(6, 18, 32, 0.88);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 225, 255, 0.32);
+    box-shadow:
+      0 4px 20px rgba(0, 0, 0, 0.55),
+      0 0 12px rgba(0, 225, 255, 0.15);
+    pointer-events: auto;
+    user-select: none;
+
+    .view-mode-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      border-radius: 16px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: #92b1d0;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.22s ease;
+      outline: none;
+
+      .mode-icon {
+        font-size: 13px;
+        line-height: 1;
+      }
+
+      .mode-label {
+        letter-spacing: 0.5px;
+      }
+
+      &:hover {
+        color: #d6eaff;
+        background: rgba(0, 225, 255, 0.1);
+      }
+
+      &.is-active {
+        color: #ffffff;
+        font-weight: 700;
+        background: linear-gradient(135deg, rgba(0, 200, 255, 0.35) 0%, rgba(0, 119, 255, 0.45) 100%);
+        border-color: rgba(0, 225, 255, 0.6);
+        box-shadow:
+          0 0 10px rgba(0, 225, 255, 0.35),
+          inset 0 0 6px rgba(0, 225, 255, 0.2);
+        text-shadow: 0 0 6px rgba(0, 225, 255, 0.8);
+
+        .mode-icon {
+          filter: drop-shadow(0 0 4px #00e1ff);
+        }
+      }
+    }
+
+    .view-mode-divider {
+      width: 1px;
+      height: 14px;
+      background: rgba(0, 225, 255, 0.2);
+      margin: 0 2px;
+    }
+  }
+
+  /* 3. 悬浮面板基础通用样式 */
   .floating-panel {
     position: absolute;
     top: 14px;
