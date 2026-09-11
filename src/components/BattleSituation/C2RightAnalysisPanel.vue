@@ -2,7 +2,10 @@
   <aside class="c2-panel c2-panel--right dark-theme">
     <div class="panel-header">
       <div class="header-title-box">
-        <span class="header-title glow-text-cyan">推荐打击链路</span>
+        <span class="header-title glow-text-cyan">打击链路列表</span>
+        <span class="link-count-badge" v-if="displayLinkItems.length">
+          共 {{ displayLinkItems.length }} 条
+        </span>
       </div>
       <button type="button" class="clear-link-btn" :disabled="!selectedTransmissionLinkId"
         @click.stop="handleClearSelectedLink">
@@ -18,66 +21,63 @@
 
     <template v-else>
       <div class="link-section">
-
         <div class="link-section-scroll">
           <div v-if="displayLinkItems.length" class="link-cards-list">
-            <div v-for="item in displayLinkItems" :key="item.id" class="transmission-link-card" :class="[
+            <div v-for="(link, index) in displayLinkItems" :key="link.id" class="transmission-link-card" :class="[
               {
-                active: selectedTransmissionLinkId === item.link.id,
-                blocked: item.link.blocked,
+                active: selectedTransmissionLinkId === link.id,
+                blocked: link.blocked,
               },
-              item.priority ? `priority-rank-${item.priority.rank}` : '',
-            ]" role="button" tabindex="0" @click="handleLinkCardClick(item.link)"
-              @keydown.enter.prevent="handleLinkCardClick(item.link)">
+            ]" role="button" tabindex="0" @click="handleLinkCardClick(link)"
+              @keydown.enter.prevent="handleLinkCardClick(link)">
+              <!-- 顶部行：左侧为链路序号/名称，右侧平铺展示 威胁度 / 链路时长 / 覆盖率 三大指标 -->
               <div class="link-card-header">
                 <div class="link-title-left">
-                  <span class="link-index">链路 {{ item.displayIndex }}</span>
-                  <span v-if="item.priority" class="rank-badge" :class="`rank-badge--${item.priority.rank}`">
-                    {{ getRankMedal(item.priority.rank) }} TOP {{ item.priority.rank }}
-                    ({{ item.priority.totalScore }}分)
-                  </span>
+                  <span class="link-index">链路 {{ index + 1 }}</span>
                 </div>
-                <div class="link-metrics-row">
-                  <div class="link-metric-card">
-                    <span class="link-metric-label">{{ linkPrimaryMetricLabel(item.link) }}</span>
-                    <strong>{{ formatPrimaryLinkMetric(item.link) }}</strong>
-                  </div>
+
+                <div class="link-metrics-right">
+                  <span class="metric-tag metric-tag--threat" title="卫星威胁度">
+                    <span class="metric-icon">🛡️</span>
+                    <span class="metric-label">威胁度:</span>
+                    <span class="metric-val">{{ getLinkThreatText(link) }}</span>
+                  </span>
+                  <span class="metric-tag metric-tag--duration" title="链路传输时长">
+                    <span class="metric-icon">⏱️</span>
+                    <span class="metric-label">时长:</span>
+                    <span class="metric-val">{{ getLinkDurationText(link) }}</span>
+                  </span>
+                  <span class="metric-tag metric-tag--coverage" title="卫星覆盖率">
+                    <span class="metric-icon">🌐</span>
+                    <span class="metric-label">覆盖率:</span>
+                    <span class="metric-val">{{ getLinkCoverageText(link) }}</span>
+                  </span>
                 </div>
               </div>
 
+              <!-- 链路节点传输链路流 -->
               <div class="link-flow-row">
-                <template v-for="(node, nodeIdx) in item.link.nodes" :key="item.link.id + '-' + node.layer + node.id">
+                <template v-for="(node, nodeIdx) in link.nodes" :key="link.id + '-' + node.layer + node.id">
                   <div class="flow-node">
                     <span class="flow-node-icon">{{ node.icon }}</span>
                     <span class="flow-node-name" :title="node.name">{{ node.name }}</span>
                     <span class="flow-node-layer">{{ chainLayerLabel(node.layer) }}</span>
                   </div>
-                  <span v-if="nodeIdx < item.link.nodes.length - 1" class="flow-arrow">→</span>
+                  <span v-if="nodeIdx < link.nodes.length - 1" class="flow-arrow">→</span>
                 </template>
               </div>
 
-              <div v-if="item.priority" class="priority-reason-tip">
-                <span class="reason-icon">💡</span>
-                <el-tooltip placement="left" :show-after="200" trigger="hover"
-                  popper-class="c2-priority-reason-tooltip">
-                  <template #content>
-                    <div class="reason-tooltip-body">{{ item.priority.reason }}</div>
-                  </template>
-                  <span class="reason-text">{{ item.priority.reason }}</span>
-                </el-tooltip>
-              </div>
-
-              <div v-if="item.link.blocked" class="link-blocked-tip">{{ item.link.blockedReason }}</div>
+              <div v-if="link.blocked" class="link-blocked-tip">{{ link.blockedReason }}</div>
 
               <div class="link-meta-row">
                 <span class="link-meta-label">传输时间</span>
-                <strong class="link-meta-val">{{ item.link.transmitTime }}</strong>
+                <strong class="link-meta-val">{{ link.transmitTime }}</strong>
               </div>
             </div>
           </div>
 
           <div v-else class="empty-link-box">
-            {{ selectedSatelliteNorad != null ? '该卫星暂无推荐打击链路' : '当前范围内暂无推荐打击链路' }}
+            {{ selectedSatelliteNorad != null ? '该卫星暂无可用打击链路' : '当前范围内暂无可用打击链路' }}
           </div>
         </div>
       </div>
@@ -87,8 +87,8 @@
 
 <script setup lang="ts">
 /**
- * 整体态势分析 - 右侧推荐传输链路面板
- * 集中展示经算法多维优先级评估推荐的 TOP 1~3 传输链路。
+ * 整体态势分析 - 右侧传输链路面板
+ * 展示满足筛选条件的所有传输链路，并在卡片名称右侧呈现 威胁度、链路时长、覆盖率 三大指标。
  */
 import { computed } from 'vue'
 import { type MatrixResult } from '@/api/electronic'
@@ -96,24 +96,11 @@ import { useLayoutStore } from '@/store/modules/layout'
 import {
   collectSatelliteTransmissionLinks,
   collectSeriesTransmissionLinks,
-  rankTransmissionLinksByPriority,
   resolveTaskEndMs,
-  STARLINK_PRIORITY_WEIGHTS,
+  parseTimeToMs,
   type ChainNode,
-  type LinkPriorityMetrics,
   type SatelliteTransmissionLink,
-  type PrioritizedTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
-
-/**
- * 右侧面板统一链路列表项：TOP 1~3 推荐链路。
- */
-interface DisplayTransmissionLinkItem {
-  id: string
-  link: SatelliteTransmissionLink
-  displayIndex: number
-  priority: LinkPriorityMetrics | null
-}
 
 const store = useLayoutStore()
 
@@ -138,62 +125,6 @@ const taskEndMs = computed(() => resolveTaskEndMs(store.activedTask?.endDate))
 /** 当前生效矩阵 */
 const activeMatrix = computed<MatrixResult | null>(() => props.matrixData)
 
-/** STARLINK 系列的链路首要指标使用打击前覆盖率。 */
-const isStarlinkSeries = computed(() => store.selectedSatSeries === 'STARLINK')
-
-/**
- * 判断链路源卫星是否属于 STARLINK（当前筛选为 STARLINK，或卫星名以 STARLINK 开头）。
- *
- * @param link 传输链路
- * @returns 是否按 STARLINK 展示打击前覆盖率
- */
-const isStarlinkLink = (link: SatelliteTransmissionLink): boolean => {
-  if (isStarlinkSeries.value) return true
-  const sourceSatellite = link.nodes.find((node) => node.layer === 'SAT')
-  return !!sourceSatellite?.name && sourceSatellite.name.toUpperCase().startsWith('STARLINK')
-}
-
-/**
- * 链路卡片右上角指标名称。
- *
- * @param link 传输链路
- * @returns STARLINK 为打击前覆盖率，其余为过站时间
- */
-const linkPrimaryMetricLabel = (link: SatelliteTransmissionLink): string =>
-  isStarlinkLink(link) ? '打击前覆盖率' : '过站时长'
-
-/** 按 NORAD 编号索引的打击前卫星覆盖率（initMatrixList.coverage）。 */
-const beforeCoverageByNorad = computed(() =>
-  new Map(
-    (activeMatrix.value?.initMatrixList || [])
-      .filter((satellite) => Number.isFinite(satellite.coverage))
-      .map((satellite) => [satellite.norad, satellite.coverage!])
-  )
-)
-
-/** 将毫秒时长格式化为小时和分钟。 */
-const formatElapsedTime = (durationMs: number): string => {
-  if (!Number.isFinite(durationMs) || durationMs < 0) return '--'
-  const totalMinutes = Math.floor(durationMs / 60000)
-  return `${Math.floor(totalMinutes / 60)}时${totalMinutes % 60}分`
-}
-
-/** 格式化卫星覆盖率。 */
-const formatCoverage = (coverage: number | undefined): string => {
-  if (coverage == null || !Number.isFinite(coverage)) return '--'
-  return `${Number(coverage.toFixed(2))}%`
-}
-
-/** 根据当前系列格式化链路卡片首个指标。 */
-const formatPrimaryLinkMetric = (link: SatelliteTransmissionLink): string => {
-  if (!isStarlinkLink(link)) {
-    return formatElapsedTime(link.transmitEndMs - link.transmitStartMs)
-  }
-  const sourceSatellite = link.nodes.find((node) => node.layer === 'SAT')
-  const norad = Number(sourceSatellite?.id)
-  return formatCoverage(beforeCoverageByNorad.value.get(norad))
-}
-
 /**
  * 当前展示的传输链路：
  * - 选中卫星时：仅该卫星相关链路，按过境开始时间从早到晚排序
@@ -211,37 +142,91 @@ const transmissionLinks = computed<SatelliteTransmissionLink[]>(() => {
   return collectSeriesTransmissionLinks(matrix, taskEndMs.value)
 })
 
-/**
- * 按多维优先级评估后的传输链路列表（降序）
- */
-const prioritizedLinks = computed<PrioritizedTransmissionLink[]>(() => {
+/** 展示全部传输链路（无 top 截断） */
+const displayLinkItems = computed<SatelliteTransmissionLink[]>(() => {
+  return transmissionLinks.value
+})
+
+/** NORAD -> 威胁度映射 */
+const threatMap = computed(() => {
+  const map = new Map<number, number>()
+  ;(activeMatrix.value?.threatSats || []).forEach((item) => {
+    const raw = Number(item.threatScore)
+    if (Number.isFinite(raw)) {
+      map.set(item.norad, raw <= 1 ? raw * 100 : raw)
+    }
+  })
+  return map
+})
+
+/** NORAD -> 覆盖率映射 */
+const coverageMap = computed(() => {
+  const map = new Map<number, number>()
   const matrix = activeMatrix.value
-  if (!matrix || !transmissionLinks.value.length) return []
-  return rankTransmissionLinksByPriority(
-    matrix,
-    transmissionLinks.value,
-    isStarlinkSeries.value ? STARLINK_PRIORITY_WEIGHTS : undefined
-  )
+  if (!matrix) return map
+
+  ;(matrix.initMatrixList || []).forEach((item) => {
+    if (Number.isFinite(item.coverage)) {
+      map.set(item.norad, item.coverage!)
+    }
+  })
+  ;(matrix.satelliteMatrixList || []).forEach((item) => {
+    if (Number.isFinite(item.coverage) && !map.has(item.norad)) {
+      map.set(item.norad, item.coverage!)
+    }
+  })
+  return map
 })
 
-/**
- * 仅展示经算法多维评估推荐的 TOP 3 传输链路。
- */
-const displayLinkItems = computed<DisplayTransmissionLinkItem[]>(() => {
-  const top3 = prioritizedLinks.value.slice(0, 3)
-  return top3.map((item, index) => ({
-    id: item.link.id,
-    link: item.link,
-    displayIndex: index + 1,
-    priority: item.priority,
-  }))
-})
+/** 获取源卫星 NORAD */
+const getLinkSourceNorad = (link: SatelliteTransmissionLink): number | null => {
+  const satNode = link.nodes.find((node) => node.layer === 'SAT')
+  return satNode ? Number(satNode.id) : null
+}
 
-const getRankMedal = (rank: number): string => {
-  if (rank === 1) return '🥇'
-  if (rank === 2) return '🥈'
-  if (rank === 3) return '🥉'
-  return ''
+/** 威胁度展示文本 */
+const getLinkThreatText = (link: SatelliteTransmissionLink): string => {
+  const norad = getLinkSourceNorad(link)
+  if (norad == null) return '--'
+  const val = threatMap.value.get(norad)
+  if (val == null || !Number.isFinite(val)) return '--'
+  return `${Math.round(val)}分`
+}
+
+/** 链路时长展示文本 */
+const getLinkDurationText = (link: SatelliteTransmissionLink): string => {
+  let durationMs = link.transmitEndMs - link.transmitStartMs
+  if (!Number.isFinite(durationMs) || durationMs <= 0) {
+    if (link.transmitTime && link.transmitTime.includes('~')) {
+      const parts = link.transmitTime.split('~')
+      const start = parseTimeToMs(parts[0]?.trim())
+      const end = parseTimeToMs(parts[1]?.trim())
+      if (end > start) durationMs = end - start
+    }
+  }
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return '--'
+
+  const totalSeconds = Math.floor(durationMs / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}时${minutes}分`
+  }
+  if (minutes > 0) {
+    return seconds > 0 ? `${minutes}分${seconds}秒` : `${minutes}分`
+  }
+  return `${seconds}秒`
+}
+
+/** 覆盖率展示文本 */
+const getLinkCoverageText = (link: SatelliteTransmissionLink): string => {
+  const norad = getLinkSourceNorad(link)
+  if (norad == null) return '--'
+  const val = coverageMap.value.get(norad)
+  if (val == null || !Number.isFinite(val)) return '--'
+  return `${Number(val.toFixed(1))}%`
 }
 
 /**
@@ -303,7 +288,10 @@ const handleClearSelectedLink = () => {
   .header-title-box {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+  }
+
+  .header-title {
     font-size: 15px;
     font-weight: 700;
   }
@@ -313,97 +301,20 @@ const handleClearSelectedLink = () => {
     text-shadow: 0 0 8px rgba(64, 242, 255, 0.4);
   }
 
-  .panel-badge {
+  .link-count-badge {
     padding: 2px 8px;
     font-size: 11px;
+    font-weight: 600;
     border-radius: 4px;
-    background: rgba(56, 189, 248, 0.15);
-    color: #38bdf8;
-    border: 1px solid rgba(56, 189, 248, 0.3);
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    background: rgba(0, 225, 255, 0.12);
+    color: #5ce1e6;
+    border: 1px solid rgba(0, 225, 255, 0.3);
   }
-}
-
-.scope-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 12px;
-  margin-bottom: 10px;
-  border-radius: 8px;
-  background: rgba(0, 225, 255, 0.08);
-  border: 1px solid rgba(0, 225, 255, 0.22);
-
-  .scope-label {
-    font-size: 12px;
-    color: #94a3b8;
-  }
-
-  .scope-value {
-    font-size: 13px;
-    color: #67e8f9;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
-.stats-strip {
-  flex-shrink: 0;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
-  align-items: stretch;
-  gap: 0;
-  margin-bottom: 12px;
-  padding: 12px 8px;
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(14, 25, 42, 0.95) 0%, rgba(8, 15, 26, 0.95) 100%);
-  border: 1px solid rgba(0, 225, 255, 0.18);
-  box-shadow: inset 0 0 20px rgba(0, 225, 255, 0.04);
-}
-
-.link-section {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.link-section-header {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.link-section-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.link-section-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #7dd3fc;
-}
-
-.link-section-count {
-  font-size: 11px;
-  padding: 1px 8px;
-  border-radius: 10px;
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
 }
 
 .clear-link-btn {
   flex-shrink: 0;
-  height: 22px;
+  height: 24px;
   padding: 0 8px;
   border-radius: 4px;
   border: 1px solid rgba(64, 242, 255, 0.35);
@@ -423,6 +334,13 @@ const handleClearSelectedLink = () => {
     cursor: not-allowed;
     opacity: 0.45;
   }
+}
+
+.link-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .link-section-scroll {
@@ -460,18 +378,21 @@ const handleClearSelectedLink = () => {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 
   &:hover {
-    border-color: rgba(0, 225, 255, 0.32);
+    border-color: rgba(0, 225, 255, 0.38);
     background: rgba(18, 32, 54, 0.88);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 
   &.active {
-    border-color: rgba(245, 230, 163, 0.65);
-    background: rgba(28, 32, 24, 0.72);
-    box-shadow: 0 0 12px rgba(245, 230, 163, 0.12);
+    border-color: #00e1ff;
+    background: rgba(0, 225, 255, 0.1);
+    box-shadow: 0 0 12px rgba(0, 225, 255, 0.25);
   }
 
   &.blocked {
     border-style: dashed;
+    border-color: rgba(239, 68, 68, 0.4);
   }
 
   .link-card-header {
@@ -479,186 +400,161 @@ const handleClearSelectedLink = () => {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    flex-wrap: wrap;
 
     .link-title-left {
       display: flex;
       align-items: center;
       gap: 6px;
-      flex-wrap: wrap;
+      flex-shrink: 0;
     }
 
     .link-index {
-      font-size: 14px;
-      flex-shrink: 0;
-      font-weight: 700;
-      color: #7dd3fc;
-    }
-
-    .rank-badge {
-      font-size: 10px;
-      font-weight: 800;
-      padding: 1px 6px;
-      border-radius: 4px;
-
-      &--1 {
-        background: rgba(234, 179, 8, 0.25);
-        color: #fef08a;
-        border: 1px solid rgba(234, 179, 8, 0.6);
-      }
-
-      &--2 {
-        background: rgba(56, 189, 248, 0.25);
-        color: #bae6fd;
-        border: 1px solid rgba(56, 189, 248, 0.6);
-      }
-
-      &--3 {
-        background: rgba(249, 115, 22, 0.25);
-        color: #fed7aa;
-        border: 1px solid rgba(249, 115, 22, 0.6);
-      }
-    }
-  }
-
-  .priority-reason-tip {
-    display: flex;
-    align-items: flex-start;
-    gap: 5px;
-    padding: 6px 8px;
-    border-radius: 4px;
-    background: rgba(0, 225, 255, 0.08);
-    border: 1px solid rgba(0, 225, 255, 0.2);
-    font-size: 13px;
-    color: #bae6fd;
-    line-height: 1.5;
-    text-align: left;
-
-    .reason-icon {
       font-size: 13px;
       flex-shrink: 0;
-      margin-top: 1px;
+      font-weight: 700;
+      color: #40f2ff;
+      text-shadow: 0 0 6px rgba(64, 242, 255, 0.3);
     }
 
-    :deep(.el-tooltip__trigger) {
-      flex: 1;
-      min-width: 0;
-      display: block;
+    .link-metrics-right {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+
+      .metric-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 11px;
+        line-height: 1.3;
+
+        .metric-icon {
+          font-size: 10px;
+        }
+
+        .metric-label {
+          font-size: 9px;
+          opacity: 0.75;
+        }
+
+        .metric-val {
+          font-family: Consolas, monospace;
+          font-weight: 700;
+        }
+
+        &--threat {
+          background: rgba(239, 68, 68, 0.12);
+          border: 1px solid rgba(239, 68, 68, 0.35);
+          color: #f87171;
+
+          .metric-val {
+            color: #fca5a5;
+          }
+        }
+
+        &--duration {
+          background: rgba(0, 225, 255, 0.12);
+          border: 1px solid rgba(0, 225, 255, 0.35);
+          color: #38bdf8;
+
+          .metric-val {
+            color: #7dd3fc;
+          }
+        }
+
+        &--coverage {
+          background: rgba(245, 158, 11, 0.12);
+          border: 1px solid rgba(245, 158, 11, 0.35);
+          color: #fbbf24;
+
+          .metric-val {
+            color: #fde68a;
+          }
+        }
+      }
+    }
+  }
+
+  .link-flow-row {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px;
+    border-radius: 6px;
+    background: rgba(8, 15, 26, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .flow-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    flex: 1;
+
+    .flow-node-icon {
+      font-size: 14px;
     }
 
-    .reason-text {
-      text-align: left;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      line-clamp: 3;
-      -webkit-box-orient: vertical;
+    .flow-node-name {
+      font-size: 10px;
+      font-weight: 600;
+      color: cyan;
+      text-align: center;
       overflow: hidden;
-      cursor: help;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      width: 100%;
+    }
+
+    .flow-node-layer {
+      font-size: 9px;
+      color: #64748b;
     }
   }
-}
 
-.link-flow-row {
-  display: flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 8px;
-  border-radius: 6px;
-  background: rgba(8, 15, 26, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.flow-node {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 4px;
-  flex: 1;
-
-  .flow-node-icon {
-    font-size: 14px;
-  }
-
-  .flow-node-name {
-    font-size: 10px;
-    font-weight: 600;
-    color: cyan;
-    text-align: center;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    width: 100%;
-  }
-
-  .flow-node-layer {
-    font-size: 9px;
-    color: #64748b;
-  }
-}
-
-.flow-arrow {
-  color: #00e1ff;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 32px;
-}
-
-.link-blocked-tip {
-  font-size: 11px;
-  color: #94a3b8;
-  padding: 4px 8px;
-  border-radius: 4px;
-  background: rgba(148, 163, 184, 0.08);
-}
-
-.link-metrics-row {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-  margin-top: 0;
-}
-
-.link-metric-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  min-width: 0;
-
-  .link-metric-label {
-    color: #8494aa;
-    font-size: 10px;
-    white-space: nowrap;
-  }
-
-  strong {
-    color: #d2d440;
-    font-size: 14px;
+  .flow-arrow {
+    color: #00e1ff;
+    font-size: 13px;
     font-weight: 700;
-    white-space: nowrap;
-  }
-}
-
-.link-meta-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 2px;
-
-  .link-meta-label {
-    font-size: 11px;
-    color: #64748b;
+    line-height: 32px;
   }
 
-  .link-meta-val {
+  .link-blocked-tip {
     font-size: 11px;
-    color: #67e8f9;
-    text-align: right;
-    line-height: 1.4;
+    color: #f87171;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+
+  .link-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 2px;
+
+    .link-meta-label {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .link-meta-val {
+      font-size: 11px;
+      color: #67e8f9;
+      font-family: Consolas, monospace;
+      text-align: right;
+      line-height: 1.4;
+    }
   }
 }
 
@@ -700,24 +596,5 @@ const handleClearSelectedLink = () => {
   padding: 16px 12px;
   font-size: 12px;
   color: #94a3b8;
-}
-</style>
-
-<style lang="scss">
-.c2-priority-reason-tooltip {
-  max-width: 360px !important;
-  padding: 10px 12px !important;
-  background: rgba(10, 18, 32, 0.96) !important;
-  border: 1px solid rgba(0, 225, 255, 0.28) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
-
-  .reason-tooltip-body {
-    font-size: 12px;
-    line-height: 1.65;
-    color: #e2efff;
-    text-align: left;
-    white-space: normal;
-    word-break: break-word;
-  }
 }
 </style>

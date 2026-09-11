@@ -42,53 +42,117 @@
             </el-button>
           </div>
 
-          <!-- 搜索过滤选项: 卫星类型、卫星系列、打击方案 (Tag 块多选展示) -->
-          <div class="task-filter-options">
-            <!-- 1. 卫星类型 (五大类) -->
-            <div class="filter-group">
-              <div class="filter-group-header">
-                <span class="group-title">卫星类型</span>
-                <span v-if="selectedSatTypes.length > 0" class="group-clear-btn" @click="clearSatTypes">
-                  重置
-                </span>
-              </div>
-              <div class="filter-tags-wrap">
-                <span v-for="type in SATELLITE_TYPES" :key="type" class="filter-tag-chip"
-                  :class="{ active: selectedSatTypes.includes(type) }" @click="toggleSatType(type)">
-                  {{ type }}
-                </span>
-              </div>
+          <!-- 排序与折叠控制栏 (Image 1 风格) -->
+          <div class="filter-action-bar">
+            <div class="sort-box">
+              <span class="sort-icon">⇅</span>
+              <el-select v-model="sortOrder" size="small" class="sort-select" popper-class="cyber-select-popper">
+                <el-option label="默认顺序" value="default" />
+                <el-option label="时间降序 (最新)" value="time-desc" />
+                <el-option label="时间升序 (最早)" value="time-asc" />
+                <el-option label="任务名称 (A-Z)" value="name" />
+              </el-select>
             </div>
 
-            <!-- 2. 卫星系列 (矩阵中返回的所有系列) -->
-            <div class="filter-group" v-if="seriesOptions.length > 0">
-              <div class="filter-group-header">
-                <span class="group-title">卫星系列</span>
-                <span v-if="selectedSatSeriesList.length > 0" class="group-clear-btn" @click="clearSatSeries">
-                  重置
-                </span>
-              </div>
-              <div class="filter-tags-wrap">
-                <span v-for="series in seriesOptions" :key="series" class="filter-tag-chip"
-                  :class="{ active: selectedSatSeriesList.includes(series) }" @click="toggleSatSeries(series)">
-                  {{ series }}
-                </span>
-              </div>
-            </div>
-
-            <!-- 3. 打击方案 (打击军用、打击民用、打击军用民用) -->
-            <div class="filter-group">
-              <div class="filter-group-header">
-                <span class="group-title">打击方案</span>
-              </div>
-              <div class="filter-tags-wrap">
-                <span v-for="opt in strikeSchemeOptions" :key="opt.value" class="filter-tag-chip"
-                  :class="{ active: selectedStrikeSchemes.includes(opt.value) }" @click="toggleStrikeScheme(opt.value)">
-                  {{ opt.label }}
-                </span>
-              </div>
-            </div>
+            <button type="button" class="filter-toggle-btn" :class="{ active: isFilterExpanded }"
+              @click="isFilterExpanded = !isFilterExpanded" title="展开/收起筛选面板">
+              <el-icon class="btn-icon">
+                <Operation />
+              </el-icon>
+              <span>{{ isFilterExpanded ? '收起筛选' : '指标筛选' }}</span>
+            </button>
           </div>
+
+          <!-- 可折叠筛选卡片 (Image 1 风格边框与滑块 + Image 2 Tag 多选) -->
+          <el-collapse-transition>
+            <div v-show="isFilterExpanded" class="collapsible-filter-panel">
+              <!-- 2. Tag 选择组 (Image 2) -->
+              <div class="tags-filter-group">
+                <!-- 卫星类型 (五大类) -->
+                <div class="filter-group">
+                  <div class="filter-group-header">
+                    <span class="group-title">卫星类型</span>
+                    <span v-if="selectedSatTypes.length > 0" class="group-clear-btn" @click="clearSatTypes">
+                      重置
+                    </span>
+                  </div>
+                  <div class="filter-tags-wrap">
+                    <span v-for="type in SATELLITE_TYPES" :key="type" class="filter-tag-chip"
+                      :class="{ active: selectedSatTypes.includes(type) }" @click="toggleSatType(type)">
+                      {{ type }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- 卫星系列 (矩阵中返回的所有系列) -->
+                <div class="filter-group" v-if="seriesOptions.length > 0">
+                  <div class="filter-group-header">
+                    <span class="group-title">卫星系列</span>
+                    <span v-if="selectedSatSeriesList.length > 0" class="group-clear-btn" @click="clearSatSeries">
+                      重置
+                    </span>
+                  </div>
+                  <div class="filter-tags-wrap">
+                    <span v-for="series in seriesOptions" :key="series" class="filter-tag-chip"
+                      :class="{ active: selectedSatSeriesList.includes(series) }" @click="toggleSatSeries(series)">
+                      {{ series }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- 打击方案 (打击军用、打击民用、打击军用民用) -->
+                <div class="filter-group">
+                  <div class="filter-group-header">
+                    <span class="group-title">打击方案</span>
+                  </div>
+                  <div class="filter-tags-wrap">
+                    <span v-for="opt in strikeSchemeOptions" :key="opt.value" class="filter-tag-chip"
+                      :class="{ active: selectedStrikeSchemes.includes(opt.value) }"
+                      @click="toggleStrikeScheme(opt.value)">
+                      {{ opt.label }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+
+              <!-- 分割虚线 -->
+              <div class="filter-divider" />
+
+              <!-- 1. 指标滑块组 (Image 1) -->
+              <div class="metrics-filter-group">
+                <!-- 威胁度 -->
+                <div class="metric-slider-item">
+                  <div class="slider-header">
+                    <span class="slider-label slider-label--threat">🛡️ 威胁度 ≥</span>
+                    <span class="slider-val slider-val--threat">{{ filterThreat }}分</span>
+                  </div>
+                  <el-slider v-model="filterThreat" :min="0" :max="100" :step="1" size="small"
+                    class="cyber-slider cyber-slider--threat" />
+                </div>
+
+                <!-- 链路延迟 -->
+                <div class="metric-slider-item">
+                  <div class="slider-header">
+                    <span class="slider-label slider-label--delay">📶 链路延迟 ≤</span>
+                    <span class="slider-val slider-val--delay">{{ filterDelay }}ms</span>
+                  </div>
+                  <el-slider v-model="filterDelay" :min="0" :max="1000" :step="10" size="small"
+                    class="cyber-slider cyber-slider--delay" />
+                </div>
+
+                <!-- 覆盖率 -->
+                <div class="metric-slider-item">
+                  <div class="slider-header">
+                    <span class="slider-label slider-label--coverage">🌐 覆盖率 ≥</span>
+                    <span class="slider-val slider-val--coverage">{{ filterCoverage }}%</span>
+                  </div>
+                  <el-slider v-model="filterCoverage" :min="0" :max="100" :step="1" size="small"
+                    class="cyber-slider cyber-slider--coverage" />
+                </div>
+              </div>
+            </div>
+          </el-collapse-transition>
         </div>
 
         <div class="task-scroll-list">
@@ -147,7 +211,7 @@
  * - 点击任务一键切换全局当前任务，联动刷新全局 Store 方案与矩阵数据
  */
 import { ref, computed, watch } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { Search, Operation } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getTaskList } from '@/api/dashboard'
 import type { TaskForm } from '@/types/dashboard'
@@ -190,6 +254,17 @@ const taskSwitching = ref(false)
 const taskSearchKey = ref('')
 /** 点击搜索或回车确认的搜索词 */
 const confirmedSearchKey = ref('')
+
+/** 筛选面板是否展开（可折叠） */
+const isFilterExpanded = ref(true)
+
+/** 任务排序方式：default(默认顺序) / time-desc(时间降序) / time-asc(时间升序) / name(任务名称) */
+const sortOrder = ref('default')
+
+/** 指标滑块筛选 (威胁度, 链路延迟, 覆盖率) */
+const filterThreat = ref(0)
+const filterDelay = ref(1000)
+const filterCoverage = ref(0)
 
 /** 选中的卫星类型列表（多选） */
 const selectedSatTypes = ref<string[]>(
@@ -254,7 +329,11 @@ const seriesOptions = computed<string[]>(() => {
         if (m?.series) seriesSet.add(m.series)
       })
     }
-
+    // if (Array.isArray(mData.coverRateMatrices)) {
+    //   mData.coverRateMatrices.forEach((c: any) => {
+    //     if (c?.series) seriesSet.add(c.series)
+    //   })
+    // }
   }
   return Array.from(seriesSet)
 })
@@ -366,6 +445,23 @@ const filteredTaskList = computed<TaskForm[]>(() => {
         (t.targetType && t.targetType.toLowerCase().includes(query)) ||
         (t.enemyCountry && t.enemyCountry.toLowerCase().includes(query))
     )
+  }
+
+  // 3. 排序 (默认顺序 / 时间升序 / 时间降序 / 名称)
+  if (sortOrder.value === 'time-desc') {
+    list = [...list].sort((a, b) => {
+      const ta = a.beginDate ? new Date(a.beginDate).getTime() : 0
+      const tb = b.beginDate ? new Date(b.beginDate).getTime() : 0
+      return tb - ta
+    })
+  } else if (sortOrder.value === 'time-asc') {
+    list = [...list].sort((a, b) => {
+      const ta = a.beginDate ? new Date(a.beginDate).getTime() : 0
+      const tb = b.beginDate ? new Date(b.beginDate).getTime() : 0
+      return ta - tb
+    })
+  } else if (sortOrder.value === 'name') {
+    list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
   }
 
   return list
@@ -636,77 +732,280 @@ const selectTask = async (task: TaskForm) => {
         }
       }
 
-      .task-filter-options {
+      .filter-action-bar {
         display: flex;
-        flex-direction: column;
-        gap: 8px;
+        align-items: center;
+        justify-content: space-between;
+        margin: 2px 0 2px;
+        gap: 6px;
 
-        .filter-group {
+        .sort-box {
           display: flex;
-          flex-direction: column;
+          align-items: center;
           gap: 4px;
 
-          .filter-group-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+          .sort-icon {
+            color: #00e1ff;
+            font-size: 13px;
+            font-weight: 700;
+          }
 
-            .group-title {
+          :deep(.sort-select) {
+            width: 120px;
+
+            .el-select__wrapper {
+              background-color: rgba(8, 20, 36, 0.85);
+              box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.25) inset;
+              border-radius: 4px;
+              padding: 0 8px;
+              min-height: 26px;
+              height: 26px;
               font-size: 11px;
-              font-weight: 600;
-              color: #7dd3fc;
-              letter-spacing: 0.2px;
-            }
-
-            .group-clear-btn {
-              font-size: 10px;
-              color: #38bdf8;
-              cursor: pointer;
-              opacity: 0.8;
-              transition: all 0.15s ease;
+              color: #e2efff;
 
               &:hover {
-                opacity: 1;
-                color: #00e1ff;
-                text-decoration: underline;
+                box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.5) inset;
+              }
+
+              &.is-focused {
+                box-shadow: 0 0 0 1px #00e1ff inset, 0 0 6px rgba(0, 225, 255, 0.3) !important;
+              }
+
+              .el-select__selected-item {
+                color: #e2efff;
+                font-size: 11px;
+              }
+
+              .el-select__suffix {
+                color: #40f2ff;
               }
             }
           }
+        }
 
-          .filter-tags-wrap {
+        .filter-toggle-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          height: 26px;
+          padding: 0 10px;
+          font-size: 11px;
+          font-weight: 600;
+          border-radius: 4px;
+          background: rgba(0, 225, 255, 0.08);
+          border: 1px solid rgba(0, 225, 255, 0.6);
+          color: #00e1ff;
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+          .btn-icon {
+            font-size: 12px;
+          }
+
+          &:hover {
+            background: rgba(0, 225, 255, 0.2);
+            box-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
+            color: #ffffff;
+          }
+
+          &.active {
+            background: rgba(0, 225, 255, 0.22);
+            border-color: #00e1ff;
+            box-shadow: 0 0 10px rgba(0, 225, 255, 0.45);
+            color: #40f2ff;
+          }
+        }
+      }
+
+      .collapsible-filter-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 4px;
+        padding: 10px 12px;
+        background: rgba(8, 18, 32, 0.88);
+        border: 1px solid rgba(0, 225, 255, 0.4);
+        border-radius: 6px;
+        box-shadow: 0 0 12px rgba(0, 0, 0, 0.4), inset 0 0 12px rgba(0, 225, 255, 0.05);
+
+        .metrics-filter-group {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+
+          .metric-slider-item {
             display: flex;
-            flex-wrap: wrap;
-            gap: 4px 6px;
+            flex-direction: column;
+            gap: 2px;
 
-            .filter-tag-chip {
-              display: inline-flex;
+            .slider-header {
+              display: flex;
               align-items: center;
-              justify-content: center;
-              padding: 2px 8px;
+              justify-content: space-between;
               font-size: 11px;
-              line-height: 1.35;
-              border-radius: 4px;
-              background: rgba(18, 36, 62, 0.7);
-              border: 1px solid rgba(79, 147, 221, 0.3);
-              color: #94a3b8;
-              cursor: pointer;
-              user-select: none;
-              transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+              font-weight: 600;
 
-              &:hover {
-                border-color: rgba(0, 225, 255, 0.5);
-                color: #e2efff;
-                background: rgba(24, 52, 88, 0.85);
-                transform: translateY(-1px);
+              .slider-label--threat,
+              .slider-val--threat {
+                color: #f87171;
+                font-family: monospace, system-ui;
               }
 
-              &.active {
-                background: linear-gradient(135deg, rgba(0, 225, 255, 0.25), rgba(14, 116, 144, 0.5));
-                border-color: #00e1ff;
-                color: #40f2ff;
+              .slider-label--delay,
+              .slider-val--delay {
+                color: #38bdf8;
+                font-family: monospace, system-ui;
+              }
+
+              .slider-label--coverage,
+              .slider-val--coverage {
+                color: #fbbf24;
+                font-family: monospace, system-ui;
+              }
+            }
+
+            :deep(.cyber-slider) {
+              --el-slider-height: 4px;
+
+              .el-slider__runway {
+                height: 4px;
+                margin: 6px 0;
+                background-color: rgba(79, 147, 221, 0.25);
+                border-radius: 2px;
+              }
+
+              .el-slider__bar {
+                height: 4px;
+                border-radius: 2px;
+              }
+
+              .el-slider__button-wrapper {
+                top: -14px;
+                width: 32px;
+                height: 32px;
+              }
+
+              .el-slider__button {
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+              }
+
+              &.cyber-slider--threat {
+                .el-slider__bar {
+                  background: #ef4444;
+                }
+
+                .el-slider__button {
+                  background: #ef4444;
+                  border: 2px solid #fca5a5;
+                }
+              }
+
+              &.cyber-slider--delay {
+                .el-slider__bar {
+                  background: #00e1ff;
+                }
+
+                .el-slider__button {
+                  background: #00e1ff;
+                  border: 2px solid #ffffff;
+                }
+              }
+
+              &.cyber-slider--coverage {
+                .el-slider__bar {
+                  background: #f59e0b;
+                }
+
+                .el-slider__button {
+                  background: #f59e0b;
+                  border: 2px solid #fde68a;
+                }
+              }
+            }
+          }
+        }
+
+        .filter-divider {
+          height: 1px;
+          background: rgba(0, 225, 255, 0.15);
+          margin: 2px 0;
+        }
+
+        .tags-filter-group {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+
+          .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+
+            .filter-group-header {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+
+              .group-title {
+                font-size: 11px;
                 font-weight: 600;
-                box-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
-                text-shadow: 0 0 4px rgba(64, 242, 255, 0.5);
+                color: #7dd3fc;
+                letter-spacing: 0.2px;
+              }
+
+              .group-clear-btn {
+                font-size: 10px;
+                color: #38bdf8;
+                cursor: pointer;
+                opacity: 0.8;
+                transition: all 0.15s ease;
+
+                &:hover {
+                  opacity: 1;
+                  color: #00e1ff;
+                  text-decoration: underline;
+                }
+              }
+            }
+
+            .filter-tags-wrap {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 4px 6px;
+
+              .filter-tag-chip {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 2px 8px;
+                font-size: 11px;
+                line-height: 1.35;
+                border-radius: 4px;
+                background: rgba(18, 36, 62, 0.7);
+                border: 1px solid rgba(79, 147, 221, 0.3);
+                color: #94a3b8;
+                cursor: pointer;
+                user-select: none;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+                &:hover {
+                  border-color: rgba(0, 225, 255, 0.5);
+                  color: #e2efff;
+                  background: rgba(24, 52, 88, 0.85);
+                  transform: translateY(-1px);
+                }
+
+                &.active {
+                  background: linear-gradient(135deg, rgba(0, 225, 255, 0.25), rgba(14, 116, 144, 0.5));
+                  border-color: #00e1ff;
+                  color: #40f2ff;
+                  font-weight: 600;
+                  box-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
+                  text-shadow: 0 0 4px rgba(64, 242, 255, 0.5);
+                }
               }
             }
           }
