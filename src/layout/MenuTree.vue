@@ -97,6 +97,11 @@ const notifyTaskRequired = () => {
  */
 const getIcon = (item: RouteRecordRaw): string => {
   const title = String(item.meta?.title || '')
+  if (title.includes('整体态势')) return '🌐'
+  if (title.includes('拓扑')) return '🕸️'
+  if (title.includes('甘特')) return '📊'
+  if (title.includes('打击窗口')) return '🎯'
+  if (title.includes('打击方案')) return '⚔️'
   if (title.includes('战场')) return '🌐'
   if (title.includes('系统')) return '⚙️'
   if (title.includes('用户')) return '👤'
@@ -133,7 +138,7 @@ const getIcon = (item: RouteRecordRaw): string => {
   background: transparent !important;
   border: none !important;
   height: 60px;
-  gap: 0;
+  gap: 3px;
 
   .nav-icon {
     margin-right: 8px;
@@ -159,12 +164,9 @@ const getIcon = (item: RouteRecordRaw): string => {
     color: #cbd5e1 !important;
     font-size: 15px !important;
     font-weight: 600 !important;
-    background: transparent !important;
-    border-top: none !important;
-    border-bottom: none !important;
-    border-left: 1px solid rgba(0, 225, 255, 0.15) !important;
-    border-right: 1px solid rgba(0, 225, 255, 0.15) !important;
-    margin-left: -1px;
+    background: rgba(0, 225, 255, 0.06) !important;
+    border: none !important;
+    margin: 0;
     box-sizing: border-box !important;
     transition: all 0.2s ease !important;
 
@@ -175,7 +177,7 @@ const getIcon = (item: RouteRecordRaw): string => {
 
     &:hover {
       color: #00e1ff !important;
-      background: rgba(0, 225, 255, 0.08) !important;
+      background: rgba(0, 225, 255, 0.12) !important;
       border-top: none !important;
       border-bottom: none !important;
     }

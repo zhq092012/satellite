@@ -70,9 +70,9 @@
       <!-- 主内容区 -->
       <el-scrollbar class="scroller-bar">
         <el-main class="main-wrapper">
-          <router-view v-slot="{ Component, route }">
+          <router-view v-slot="{ Component, route: viewRoute }">
             <keep-alive include="Home">
-              <component :is="Component" :key="route.name" />
+              <component :is="Component" :key="getRouterViewKey(viewRoute)" />
             </keep-alive>
           </router-view>
         </el-main>
@@ -229,11 +229,50 @@ const filterMenusByPermission = (menus: DashboardMenuNode[]): DashboardMenuNode[
     .filter((menu): menu is DashboardMenuNode => menu !== null)
 }
 
+/**
+ * 顶栏首页分析菜单：整体态势分析及其后的四个分析页。
+ */
 const homeMenu = computed<DashboardMenuNode[]>(() => [
   {
     path: '/home',
     meta: {
-      title: '战场态势分析',
+      title: '整体态势分析',
+      icon: 'icon-situation',
+      showInMenu: true,
+    },
+    children: [],
+  },
+  {
+    path: '/home/topo',
+    meta: {
+      title: '态势拓扑分析',
+      icon: 'icon-situation',
+      showInMenu: true,
+    },
+    children: [],
+  },
+  {
+    path: '/home/gantt',
+    meta: {
+      title: '甘特图分析',
+      icon: 'icon-situation',
+      showInMenu: true,
+    },
+    children: [],
+  },
+  {
+    path: '/home/windows',
+    meta: {
+      title: '打击窗口分析',
+      icon: 'icon-situation',
+      showInMenu: true,
+    },
+    children: [],
+  },
+  {
+    path: '/home/strike-plan',
+    meta: {
+      title: '打击方案生成',
       icon: 'icon-situation',
       showInMenu: true,
     },
@@ -241,17 +280,45 @@ const homeMenu = computed<DashboardMenuNode[]>(() => [
   },
 ])
 
+/**
+ * 五个分析页共用 Home 实例，避免切页时销毁 keep-alive 缓存。
+ * @param viewRoute 当前 router-view 对应的路由
+ * @returns keep-alive 使用的组件 key
+ */
+const getRouterViewKey = (viewRoute: { path?: string; name?: string | symbol | null }) => {
+  const path = typeof viewRoute.path === 'string' ? viewRoute.path : ''
+  if (path === '/home' || path.startsWith('/home/')) {
+    return 'Home'
+  }
+  return viewRoute.name ?? path
+}
+
 
 
 
 const visibleMenus = computed<RouteRecordRaw[]>(() => {
   const backendMenus = filterMenusByPermission(buildMenuRoutes(authStore.menuTree))
   const mergedMenus = mergeMenus(homeMenu.value, backendMenus)
-  return mergedMenus.filter((menu) => {
-    const path = menu.path || ''
-    const title = (menu.meta as { title?: string } | undefined)?.title || ''
-    return !path.startsWith('/system') && !path.startsWith('/algorithm') && !title.includes('系统管理') && !title.includes('算法分析管理')
-  }) as RouteRecordRaw[]
+  /** 五个分析页保持为顶栏平级项，避免后端 /home 子菜单把它变成下拉 */
+  const analysisPaths = new Set(homeMenu.value.map((item) => item.path))
+
+  return mergedMenus
+    .map((menu) => {
+      if (analysisPaths.has(menu.path)) {
+        return { ...menu, children: [] }
+      }
+      return menu
+    })
+    .filter((menu) => {
+      const path = menu.path || ''
+      const title = (menu.meta as { title?: string } | undefined)?.title || ''
+      return (
+        !path.startsWith('/system') &&
+        !path.startsWith('/algorithm') &&
+        !title.includes('系统管理') &&
+        !title.includes('算法分析管理')
+      )
+    }) as RouteRecordRaw[]
 })
 
 const isAdmin = computed(() => authStore.roles.includes('admin'))
@@ -415,7 +482,7 @@ onMounted(async () => {
     align-items: stretch;
     justify-content: space-between;
     position: relative;
-    gap: 0;
+    gap: 3px;
     height: 60px;
     background: linear-gradient(90deg,
         rgba(8, 22, 44, 0.98) 0%,
@@ -433,7 +500,6 @@ onMounted(async () => {
       align-items: center;
       flex: 0 0 auto;
       padding-right: 20px;
-      border-right: 1px solid rgba(0, 225, 255, 0.15);
 
       .logo {
         height: 60px;
@@ -490,7 +556,7 @@ onMounted(async () => {
       display: flex;
       align-items: stretch;
       height: 60px;
-      gap: 0;
+      gap: 3px;
 
       /* 战场与任务指示状态栏 */
       .task-status-bar {
@@ -506,8 +572,6 @@ onMounted(async () => {
           height: 60px;
           background: transparent;
           border: none;
-          border-left: 1px solid rgba(0, 225, 255, 0.15);
-          border-right: 1px solid rgba(0, 225, 255, 0.15);
           border-radius: 0;
           cursor: pointer;
           transition: all 0.2s ease;
@@ -547,8 +611,7 @@ onMounted(async () => {
           align-items: center;
           padding: 0 16px;
           height: 60px;
-          border-left: 1px solid rgba(0, 225, 255, 0.15);
-          border-right: 1px solid rgba(0, 225, 255, 0.15);
+          border: none;
           cursor: pointer;
 
           &:hover {
@@ -583,9 +646,7 @@ onMounted(async () => {
         outline: none;
         background: transparent;
         border: none;
-        border-left: 1px solid rgba(0, 225, 255, 0.15);
-        border-right: 1px solid rgba(0, 225, 255, 0.15);
-        margin-left: -1px;
+        margin: 0;
         box-sizing: border-box;
         transition: all 0.2s ease;
 

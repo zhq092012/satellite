@@ -37,6 +37,46 @@ const routes: Array<RouteRecordRaw> = [
         },
       },
       {
+        path: 'home/topo',
+        name: 'HomeTopo',
+        component: () => import('@/layout/Home.vue'),
+        meta: {
+          title: '态势拓扑分析',
+          icon: 'icon-situation',
+          showInMenu: true,
+        },
+      },
+      {
+        path: 'home/gantt',
+        name: 'HomeGantt',
+        component: () => import('@/layout/Home.vue'),
+        meta: {
+          title: '甘特图分析',
+          icon: 'icon-situation',
+          showInMenu: true,
+        },
+      },
+      {
+        path: 'home/windows',
+        name: 'HomeWindows',
+        component: () => import('@/layout/Home.vue'),
+        meta: {
+          title: '打击窗口分析',
+          icon: 'icon-situation',
+          showInMenu: true,
+        },
+      },
+      {
+        path: 'home/strike-plan',
+        name: 'HomeStrikePlan',
+        component: () => import('@/layout/Home.vue'),
+        meta: {
+          title: '打击方案生成',
+          icon: 'icon-situation',
+          showInMenu: true,
+        },
+      },
+      {
         path: 'situation',
         name: 'Situation',
         component: () => import('@/components/BattleSituation/BattleSituation.vue'),

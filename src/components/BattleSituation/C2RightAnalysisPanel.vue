@@ -30,31 +30,28 @@
               },
             ]" role="button" tabindex="0" @click="handleLinkCardClick(link)"
               @keydown.enter.prevent="handleLinkCardClick(link)">
-              <!-- 顶部行：左侧为链路序号/名称，右侧平铺展示 威胁度 / 链路时长 / 覆盖率 三大指标 -->
-              <div class="link-card-header">
-                <div class="link-title-left">
+              <div class="link-card-top">
+                <div class="link-card-header">
                   <span class="link-index">链路 {{ index + 1 }}</span>
                 </div>
-
-                <div class="link-metrics-right">
+                <div class="link-metrics-row">
                   <span class="metric-tag metric-tag--threat" title="卫星威胁度">
                     <span class="metric-icon">🛡️</span>
-                    <span class="metric-label">威胁度:</span>
+                    <span class="metric-label">威胁度</span>
                     <span class="metric-val">{{ getLinkThreatText(link) }}</span>
                   </span>
                   <span class="metric-tag metric-tag--duration" title="链路传输时长">
                     <span class="metric-icon">⏱️</span>
-                    <span class="metric-label">时长:</span>
+                    <span class="metric-label">时长</span>
                     <span class="metric-val">{{ getLinkDurationText(link) }}</span>
                   </span>
                   <span class="metric-tag metric-tag--coverage" title="卫星覆盖率">
                     <span class="metric-icon">🌐</span>
-                    <span class="metric-label">覆盖率:</span>
+                    <span class="metric-label">覆盖率</span>
                     <span class="metric-val">{{ getLinkCoverageText(link) }}</span>
                   </span>
                 </div>
               </div>
-
               <!-- 链路节点传输链路流 -->
               <div class="link-flow-row">
                 <template v-for="(node, nodeIdx) in link.nodes" :key="link.id + '-' + node.layer + node.id">
@@ -394,87 +391,90 @@ const handleClearSelectedLink = () => {
     border-color: rgba(239, 68, 68, 0.4);
   }
 
+  .link-card-top {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
   .link-card-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    flex-wrap: wrap;
+    min-height: 22px;
+  }
 
-    .link-title-left {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+  .link-index {
+    font-size: 14px;
+    font-weight: 700;
+    color: #40f2ff;
+    letter-spacing: 0.3px;
+    text-shadow: 0 0 6px rgba(64, 242, 255, 0.3);
+  }
+
+  .link-metrics-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .metric-tag {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-width: 0;
+    padding: 4px 6px;
+    border-radius: 5px;
+    font-size: 11px;
+    line-height: 1.3;
+    font-weight: 600;
+    white-space: nowrap;
+
+    .metric-icon {
       flex-shrink: 0;
+      font-size: 11px;
     }
 
-    .link-index {
-      font-size: 13px;
+    .metric-label {
       flex-shrink: 0;
+      opacity: 0.72;
+    }
+
+    .metric-val {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: Consolas, 'Courier New', monospace;
       font-weight: 700;
-      color: #40f2ff;
-      text-shadow: 0 0 6px rgba(64, 242, 255, 0.3);
     }
 
-    .link-metrics-right {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
+    &--threat {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #f87171;
 
-      .metric-tag {
-        display: inline-flex;
-        align-items: center;
-        gap: 2px;
-        padding: 1px 6px;
-        border-radius: 4px;
-        font-size: 14px;
-        line-height: 1.3;
-        font-weight: 700;
+      .metric-val {
+        color: #fca5a5;
+      }
+    }
 
-        .metric-icon {
-          font-size: 10px;
-        }
+    &--duration {
+      background: rgba(0, 225, 255, 0.12);
+      border: 1px solid rgba(0, 225, 255, 0.35);
+      color: #38bdf8;
 
-        .metric-label {
-          opacity: 0.75;
-        }
+      .metric-val {
+        color: #7dd3fc;
+      }
+    }
 
-        .metric-val {
-          font-family: Consolas, monospace;
+    &--coverage {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
 
-        }
-
-        &--threat {
-          background: rgba(239, 68, 68, 0.12);
-          border: 1px solid rgba(239, 68, 68, 0.35);
-          color: #f87171;
-
-          .metric-val {
-            color: #fca5a5;
-          }
-        }
-
-        &--duration {
-          background: rgba(0, 225, 255, 0.12);
-          border: 1px solid rgba(0, 225, 255, 0.35);
-          color: #38bdf8;
-
-          .metric-val {
-            color: #7dd3fc;
-          }
-        }
-
-        &--coverage {
-          background: rgba(245, 158, 11, 0.12);
-          border: 1px solid rgba(245, 158, 11, 0.35);
-          color: #fbbf24;
-
-          .metric-val {
-            color: #fde68a;
-          }
-        }
+      .metric-val {
+        color: #fde68a;
       }
     }
   }
