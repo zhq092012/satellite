@@ -2,130 +2,82 @@
   <aside class="c2-panel c2-panel--right dark-theme">
     <div class="panel-header">
       <div class="header-title-box">
-        <span class="header-title glow-text-cyan">态势统计分析</span>
+        <span class="header-title glow-text-cyan">推荐打击链路</span>
       </div>
-
+      <button type="button" class="clear-link-btn" :disabled="!selectedTransmissionLinkId"
+        @click.stop="handleClearSelectedLink">
+        清除选择的链路
+      </button>
     </div>
 
     <div v-if="!activeMatrix" class="empty-sat-box">
       <span class="empty-icon">📡</span>
       <p class="empty-text">暂无矩阵数据</p>
-      <p class="empty-sub">请在左侧选择系列，或选择「全部系列」加载态势</p>
+      <p class="empty-sub">请在左侧选择任务以加载态势分析</p>
     </div>
 
     <template v-else>
-      <div class="stats-strip">
-        <div class="stats-strip-item stats-strip-item--sat" role="button" tabindex="0" title="点击跳转到卫星管理"
-          @click="goToSatellites" @keydown.enter.prevent="goToSatellites">
-          <strong class="stats-strip-label">卫星</strong>
-          <div class="stats-strip-bottom">
-            <span class="stats-strip-value">{{ overviewStats.satelliteCount }}</span>
-            <span class="stats-strip-unit">颗</span>
-          </div>
-        </div>
-        <div class="stats-strip-divider"></div>
-        <div class="stats-strip-item stats-strip-item--receive" role="button" tabindex="0" title="点击跳转到基站管理"
-          @click="goToBaseStations" @keydown.enter.prevent="goToBaseStations">
-          <strong class="stats-strip-label">地面站</strong>
-          <div class="stats-strip-bottom">
-            <span class="stats-strip-value">{{ overviewStats.receiveCount }}</span>
-            <span class="stats-strip-unit">个</span>
-          </div>
-        </div>
-        <div class="stats-strip-divider"></div>
-        <div class="stats-strip-item stats-strip-item--station" role="button" tabindex="0" title="点击跳转到基站管理"
-          @click="goToBaseStations" @keydown.enter.prevent="goToBaseStations">
-          <strong class="stats-strip-label">数据中心</strong>
-          <div class="stats-strip-bottom">
-            <span class="stats-strip-value">{{ overviewStats.stationCount }}</span>
-            <span class="stats-strip-unit">个</span>
-          </div>
-        </div>
-        <div class="stats-strip-divider"></div>
-        <div class="stats-strip-item stats-strip-item--weapon" role="button" tabindex="0" title="点击跳转到武器管理"
-          @click="goToWeapons" @keydown.enter.prevent="goToWeapons">
-          <strong class="stats-strip-label">我方武器</strong>
-          <div class="stats-strip-bottom">
-            <span class="stats-strip-value">{{ ourWeaponCount }}</span>
-            <span class="stats-strip-unit">件</span>
-          </div>
-        </div>
-      </div>
-
       <div class="link-section">
-        <div class="link-section-header">
-          <div class="link-section-title-wrap">
-            <span class="link-section-title">可能传输链路</span>
-            <span class="link-section-count">{{ transmissionLinks.length }} 条</span>
-          </div>
-          <button type="button" class="clear-link-btn" :disabled="!selectedTransmissionLinkId"
-            @click.stop="handleClearSelectedLink">
-            清除选择的链路
-          </button>
-        </div>
 
         <div class="link-section-scroll">
-          <VirtualScrollList v-if="displayLinkItems.length" :items="displayLinkItems"
-            :item-height="OTHER_LINK_ITEM_HEIGHT" :get-item-height="getDisplayLinkItemHeight" item-key="id">
-            <template #default="{ item }">
-              <div class="transmission-link-card" :class="[
-                {
-                  active: selectedTransmissionLinkId === item.link.id,
-                  blocked: item.link.blocked,
-                },
-                item.priority ? `priority-rank-${item.priority.rank}` : '',
-              ]" role="button" tabindex="0" @click="handleLinkCardClick(item.link)"
-                @keydown.enter.prevent="handleLinkCardClick(item.link)">
-                <div class="link-card-header">
-                  <div class="link-title-left">
-                    <span class="link-index">链路 {{ item.displayIndex }}</span>
-                    <span v-if="item.priority" class="rank-badge" :class="`rank-badge--${item.priority.rank}`">
-                      {{ getRankMedal(item.priority.rank) }} TOP {{ item.priority.rank }}
-                      ({{ item.priority.totalScore }}分)
-                    </span>
+          <div v-if="displayLinkItems.length" class="link-cards-list">
+            <div v-for="item in displayLinkItems" :key="item.id" class="transmission-link-card" :class="[
+              {
+                active: selectedTransmissionLinkId === item.link.id,
+                blocked: item.link.blocked,
+              },
+              item.priority ? `priority-rank-${item.priority.rank}` : '',
+            ]" role="button" tabindex="0" @click="handleLinkCardClick(item.link)"
+              @keydown.enter.prevent="handleLinkCardClick(item.link)">
+              <div class="link-card-header">
+                <div class="link-title-left">
+                  <span class="link-index">链路 {{ item.displayIndex }}</span>
+                  <span v-if="item.priority" class="rank-badge" :class="`rank-badge--${item.priority.rank}`">
+                    {{ getRankMedal(item.priority.rank) }} TOP {{ item.priority.rank }}
+                    ({{ item.priority.totalScore }}分)
+                  </span>
+                </div>
+                <div class="link-metrics-row">
+                  <div class="link-metric-card">
+                    <span class="link-metric-label">{{ linkPrimaryMetricLabel(item.link) }}</span>
+                    <strong>{{ formatPrimaryLinkMetric(item.link) }}</strong>
                   </div>
-                  <div class="link-metrics-row">
-                    <div class="link-metric-card">
-                      <span class="link-metric-label">{{ linkPrimaryMetricLabel(item.link) }}</span>
-                      <strong>{{ formatPrimaryLinkMetric(item.link) }}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="link-flow-row">
-                  <template v-for="(node, nodeIdx) in item.link.nodes" :key="item.link.id + '-' + node.layer + node.id">
-                    <div class="flow-node">
-                      <span class="flow-node-icon">{{ node.icon }}</span>
-                      <span class="flow-node-name" :title="node.name">{{ node.name }}</span>
-                      <span class="flow-node-layer">{{ chainLayerLabel(node.layer) }}</span>
-                    </div>
-                    <span v-if="nodeIdx < item.link.nodes.length - 1" class="flow-arrow">→</span>
-                  </template>
-                </div>
-
-                <div v-if="item.priority" class="priority-reason-tip">
-                  <span class="reason-icon">💡</span>
-                  <el-tooltip placement="left" :show-after="200" trigger="hover"
-                    popper-class="c2-priority-reason-tooltip">
-                    <template #content>
-                      <div class="reason-tooltip-body">{{ item.priority.reason }}</div>
-                    </template>
-                    <span class="reason-text">{{ item.priority.reason }}</span>
-                  </el-tooltip>
-                </div>
-
-                <div v-if="item.link.blocked" class="link-blocked-tip">{{ item.link.blockedReason }}</div>
-
-                <div class="link-meta-row">
-                  <span class="link-meta-label">传输时间</span>
-                  <strong class="link-meta-val">{{ item.link.transmitTime }}</strong>
                 </div>
               </div>
-            </template>
-          </VirtualScrollList>
+
+              <div class="link-flow-row">
+                <template v-for="(node, nodeIdx) in item.link.nodes" :key="item.link.id + '-' + node.layer + node.id">
+                  <div class="flow-node">
+                    <span class="flow-node-icon">{{ node.icon }}</span>
+                    <span class="flow-node-name" :title="node.name">{{ node.name }}</span>
+                    <span class="flow-node-layer">{{ chainLayerLabel(node.layer) }}</span>
+                  </div>
+                  <span v-if="nodeIdx < item.link.nodes.length - 1" class="flow-arrow">→</span>
+                </template>
+              </div>
+
+              <div v-if="item.priority" class="priority-reason-tip">
+                <span class="reason-icon">💡</span>
+                <el-tooltip placement="left" :show-after="200" trigger="hover"
+                  popper-class="c2-priority-reason-tooltip">
+                  <template #content>
+                    <div class="reason-tooltip-body">{{ item.priority.reason }}</div>
+                  </template>
+                  <span class="reason-text">{{ item.priority.reason }}</span>
+                </el-tooltip>
+              </div>
+
+              <div v-if="item.link.blocked" class="link-blocked-tip">{{ item.link.blockedReason }}</div>
+
+              <div class="link-meta-row">
+                <span class="link-meta-label">传输时间</span>
+                <strong class="link-meta-val">{{ item.link.transmitTime }}</strong>
+              </div>
+            </div>
+          </div>
 
           <div v-else class="empty-link-box">
-            {{ selectedSatelliteNorad != null ? '该卫星暂无关联传输链路' : '当前范围内暂无可枚举链路' }}
+            {{ selectedSatelliteNorad != null ? '该卫星暂无推荐打击链路' : '当前范围内暂无推荐打击链路' }}
           </div>
         </div>
       </div>
@@ -135,17 +87,13 @@
 
 <script setup lang="ts">
 /**
- * 整体态势分析 - 右侧统计面板
- * 上方展示卫星/地面站/数据中心/我方武器统计，下方列出全部可能传输链路。
+ * 整体态势分析 - 右侧推荐传输链路面板
+ * 集中展示经算法多维优先级评估推荐的 TOP 1~3 传输链路。
  */
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed } from 'vue'
 import { type MatrixResult } from '@/api/electronic'
-import { getAllWeapons } from '@/api/dashboard'
 import { useLayoutStore } from '@/store/modules/layout'
-import VirtualScrollList from '@/components/common/VirtualScrollList.vue'
 import {
-  collectMatrixOverviewStats,
   collectSatelliteTransmissionLinks,
   collectSeriesTransmissionLinks,
   rankTransmissionLinksByPriority,
@@ -158,56 +106,21 @@ import {
 } from '@/utils/satelliteFullChainAnalysis'
 
 /**
- * 右侧面板统一链路列表项：TOP 3 带优先级，其余为普通链路。
+ * 右侧面板统一链路列表项：TOP 1~3 推荐链路。
  */
 interface DisplayTransmissionLinkItem {
-  /** 链路稳定 id，供虚拟列表作 key */
   id: string
-  /** 原始传输链路 */
   link: SatelliteTransmissionLink
-  /** 列表展示序号，从 1 开始 */
   displayIndex: number
-  /** TOP 3 优先级信息；非推荐链路为 null */
   priority: LinkPriorityMetrics | null
 }
 
-/** 普通链路卡片行高（含间距），单位 px */
-const OTHER_LINK_ITEM_HEIGHT = 188
-/** TOP 3 推荐卡片行高（含推荐理由与间距），单位 px */
-const TOP_LINK_ITEM_HEIGHT = 260
-
-const router = useRouter()
 const store = useLayoutStore()
-/** 当前任务结束毫秒，用于过站分段延迟。 */
-const taskEndMs = computed(() => resolveTaskEndMs(store.activedTask?.endDate))
-
-
-/** 将毫秒时长格式化为小时和分钟。 */
-const formatElapsedTime = (durationMs: number): string => {
-  if (!Number.isFinite(durationMs) || durationMs < 0) return '--'
-  const totalMinutes = Math.floor(durationMs / 60000)
-  return `${Math.floor(totalMinutes / 60)}时${totalMinutes % 60}分`
-}
-
-/**
- * 快捷跳转页面
- */
-const goToSatellites = () => {
-  router.push('/system/satellites')
-}
-
-const goToBaseStations = () => {
-  router.push('/system/basestations')
-}
-
-const goToWeapons = () => {
-  router.push('/system/weapons')
-}
 
 const props = defineProps<{
   /** 算法矩阵数据 */
   matrixData: MatrixResult | null
-  /** 保留兼容 */
+  /** 当前选中的卫星 NORAD（若有） */
   selectedSatelliteNorad?: number | null
   /** 当前在地图上高亮展示的传输链路 ID */
   selectedTransmissionLinkId?: string | null
@@ -219,11 +132,11 @@ const emit = defineEmits<{
   (e: 'select-transmission-link', link: SatelliteTransmissionLink | null): void
 }>()
 
+/** 当前任务结束毫秒，用于过站分段延迟。 */
+const taskEndMs = computed(() => resolveTaskEndMs(store.activedTask?.endDate))
+
 /** 当前生效矩阵 */
 const activeMatrix = computed<MatrixResult | null>(() => props.matrixData)
-
-/** 统计范围文案 */
-const scopeLabel = computed(() => (store.selectedSatSeries ? store.selectedSatSeries : '全部系列'))
 
 /** STARLINK 系列的链路首要指标使用打击前覆盖率。 */
 const isStarlinkSeries = computed(() => store.selectedSatSeries === 'STARLINK')
@@ -258,27 +171,27 @@ const beforeCoverageByNorad = computed(() =>
   )
 )
 
-/** 矩阵概览统计（不含我方武器数量） */
-const overviewStats = computed(() => collectMatrixOverviewStats(activeMatrix.value, scopeLabel.value))
+/** 将毫秒时长格式化为小时和分钟。 */
+const formatElapsedTime = (durationMs: number): string => {
+  if (!Number.isFinite(durationMs) || durationMs < 0) return '--'
+  const totalMinutes = Math.floor(durationMs / 60000)
+  return `${Math.floor(totalMinutes / 60)}时${totalMinutes % 60}分`
+}
 
-/** 我方武器总数 */
-const ourWeaponCount = ref(0)
+/** 格式化卫星覆盖率。 */
+const formatCoverage = (coverage: number | undefined): string => {
+  if (coverage == null || !Number.isFinite(coverage)) return '--'
+  return `${Number(coverage.toFixed(2))}%`
+}
 
-/**
- * 拉取我方武器总数
- */
-const loadOurWeaponCount = async () => {
-  try {
-    const res = await getAllWeapons()
-    if (res.code === 200 && res.data?.weapons) {
-      ourWeaponCount.value = res.data.weapons.length
-    } else {
-      ourWeaponCount.value = 0
-    }
-  } catch (err) {
-    console.error('获取我方武器统计失败:', err)
-    ourWeaponCount.value = 0
+/** 根据当前系列格式化链路卡片首个指标。 */
+const formatPrimaryLinkMetric = (link: SatelliteTransmissionLink): string => {
+  if (!isStarlinkLink(link)) {
+    return formatElapsedTime(link.transmitEndMs - link.transmitStartMs)
   }
+  const sourceSatellite = link.nodes.find((node) => node.layer === 'SAT')
+  const norad = Number(sourceSatellite?.id)
+  return formatCoverage(beforeCoverageByNorad.value.get(norad))
 }
 
 /**
@@ -312,53 +225,17 @@ const prioritizedLinks = computed<PrioritizedTransmissionLink[]>(() => {
 })
 
 /**
- * TOP 3 与其余链路拼成一条列表：推荐卡在前，其余保持原排序且不重复。
+ * 仅展示经算法多维评估推荐的 TOP 3 传输链路。
  */
 const displayLinkItems = computed<DisplayTransmissionLinkItem[]>(() => {
   const top3 = prioritizedLinks.value.slice(0, 3)
-  const topIds = new Set(top3.map((item) => item.link.id))
-  const items: DisplayTransmissionLinkItem[] = top3.map((item, index) => ({
+  return top3.map((item, index) => ({
     id: item.link.id,
     link: item.link,
     displayIndex: index + 1,
     priority: item.priority,
   }))
-  transmissionLinks.value.forEach((link) => {
-    if (topIds.has(link.id)) return
-    items.push({
-      id: link.id,
-      link,
-      displayIndex: items.length + 1,
-      priority: null,
-    })
-  })
-  return items
 })
-
-/**
- * 虚拟列表按条目取行高：推荐卡更高，普通卡沿用紧凑高度。
- *
- * @param item 统一链路展示项
- * @returns 行高（px）
- */
-const getDisplayLinkItemHeight = (item: DisplayTransmissionLinkItem): number =>
-  item.priority ? TOP_LINK_ITEM_HEIGHT : OTHER_LINK_ITEM_HEIGHT
-
-/** 格式化卫星覆盖率。 */
-const formatCoverage = (coverage: number | undefined): string => {
-  if (coverage == null || !Number.isFinite(coverage)) return '--'
-  return `${Number(coverage.toFixed(2))}%`
-}
-
-/** 根据当前系列格式化链路卡片首个指标。 */
-const formatPrimaryLinkMetric = (link: SatelliteTransmissionLink): string => {
-  if (!isStarlinkLink(link)) {
-    return formatElapsedTime(link.transmitEndMs - link.transmitStartMs)
-  }
-  const sourceSatellite = link.nodes.find((node) => node.layer === 'SAT')
-  const norad = Number(sourceSatellite?.id)
-  return formatCoverage(beforeCoverageByNorad.value.get(norad))
-}
 
 const getRankMedal = (rank: number): string => {
   if (rank === 1) return '🥇'
@@ -398,10 +275,6 @@ const handleClearSelectedLink = () => {
   if (!props.selectedTransmissionLinkId) return
   emit('select-transmission-link', null)
 }
-
-onMounted(() => {
-  void loadOurWeaponCount()
-})
 </script>
 
 <style lang="scss" scoped>
@@ -493,92 +366,9 @@ onMounted(() => {
   box-shadow: inset 0 0 20px rgba(0, 225, 255, 0.04);
 }
 
-.stats-strip-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-width: 0;
-  padding: 6px 4px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  user-select: none;
-
-  &:hover {
-    background: rgba(0, 225, 255, 0.08);
-    box-shadow: 0 0 10px rgba(0, 225, 255, 0.15);
-    transform: translateY(-1px);
-
-    .stats-strip-label {
-      color: #ffffff;
-    }
-  }
-
-  &:active {
-    transform: translateY(0);
-    background: rgba(0, 225, 255, 0.15);
-  }
-
-  &:focus-visible {
-    outline: 1px solid rgba(0, 225, 255, 0.6);
-    background: rgba(0, 225, 255, 0.08);
-  }
-
-  .stats-strip-label {
-    font-size: 12px;
-    font-weight: 700;
-    color: #cbd5e1;
-    letter-spacing: 0.5px;
-    transition: color 0.2s ease;
-  }
-
-  .stats-strip-bottom {
-    display: flex;
-    align-items: baseline;
-    gap: 2px;
-  }
-
-  .stats-strip-value {
-    font-size: 20px;
-    line-height: 1;
-    color: #f8fafc;
-    font-weight: 700;
-  }
-
-  .stats-strip-unit {
-    font-size: 10px;
-    color: #64748b;
-  }
-
-  &--sat .stats-strip-value {
-    color: #38bdf8;
-  }
-
-  &--receive .stats-strip-value {
-    color: #22d3ee;
-  }
-
-  &--station .stats-strip-value {
-    color: #60a5fa;
-  }
-
-  &--weapon .stats-strip-value {
-    color: #fb7185;
-  }
-}
-
-.stats-strip-divider {
-  width: 1px;
-  align-self: stretch;
-  background: rgba(148, 163, 184, 0.18);
-}
-
 .link-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
   flex: 1;
   min-height: 0;
 }
@@ -639,16 +429,22 @@ onMounted(() => {
   position: relative;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  padding-right: 2px;
 
-  :deep(.virtual-scroll-list__item) {
-    padding-bottom: 8px;
+  &::-webkit-scrollbar {
+    width: 4px;
   }
 
-  .transmission-link-card {
-    box-sizing: border-box;
-    height: 100%;
-    overflow: hidden;
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 225, 255, 0.3);
+    border-radius: 3px;
+  }
+
+  .link-cards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 }
 

@@ -3,711 +3,404 @@
     <!-- 面板标题 Header -->
     <div class="panel-header">
       <div class="header-title-box">
-        <span class="header-title glow-text-cyan">卫星系列（当前方案）</span>
+        <span class="header-title glow-text-cyan">任务列表（当前战场）</span>
       </div>
+      <span class="battle-name-tag" :title="store.battle?.name || '当前战场'">
+        {{ store.battle?.name || '当前战场' }}
+      </span>
     </div>
 
-    <!-- 卫星系列列表（来自当前综合打击方案 levelSeriesEntities） -->
-    <div class="filter-section">
-      <div v-if="store.zhchPlanLoading && !seriesOptions.length" class="series-list-box is-loading">
-        <div class="series-loading-mask">
-          <span class="series-loading-spinner" aria-hidden="true" />
-          <span class="series-loading-text">正在加载系列数据...</span>
+    <!-- 当前战场下的任务列表容器（占满面板剩余高度） -->
+    <div class="task-section">
+      <div v-if="taskLoading && !taskList.length" class="task-list-box is-loading">
+        <div class="task-loading-mask">
+          <span class="task-loading-spinner" aria-hidden="true" />
+          <span class="task-loading-text">正在加载任务数据...</span>
         </div>
       </div>
 
-      <div v-else-if="seriesOptions.length > 0" class="series-list-box" :class="{ 'is-loading': matrixMerging }">
-        <div v-if="matrixMerging" class="series-loading-mask series-loading-mask--light">
-          <span class="series-loading-spinner" aria-hidden="true" />
-          <span class="series-loading-text">正在合并矩阵...</span>
+      <div v-else-if="taskList.length > 0" class="task-list-box" :class="{ 'is-loading': taskSwitching }">
+        <div v-if="taskSwitching" class="task-loading-mask task-loading-mask--light">
+          <span class="task-loading-spinner" aria-hidden="true" />
+          <span class="task-loading-text">正在切换任务...</span>
         </div>
-        <div class="series-list-header">
-          <span class="series-title">包含系列 {{ seriesOptions.length }} 个</span>
-          <span class="series-current" :title="selectedSeries || '全部系列'">
-            当前系列：{{ selectedSeries || '全部系列' }}
+
+        <div class="task-list-header">
+          <span class="task-count">包含任务 {{ taskList.length }} 个</span>
+          <span class="task-current" :title="store.activedTask?.name || '未选择任务'">
+            当前任务：{{ store.activedTask?.name || '未选择' }}
           </span>
         </div>
-        <div class="series-search-bar">
-          <el-input v-model="seriesSearchKey" size="small" placeholder="搜索系列名称..." clearable :prefix-icon="Search"
-            class="series-search-input" />
+
+        <div class="task-filter-container">
+          <!-- 搜索输入框 + 搜索按钮 -->
+          <div class="task-search-row">
+            <el-input v-model="taskSearchKey" size="small" placeholder="搜索任务名称/作战目标..." clearable :prefix-icon="Search"
+              class="task-search-input" @keyup.enter="handleSearch" @clear="handleSearch" />
+            <el-button type="primary" size="small" class="task-search-btn" :icon="Search" @click="handleSearch">
+              搜索
+            </el-button>
+          </div>
+
+          <!-- 搜索过滤选项: 卫星类型、卫星系列、打击方案 (Tag 块多选展示) -->
+          <div class="task-filter-options">
+            <!-- 1. 卫星类型 (五大类) -->
+            <div class="filter-group">
+              <div class="filter-group-header">
+                <span class="group-title">卫星类型</span>
+                <span v-if="selectedSatTypes.length > 0" class="group-clear-btn" @click="clearSatTypes">
+                  重置
+                </span>
+              </div>
+              <div class="filter-tags-wrap">
+                <span v-for="type in SATELLITE_TYPES" :key="type" class="filter-tag-chip"
+                  :class="{ active: selectedSatTypes.includes(type) }" @click="toggleSatType(type)">
+                  {{ type }}
+                </span>
+              </div>
+            </div>
+
+            <!-- 2. 卫星系列 (矩阵中返回的所有系列) -->
+            <div class="filter-group" v-if="seriesOptions.length > 0">
+              <div class="filter-group-header">
+                <span class="group-title">卫星系列</span>
+                <span v-if="selectedSatSeriesList.length > 0" class="group-clear-btn" @click="clearSatSeries">
+                  重置
+                </span>
+              </div>
+              <div class="filter-tags-wrap">
+                <span v-for="series in seriesOptions" :key="series" class="filter-tag-chip"
+                  :class="{ active: selectedSatSeriesList.includes(series) }" @click="toggleSatSeries(series)">
+                  {{ series }}
+                </span>
+              </div>
+            </div>
+
+            <!-- 3. 打击方案 (打击军用、打击民用、打击军用民用) -->
+            <div class="filter-group">
+              <div class="filter-group-header">
+                <span class="group-title">打击方案</span>
+              </div>
+              <div class="filter-tags-wrap">
+                <span v-for="opt in strikeSchemeOptions" :key="opt.value" class="filter-tag-chip"
+                  :class="{ active: selectedStrikeSchemes.includes(opt.value) }" @click="toggleStrikeScheme(opt.value)">
+                  {{ opt.label }}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="series-list">
-          <div v-if="!seriesSearchKey.trim() || '全部系列'.includes(seriesSearchKey.trim())" class="series-item"
-            :class="{ active: !selectedSeries, disabled: matrixMerging }" @click="selectSeries('')">
-            <span class="series-icon"></span>
-            <span class="series-name">全部系列</span>
-            <span class="series-status">{{ !selectedSeries ? '✓ 已筛选' : '点击筛选' }}</span>
+
+        <div class="task-scroll-list">
+          <div v-for="task in filteredTaskList" :key="task.id" class="task-item-card"
+            :class="{ active: store.activedTask?.id === task.id, disabled: taskSwitching }" @click="selectTask(task)">
+            <div class="task-card-top">
+              <span class="task-icon">🎯</span>
+              <span class="task-name" :title="task.name">{{ task.name }}</span>
+              <span class="task-status-badge">
+                {{ store.activedTask?.id === task.id ? '✓ 当前任务' : '点击切换' }}
+              </span>
+            </div>
+
+            <div class="task-card-meta" v-if="task.targetType || task.beginDate || task.description">
+              <div class="meta-tags-row" v-if="task.targetType || task.enemyCountry">
+                <span v-if="task.targetType" class="meta-tag tag-target" title="作战目标">
+                  目标: {{ task.targetType }}
+                </span>
+                <span v-if="task.enemyCountry" class="meta-tag tag-country" title="敌方国家">
+                  敌方: {{ task.enemyCountry }}
+                </span>
+              </div>
+
+              <div class="meta-time-row" v-if="task.beginDate || task.endDate">
+                <span class="time-label">周期:</span>
+                <span class="time-val">{{ formatTaskDate(task.beginDate) }} ~ {{ formatTaskDate(task.endDate) }}</span>
+              </div>
+
+              <div class="meta-desc-row" v-if="task.description">
+                <span class="desc-text" :title="task.description">{{ task.description }}</span>
+              </div>
+            </div>
           </div>
-          <div v-for="series in filteredSeriesOptions" :key="series" class="series-item"
-            :class="{ active: selectedSeries === series, disabled: matrixMerging }" @click="selectSeries(series)">
-            <span class="series-icon"></span>
-            <span class="series-name">{{ series }}</span>
-            <span class="series-status">{{ selectedSeries === series ? '✓ 已筛选' : '点击筛选' }}</span>
-          </div>
-          <div
-            v-if="filteredSeriesOptions.length === 0 && (seriesSearchKey.trim() && !'全部系列'.includes(seriesSearchKey.trim()))"
-            class="series-search-empty">
-            无匹配系列
+
+          <div v-if="filteredTaskList.length === 0" class="task-search-empty">
+            无匹配任务
           </div>
         </div>
       </div>
 
-      <div v-else class="series-empty-tip">
-        暂无系列数据，请确认当前方案接口已返回 levelSeriesEntities
+      <div v-else class="task-empty-tip">
+        当前战场暂无任务数据
       </div>
     </div>
-
-    <!-- 2. 敌方天基空间节点资产清单 (Space Layer) -->
-    <div class="panel-section section-space">
-      <div class="section-header-block">
-        <div class="section-title">
-          <span>敌方卫星列表</span>
-          <span class="count-tag">{{ satList.length }} 颗</span>
-          <span v-if="selectedSatelliteName" class="current-sat" :title="selectedSatelliteName">
-            当前选择：{{ selectedSatelliteName }}
-          </span>
-          <button v-if="selectedNorad != null" type="button" class="clear-sat-btn"
-            @click.stop="emit('select-satellite', null)">
-            清空所选
-          </button>
-        </div>
-        <div class="sort-toggle-bar">
-          <button class="sort-btn" :class="{ active: sortMode === 'threat' }" @click="sortMode = 'threat'">
-            按威胁度
-          </button>
-          <button class="sort-btn" :class="{ active: sortMode === 'transTime' }" @click="sortMode = 'transTime'">
-            {{ isStarlinkSeries ? '按打击前覆盖率' : '按首次过站时延' }}
-          </button>
-        </div>
-      </div>
-
-      <div class="asset-scroll-list">
-        <VirtualScrollList :items="satList" :item-height="sortMode === 'transTime' ? 170 : 120" item-key="norad">
-          <template #default="{ item: sat, index }">
-            <div class="asset-card" :class="{
-              'card-active': selectedNorad === sat.norad,
-              'card-relay': sat.isRelay,
-              'card-threat-rank-1': index === 0 && isTopRankEligible(sat),
-              'card-threat-rank-2': index === 1 && isTopRankEligible(sat),
-              'card-threat-rank-3': index === 2 && isTopRankEligible(sat),
-            }" @click="handleSelectSatellite(sat.norad)">
-              <div class="card-top">
-                <span class="sat-name">
-                  🛰️<strong>{{ sat.name }}</strong>
-                  <span v-if="sat.isRelay" class="relay-tag">中继</span>
-                </span>
-                <span v-if="sortMode === 'threat'" class="metric-highlight"
-                  :class="sat.threatScore != null ? getThreatLevelClass(sat.threatScore) : 'threat-unknown'">
-                  威胁度 {{ sat.threatScore != null ? formatThreatScore(sat.threatScore) : '--' }}
-                </span>
-                <span v-else class="metric-highlight metric-duration">
-                  {{ isStarlinkSatellite(sat) ? '打击前覆盖率' : '首次过站时延' }}
-                  {{ isStarlinkSatellite(sat) ? formatCoverage(sat.beforeCoverage) : (sat.timeEffect ?
-                    formatDuration(sat.timeEffect.duration) : '--') }}
-                </span>
-              </div>
-              <div class="card-meta-row" v-if="sat.satType || sat.usage || sat.orbitType != null">
-                <span v-if="sat.satType" class="meta-tag tag-type" title="卫星类型">
-                  {{ sat.satType }}
-                </span>
-                <span v-if="sat.usage" class="meta-tag tag-usage" title="用途">
-                  {{ sat.usage }}
-                </span>
-                <span v-if="sat.orbitType != null" class="meta-tag tag-orbit" title="轨道类型">
-                  {{ orbitTypeLabel(sat.orbitType) }}
-                </span>
-              </div>
-              <div class="card-time-row" v-if="sortMode === 'transTime'">
-                <span>开始 {{ sat.timeEffect ? formatTransTime(sat.timeEffect.beginTime) : '--' }}</span>
-                <span>结束 {{ sat.timeEffect ? formatTransTime(sat.timeEffect.endTime) : '--' }}</span>
-              </div>
-              <div class="card-footer" @click.stop>
-                <span class="click-hint" v-if="selectedNorad === sat.norad">✓ 已选择分析</span>
-                <el-button v-if="sortMode === 'threat'" class="detail-btn" size="small" link type="primary"
-                  @click="openThreatDetail(sat)">
-                  查看详情
-                </el-button>
-                <el-button v-else class="detail-btn" size="small" link type="primary" @click="openTopoAnalysis(sat)">
-                  查看详情
-                </el-button>
-              </div>
-            </div>
-          </template>
-        </VirtualScrollList>
-      </div>
-    </div>
-
-    <el-dialog v-model="threatDialogVisible" :title="`威胁度计算过程 · ${threatDialogSat?.name || ''}`" width="640px"
-      class="threat-detail-dialog" align-center destroy-on-close @closed="handleThreatDialogClosed">
-      <div v-loading="threatLoading" class="threat-dialog-body">
-        <template v-if="threatInfo">
-          <div class="threat-summary-card">
-            <div class="summary-item">
-              <span class="summary-label">NORAD</span>
-              <strong>{{ threatInfo.satelliteBaseModelResp?.norad ?? threatDialogSat?.norad ?? '--' }}</strong>
-            </div>
-            <div class="summary-item">
-              <span class="summary-label">卫星名称</span>
-              <strong>{{ threatInfo.satelliteBaseModelResp?.name_en || threatDialogSat?.name || '--' }}</strong>
-            </div>
-            <div class="summary-item highlight">
-              <span class="summary-label">威胁度评分</span>
-              <strong class="threat-value" :class="getThreatLevelClass(threatInfo.threatScore)">
-                {{ formatThreatScore(threatInfo.threatScore) }}
-              </strong>
-            </div>
-          </div>
-
-          <div class="threat-section">
-            <div class="section-label">威胁度计算公式</div>
-            <pre class="formula-box">{{ threatInfo.formula || '暂无公式说明' }}</pre>
-          </div>
-
-          <div class="threat-section">
-            <div class="section-label">卫星能力指标</div>
-            <div class="param-grid">
-              <div class="param-item">
-                <span class="param-label">载荷类型</span>
-                <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.sat_type || '--' }}</span>
-              </div>
-              <template v-if="isThreatDialogCommSat">
-                <div class="param-item">
-                  <span class="param-label">通信带宽</span>
-                  <span class="param-value">{{ threatInfo.txBandwidth ?? '--' }}</span>
-                </div>
-                <div class="param-item">
-                  <span class="param-label">同时服务用户数</span>
-                  <span class="param-value">{{ threatInfo.txUserNum ?? '--' }}</span>
-                </div>
-                <div class="param-item">
-                  <span class="param-label">定点位置</span>
-                  <span class="param-value">{{ threatInfo.txFixedPosition ?? '--' }}</span>
-                </div>
-                <div class="param-item">
-                  <span class="param-label">覆盖重数</span>
-                  <span class="param-value">{{ threatInfo.txCoverage ?? '--' }}</span>
-                </div>
-                <div class="param-item">
-                  <span class="param-label">通信周期</span>
-                  <span class="param-value">{{ threatInfo.txCycle ?? '--' }}</span>
-                </div>
-              </template>
-              <template v-else>
-                <div class="param-item">
-                  <span class="param-label">成像分辨率</span>
-                  <span class="param-value">{{ threatInfo.zhchResolution ?? '--' }}</span>
-                </div>
-                <div class="param-item">
-                  <span class="param-label">成像幅宽</span>
-                  <span class="param-value">{{ threatInfo.zhchSwathWidth ?? '--' }}</span>
-                </div>
-                <div class="param-item">
-                  <span class="param-label">重访周期</span>
-                  <span class="param-value">{{ threatInfo.zhchCycle ?? '--' }}</span>
-                </div>
-                <div class="param-item">
-                  <span class="param-label">降交点地方时</span>
-                  <span class="param-value">{{ threatInfo.zhchLtdn ?? '--' }}</span>
-                </div>
-                <div class="param-item">
-                  <span class="param-label">定点位置（高轨卫星）</span>
-                  <span class="param-value">{{ threatInfo.zhchFixedPosition ?? '--' }}</span>
-                </div>
-              </template>
-              <div class="param-item">
-                <span class="param-label">在轨状态</span>
-                <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.orbitStatusIndicator ?? '--' }}</span>
-              </div>
-              <div class="param-item">
-                <span class="param-label">剩余工作寿命</span>
-                <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.remainLifetimeIndicator ?? '--'
-                }}</span>
-              </div>
-              <div class="param-item">
-                <span class="param-label">国别</span>
-                <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.countryIndicator ?? '--' }}</span>
-              </div>
-              <div class="param-item">
-                <span class="param-label">用户属性</span>
-                <span class="param-value">{{ threatInfo.satelliteBaseModelResp?.usageIndicator ?? '--' }}</span>
-              </div>
-            </div>
-          </div>
-        </template>
-        <div v-else-if="!threatLoading" class="threat-empty">暂无威胁度计算数据</div>
-      </div>
-    </el-dialog>
-
   </aside>
 </template>
 
 <script setup lang="ts">
 /**
  * [功能]
- * 战场态势 - C2 左侧控制与敌方资产清单面板
+ * 战场态势 - C2 左侧战场任务列表控制面板
  *
  * [处理规则]
- * - 重点展示敌方过境卫星、中继卫星、地面接收站及数据中心
- * - 支持根据接口 getSatelliteTypeSerials 获取的类型与系列联动筛选卫星列表
- * - 点击天基卫星卡片时向父组件抛出 select-satellite 事件
- * - 不包含任何攻击/毁伤/打压控制
- *
- * [副作用]
- * - 触发视角切换与控制事件
+ * - 集中展示当前战场下的所有任务列表
+ * - 支持按关键词、卫星类型（五大类Tag多选）、卫星系列（Tag多选）、打击方案（Tag多选）多维度过滤与检索
+ * - 点击任务一键切换全局当前任务，联动刷新全局 Store 方案与矩阵数据
  */
 import { ref, computed, watch } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import {
-  getSatelliteThreatInfo,
-  type MatrixResult,
-  type SatelliteMatrix,
-  type InitMatrix,
-  type SatelliteThreatInfo,
-} from '@/api/electronic'
+import { getTaskList } from '@/api/dashboard'
+import type { TaskForm } from '@/types/dashboard'
+import type { MatrixResult } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
-import VirtualScrollList from '@/components/common/VirtualScrollList.vue'
-/** 组件接收的矩阵数据及当前选中卫星信息。 */
+
+/** 卫星五大类（创建任务时的五大类） */
+const SATELLITE_TYPES = ['侦察', '导航', '通信', '导弹预警', '空间目标监视与攻防'] as const
+
+/** 打击方案三类（打击军用、打击民用、打击军用民用） */
+const strikeSchemeOptions = [
+  { value: '军用', label: '打击军用' },
+  { value: '民用', label: '打击民用' },
+  { value: '军用民用', label: '打击军用民用' },
+]
+
+/** 组件接收的矩阵数据及当前选中卫星信息（保持兼容） */
 const props = defineProps<{
   /** 算法矩阵响应式数据 */
-  matrixData: MatrixResult | null
+  matrixData?: MatrixResult | null
   /** 当前选中的敌方卫星 NORAD */
   selectedNorad?: number | null
 }>()
 
-/** 组件向父级触发的卫星选择事件。 */
+/** 组件向父级触发的事件（保持兼容） */
 const emit = defineEmits<{
-  /**
-   * [事件说明]
-   * 触发选择/取消选择敌方卫星事件
-   * @param norad 选中的敌方卫星 NORAD 编号，取消选中时为 null
-   */
   (e: 'select-satellite', norad: number | null): void
 }>()
 
-/** 布局 Store，用于读取当前任务及持久化卫星筛选状态。 */
+/** 布局 Store，用于读取当前战场、当前任务及持久化状态。 */
 const store = useLayoutStore()
 
-/** 当前选中的卫星系列筛选值，与 Store 全局同步。 */
-const selectedSeries = computed({
-  get: () => store.selectedSatSeries,
-  set: (val: string) => store.setSelectedSatSeries(val),
-})
+/** 当前战场下的任务列表数据 */
+const taskList = ref<TaskForm[]>([])
+/** 任务列表是否正在加载中 */
+const taskLoading = ref(false)
+/** 任务切换中状态 */
+const taskSwitching = ref(false)
+/** 任务快速搜索关键词 */
+const taskSearchKey = ref('')
+/** 点击搜索或回车确认的搜索词 */
+const confirmedSearchKey = ref('')
 
-/** STARLINK 系列使用打击前覆盖率替代链路时长作为列表指标。 */
-const isStarlinkSeries = computed(() => selectedSeries.value === 'STARLINK')
-
-/**
- * 判断列表中的卫星是否应按 STARLINK 展示打击前覆盖率。
- * 当前筛选为 STARLINK，或卫星名称以 STARLINK 开头时视为是。
- *
- * @param sat 卫星列表项
- * @returns 是否展示打击前覆盖率
- */
-const isStarlinkSatellite = (sat: { name?: string | null }): boolean => {
-  if (isStarlinkSeries.value) return true
-  return !!sat.name && sat.name.toUpperCase().startsWith('STARLINK')
-}
-
-/**
- * 判断卫星是否应按通信卫星处理威胁度详情。
- * 当前系列为 STARLINK，或卫星名称以 STARLINK 开头时视为通信卫星。
- *
- * @param satName 卫星名称
- * @returns 是否为通信卫星
- */
-const isCommThreatSatellite = (satName?: string | null): boolean => {
-  if (selectedSeries.value === 'STARLINK') return true
-  return !!satName && satName.toUpperCase().startsWith('STARLINK')
-}
-
-/** 当前威胁度弹窗中的卫星是否为通信卫星 */
-const isThreatDialogCommSat = computed(() => isCommThreatSatellite(threatDialogSat.value?.name))
-
-/** 方案接口请求中（系列列表尚未返回） */
-const planLoading = computed(() => store.zhchPlanLoading)
-
-/** 矩阵本地合并中（系列已可见，不应整页遮罩） */
-const matrixMerging = computed(
-  () => store.matrixLoading && seriesOptions.value.length > 0
+/** 选中的卫星类型列表（多选） */
+const selectedSatTypes = ref<string[]>(
+  store.selectedSatType ? store.selectedSatType.split(',').filter(Boolean) : []
 )
 
-/** 当前综合打击方案下的卫星系列列表（来自 levelSeriesEntities，无需逐系列请求后端） */
-const seriesOptions = computed<string[]>(() => store.zhchPlanSeriesList)
+/** 选中的卫星系列列表（多选） */
+const selectedSatSeriesList = ref<string[]>(
+  store.selectedSatSeries ? [store.selectedSatSeries] : []
+)
 
-/** 卫星系列快速搜索关键词 */
-const seriesSearchKey = ref('')
+/** 选中的打击方案列表（多选） */
+const selectedStrikeSchemes = ref<string[]>(
+  Array.isArray(store.selectedZhchUsageTypes) && store.selectedZhchUsageTypes.length > 0
+    ? [...store.selectedZhchUsageTypes]
+    : [store.activeZhchUsageType || '军用']
+)
 
-/** 根据搜索关键词筛选后的卫星系列列表 */
-const filteredSeriesOptions = computed<string[]>(() => {
-  const query = seriesSearchKey.value.trim().toLowerCase()
-  if (!query) return seriesOptions.value
-  return seriesOptions.value.filter((s) => s.toLowerCase().includes(query))
+/** 监听 store 中的卫星类型、系列、打击方案变动，保持面板内双向同步 */
+watch(
+  () => store.selectedSatType,
+  (val) => {
+    const list = val ? val.split(',').filter(Boolean) : []
+    if (JSON.stringify(list) !== JSON.stringify(selectedSatTypes.value)) {
+      selectedSatTypes.value = list
+    }
+  }
+)
+
+watch(
+  () => store.selectedSatSeries,
+  (val) => {
+    if (!val) {
+      if (selectedSatSeriesList.value.length > 0) selectedSatSeriesList.value = []
+    } else if (!selectedSatSeriesList.value.includes(val)) {
+      selectedSatSeriesList.value = [val]
+    }
+  }
+)
+
+watch(
+  () => store.activeZhchUsageType,
+  (val) => {
+    if (val && !selectedStrikeSchemes.value.includes(val)) {
+      selectedStrikeSchemes.value = [val]
+    }
+  }
+)
+
+/** 从当前方案和矩阵中提取所有卫星系列列表 */
+const seriesOptions = computed<string[]>(() => {
+  const seriesSet = new Set<string>()
+  if (store.zhchPlanSeriesList && Array.isArray(store.zhchPlanSeriesList)) {
+    store.zhchPlanSeriesList.forEach((s) => {
+      if (s) seriesSet.add(s)
+    })
+  }
+  const mData = props.matrixData || store.matrixData
+  if (mData) {
+    if (Array.isArray(mData.initMatrixList)) {
+      mData.initMatrixList.forEach((m: any) => {
+        if (m?.series) seriesSet.add(m.series)
+      })
+    }
+
+  }
+  return Array.from(seriesSet)
 })
 
-/**
- * [函数说明]
- * 选择或切换选中的卫星系列，并同步保存至 Store
- * @param series 选中的卫星系列名称（空字符串表示全部系列）
- */
-const selectSeries = (series: string) => {
-  if (planLoading.value) return
-  if (store.selectedSatSeries === series) {
-    store.setSelectedSatSeries('')
+/** 切换卫星类型选中状态 (多选) */
+const toggleSatType = (type: string) => {
+  const idx = selectedSatTypes.value.indexOf(type)
+  if (idx > -1) {
+    selectedSatTypes.value.splice(idx, 1)
   } else {
-    store.setSelectedSatSeries(series)
+    selectedSatTypes.value.push(type)
+  }
+  store.selectedSatType = selectedSatTypes.value.join(',')
+}
+
+const clearSatTypes = () => {
+  selectedSatTypes.value = []
+  store.selectedSatType = ''
+}
+
+/** 切换卫星系列选中状态 (多选) */
+const toggleSatSeries = (series: string) => {
+  const idx = selectedSatSeriesList.value.indexOf(series)
+  if (idx > -1) {
+    selectedSatSeriesList.value.splice(idx, 1)
+  } else {
+    selectedSatSeriesList.value.push(series)
+  }
+  const activeSeries = selectedSatSeriesList.value.length === 1 ? selectedSatSeriesList.value[0] : ''
+  store.setSelectedSatSeries(activeSeries)
+}
+
+const clearSatSeries = () => {
+  selectedSatSeriesList.value = []
+  store.setSelectedSatSeries('')
+}
+
+/** 切换打击方案选中状态 (多选) */
+const toggleStrikeScheme = async (val: string) => {
+  const idx = selectedStrikeSchemes.value.indexOf(val)
+  if (idx > -1) {
+    if (selectedStrikeSchemes.value.length > 1) {
+      selectedStrikeSchemes.value.splice(idx, 1)
+    }
+  } else {
+    selectedStrikeSchemes.value.push(val)
+  }
+  store.selectedZhchUsageTypes = [...selectedStrikeSchemes.value]
+  const lastActive = selectedStrikeSchemes.value[selectedStrikeSchemes.value.length - 1]
+  if (lastActive && lastActive !== store.activeZhchUsageType) {
+    await store.setActiveZhchUsageType(lastActive)
+  }
+}
+
+/** 执行搜索 */
+const handleSearch = () => {
+  confirmedSearchKey.value = taskSearchKey.value.trim().toLowerCase()
+}
+
+/** 加载当前战场下的所有任务 */
+const loadBattleTasks = async () => {
+  const battleId = store.battle?.id
+  if (!battleId) {
+    taskList.value = store.battle?.tasks || []
+    return
+  }
+  taskLoading.value = true
+  try {
+    const res = await getTaskList(battleId)
+    if (res.code === 200 && Array.isArray(res.data)) {
+      taskList.value = res.data
+    } else {
+      taskList.value = store.battle?.tasks || []
+    }
+  } catch (error) {
+    console.error('加载战场任务列表失败:', error)
+    taskList.value = store.battle?.tasks || []
+  } finally {
+    taskLoading.value = false
   }
 }
 
 watch(
-  seriesOptions,
-  (sOptions) => {
-    if (!sOptions?.length) return
-    const stored = store.selectedSatSeries
-    if (stored && !sOptions.includes(stored)) {
-      store.setSelectedSatSeries('')
-    }
+  () => store.battle?.id,
+  () => {
+    loadBattleTasks()
   },
   { immediate: true }
 )
 
-// 任务切换时重置系列筛选与搜索词
-watch(
-  () => store.activedTask?.id,
-  (newTaskId) => {
-    if (!newTaskId) {
-      store.setSelectedSatSeries('')
-    }
-    seriesSearchKey.value = ''
+/** 根据卫星类型和搜索关键词筛选后的任务列表 */
+const filteredTaskList = computed<TaskForm[]>(() => {
+  let list = taskList.value
+
+  // 1. 卫星类型多选筛选 (五大类)
+  if (selectedSatTypes.value.length > 0) {
+    list = list.filter((t) =>
+      selectedSatTypes.value.some((st) => t.targetType && t.targetType.includes(st))
+    )
   }
-)
+
+  // 2. 搜索关键词筛选（实时输入或点击搜索均响应）
+  const query = (taskSearchKey.value || confirmedSearchKey.value).trim().toLowerCase()
+  if (query) {
+    list = list.filter(
+      (t) =>
+        (t.name && t.name.toLowerCase().includes(query)) ||
+        (t.description && t.description.toLowerCase().includes(query)) ||
+        (t.targetType && t.targetType.toLowerCase().includes(query)) ||
+        (t.enemyCountry && t.enemyCountry.toLowerCase().includes(query))
+    )
+  }
+
+  return list
+})
+
+/** 格式化任务日期字符串展示 */
+const formatTaskDate = (dateStr?: string) => {
+  if (!dateStr) return '--'
+  return dateStr.length > 10 ? dateStr.substring(0, 10) : dateStr
+}
 
 /**
  * [函数说明]
- * 触发选择卫星事件 (再次点击已选中的卫星可取消选择)
- * @param norad 选中的敌方卫星 NORAD 编号
+ * 切换选中的任务，并触发全局 Store 数据更新
+ * @param task 选中的任务对象
  */
-const handleSelectSatellite = (norad: number) => {
-  if (props.selectedNorad === norad) {
-    emit('select-satellite', null)
-  } else {
-    emit('select-satellite', norad)
-  }
-}
-
-interface SatTimeEffectInfo {
-  /** 链路开始时间。 */
-  beginTime: string
-  /** 链路结束时间。 */
-  endTime: string
-  /** 链路持续时长，单位为分钟。 */
-  duration: number
-  /** 链路对应的接收站名称。 */
-  receiveName: string
-}
-
-/** 展示在卫星资产列表中的卫星信息。 */
-interface SatListItem {
-  /** 卫星 NORAD 编号。 */
-  norad: number
-  /** 卫星名称。 */
-  name: string
-  /** 卫星类型。 */
-  satType: string
-  /** 卫星用途（商用/军用/民用等）。 */
-  usage?: string
-  /** 轨道类型（1-低轨 2-中轨 3-高轨 等）。 */
-  orbitType?: number | string | null
-  /** 是否为中继卫星。 */
-  isRelay: boolean
-  /** 威胁度分数，未计算时为空。 */
-  threatScore: number | null
-  /** 过境链路信息，暂无链路时为空。 */
-  timeEffect: SatTimeEffectInfo | null
-  /** 打击后覆盖率（satelliteMatrixList.coverage），排序回退用。 */
-  coverage: number | null
-  /** 打击前覆盖率（initMatrixList.coverage），STARLINK 列表展示用。 */
-  beforeCoverage: number | null
-}
-
-/** 卫星资产列表的排序模式。 */
-type SatSortMode = 'threat' | 'transTime'
-
-/** 当前卫星资产列表的排序模式。 */
-const sortMode = ref<SatSortMode>('threat')
-
-/** 威胁度详情弹窗是否可见。 */
-const threatDialogVisible = ref(false)
-/** 威胁度详情是否正在加载。 */
-const threatLoading = ref(false)
-/** 当前加载完成的威胁度详情。 */
-const threatInfo = ref<SatelliteThreatInfo | null>(null)
-/** 当前查看详情的卫星基本信息。 */
-const threatDialogSat = ref<{ norad: number; name: string } | null>(null)
-
-/**
- * 格式化威胁度分数，整数不显示小数部分，其余最多保留两位小数。
- *
- * @param score 威胁度分数
- * @returns 格式化后的威胁度文本
- */
-const formatThreatScore = (score: number): string => {
-  if (Number.isInteger(score)) return String(score)
-  return Number(score.toFixed(2)).toString()
-}
-
-/**
- * 轨道类型枚举转中文标签。
- *
- * @param orbitType 轨道类型枚举值 (1-低轨, 2-中轨, 3-高轨, 4-大椭圆)
- * @returns 中文轨道类型
- */
-const orbitTypeLabel = (orbitType?: number | string | null): string => {
-  if (orbitType == null || orbitType === '') return '--'
-  if (typeof orbitType === 'string' && isNaN(Number(orbitType))) {
-    return orbitType
-  }
-  const map: Record<number, string> = { 1: '低轨', 2: '中轨', 3: '高轨', 4: '大椭圆' }
-  const num = Number(orbitType)
-  return map[num] || `类型${num}`
-}
-
-/**
- * 将过境时间字符串格式化为本地日期时间文本。
- *
- * @param timeStr 过境时间字符串
- * @returns 格式化后的时间文本，缺失或无法解析时返回原值或占位符
- */
-const formatTransTime = (timeStr: string | null | undefined): string => {
-  if (!timeStr) return '--'
-  /** 解析后的日期对象。 */
-  const d = new Date(timeStr)
-  if (Number.isNaN(d.getTime())) return timeStr
-  /** 将数字补齐为两位字符串。 */
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-}
-
-/**
- * 将链路时长格式化为分钟文本。
- *
- * @param duration 链路时长，单位为分钟
- * @returns 格式化后的时长文本
- */
-const formatDuration = (duration: number | null | undefined): string => {
-  if (duration == null || Number.isNaN(duration)) return '--'
-  /** 按展示精度处理后的链路时长。 */
-  const rounded = Number.isInteger(duration) ? duration : Number(duration.toFixed(1))
-  return `${rounded} 分钟`
-}
-
-/** 将覆盖率格式化为百分比文本。 */
-const formatCoverage = (coverage: number | null | undefined): string => {
-  if (coverage == null || Number.isNaN(coverage)) return '--'
-  return `${Number(coverage.toFixed(2))}%`
-}
-
-/**
- * 根据威胁度分数返回对应的样式类名。
- * 分数在 0 到 1 之间时按比例转换为百分制。
- *
- * @param score 威胁度分数
- * @returns 威胁等级样式类名
- */
-const getThreatLevelClass = (score: number): string => {
-  /** 转换为百分制后的威胁度分数。 */
-  const normalized = score <= 1 ? score * 100 : score
-  if (normalized >= 70) return 'threat-high'
-  if (normalized >= 40) return 'threat-medium'
-  return 'threat-low'
-}
-
-/**
- * 打开卫星威胁度详情弹窗并加载后端计算信息。
- *
- * @param sat 待查看详情的卫星
- */
-const openThreatDetail = async (sat: SatListItem) => {
-  emit('select-satellite', sat.norad)
-  /** 当前任务 ID，用于请求卫星威胁度详情。 */
-  const taskId = store.activedTask?.id
-  if (!taskId) {
-    ElMessage.warning('请先选择任务')
-    return
-  }
-
-  threatDialogSat.value = { norad: sat.norad, name: sat.name }
-  threatDialogVisible.value = true
-  threatLoading.value = true
-  threatInfo.value = null
-
+const selectTask = async (task: TaskForm) => {
+  if (taskLoading.value || taskSwitching.value) return
+  if (store.activedTask?.id === task.id) return
+  taskSwitching.value = true
   try {
-    /** 卫星威胁度详情接口响应。 */
-    const res = await getSatelliteThreatInfo({
-      norad: sat.norad,
-      series: isCommThreatSatellite(sat.name) ? '通信' : '侦察',
-      taskId,
-    })
-    if (res.code === 200 && res.data?.length) {
-      threatInfo.value = res.data[0]
-    }
+    store.setActivedTask(task)
+    store.setSelectedSatSeries('')
+    ElMessage.success(`已切换当前任务：${task.name}`)
+    await store.ensureActiveZhchPlan(true)
+    await store.fetchMatrixForCurrentScope(true)
   } catch (err) {
-    console.error('获取卫星威胁度详情失败:', err)
-    ElMessage.error('获取威胁度详情失败')
+    console.error('切换任务失败:', err)
   } finally {
-    threatLoading.value = false
+    taskSwitching.value = false
   }
 }
-/**
- * [函数说明]
- * 处理威胁度详情弹窗关闭事件，清空相关状态
- */
-const handleThreatDialogClosed = () => {
-  threatInfo.value = null
-  threatDialogSat.value = null
-}
-
-/**
- * 跳转至态势拓扑分析页，并聚焦当前卫星的全部传输链路
- *
- * @param sat 待分析的卫星
- */
-const openTopoAnalysis = (sat: SatListItem) => {
-  emit('select-satellite', sat.norad)
-  store.navigateToTopoAnalysis(sat.norad)
-}
-/**
- * 归一化威胁度分数，将 0-1 的分数转换为百分制
- * @param score 威胁度分数
- * @returns 归一化后的威胁度分数
- */
-const normalizeThreatScore = (score: number | null): number => {
-  if (score == null) return -Infinity
-  return score <= 1 ? score * 100 : score
-}
-/**
- * 解析过境时间字符串为时间戳
- * @param timeStr 过境时间字符串
- * @returns 时间戳，解析失败返回 Infinity
- */
-const parseTransTimeTs = (timeStr: string | null | undefined): number => {
-  if (!timeStr) return Infinity
-  const ts = new Date(timeStr).getTime()
-  return Number.isNaN(ts) ? Infinity : ts
-}
-/**
- * 判断卫星是否有资格进入排行榜
- * @param sat 卫星信息
- * @returns 是否有资格
- */
-const isTopRankEligible = (sat: SatListItem): boolean => {
-  if (sortMode.value === 'threat') return sat.threatScore != null
-  if (isStarlinkSeries.value) return sat.beforeCoverage != null || sat.coverage != null
-  return sat.timeEffect != null
-}
-
-/**
- * 提取当前矩阵中的敌方天基过境与中继卫星列表，支持按威胁度或链路时长排序。
- */
-const satList = computed<SatListItem[]>(() => {
-  /** 当前算法矩阵响应数据。 */
-  const matrixData = props.matrixData
-  if (!matrixData) return []
-  // 构建 NORAD -> 威胁度映射
-  /** 按 NORAD 编号索引的威胁度映射。 */
-  const threatMap = new Map<number, number>()
-    ; (matrixData.threatSats || []).forEach((item) => {
-      threatMap.set(item.norad, item.threatScore)
-    })
-  // 构建 NORAD -> 过境链路时长映射
-  /** 按 NORAD 编号索引的过境链路映射。 */
-  const timeEffectMap = new Map<number, SatTimeEffectInfo>()
-    ; (matrixData.timeEffects || []).forEach((item) => {
-      timeEffectMap.set(item.norad, {
-        beginTime: item.beginTime,
-        endTime: item.endTime,
-        duration: item.duration,
-        receiveName: item.receiveName,
-      })
-    })
-
-  // 使用 Map 来去重并合并 initMatrixList 与 satelliteMatrixList
-  /** 按 NORAD 编号去重并合并后的卫星信息映射。 */
-  const map = new Map<number, SatListItem>()
-
-  /** 初始算法矩阵中的卫星列表。 */
-  const initList = matrixData.initMatrixList?.length ? matrixData.initMatrixList : []
-  /** 卫星矩阵中的卫星列表。 */
-  const satMatrixList = matrixData.satelliteMatrixList?.length ? matrixData.satelliteMatrixList : []
-  /** 中继卫星 NORAD 编号列表。 */
-  const relayList = matrixData.relayRelation?.relayList?.length ? matrixData.relayRelation.relayList : []
-
-  // 遍历 initMatrixList 和 satelliteMatrixList，合并卫星信息
-  initList.forEach((s: InitMatrix) => {
-    /** 根据卫星类型或中继关系判断是否为中继卫星。 */
-    const isRelay = (s.satType || '').includes('中继') || relayList.includes(s.norad)
-    map.set(s.norad, {
-      norad: s.norad,
-      name: s.name,
-      satType: s.satType,
-      usage: s.usage,
-      orbitType: s.orbitType,
-      isRelay,
-      threatScore: threatMap.get(s.norad) ?? null,
-      timeEffect: timeEffectMap.get(s.norad) ?? null,
-      coverage: s.coverage ?? null,
-      beforeCoverage: s.coverage ?? null,
-    })
-  })
-  satMatrixList.forEach((s: SatelliteMatrix) => {
-    /** 根据卫星类型或中继关系判断是否为中继卫星。 */
-    const isRelay = (s.satType || '').includes('中继') || relayList.includes(s.norad)
-    const existing = map.get(s.norad)
-    map.set(s.norad, {
-      norad: s.norad,
-      name: s.name,
-      satType: s.satType || existing?.satType || '',
-      usage: s.usage || existing?.usage,
-      orbitType: s.orbitType ?? existing?.orbitType,
-      isRelay,
-      threatScore: threatMap.get(s.norad) ?? existing?.threatScore ?? null,
-      timeEffect: timeEffectMap.get(s.norad) ?? existing?.timeEffect ?? null,
-      coverage: s.coverage ?? existing?.coverage ?? null,
-      beforeCoverage: existing?.beforeCoverage ?? null,
-    })
-  })
-
-  /** 去重合并后的卫星资产列表。 */
-  const list = Array.from(map.values())
-
-  // 根据当前排序模式进行排序
-  if (sortMode.value === 'transTime') {
-    return list.sort((a, b) => {
-      if (isStarlinkSeries.value) {
-        return (b.beforeCoverage ?? b.coverage ?? -Infinity) - (a.beforeCoverage ?? a.coverage ?? -Infinity)
-      }
-      /** 两颗卫星的链路持续时长。 */
-      const durationA = a.timeEffect?.duration ?? Infinity
-      const durationB = b.timeEffect?.duration ?? Infinity
-      if (durationA !== durationB) return durationA - durationB
-      return parseTransTimeTs(a.timeEffect?.beginTime) - parseTransTimeTs(b.timeEffect?.beginTime)
-    })
-  }
-
-  return list.sort((a, b) => normalizeThreatScore(b.threatScore) - normalizeThreatScore(a.threatScore))
-})
-
-const selectedSatelliteName = computed(() => {
-  if (props.selectedNorad == null) return ''
-  return satList.value.find((sat) => sat.norad === props.selectedNorad)?.name || `Sat-${props.selectedNorad}`
-})
-
-
-
-
 </script>
 
-<style lang="scss" scoped>
+<style scoped lang="scss">
 .c2-panel {
   display: flex;
   flex-direction: column;
@@ -725,7 +418,7 @@ const selectedSatelliteName = computed(() => {
     -apple-system,
     sans-serif;
   overflow: hidden;
-  gap: 12px;
+  gap: 10px;
 }
 
 .panel-header {
@@ -749,208 +442,48 @@ const selectedSatelliteName = computed(() => {
     text-shadow: 0 0 8px rgba(64, 242, 255, 0.4);
   }
 
-  .panel-badge {
+  .battle-name-tag {
+    max-width: 160px;
     padding: 2px 8px;
     font-size: 11px;
+    font-weight: 600;
     border-radius: 4px;
     background: rgba(0, 225, 255, 0.12);
     color: #5ce1e6;
     border: 1px solid rgba(0, 225, 255, 0.3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
-.panel-section {
+.task-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  background: rgba(14, 25, 42, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 
-  &.section-space {
-    flex: 1;
-    min-height: 0;
-  }
-
-  .section-header-block {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .section-title {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #b5d5ff;
-
-    .current-sat {
-      flex: 1;
-      min-width: 0;
-      margin-left: auto;
-      font-weight: 700;
-      color: #40f2ff;
-      text-align: right;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .clear-sat-btn {
-      flex-shrink: 0;
-      height: 22px;
-      padding: 0 8px;
-      border-radius: 4px;
-      border: 1px solid rgba(64, 242, 255, 0.35);
-      background: rgba(8, 18, 32, 0.85);
-      color: #7dd3fc;
-      font-size: 11px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-
-      &:hover {
-        border-color: rgba(64, 242, 255, 0.55);
-        background: rgba(64, 242, 255, 0.12);
-        color: #e0faff;
-      }
-    }
-
-    .count-tag {
-      margin-left: 0;
-      flex-shrink: 0;
-      font-size: 11px;
-      padding: 1px 6px;
-      border-radius: 10px;
-      background: rgba(64, 242, 255, 0.15);
-      color: #7dd3fc;
-    }
-  }
-
-  .sort-toggle-bar {
-    display: flex;
-    gap: 6px;
-
-    .sort-btn {
-      flex: 1;
-      height: 26px;
-      padding: 0 8px;
-      font-size: 11px;
-      font-weight: 500;
-      color: #9ec5ed;
-      background: rgba(18, 32, 54, 0.85);
-      border: 1px solid rgba(0, 225, 255, 0.25);
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      outline: none;
-      white-space: nowrap;
-
-      &:hover {
-        color: #ffffff;
-        border-color: rgba(0, 225, 255, 0.6);
-        background: rgba(24, 48, 80, 0.9);
-      }
-
-      &.active {
-        color: #ffffff;
-        font-weight: 600;
-        background: linear-gradient(135deg, rgba(0, 180, 216, 0.4) 0%, rgba(0, 225, 255, 0.25) 100%);
-        border-color: #00e1ff;
-        box-shadow: 0 0 8px rgba(0, 225, 255, 0.3);
-      }
-    }
-  }
-}
-
-.filter-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex-shrink: 0;
-
-  .type-button-bar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    width: 100%;
-    flex-wrap: wrap;
-
-    .type-btn {
-      flex: 1 1 auto;
-      min-width: 60px;
-      height: 28px;
-      padding: 0 8px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: 500;
-      color: #9ec5ed;
-      background: rgba(18, 32, 54, 0.85);
-      border: 1px solid rgba(0, 225, 255, 0.25);
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      outline: none;
-      white-space: nowrap;
-
-      &:hover {
-        color: #ffffff;
-        border-color: rgba(0, 225, 255, 0.6);
-        background: rgba(24, 48, 80, 0.9);
-        box-shadow: 0 0 6px rgba(0, 225, 255, 0.2);
-      }
-
-      &.active {
-        color: #ffffff;
-        font-weight: 600;
-        background: linear-gradient(135deg, rgba(0, 180, 216, 0.4) 0%, rgba(0, 225, 255, 0.25) 100%);
-        border-color: #00e1ff;
-        box-shadow: 0 0 10px rgba(0, 225, 255, 0.35);
-      }
-
-      &:disabled,
-      &.disabled {
-        opacity: 0.45;
-        color: #64748b;
-        background: rgba(15, 23, 42, 0.6);
-        border-color: rgba(100, 116, 139, 0.2);
-        cursor: not-allowed;
-        pointer-events: none;
-        box-shadow: none;
-
-        &:hover {
-          color: #64748b;
-          background: rgba(15, 23, 42, 0.6);
-          border-color: rgba(100, 116, 139, 0.2);
-          box-shadow: none;
-        }
-      }
-    }
-  }
-
-  .series-list-box {
+  .task-list-box {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 8px;
-    min-height: 120px;
+    gap: 8px;
+    padding: 10px;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
     box-sizing: border-box;
     background: rgba(12, 22, 38, 0.75);
     border: 1px dashed rgba(0, 225, 255, 0.25);
     border-radius: 6px;
 
-    &.is-loading .series-list {
+    &.is-loading .task-scroll-list {
       pointer-events: none;
       opacity: 0.5;
     }
 
-    .series-loading-mask {
+    .task-loading-mask {
       position: absolute;
       inset: 0;
       z-index: 10;
@@ -968,47 +501,38 @@ const selectedSatelliteName = computed(() => {
       }
     }
 
-    .series-empty-tip {
-      padding: 16px 12px;
-      font-size: 12px;
-      line-height: 1.6;
-      color: rgba(255, 255, 255, 0.55);
-      text-align: center;
-      border: 1px dashed rgba(79, 147, 221, 0.35);
-      border-radius: 6px;
-    }
-
-    .series-loading-spinner {
+    .task-loading-spinner {
       width: 22px;
       height: 22px;
       border: 2px solid rgba(0, 225, 255, 0.2);
       border-top-color: #00e1ff;
       border-radius: 50%;
-      animation: series-panel-spin 0.8s linear infinite;
+      animation: task-panel-spin 0.8s linear infinite;
     }
 
-    .series-loading-text {
+    .task-loading-text {
       font-size: 11px;
       font-weight: 600;
       color: #7dd3fc;
       letter-spacing: 0.5px;
     }
 
-    .series-list-header {
+    .task-list-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       font-size: 11px;
       color: #7dd3fc;
-      padding-bottom: 4px;
+      padding-bottom: 6px;
       border-bottom: 1px rgba(0, 225, 255, 0.15) solid;
+      flex-shrink: 0;
 
-      .series-title {
+      .task-count {
         font-weight: 600;
         flex-shrink: 0;
       }
 
-      .series-current {
+      .task-current {
         flex: 1;
         min-width: 0;
         margin-left: 8px;
@@ -1023,71 +547,191 @@ const selectedSatelliteName = computed(() => {
       }
     }
 
-    .series-search-bar {
-      margin: 2px 0 4px;
+    .task-filter-container {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      margin: 2px 0 6px;
+      flex-shrink: 0;
+      background: rgba(10, 24, 44, 0.55);
+      border: 1px solid rgba(0, 225, 255, 0.16);
+      border-radius: 6px;
 
-      :deep(.series-search-input) {
+      .task-search-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
         width: 100%;
 
-        .el-input__wrapper {
-          background-color: rgba(8, 20, 36, 0.85);
-          box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.25) inset;
+        :deep(.task-search-input) {
+          flex: 1;
+          min-width: 0;
+
+          .el-input__wrapper {
+            background-color: rgba(8, 20, 36, 0.85);
+            box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.25) inset;
+            border-radius: 4px;
+            padding: 1px 8px;
+            transition: all 0.2s ease;
+
+            &:hover {
+              box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.5) inset, 0 0 6px rgba(0, 225, 255, 0.15);
+            }
+
+            &.is-focus {
+              box-shadow: 0 0 0 1px #00e1ff inset, 0 0 8px rgba(0, 225, 255, 0.3) !important;
+            }
+          }
+
+          .el-input__inner {
+            color: #e2efff;
+            font-size: 11px;
+            height: 26px;
+            line-height: 26px;
+
+            &::placeholder {
+              color: rgba(158, 197, 237, 0.45);
+            }
+          }
+
+          .el-input__prefix {
+            color: #40f2ff;
+            margin-right: 4px;
+          }
+
+          .el-input__clear {
+            color: #7dd3fc;
+            font-size: 12px;
+
+            &:hover {
+              color: #ffffff;
+            }
+          }
+        }
+
+        .task-search-btn {
+          flex-shrink: 0;
+          height: 26px;
+          padding: 0 10px;
+          font-size: 11px;
+          font-weight: 600;
           border-radius: 4px;
-          padding: 1px 8px;
+          background: linear-gradient(135deg, rgba(0, 225, 255, 0.25), rgba(14, 116, 144, 0.45));
+          border: 1px solid rgba(0, 225, 255, 0.45);
+          color: #40f2ff;
+          cursor: pointer;
           transition: all 0.2s ease;
 
           &:hover {
-            box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.5) inset, 0 0 6px rgba(0, 225, 255, 0.15);
-          }
-
-          &.is-focus {
-            box-shadow: 0 0 0 1px #00e1ff inset, 0 0 8px rgba(0, 225, 255, 0.3) !important;
-          }
-        }
-
-        .el-input__inner {
-          color: #e2efff;
-          font-size: 11px;
-          height: 24px;
-          line-height: 24px;
-
-          &::placeholder {
-            color: rgba(158, 197, 237, 0.45);
-          }
-        }
-
-        .el-input__prefix {
-          color: #40f2ff;
-          margin-right: 4px;
-        }
-
-        .el-input__clear {
-          color: #7dd3fc;
-          font-size: 12px;
-
-          &:hover {
+            background: linear-gradient(135deg, rgba(0, 225, 255, 0.4), rgba(14, 116, 144, 0.65));
+            border-color: #00e1ff;
+            box-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
             color: #ffffff;
+          }
+
+          &:active {
+            transform: scale(0.97);
+          }
+        }
+      }
+
+      .task-filter-options {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+
+        .filter-group {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+
+          .filter-group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            .group-title {
+              font-size: 11px;
+              font-weight: 600;
+              color: #7dd3fc;
+              letter-spacing: 0.2px;
+            }
+
+            .group-clear-btn {
+              font-size: 10px;
+              color: #38bdf8;
+              cursor: pointer;
+              opacity: 0.8;
+              transition: all 0.15s ease;
+
+              &:hover {
+                opacity: 1;
+                color: #00e1ff;
+                text-decoration: underline;
+              }
+            }
+          }
+
+          .filter-tags-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 6px;
+
+            .filter-tag-chip {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              padding: 2px 8px;
+              font-size: 11px;
+              line-height: 1.35;
+              border-radius: 4px;
+              background: rgba(18, 36, 62, 0.7);
+              border: 1px solid rgba(79, 147, 221, 0.3);
+              color: #94a3b8;
+              cursor: pointer;
+              user-select: none;
+              transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+              &:hover {
+                border-color: rgba(0, 225, 255, 0.5);
+                color: #e2efff;
+                background: rgba(24, 52, 88, 0.85);
+                transform: translateY(-1px);
+              }
+
+              &.active {
+                background: linear-gradient(135deg, rgba(0, 225, 255, 0.25), rgba(14, 116, 144, 0.5));
+                border-color: #00e1ff;
+                color: #40f2ff;
+                font-weight: 600;
+                box-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
+                text-shadow: 0 0 4px rgba(64, 242, 255, 0.5);
+              }
+            }
           }
         }
       }
     }
 
-    .series-search-empty {
-      padding: 12px 8px;
-      font-size: 11px;
+    .task-search-empty {
+      padding: 24px 8px;
+      font-size: 12px;
       color: rgba(158, 197, 237, 0.6);
       text-align: center;
     }
 
-    .series-list {
+    .task-scroll-list {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      max-height: 150px;
+      gap: 8px;
+      flex: 1;
+      min-height: 0;
       overflow-y: auto;
+      padding: 6px 3px 6px 2px;
 
       &::-webkit-scrollbar {
-        width: 3px;
+        width: 4px;
       }
 
       &::-webkit-scrollbar-thumb {
@@ -1095,54 +739,145 @@ const selectedSatelliteName = computed(() => {
         border-radius: 3px;
       }
 
-      .series-item {
+      .task-item-card {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 6px 10px;
-        font-size: 12px;
-        color: #c4e0ff;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 12px;
         background: rgba(18, 36, 62, 0.6);
-        border: 1px solid rgba(79, 147, 221, 0.2);
-        border-radius: 4px;
+        border: 1px solid rgba(79, 147, 221, 0.22);
+        border-radius: 6px;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.22s ease;
+        box-sizing: border-box;
 
-        .series-icon {
-          margin-right: 6px;
-          font-size: 12px;
+        .task-card-top {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+
+          .task-icon {
+            font-size: 14px;
+            flex-shrink: 0;
+          }
+
+          .task-name {
+            flex: 1;
+            min-width: 0;
+            font-weight: 600;
+            font-size: 13px;
+            color: #e2efff;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .task-status-badge {
+            flex-shrink: 0;
+            font-size: 11px;
+            color: #64748b;
+            padding: 1px 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.2s ease;
+          }
         }
 
-        .series-name {
-          flex: 1;
-          font-weight: 500;
-        }
+        .task-card-meta {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          padding-left: 22px;
 
-        .series-status {
-          font-size: 11px;
-          color: #64748b;
+          .meta-tags-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+
+            .meta-tag {
+              padding: 1px 6px;
+              font-size: 10px;
+              border-radius: 3px;
+
+              &.tag-target {
+                background: rgba(0, 225, 255, 0.12);
+                border: 1px solid rgba(0, 225, 255, 0.3);
+                color: #38bdf8;
+              }
+
+              &.tag-country {
+                background: rgba(244, 63, 94, 0.12);
+                border: 1px solid rgba(244, 63, 94, 0.3);
+                color: #fda4af;
+              }
+            }
+          }
+
+          .meta-time-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: #94a3b8;
+
+            .time-label {
+              color: #64748b;
+            }
+
+            .time-val {
+              font-family: Consolas, monospace;
+              color: #cbd5e1;
+            }
+          }
+
+          .meta-desc-row {
+            font-size: 11px;
+            color: #94a3b8;
+            line-height: 1.4;
+
+            .desc-text {
+              display: -webkit-box;
+              -webkit-line-clamp: 2;
+              -webkit-box-orient: vertical;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+          }
         }
 
         &:hover {
-          color: #ffffff;
-          border-color: rgba(0, 225, 255, 0.5);
-          background: rgba(24, 52, 88, 0.8);
+          border-color: rgba(0, 225, 255, 0.55);
+          background: rgba(24, 52, 88, 0.85);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 
-          .series-status {
+          .task-card-top .task-name {
+            color: #ffffff;
+          }
+
+          .task-status-badge {
             color: #38bdf8;
+            border-color: rgba(0, 225, 255, 0.3);
           }
         }
 
         &.active {
-          color: #40f2ff;
-          font-weight: 600;
-          background: rgba(0, 225, 255, 0.15);
+          background: rgba(0, 225, 255, 0.12);
           border-color: #00e1ff;
-          box-shadow: 0 0 8px rgba(0, 225, 255, 0.25);
+          box-shadow: 0 0 12px rgba(0, 225, 255, 0.25);
 
-          .series-status {
+          .task-card-top .task-name {
+            color: #40f2ff;
+            text-shadow: 0 0 8px rgba(0, 225, 255, 0.4);
+          }
+
+          .task-status-badge {
             color: #00e1ff;
             font-weight: 600;
+            background: rgba(0, 225, 255, 0.2);
+            border-color: #00e1ff;
           }
         }
 
@@ -1150,412 +885,30 @@ const selectedSatelliteName = computed(() => {
           cursor: not-allowed;
           pointer-events: none;
           opacity: 0.55;
-
-          &:hover {
-            color: #c4e0ff;
-            border-color: rgba(79, 147, 221, 0.2);
-            background: rgba(18, 36, 62, 0.6);
-
-            .series-status {
-              color: #64748b;
-            }
-          }
         }
       }
     }
   }
+
+  .task-empty-tip {
+    padding: 36px 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.55);
+    text-align: center;
+    border: 1px dashed rgba(79, 147, 221, 0.35);
+    border-radius: 6px;
+    background: rgba(12, 22, 38, 0.75);
+  }
 }
 
-@keyframes series-panel-spin {
+@keyframes task-panel-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
   to {
     transform: rotate(360deg);
   }
-}
-
-.toggle-grid {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-
-  .toggle-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    font-size: 12px;
-
-    input {
-      accent-color: #00e1ff;
-    }
-  }
-}
-
-.asset-scroll-list {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-
-  :deep(.virtual-scroll-list) {
-    padding-right: 2px;
-  }
-
-  :deep(.virtual-scroll-list__item) {
-    padding-bottom: 10px;
-  }
-}
-
-.asset-card {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: rgba(18, 32, 54, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: left;
-
-  &:hover {
-    border-color: rgba(0, 225, 255, 0.4);
-    background: rgba(22, 42, 70, 0.9);
-  }
-
-  &.card-active {
-    border-color: #00e1ff;
-    background: rgba(0, 225, 255, 0.18);
-    box-shadow: 0 0 12px rgba(0, 225, 255, 0.25);
-  }
-
-  &.card-threat-rank-1 {
-    border-color: rgba(239, 68, 68, 0.85);
-    background: rgba(239, 68, 68, 0.14);
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.22);
-
-    .metric-highlight {
-      color: #fecaca !important;
-      background: rgba(239, 68, 68, 0.25) !important;
-      border-color: rgba(239, 68, 68, 0.55) !important;
-    }
-  }
-
-  &.card-threat-rank-2 {
-    border-color: rgba(249, 115, 22, 0.75);
-    background: rgba(249, 115, 22, 0.12);
-    box-shadow: 0 0 6px rgba(249, 115, 22, 0.18);
-
-    .metric-highlight {
-      color: #fed7aa !important;
-      background: rgba(249, 115, 22, 0.2) !important;
-      border-color: rgba(249, 115, 22, 0.45) !important;
-    }
-  }
-
-  &.card-threat-rank-3 {
-    border-color: rgba(250, 204, 21, 0.7);
-    background: rgba(250, 204, 21, 0.1);
-    box-shadow: 0 0 6px rgba(250, 204, 21, 0.18);
-
-    .metric-highlight {
-      color: #fef08a !important;
-      background: rgba(250, 204, 21, 0.18) !important;
-      border-color: rgba(250, 204, 21, 0.4) !important;
-    }
-  }
-
-  .card-top {
-    flex-shrink: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    margin-bottom: 8px;
-
-    .sat-name {
-      font-size: 16px;
-      color: #ffffff;
-      min-width: 0;
-      flex: 1;
-      text-align: left;
-
-      .relay-tag {
-        margin-left: 6px;
-        font-size: 12px;
-        font-weight: 700;
-        color: #fbbf24;
-        background: rgba(245, 158, 11, 0.18);
-        border: 1px solid rgba(245, 158, 11, 0.4);
-        border-radius: 4px;
-        padding: 0 6px;
-        vertical-align: middle;
-      }
-    }
-
-    .metric-highlight {
-      flex-shrink: 0;
-      font-size: 14px;
-      font-weight: 800;
-      padding: 2px 8px;
-      border-radius: 4px;
-      white-space: nowrap;
-      letter-spacing: 0.2px;
-      text-shadow: 0 0 8px currentColor;
-
-      &.threat-high {
-        color: #fca5a5;
-        background: rgba(239, 68, 68, 0.18);
-        border: 1px solid rgba(239, 68, 68, 0.4);
-      }
-
-      &.threat-medium {
-        color: #fdba74;
-        background: rgba(249, 115, 22, 0.16);
-        border: 1px solid rgba(249, 115, 22, 0.38);
-      }
-
-      &.threat-low {
-        color: #7dd3fc;
-        background: rgba(56, 189, 248, 0.14);
-        border: 1px solid rgba(56, 189, 248, 0.35);
-      }
-
-      &.threat-unknown {
-        color: #64748b;
-        background: rgba(100, 116, 139, 0.12);
-        border: 1px solid rgba(100, 116, 139, 0.2);
-      }
-
-      &.metric-duration {
-        color: #86efac;
-        background: rgba(34, 197, 94, 0.14);
-        border: 1px solid rgba(34, 197, 94, 0.35);
-      }
-    }
-  }
-
-  .card-meta-row {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 6px;
-
-    .meta-tag {
-      display: inline-flex;
-      align-items: center;
-      padding: 1px 7px;
-      font-size: 14px;
-      line-height: 16px;
-      border-radius: 3px;
-      font-weight: 500;
-      white-space: nowrap;
-      letter-spacing: 0.2px;
-
-      &.tag-type {
-        color: #38bdf8;
-        background: rgba(56, 189, 248, 0.12);
-        border: 1px solid rgba(56, 189, 248, 0.32);
-      }
-
-      &.tag-usage {
-        color: #c084fc;
-        background: rgba(192, 132, 252, 0.12);
-        border: 1px solid rgba(192, 132, 252, 0.32);
-      }
-
-      &.tag-orbit {
-        color: #34d399;
-        background: rgba(52, 211, 153, 0.12);
-        border: 1px solid rgba(52, 211, 153, 0.32);
-      }
-    }
-  }
-
-  .card-station {
-    display: block;
-    width: 100%;
-    font-size: 14px;
-    color: #e2e8f0;
-    margin-bottom: 6px;
-    line-height: 1.4;
-    text-align: left;
-  }
-
-  .card-time-row {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    width: 100%;
-    font-size: 13px;
-    color: #86efac;
-    line-height: 1.4;
-    text-align: left;
-  }
-
-  .card-footer {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 4px;
-
-    .click-hint {
-      color: #38bdf8;
-      font-size: 11px;
-      font-weight: 600;
-    }
-
-    .detail-btn {
-      font-size: medium;
-      padding: 0;
-      height: auto;
-      margin-left: auto;
-    }
-  }
-}
-
-:deep(.threat-detail-dialog) {
-  .el-dialog {
-    background: rgba(8, 15, 26, 0.98);
-    border: 1px solid rgba(0, 225, 255, 0.25);
-    border-radius: 10px;
-  }
-
-  .el-dialog__header {
-    border-bottom: 1px solid rgba(0, 225, 255, 0.15);
-    margin-right: 0;
-    padding: 14px 18px 10px;
-  }
-
-  .el-dialog__title {
-    color: #40f2ff;
-    font-size: 15px;
-    font-weight: 700;
-  }
-
-  .el-dialog__body {
-    padding: 14px 18px 18px;
-    color: #e2efff;
-  }
-}
-
-.threat-dialog-body {
-  min-height: 180px;
-}
-
-.threat-summary-card {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 14px;
-
-  .summary-item {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 10px;
-    border-radius: 6px;
-    background: rgba(14, 25, 42, 0.8);
-    border: 1px solid rgba(0, 225, 255, 0.12);
-
-    &.highlight {
-      border-color: rgba(255, 140, 0, 0.3);
-      background: rgba(255, 140, 0, 0.06);
-    }
-
-    .summary-label {
-      font-size: 11px;
-      color: #94a3b8;
-    }
-
-    strong {
-      font-size: 14px;
-      color: #e2efff;
-      word-break: break-all;
-    }
-
-    .threat-value {
-      font-size: 20px;
-      font-weight: 700;
-    }
-  }
-}
-
-.threat-section {
-  margin-bottom: 14px;
-
-  .section-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #7dd3fc;
-    margin-bottom: 8px;
-  }
-
-  .formula-box {
-    margin: 0;
-    padding: 12px;
-    border-radius: 6px;
-    background: rgba(10, 18, 32, 0.9);
-    border: 1px solid rgba(0, 225, 255, 0.15);
-    color: #cbd5e1;
-    font-size: 12px;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-family: Consolas, 'Courier New', monospace;
-  }
-}
-
-.param-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-
-  .param-item {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding: 8px 10px;
-    border-radius: 6px;
-    background: rgba(14, 25, 42, 0.65);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-
-    .param-label {
-      font-size: 11px;
-      color: #94a3b8;
-    }
-
-    .param-value {
-      font-size: 13px;
-      color: #e2efff;
-      font-weight: 600;
-    }
-  }
-}
-
-.threat-empty {
-  text-align: center;
-  color: #64748b;
-  padding: 40px 0;
-  font-size: 13px;
-}
-
-.threat-high {
-  color: #fca5a5 !important;
-}
-
-.threat-medium {
-  color: #fdba74 !important;
-}
-
-.threat-low {
-  color: #7dd3fc !important;
 }
 </style>
