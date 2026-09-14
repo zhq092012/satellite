@@ -104,7 +104,7 @@ const selectedTransmissionLink = ref<SatelliteTransmissionLink | null>(null)
 const currentClockMs = ref<number>(0)
 
 /** 地球时钟当前播放/暂停状态 */
-const isClockPlaying = ref<boolean>(true)
+const isClockPlaying = ref<boolean>(false)
 /** TLE轨道仿真播放倍率，单位为仿真秒/现实秒。 */
 const orbitPlaybackSpeed = ref(120)
 
@@ -532,7 +532,7 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
     /* 右侧面板定位与收起 */
     &--right {
       right: 14px;
-      width: 450px;
+      width: 750px;
 
       .toggle-btn--right {
         left: -21px;

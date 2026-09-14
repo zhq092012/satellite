@@ -3,10 +3,10 @@
     <!-- 场景操作：添加 / 修改当前场景（即战场） -->
     <div class="panel-header">
       <button type="button" class="scene-action-btn" @click="openCreateScene">添加场景</button>
-      <button type="button" class="scene-action-btn" :disabled="!store.battle" title="修改当前选择的场景"
-        @click="openEditScene">
+      <button type="button" class="scene-action-btn" :disabled="!store.battle" title="修改当前选择的场景" @click="openEditScene">
         修改场景
       </button>
+      <button type="button" class="scene-action-btn" @click="openCreateTask">添加任务</button>
     </div>
 
     <!-- 当前战场下的任务列表容器（占满面板剩余高度） -->
@@ -25,9 +25,12 @@
         </div>
 
         <div class="task-list-header">
-          <span class="task-count">包含任务 {{ taskList.length }} 个</span>
-          <span class="task-current" :title="store.activedTask?.name || '未选择任务'">
-            当前任务：{{ store.activedTask?.name || '未选择' }}
+          <!-- 从左到右：当前场景、任务数量、当前任务 -->
+          <span
+            class="task-header-text"
+            :title="`当前场景：${store.battle?.name || '未选择'}（包含${taskList.length}个任务），当前任务：${store.activedTask?.name || '未选择'}`"
+          >
+            当前场景：{{ store.battle?.name || '未选择' }}（包含{{ taskList.length }}个任务），当前任务：{{ store.activedTask?.name || '未选择' }}
           </span>
         </div>
 
@@ -92,7 +95,7 @@
       </div>
     </div>
 
-    <TaskEditDialog v-model="taskEditVisible" :task="editingTask" @saved="handleTaskSaved" />
+    <TaskEditDialog v-model="taskEditVisible" :is-edit="taskEditIsEdit" :task="editingTask" @saved="handleTaskSaved" />
     <SceneEditDialog v-model="sceneEditVisible" :is-edit="sceneEditIsEdit" :scene="editingScene"
       @saved="handleSceneSaved" />
   </aside>
@@ -140,9 +143,11 @@ const taskList = ref<TaskForm[]>([])
 const taskLoading = ref(false)
 /** 任务切换中状态 */
 const taskSwitching = ref(false)
-/** 修改任务对话框是否可见 */
+/** 任务对话框是否可见 */
 const taskEditVisible = ref(false)
-/** 当前正在编辑的任务 */
+/** 任务对话框是否为修改模式（false 为添加任务） */
+const taskEditIsEdit = ref(false)
+/** 当前正在编辑的任务；添加任务时为 null */
 const editingTask = ref<TaskForm | null>(null)
 /** 添加 / 修改场景对话框是否可见 */
 const sceneEditVisible = ref(false)
@@ -226,6 +231,19 @@ const openCreateScene = () => {
 }
 
 /**
+ * 打开添加任务对话框。必须先选择当前场景，以便把任务挂到该战场下。
+ */
+const openCreateTask = () => {
+  if (!store.battle?.id) {
+    ElMessage.warning('请先选择当前场景后再添加任务')
+    return
+  }
+  taskEditIsEdit.value = false
+  editingTask.value = null
+  taskEditVisible.value = true
+}
+
+/**
  * 打开修改当前场景对话框。
  */
 const openEditScene = () => {
@@ -261,25 +279,40 @@ const handleSceneSaved = async (scene: BattleForm) => {
  */
 const openEditTask = (task: TaskForm) => {
   if (taskSwitching.value) return
+  taskEditIsEdit.value = true
   editingTask.value = task
   taskEditVisible.value = true
 }
 
 /**
- * 任务保存成功后刷新列表；若改的是当前任务则同步 Store 并重拉矩阵。
+ * 任务保存成功后刷新列表。
+ * 新增任务会切到该任务并加载矩阵；修改当前任务则同步 Store 后重拉矩阵。
  *
  * @param updated 提交后的任务数据
  */
 const handleTaskSaved = async (updated: TaskForm) => {
   await loadBattleTasks()
-  if (store.activedTask?.id && updated.id === store.activedTask.id) {
-    const latest = taskList.value.find((item) => item.id === updated.id) || updated
-    store.setActivedTask(latest)
-    try {
-      await store.fetchMatrixForCurrentScope(true)
-    } catch (error) {
-      console.error('刷新当前任务矩阵失败:', error)
+  if (!updated.id) return
+
+  const latest = taskList.value.find((item) => item.id === updated.id) || updated
+  const isCurrentTask = store.activedTask?.id === updated.id
+  const isNewTask = !isCurrentTask
+
+  if (!isCurrentTask && !isNewTask) return
+
+  store.setActivedTask(latest)
+  if (isNewTask) {
+    store.setSelectedSatSeries('')
+    ElMessage.success(`已切换到新任务：${latest.name}`)
+  }
+
+  try {
+    if (isNewTask) {
+      await store.ensureActiveZhchPlan(true)
     }
+    await store.fetchMatrixForCurrentScope(true)
+  } catch (error) {
+    console.error('刷新任务矩阵失败:', error)
   }
 }
 
@@ -425,26 +458,18 @@ const selectTask = async (task: TaskForm) => {
     .task-list-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       font-size: 11px;
       color: #7dd3fc;
       padding-bottom: 6px;
       border-bottom: 1px rgba(0, 225, 255, 0.15) solid;
       flex-shrink: 0;
+      min-width: 0;
 
-      .task-count {
-        font-weight: 600;
-        flex-shrink: 0;
-      }
-
-      .task-current {
-        flex: 1;
+      /* 单行从左到右展示，过长时省略 */
+      .task-header-text {
         min-width: 0;
-        margin-left: 8px;
-        padding: 1px 8px;
-        border-radius: 4px;
-        text-align: right;
-        font-weight: 700;
+        font-weight: 600;
         color: #40f2ff;
         overflow: hidden;
         text-overflow: ellipsis;

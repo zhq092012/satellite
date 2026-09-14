@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="修改任务" width="640px" append-to-body destroy-on-close align-center
+  <el-dialog v-model="visible" title="添加任务" width="640px" append-to-body destroy-on-close align-center
     class="task-edit-dialog" modal-class="task-edit-dialog-modal" @closed="handleClosed">
     <el-form ref="formRef" :model="taskForm" :rules="formRules" label-width="96px" class="task-edit-form">
       <el-form-item label="任务名称" prop="name">
@@ -10,33 +10,19 @@
           placeholder="请输入任务概述" />
       </el-form-item>
       <el-form-item label="开始时间" prop="beginDate">
-        <input
-          class="task-datetime-input"
-          type="datetime-local"
-          step="1"
+        <input class="task-datetime-input" type="datetime-local" step="1"
           :value="toDatetimeLocalValue(taskForm.beginDate)"
-          @input="handleBeginInput(($event.target as HTMLInputElement).value)"
-        />
+          @input="handleBeginInput(($event.target as HTMLInputElement).value)" />
       </el-form-item>
       <el-form-item label="结束时间" prop="endDate">
-        <input
-          class="task-datetime-input"
-          type="datetime-local"
-          step="1"
+        <input class="task-datetime-input" type="datetime-local" step="1"
           :value="toDatetimeLocalValue(taskForm.endDate)"
-          @input="handleEndInput(($event.target as HTMLInputElement).value)"
-        />
+          @input="handleEndInput(($event.target as HTMLInputElement).value)" />
       </el-form-item>
       <el-form-item label="任务时长">
         <div class="duration-edit">
-          <CyberMetricSlider
-            v-model="durationHours"
-            :min="1"
-            :max="durationMaxHours"
-            :step="1"
-            variant="delay"
-            aria-label="任务时长小时数"
-          />
+          <CyberMetricSlider v-model="durationHours" :min="1" :max="durationMaxHours" :step="1" variant="delay"
+            aria-label="任务时长小时数" />
           <span class="duration-edit__text">{{ durationText }}</span>
         </div>
       </el-form-item>
@@ -76,8 +62,9 @@
 import { computed, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { getBattleCountrys, updateTask } from '@/api/dashboard'
+import { getBattleCountrys, createTask, updateTask } from '@/api/dashboard'
 import type { TaskForm } from '@/types/dashboard'
+import { useLayoutStore } from '@/store/modules/layout'
 import CyberMetricSlider from '@/components/BattleSituation/CyberMetricSlider.vue'
 
 /** 作战目标可选项（与任务创建五大类一致）。 */
@@ -86,7 +73,9 @@ const SATELLITE_TYPES = ['侦察', '导航', '通信', '导弹预警', '空间�
 const props = defineProps<{
   /** 对话框是否可见。 */
   modelValue: boolean
-  /** 当前正在编辑的任务；关闭时可为 null。 */
+  /** 是否为修改模式；false 表示添加任务。 */
+  isEdit?: boolean
+  /** 当前正在编辑的任务；添加任务时为 null。 */
   task: TaskForm | null
 }>()
 
