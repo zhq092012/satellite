@@ -532,7 +532,7 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
     /* 右侧面板定位与收起 */
     &--right {
       right: 14px;
-      width: 750px;
+      width: 450px;
 
       .toggle-btn--right {
         left: -21px;

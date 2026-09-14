@@ -22,8 +22,12 @@
             <span class="asset-count">共 {{ filteredSatellites.length }} / {{ satelliteRows.length }} 颗</span>
           </div>
           <div class="filter-bar">
-            <el-input v-model="satFilters.keyword" size="small" clearable placeholder="名称 / NORAD"
+            <el-input v-model="satFilters.keyword" size="small" clearable placeholder="名称 / NORAD / 系列"
               class="filter-control filter-control--grow" />
+            <el-select v-model="satFilters.series" size="small" clearable placeholder="系列" class="filter-control"
+              popper-class="c2-filter-popper">
+              <el-option v-for="item in satSeriesOptions" :key="item" :label="item" :value="item" />
+            </el-select>
             <el-select v-model="satFilters.satType" size="small" clearable placeholder="类型" class="filter-control"
               popper-class="c2-filter-popper">
               <el-option v-for="item in satTypeOptions" :key="item" :label="item" :value="item" />
@@ -38,15 +42,26 @@
             </el-select>
           </div>
           <el-table :data="filteredSatellites" size="small" height="240" highlight-current-row row-key="norad"
-            class="asset-table" :row-class-name="satRowClassName" empty-text="当前筛选下暂无卫星" @row-click="handleSatRowClick">
+            class="asset-table sat-table" :expand-row-keys="expandedSatKeys" :row-class-name="satRowClassName"
+            empty-text="当前筛选下暂无卫星" @row-click="handleSatRowClick">
+            <el-table-column type="expand" width="1">
+              <template #default="{ row }">
+                <div class="sat-row-actions" @click.stop>
+                  <button type="button" class="sat-action-btn" @click="openSatProfile(row)">查看详情</button>
+                  <button type="button" class="sat-action-btn" @click="goTopoAnalysis">拓扑分析</button>
+                  <button type="button" class="sat-action-btn" @click="goGanttAnalysis">甘特图分析</button>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column prop="name" label="名称" min-width="120" show-overflow-tooltip />
-            <el-table-column prop="norad" label="NORAD" width="88" />
+            <el-table-column prop="series" label="系列" min-width="96" show-overflow-tooltip />
+            <el-table-column prop="threatText" label="威胁度" width="88" sortable :sort-method="sortByThreat" />
+            <el-table-column prop="coverageText" label="覆盖率" width="92" sortable :sort-method="sortByCoverage" />
             <el-table-column prop="satType" label="类型" min-width="110" show-overflow-tooltip />
             <el-table-column prop="orbitLabel" label="轨道" width="72" />
             <el-table-column prop="usage" label="用途" width="72" />
+            <el-table-column prop="norad" label="NORAD" width="88" />
             <el-table-column prop="heightText" label="高度" width="92" />
-            <el-table-column prop="threatText" label="威胁度" width="88" sortable :sort-method="sortByThreat" />
-            <el-table-column prop="coverageText" label="覆盖率" width="92" sortable :sort-method="sortByCoverage" />
           </el-table>
         </section>
 
@@ -69,10 +84,18 @@
           <el-table :data="filteredLinks" size="small" height="240" highlight-current-row row-key="id"
             class="asset-table" :row-class-name="linkRowClassName" empty-text="当前筛选下暂无链路"
             @row-click="handleLinkRowClick">
-            <el-table-column prop="pathText" label="链路路径" min-width="200" show-overflow-tooltip />
+            <el-table-column prop="pathText" label="链路路径" min-width="200">
+              <template #default="{ row }">
+                <!-- 始终用 tooltip 展示完整路径，避免表格溢出检测失败导致无法查看 -->
+                <el-tooltip :content="row.pathText" placement="top" :show-after="200" :disabled="!row.pathText"
+                  popper-class="c2-path-tooltip">
+                  <span class="link-path-text">{{ row.pathText }}</span>
+                </el-tooltip>
+              </template>
+            </el-table-column>
+            <el-table-column prop="durationText" label="链路时长" width="100" sortable :sort-method="sortLinkByDuration" />
             <el-table-column prop="threatText" label="威胁度" width="88" sortable :sort-method="sortLinkByThreat" />
             <el-table-column prop="coverageText" label="覆盖率" width="92" sortable :sort-method="sortLinkByCoverage" />
-            <el-table-column prop="durationText" label="链路时长" width="100" sortable :sort-method="sortLinkByDuration" />
             <el-table-column prop="transmitTime" label="传输时间" min-width="150" show-overflow-tooltip />
             <el-table-column prop="statusText" label="状态" width="72" />
           </el-table>
@@ -152,8 +175,10 @@
  * 以表格展示卫星、链路、地面站、数据中心；威胁度 / 覆盖率 / 链路时长可排序，各类列表支持筛选。
  */
 import { computed, reactive, toRef } from 'vue'
+import { useRouter } from 'vue-router'
 import { type MatrixResult } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
+import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import {
   useElectronicCesiumBridge,
   type InfrastructureLocation,
@@ -168,6 +193,8 @@ import {
 import { orbitTypeLabel } from '@/utils/zhchPlanDisplay'
 
 const store = useLayoutStore()
+const router = useRouter()
+const { openSatelliteProfile } = useSatelliteProfileDialog()
 
 const props = defineProps<{
   /** 算法矩阵数据 */
@@ -188,8 +215,10 @@ const emit = defineEmits<{
 
 /** 卫星列表筛选条件。 */
 const satFilters = reactive({
-  /** 名称或 NORAD 关键字 */
+  /** 名称、NORAD 或系列关键字 */
   keyword: '',
+  /** 卫星系列 */
+  series: '',
   /** 卫星类型 */
   satType: '',
   /** 轨道类型 */
@@ -238,6 +267,8 @@ interface SituationSatelliteRow {
   norad: number
   /** 卫星名称 */
   name: string
+  /** 卫星系列（接口未返回时使用占位数据） */
+  series: string
   /** 卫星类型 */
   satType: string
   /** 轨道类型中文 */
@@ -384,6 +415,29 @@ const coverageMap = computed(() => {
   return map
 })
 
+/** 系列接口未就绪时的占位系列，按 NORAD 轮换，便于筛选联调。 */
+const MOCK_SAT_SERIES = ['STARLINK', 'starshield', 'ICEYE', 'GPS'] as const
+
+/**
+ * 解析卫星系列：有真实值则用真实值，否则按 NORAD 分配占位系列。
+ * @param norad 卫星 NORAD
+ * @param existing 已有系列
+ * @returns 系列名称
+ */
+const resolveSatSeries = (norad: number, existing?: string): string => {
+  const value = (existing || '').trim()
+  if (value && value !== '--') return value
+  return MOCK_SAT_SERIES[Math.abs(norad) % MOCK_SAT_SERIES.length]
+}
+
+/**
+ * 当前展开操作栏的卫星行 key，与选中卫星同步。
+ * @returns 选中卫星 NORAD 组成的展开 key 列表
+ */
+const expandedSatKeys = computed<(string | number)[]>(() => {
+  return props.selectedSatelliteNorad != null ? [props.selectedSatelliteNorad] : []
+})
+
 /** 去重后的卫星列表 */
 const satelliteRows = computed<SituationSatelliteRow[]>(() => {
   const matrix = activeMatrix.value
@@ -393,6 +447,7 @@ const satelliteRows = computed<SituationSatelliteRow[]>(() => {
   const upsert = (item: {
     norad: number
     name?: string
+    series?: string
     satType?: string | null
     orbitType?: number
     usage?: string
@@ -405,6 +460,7 @@ const satelliteRows = computed<SituationSatelliteRow[]>(() => {
     rowMap.set(item.norad, {
       norad: item.norad,
       name: item.name || exist?.name || `Sat-${item.norad}`,
+      series: resolveSatSeries(item.norad, item.series || exist?.series),
       satType: item.satType || exist?.satType || '--',
       orbitLabel: item.orbitType != null ? orbitTypeLabel(item.orbitType) : exist?.orbitLabel || '--',
       usage: item.usage || exist?.usage || '--',
@@ -513,6 +569,8 @@ const linkRows = computed<SituationLinkRow[]>(() => {
   })
 })
 
+/** 系列筛选项 */
+const satSeriesOptions = computed(() => uniqueOptions(satelliteRows.value, (row) => row.series))
 /** 卫星类型筛选项 */
 const satTypeOptions = computed(() => uniqueOptions(satelliteRows.value, (row) => row.satType))
 /** 轨道筛选项 */
@@ -524,7 +582,8 @@ const satUsageOptions = computed(() => uniqueOptions(satelliteRows.value, (row) 
 const filteredSatellites = computed(() => {
   const keyword = satFilters.keyword
   return satelliteRows.value.filter((row) => {
-    if (!includesKeyword(`${row.name} ${row.norad}`, keyword)) return false
+    if (!includesKeyword(`${row.name} ${row.norad} ${row.series}`, keyword)) return false
+    if (satFilters.series && row.series !== satFilters.series) return false
     if (satFilters.satType && row.satType !== satFilters.satType) return false
     if (satFilters.orbit && row.orbitLabel !== satFilters.orbit) return false
     if (satFilters.usage && row.usage !== satFilters.usage) return false
@@ -624,6 +683,28 @@ const handleSatRowClick = (row: SituationSatelliteRow) => {
     return
   }
   emit('select-satellite', row.norad)
+}
+
+/**
+ * 打开卫星画像弹窗。
+ * @param row 卫星行
+ */
+const openSatProfile = (row: SituationSatelliteRow) => {
+  openSatelliteProfile(row.norad)
+}
+
+/**
+ * 跳转到态势拓扑分析页。
+ */
+const goTopoAnalysis = () => {
+  void router.push('/home/topo')
+}
+
+/**
+ * 跳转到甘特图分析页。
+ */
+const goGanttAnalysis = () => {
+  void router.push('/home/gantt')
 }
 
 /**
@@ -844,6 +925,72 @@ const handleClearSelectedLink = () => {
   }
 }
 
+.sat-table {
+  :deep(.atlas-app-table__expand-column) {
+    width: 1px !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  :deep(.atlas-app-table__expand-icon) {
+    display: none;
+  }
+
+  :deep(.atlas-app-table__expanded-cell) {
+    padding: 8px 12px 10px !important;
+    background: rgba(0, 225, 255, 0.06) !important;
+    cursor: default;
+  }
+
+  :deep(.atlas-app-table__expanded-cell .cell) {
+    padding: 0 !important;
+  }
+
+  :deep(.is-active-row td.atlas-app-table__cell) {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+.sat-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sat-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(64, 242, 255, 0.4);
+  background: rgba(0, 225, 255, 0.08);
+  color: #7dd3fc;
+  font-size: 12px;
+  line-height: 1;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: all 0.18s ease;
+
+  &:hover {
+    color: #40f2ff;
+    border-color: #00e1ff;
+    background: rgba(0, 225, 255, 0.18);
+  }
+}
+
+/* 链路路径单元格：单行省略，完整内容交给 tooltip */
+.link-path-text {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .empty-sat-box {
   flex: 1;
   display: flex;
@@ -884,6 +1031,20 @@ const handleClearSelectedLink = () => {
 </style>
 
 <style lang="scss">
+/* 链路路径完整文案浮层：保证盖在态势面板之上且长路径可换行 */
+.c2-path-tooltip.atlas-app-popper,
+.atlas-app-popper.c2-path-tooltip {
+  max-width: 480px;
+  padding: 8px 10px;
+  line-height: 1.5;
+  word-break: break-all;
+  white-space: normal;
+  z-index: 4000 !important;
+  background: rgba(8, 15, 26, 0.98) !important;
+  border: 1px solid rgba(0, 225, 255, 0.28) !important;
+  color: #e2efff !important;
+}
+
 .c2-filter-popper.atlas-app-popper,
 .atlas-app-popper.c2-filter-popper {
   background: rgba(8, 15, 26, 0.98) !important;
