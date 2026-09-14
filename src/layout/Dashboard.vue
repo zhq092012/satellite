@@ -14,20 +14,44 @@
         </div>
 
         <div class="header-right actions-bar">
-          <!-- 战场与任务显示 / 切换区域 -->
+          <!-- 当前场景（即战场）显示 / 下拉切换 -->
           <div class="task-status-bar">
-            <!-- 场景 A：已选择战场和任务 -->
-            <div v-if="layoutStore.battle && layoutStore.activedTask" class="task-info-badge" @click="openTaskSelector">
-              <span class="battle-name">{{ layoutStore.battle.name }}</span>
-              <span class="divider">/</span>
-              <span class="task-name">{{ layoutStore.activedTask.name }}</span>
-              <el-button type="primary" size="small" link class="switch-btn">切换任务</el-button>
-            </div>
-
-            <!-- 场景 B：尚未选择战场任务，突出提醒 -->
-            <div v-else class="task-prompt-badge" @click="openTaskSelector">
-              <el-tag type="warning" effect="dark" round class="prompt-tag"> ⚠️ 尚未选择战场任务（点击选择） </el-tag>
-            </div>
+            <el-dropdown
+              trigger="click"
+              :disabled="sceneSwitching"
+              @command="handleSwitchScene"
+              @visible-change="handleSceneDropdownVisible"
+              popper-class="scene-selector-popper"
+            >
+              <div class="scene-trigger" :class="{ 'is-empty': !layoutStore.battle }">
+                <template v-if="layoutStore.battle">
+                  <span class="scene-label">当前场景：</span>
+                  <span class="scene-name" :title="layoutStore.battle.name">{{ layoutStore.battle.name }}</span>
+                </template>
+                <template v-else>
+                  <span class="scene-empty">尚未选择场景（点击选择）</span>
+                </template>
+                <el-icon class="scene-arrow">
+                  <ArrowDown />
+                </el-icon>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu class="scene-dropdown-menu">
+                  <el-dropdown-item
+                    v-for="battle in battleList"
+                    :key="battle.id"
+                    :command="battle.id"
+                    :disabled="sceneSwitching"
+                    :class="{ 'is-active': layoutStore.battle?.id === battle.id }"
+                  >
+                    {{ battle.name }}
+                  </el-dropdown-item>
+                  <el-dropdown-item v-if="battleList.length === 0" disabled>
+                    {{ loadingData ? '正在加载场景...' : '暂无场景数据' }}
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
 
           <el-dropdown trigger="click" @command="handleCommand" popper-class="user-profile-popper">
@@ -79,42 +103,6 @@
       </el-scrollbar>
     </el-container>
 
-    <!-- 战场与任务选择模态弹窗 -->
-    <el-dialog v-model="selectorDialogVisible" title="选择战场与任务" width="540px" append-to-body
-      class="task-selector-dialog">
-      <div class="dialog-body" v-loading="loadingData">
-        <!-- 级联选择器 -->
-        <el-form>
-          <el-form-item>
-            <el-cascader v-model="selectedCascadeValue" :options="battleTaskOptions"
-              :props="{ expandTrigger: 'hover', value: 'id', label: 'name', children: 'children' }"
-              placeholder="请选择 战场 / 任务" style="width: 100%" filterable @change="handleCascaderChange" />
-          </el-form-item>
-        </el-form>
-
-        <!-- 战场-任务 快捷选择列表 -->
-        <div class="quick-battle-tree" v-if="battleListWithTasks.length > 0">
-          <div class="tree-title">快捷选择列表：</div>
-          <el-scrollbar max-height="260px">
-            <div v-for="battle in battleListWithTasks" :key="battle.id" class="battle-group">
-              <div class="battle-group-name">{{ battle.name }}</div>
-              <div class="task-chips">
-                <div v-for="task in battle.tasks" :key="task.id" class="task-chip"
-                  :class="{ active: layoutStore.activedTask?.id === task.id }" @click="selectBattleAndTask(battle, task)">
-                  {{ task.name }}
-                </div>
-                <div v-if="!battle.tasks || battle.tasks.length === 0" class="no-task">暂无所属任务</div>
-              </div>
-            </div>
-          </el-scrollbar>
-        </div>
-      </div>
-
-      <template #footer>
-        <el-button @click="selectorDialogVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="!pendingSelection" @click="confirmTaskSelection"> 确认选择 </el-button>
-      </template>
-    </el-dialog>
   </el-container>
 </template>
 
@@ -128,7 +116,7 @@ import { logout as logoutApi, type MenuItem } from '@/api/auth'
 import { useAuthStore } from '@/store/modules/auth'
 import { useLayoutStore } from '@/store/modules/layout'
 import { getBattleList, getTaskList } from '@/api/dashboard'
-import type { BattleForm, TaskForm } from '@/types/dashboard'
+import type { BattleForm } from '@/types/dashboard'
 
 const authStore = useAuthStore()
 const layoutStore = useLayoutStore()
@@ -354,122 +342,94 @@ const handleLogout = async () => {
   await router.replace({ name: 'Login' })
 }
 
-/** [变量说明] 任务选择弹窗显隐控制 */
-const selectorDialogVisible = ref(false)
-/** [变量说明] 战场与任务数据加载状态 */
+/** 场景（战场）列表加载状态 */
 const loadingData = ref(false)
-/** [变量说明] 包含完整任务列表的战场数据列表 */
-const battleListWithTasks = ref<BattleForm[]>([])
-/** [变量说明] Cascader 级联选择器绑定的路径 */
-const selectedCascadeValue = ref<string[]>([])
-/** [变量说明] 暂存待确认的战场与任务 */
-const pendingSelection = ref<{ battle: BattleForm; task: TaskForm } | null>(null)
-
-/** [计算属性说明] 转换为 Cascader 选项数据 */
-const battleTaskOptions = computed(() => {
-  return battleListWithTasks.value.map((battle) => ({
-    id: `battle_${battle.id}`,
-    name: `${battle.name}`,
-    battleObj: battle,
-    children: (battle.tasks || []).map((task) => ({
-      id: `task_${task.id}`,
-      name: `${task.name}`,
-      taskObj: task,
-      battleObj: battle,
-    })),
-  }))
-})
+/** 场景切换中，避免重复点击 */
+const sceneSwitching = ref(false)
+/** 可供切换的场景列表（数据源为战场列表） */
+const battleList = ref<BattleForm[]>([])
 
 /**
- * [函数说明] 加载战场及其对应的关联任务列表
+ * 加载全部场景（战场）列表，供顶栏下拉切换使用。
+ *
+ * @returns 无返回值；失败时保留已有列表
  */
-const loadBattleAndTaskData = async () => {
+const loadBattleList = async () => {
   loadingData.value = true
   try {
     const res = await getBattleList()
     if (res.code === 200 && Array.isArray(res.data)) {
-      const list = res.data
-      await Promise.all(
-        list.map(async (battle) => {
-          if (battle.id) {
-            const taskRes = await getTaskList(battle.id)
-            if (taskRes.code === 200 && Array.isArray(taskRes.data)) {
-              battle.tasks = taskRes.data
-            }
-          }
-        })
-      )
-      battleListWithTasks.value = list
+      battleList.value = res.data
     }
   } catch (error) {
-    console.error('加载战场任务列表失败:', error)
+    console.error('加载场景列表失败:', error)
   } finally {
     loadingData.value = false
   }
 }
 
 /**
- * [函数说明] 打开战场任务选择弹窗
+ * 下拉展开时刷新场景列表，保证刚添加的场景能出现在选项中。
+ *
+ * @param visible 下拉是否展开
  */
-const openTaskSelector = async () => {
-  selectorDialogVisible.value = true
-  if (battleListWithTasks.value.length === 0) {
-    await loadBattleAndTaskData()
+const handleSceneDropdownVisible = async (visible: boolean) => {
+  if (visible) {
+    await loadBattleList()
   }
 }
 
 /**
- * [函数说明] Cascader 选择变更回调
- * @param val 选中的节点 ID 路径数组
+ * 切换当前场景（即切换战场）。
+ * 写入全局 battle 后，左侧任务列表会按新场景 ID 重新拉取任务；
+ * 若当前任务不属于新场景，则自动选中该场景下的第一个任务并刷新矩阵。
+ *
+ * @param battleId 下拉项 command，对应战场 ID
  */
-const handleCascaderChange = (val: any) => {
-  if (Array.isArray(val) && val.length === 2) {
-    const taskIdStr = val[1]
-    for (const battle of battleListWithTasks.value) {
-      const matchedTask = (battle.tasks || []).find((t) => `task_${t.id}` === taskIdStr)
-      if (matchedTask) {
-        pendingSelection.value = { battle, task: matchedTask }
-        break
-      }
-    }
-  }
-}
+const handleSwitchScene = async (battleId: number | string) => {
+  const id = Number(battleId)
+  const battle = battleList.value.find((item) => item.id === id)
+  if (!battle?.id || sceneSwitching.value) return
+  if (layoutStore.battle?.id === battle.id) return
 
-/**
- * [函数说明] 快捷芯片列表项选择任务
- * @param battle 战场对象
- * @param task 任务对象
- */
-const selectBattleAndTask = (battle: BattleForm, task: TaskForm) => {
-  pendingSelection.value = { battle, task }
-  selectedCascadeValue.value = [`battle_${battle.id}`, `task_${task.id}`]
-}
-
-/**
- * [函数说明] 确认选择并写入全局 Store
- */
-const confirmTaskSelection = async () => {
-  if (pendingSelection.value) {
-    const { battle, task } = pendingSelection.value
+  sceneSwitching.value = true
+  try {
     layoutStore.setActivedBattle(battle)
-    layoutStore.setActivedTask(task)
-    selectorDialogVisible.value = false
-    ElMessage.success(`已设置当前任务：${battle.name} / ${task.name}`)
-    await layoutStore.ensureActiveZhchPlan(true)
-    await layoutStore.fetchMatrixForCurrentScope(true)
+    layoutStore.setSelectedSatSeries('')
+
+    const taskRes = await getTaskList(battle.id)
+    const tasks = taskRes.code === 200 && Array.isArray(taskRes.data) ? taskRes.data : []
+    layoutStore.setActivedBattle({ ...battle, tasks })
+
+    const matchedTask = tasks.find((task) => task.id === layoutStore.activedTask?.id)
+    if (matchedTask) {
+      layoutStore.setActivedTask(matchedTask)
+    } else if (tasks.length > 0) {
+      layoutStore.setActivedTask(tasks[0])
+    } else {
+      layoutStore.setActivedTask(null)
+    }
+
+    ElMessage.success(`已切换场景：${battle.name}`)
+
+    if (layoutStore.activedTask?.id) {
+      await layoutStore.ensureActiveZhchPlan(true)
+      await layoutStore.fetchMatrixForCurrentScope(true)
+    }
+  } catch (error) {
+    console.error('切换场景失败:', error)
+    ElMessage.error('切换场景失败，请稍后重试')
+  } finally {
+    sceneSwitching.value = false
   }
 }
 
 onMounted(async () => {
-  await loadBattleAndTaskData()
+  await loadBattleList()
 
   if (layoutStore.activedTask?.id) {
     await layoutStore.ensureActiveZhchPlan(false)
     await layoutStore.fetchMatrixForCurrentScope(false)
-  }
-
-  if (!layoutStore.battle || !layoutStore.activedTask) {
-    selectorDialogVisible.value = true
   }
 })
 
@@ -558,16 +518,23 @@ onMounted(async () => {
       height: 60px;
       gap: 3px;
 
-      /* 战场与任务指示状态栏 */
+      /* 当前场景（战场）下拉切换 */
       .task-status-bar {
         display: flex;
         align-items: stretch;
         height: 60px;
 
-        .task-info-badge {
+        :deep(.el-dropdown) {
           display: flex;
+          align-items: stretch;
+          height: 60px;
+          outline: none !important;
+        }
+
+        .scene-trigger {
+          display: inline-flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           padding: 0 18px;
           height: 60px;
           background: transparent;
@@ -577,51 +544,50 @@ onMounted(async () => {
           transition: all 0.2s ease;
           font-size: 14px;
           box-sizing: border-box;
+          outline: none;
+          max-width: 360px;
+
+          .scene-label {
+            color: #8eb3d6;
+            flex-shrink: 0;
+          }
+
+          .scene-name {
+            color: #00e1ff;
+            font-weight: 700;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .scene-empty {
+            color: #fbbf24;
+            font-weight: 600;
+          }
+
+          .scene-arrow {
+            font-size: 12px;
+            color: #7dd3fc;
+            flex-shrink: 0;
+            transition: transform 0.25s ease, color 0.2s ease;
+          }
 
           &:hover {
             background: rgba(0, 225, 255, 0.08);
 
-            .switch-btn {
+            .scene-name,
+            .scene-arrow {
               color: #00e1ff;
             }
           }
 
-          .battle-name {
-            color: #00e1ff;
-            font-weight: bold;
-          }
+          &[aria-expanded="true"] {
+            background: rgba(0, 225, 255, 0.14);
 
-          .divider {
-            color: #8eb3d6;
-          }
-
-          .task-name {
-            color: #ffffff;
-          }
-
-          .switch-btn {
-            margin-left: 4px;
-            color: #4f93dd;
-            font-size: 13px;
-          }
-        }
-
-        .task-prompt-badge {
-          display: flex;
-          align-items: center;
-          padding: 0 16px;
-          height: 60px;
-          border: none;
-          cursor: pointer;
-
-          &:hover {
-            background: rgba(230, 162, 60, 0.1);
-          }
-
-          .prompt-tag {
-            font-size: 13px;
-            padding: 4px 12px;
-            cursor: pointer;
+            .scene-arrow {
+              transform: rotate(180deg);
+              color: #00e1ff;
+            }
           }
         }
       }
@@ -788,120 +754,52 @@ onMounted(async () => {
   }
 }
 
-/* 战场与任务选择模态框深色主题样式 */
-:deep(.task-selector-dialog) {
-  .el-dialog,
-  .atlas-app-dialog {
-    background: #0d1e36 !important;
-    border: 1px solid rgba(79, 147, 221, 0.35) !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
-    border-radius: 10px;
+/* 场景下拉菜单（Teleport 到 body） */
+:global(.scene-selector-popper) {
+  background: rgba(8, 24, 48, 0.98) !important;
+  border: 1px solid rgba(0, 225, 255, 0.3) !important;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.6),
+    0 0 14px rgba(0, 225, 255, 0.15) !important;
+  backdrop-filter: blur(12px);
+  border-radius: 6px !important;
+  padding: 4px 0 !important;
+  max-height: 360px;
+  overflow-y: auto;
 
-    .el-dialog__header,
-    .atlas-app-dialog__header {
-      padding: 16px 20px 10px 20px;
-      border-bottom: 1px solid rgba(79, 147, 221, 0.2);
-
-      .el-dialog__title,
-      .atlas-app-dialog__title {
-        color: #ffffff !important;
-        font-size: 16px;
-        font-weight: bold;
-      }
-
-      .el-dialog__headerbtn .el-dialog__close,
-      .atlas-app-dialog__headerbtn .atlas-app-dialog__close {
-        color: #94a3b8 !important;
-
-        &:hover {
-          color: #00e1ff !important;
-        }
-      }
-    }
-
-    .el-dialog__body,
-    .atlas-app-dialog__body {
-      padding: 16px 20px;
-      color: #e2e8f0;
-    }
-
-    .el-dialog__footer,
-    .atlas-app-dialog__footer {
-      padding: 12px 20px;
-      border-top: 1px solid rgba(79, 147, 221, 0.2);
-    }
-  }
-}
-
-.dialog-body {
-  :deep(.atlas-app-form-item__label),
-  :deep(.el-form-item__label) {
-    color: #cbd5e1 !important;
-    font-weight: 500;
+  .el-popper__arrow::before,
+  .atlas-app-popper__arrow::before {
+    background: rgba(8, 24, 48, 0.98) !important;
+    border: 1px solid rgba(0, 225, 255, 0.3) !important;
   }
 
-  .quick-battle-tree {
-    margin-top: 16px;
-    border-top: 1px dashed rgba(79, 147, 221, 0.25);
-    padding-top: 14px;
+  .el-dropdown-menu,
+  .atlas-app-dropdown-menu {
+    background: transparent !important;
+    padding: 4px 6px !important;
+    border: none !important;
+  }
 
-    .tree-title {
-      font-size: 14px;
-      font-weight: bold;
-      color: #ffffff;
-      margin-bottom: 12px;
+  .el-dropdown-menu__item,
+  .atlas-app-dropdown-menu__item {
+    color: #dbeafe !important;
+    border-radius: 4px;
+    margin: 2px 0;
+
+    &:hover,
+    &:focus {
+      background: rgba(0, 225, 255, 0.12) !important;
+      color: #00e1ff !important;
     }
 
-    .battle-group {
-      margin-bottom: 12px;
-      padding: 10px 14px;
-      background: rgba(16, 36, 62, 0.6);
-      border: 1px solid rgba(79, 147, 221, 0.25);
-      border-radius: 8px;
+    &.is-active {
+      background: rgba(0, 225, 255, 0.2) !important;
+      color: #00e1ff !important;
+      font-weight: 700;
+    }
 
-      .battle-group-name {
-        font-size: 14px;
-        font-weight: bold;
-        color: #00e1ff;
-        margin-bottom: 8px;
-      }
-
-      .task-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-
-        .task-chip {
-          padding: 5px 14px;
-          font-size: 12px;
-          color: #e2e8f0;
-          background: rgba(8, 20, 36, 0.9);
-          border: 1px solid rgba(79, 147, 221, 0.3);
-          border-radius: 6px;
-          cursor: pointer;
-          transition: all 0.25s ease;
-
-          &:hover {
-            border-color: #00e1ff;
-            color: #00e1ff;
-            background: rgba(0, 225, 255, 0.12);
-            box-shadow: 0 0 8px rgba(0, 225, 255, 0.2);
-          }
-
-          &.active {
-            background: linear-gradient(135deg, rgba(79, 147, 221, 0.8) 0%, rgba(0, 180, 216, 0.9) 100%);
-            color: #ffffff;
-            font-weight: 600;
-            border-color: #00e1ff;
-            box-shadow: 0 0 10px rgba(0, 225, 255, 0.4);
-          }
-        }
-
-        .no-task {
-          font-size: 12px;
-          color: #64748b;
-        }
-      }
+    &.is-disabled {
+      color: #64748b !important;
     }
   }
 }

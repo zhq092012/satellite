@@ -13,8 +13,7 @@
           @select-satellite="handleSelectSatellite" />
       </div>
       <!-- 折叠/展开控制按钮 -->
-      <button type="button" class="toggle-btn toggle-btn--left"
-        :title="isLeftCollapsed ? '展开左侧面板' : '收起左侧面板'"
+      <button type="button" class="toggle-btn toggle-btn--left" :title="isLeftCollapsed ? '展开左侧面板' : '收起左侧面板'"
         @click="isLeftCollapsed = !isLeftCollapsed">
         <el-icon class="toggle-icon">
           <DArrowLeft v-if="!isLeftCollapsed" />
@@ -28,12 +27,11 @@
       <div class="panel-inner">
         <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad"
           :selected-transmission-link-id="selectedTransmissionLinkId"
-          @clear-satellite-selection="handleSelectSatellite(null)"
+          @clear-satellite-selection="handleSelectSatellite(null)" @select-satellite="handleSelectSatellite"
           @select-transmission-link="handleSelectTransmissionLink" />
       </div>
       <!-- 折叠/展开控制按钮 -->
-      <button type="button" class="toggle-btn toggle-btn--right"
-        :title="isRightCollapsed ? '展开右侧面板' : '收起右侧面板'"
+      <button type="button" class="toggle-btn toggle-btn--right" :title="isRightCollapsed ? '展开右侧面板' : '收起右侧面板'"
         @click="isRightCollapsed = !isRightCollapsed">
         <el-icon class="toggle-icon">
           <DArrowRight v-if="!isRightCollapsed" />
@@ -45,8 +43,7 @@
     <!-- 4. 悬浮下方时间轴（两侧留距离、圆角、半透明、支持向下折叠/展开） -->
     <div class="floating-timeline-wrapper" :class="{ 'is-collapsed': isTimelineCollapsed }" v-if="taskTimeRange">
       <!-- 折叠/展开控制按钮 -->
-      <button type="button" class="timeline-toggle-btn"
-        :title="isTimelineCollapsed ? '展开时间轴' : '收起时间轴'"
+      <button type="button" class="timeline-toggle-btn" :title="isTimelineCollapsed ? '展开时间轴' : '收起时间轴'"
         @click="isTimelineCollapsed = !isTimelineCollapsed">
         <el-icon class="toggle-icon">
           <ArrowUp v-if="isTimelineCollapsed" />
@@ -56,11 +53,10 @@
       </button>
 
       <div class="timeline-inner">
-        <BattleGlobeTimeline :task-start="taskTimeRange.start" :task-end="taskTimeRange.end"
-          :matrix-data="matrixData" :selected-norad="selectedNorad" :force-task-mode="!!selectedTransmissionLinkId"
+        <BattleGlobeTimeline :task-start="taskTimeRange.start" :task-end="taskTimeRange.end" :matrix-data="matrixData"
+          :selected-norad="selectedNorad" :force-task-mode="!!selectedTransmissionLinkId"
           :current-time-ms="currentClockMs" :is-playing="isClockPlaying" :playback-speed="orbitPlaybackSpeed"
-          @time-change="handleTimelineTimeChange" @toggle-play="handleTogglePlay"
-          @speed-change="handleSpeedChange" />
+          @time-change="handleTimelineTimeChange" @toggle-play="handleTogglePlay" @speed-change="handleSpeedChange" />
       </div>
     </div>
   </div>
@@ -536,7 +532,7 @@ $bs-accent-line: rgba(79, 147, 221, 0.35);
     /* 右侧面板定位与收起 */
     &--right {
       right: 14px;
-      width: 460px;
+      width: 450px;
 
       .toggle-btn--right {
         left: -21px;
