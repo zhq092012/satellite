@@ -241,12 +241,12 @@ import {
   getBattleList,
   getTaskList,
   getTaskStageTargetOptions,
-  queryTaskProgress,
   saveBattle,
   updateBattle,
   updateTask,
 } from '@/api/dashboard'
 import type { BattleForm, TaskForm } from '@/types/dashboard'
+import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 
 /** Store 状态对象 */
@@ -336,16 +336,13 @@ const createTaskRules = reactive<FormRules<TaskForm>>({
   beginDate: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
 })
 
-/** 任务进度信息类型与轮询管理对象 */
-type TaskProgressInfo = {
-  totalStatus: string
-  transitStatus: string
-  threatAndStrikeStatus: string
-  mes?: string
-}
-
-const taskProgressMap = reactive<Record<number, TaskProgressInfo>>({})
-const taskProgressTimerMap = new Map<number, ReturnType<typeof setInterval>>()
+const {
+  getTaskProgress,
+  getTaskProgressPercent,
+  isTaskProgressComplete,
+  startTaskProgressPolling,
+  resumeTaskProgressPollingForTasks,
+} = useTaskProgressPolling()
 
 /**
  * 判断指定战场 ID 的卡片是否展开
@@ -379,18 +376,7 @@ watch(
       activeNames.value.forEach(async (battleId) => {
         const res = await getTaskList(Number(battleId))
         if (res.code === 200) {
-          for (const task of res.data) {
-            const progressRes = task.algorithmProgressEntity
-            if (
-              task.id &&
-              progressRes &&
-              (progressRes.totalStatus !== '完成' ||
-                progressRes.transitStatus !== '完成' ||
-                progressRes.threatAndStrikeStatus !== '完成')
-            ) {
-              await startTaskProgressPolling(task.id)
-            }
-          }
+          await resumeTaskProgressPollingForTasks(res.data)
           const battle = battleList.value.find((s) => s.id === Number(battleId))
           if (battle) {
             battle.tasks = res.data
@@ -632,67 +618,6 @@ const confirmPolygonMap = () => {
 const clearMap = () => {
   showPolygonMap.value = false
   polygonRef.value?.clearAll()
-}
-
-/**
- * 获取任务进度管理方法
- */
-const isTaskProgressComplete = (progress?: TaskProgressInfo) => {
-  if (!progress) return false
-  return (
-    progress.totalStatus === '完成' && progress.transitStatus === '完成' && progress.threatAndStrikeStatus === '完成'
-  )
-}
-
-const getTaskProgress = (task: TaskForm) => {
-  if (!task.id) return undefined
-  return taskProgressMap[task.id]
-}
-
-const getTaskProgressPercent = (progress?: TaskProgressInfo) => {
-  if (!progress) return 0
-  const finishedCount = [progress.totalStatus, progress.transitStatus, progress.threatAndStrikeStatus].filter(
-    (status) => status === '完成'
-  ).length
-  return Math.round((finishedCount / 3) * 100)
-}
-
-const stopTaskProgressPolling = (taskId: number) => {
-  const timer = taskProgressTimerMap.get(taskId)
-  if (timer) {
-    clearInterval(timer)
-    taskProgressTimerMap.delete(taskId)
-  }
-}
-
-const updateTaskProgress = async (taskId: number) => {
-  const res = await queryTaskProgress(taskId)
-  if (res.code === 200) {
-    taskProgressMap[taskId] = {
-      totalStatus: res.data.totalStatus,
-      transitStatus: res.data.transitStatus,
-      threatAndStrikeStatus: res.data.threatAndStrikeStatus,
-      mes: res.data.mes,
-    }
-    if (isTaskProgressComplete(taskProgressMap[taskId])) {
-      stopTaskProgressPolling(taskId)
-    }
-  }
-}
-
-const startTaskProgressPolling = async (taskId: number) => {
-  stopTaskProgressPolling(taskId)
-  taskProgressMap[taskId] = {
-    totalStatus: '进行中',
-    transitStatus: '进行中',
-    threatAndStrikeStatus: '进行中',
-    mes: '任务后台计算中',
-  }
-  await updateTaskProgress(taskId)
-  const timer = setInterval(() => {
-    void updateTaskProgress(taskId)
-  }, 3000)
-  taskProgressTimerMap.set(taskId, timer)
 }
 
 /** 加载战场列表 */

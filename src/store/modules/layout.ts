@@ -1,12 +1,12 @@
 import { defineStore } from 'pinia'
 import * as Cesium from 'cesium'
 import {
+  getReconnaissanceAttackMatrix,
   getSatelliteThreatInfoByType,
   type MatrixResult,
-  type ZhchPlanLevelSeriesEntity,
   type ZhchPlanResp,
 } from '@/api/electronic'
-import { mergeMatrixResults, type ChainNode } from '@/utils/satelliteFullChainAnalysis'
+import { type ChainNode } from '@/utils/satelliteFullChainAnalysis'
 import { prefetchSeriesTransmissionLinks } from '@/utils/prefetchTransmissionLinks'
 import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
@@ -168,10 +168,14 @@ export const useLayoutStore = defineStore('layout-store', {
     activeZhchPlan(state): ZhchPlanResp | null {
       return state.zhchPlanMap[state.activeZhchUsageType] ?? null
     },
-    /** 当前方案下全部卫星系列名称列表 */
+    /** 可选卫星系列：优先生成页缓存的方案系列，否则回退当前矩阵系列 */
     zhchPlanSeriesList(state): string[] {
-      const plan = state.zhchPlanMap[state.activeZhchUsageType]
-      return (plan?.levelSeriesEntities || []).map((entity) => entity.series)
+      const fromPlan = (state.zhchPlanMap[state.activeZhchUsageType]?.levelSeriesEntities || []).map(
+        (entity) => entity.series
+      )
+      if (fromPlan.length) return fromPlan
+      if (state.matrixData?.series) return [state.matrixData.series]
+      return []
     },
     // 从 battle.area 中解析 lonlats 并计算战场区域边界包围盒
     battleAreaBounds(state): {
@@ -318,53 +322,8 @@ export const useLayoutStore = defineStore('layout-store', {
       this.selectedSatSeries = series
     },
     /**
-     * 将综合打击方案中的系列实体转为矩阵结果（结构与 MatrixResult 一致）
-     * @param entity 系列级打击矩阵实体
-     */
-    levelSeriesEntityToMatrix(entity: ZhchPlanLevelSeriesEntity): MatrixResult {
-      return entity as unknown as MatrixResult
-    },
-    /**
-     * 从综合打击方案中解析当前系列筛选下的矩阵数据（本地切片，不请求后端）
-     * @param plan 综合打击方案
-     * @param series 指定系列；为空时合并全部系列
-     */
-    resolveMatrixFromZhchPlan(plan: ZhchPlanResp, series?: string): MatrixResult | null {
-      const entities = plan.levelSeriesEntities || []
-      if (!entities.length) return null
-
-      if (series) {
-        const entity = entities.find((item) => item.series === series)
-        return entity ? this.levelSeriesEntityToMatrix(entity) : null
-      }
-
-      const matrices = entities.map((entity) => this.levelSeriesEntityToMatrix(entity))
-      if (matrices.length === 1) return matrices[0]
-      return mergeMatrixResults(matrices)
-    },
-    /**
-     * 确保当前激活用途类型的综合打击方案已加载
-     * @param force 是否强制重新请求
-     */
-    async ensureActiveZhchPlan(force = false): Promise<ZhchPlanResp | null> {
-      const taskId = this.activedTask?.id
-      if (!taskId) {
-        this.clearZhchPlans()
-        return null
-      }
-
-      const type = this.activeZhchUsageType
-      const needFetch = force || this.zhchPlanTaskId !== taskId || !this.zhchPlanMap[type]
-      if (needFetch) {
-        const ok = await this.fetchZhchPlans([type], force)
-        if (!ok) return null
-      }
-
-      return this.zhchPlanMap[type] ?? null
-    },
-    /**
      * [功能说明]
-     * 按当前系列筛选范围从综合打击方案中加载矩阵（不再调用 calSeriesChainV2）
+     * 按当前系列筛选范围动态生成矩阵（calSeriesChainV2）
      * @param params 兼容旧调用：可指定 series
      * @param force 是否强制重新解析
      */
@@ -445,8 +404,8 @@ export const useLayoutStore = defineStore('layout-store', {
       }
     },
     /**
-     * 按当前方案与系列筛选范围加载矩阵：从 activeZhchPlan.levelSeriesEntities 本地切片/合并。
-     * @param force 是否强制重新解析
+     * 按当前任务与选中系列动态生成矩阵（calSeriesChainV2），不再预查 zhchPlanV2。
+     * @param force 是否强制重新请求
      */
     async fetchMatrixForCurrentScope(force = false): Promise<MatrixResult | null> {
       const taskId = this.activedTask?.id ?? 0
@@ -455,10 +414,13 @@ export const useLayoutStore = defineStore('layout-store', {
         return null
       }
 
+      const series = this.selectedSatSeries
+      if (!series) {
+        return this.matrixData
+      }
+
       const usageType = this.activeZhchUsageType
-      const queryKey = this.selectedSatSeries
-        ? `${taskId}_${usageType}_${this.selectedSatSeries}`
-        : `${taskId}_${usageType}__ALL_SERIES__`
+      const queryKey = `${taskId}_${usageType}_${series}`
 
       if (!force && this.matrixQueryKey === queryKey && this.matrixData) {
         return this.matrixData
@@ -472,19 +434,14 @@ export const useLayoutStore = defineStore('layout-store', {
       matrixScopeInflightKey = inflightKey
       matrixScopeInflight = (async () => {
         try {
-          // 方案拉取使用 zhchPlanLoading，避免阻塞系列列表
-          const plan = await this.ensureActiveZhchPlan(force)
-          if (!plan) {
-            return this.matrixData
-          }
-
           const { token, scopeKey, queryKey: activeQueryKey, taskId: activeTaskId } = this.beginMatrixFetch()
           try {
             if (!this.isMatrixFetchCurrent(token)) {
               return this.matrixData
             }
 
-            const matrix = this.resolveMatrixFromZhchPlan(plan, this.selectedSatSeries || undefined)
+            const res = await getReconnaissanceAttackMatrix({ taskId, series })
+            const matrix = res.code === 200 ? res.data : null
             if (matrix) {
               await prefetchSeriesTransmissionLinks(matrix)
             }
@@ -496,7 +453,7 @@ export const useLayoutStore = defineStore('layout-store', {
             this.finishMatrixFetch(token)
           }
         } catch (err) {
-          console.error('从综合打击方案解析矩阵失败:', err)
+          console.error('动态生成算法传输矩阵失败:', err)
           return this.matrixData
         } finally {
           if (matrixScopeInflightKey === inflightKey) {
@@ -636,7 +593,7 @@ export const useLayoutStore = defineStore('layout-store', {
       this.clearMatrixData()
     },
     /**
-     * 拉取并缓存指定用途类型的综合打击方案
+     * 手动生成并缓存指定用途类型的综合打击方案（仅打击方案页触发，不自动预查）。
      * @param types 用途类型列表
      * @param force 是否强制重新请求
      */

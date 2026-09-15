@@ -730,7 +730,7 @@ export interface ZhchPlanResp {
 }
 
 /**
- * 基于军用/民用类型获取综合打击方案
+ * 基于军用/民用类型生成综合打击方案（手动触发，非自动预查）。
  *
  * @param data.type - 卫星用途类型筛选条件（如"军用"、"民用"）
  * @param data.taskId - 作战任务 ID

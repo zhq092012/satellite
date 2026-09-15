@@ -412,8 +412,7 @@ const handleSwitchScene = async (battleId: number | string) => {
 
     ElMessage.success(`已切换场景：${battle.name}`)
 
-    if (layoutStore.activedTask?.id) {
-      await layoutStore.ensureActiveZhchPlan(true)
+    if (layoutStore.activedTask?.id && layoutStore.selectedSatSeries) {
       await layoutStore.fetchMatrixForCurrentScope(true)
     }
   } catch (error) {
@@ -427,8 +426,7 @@ const handleSwitchScene = async (battleId: number | string) => {
 onMounted(async () => {
   await loadBattleList()
 
-  if (layoutStore.activedTask?.id) {
-    await layoutStore.ensureActiveZhchPlan(false)
+  if (layoutStore.activedTask?.id && layoutStore.selectedSatSeries) {
     await layoutStore.fetchMatrixForCurrentScope(false)
   }
 })

@@ -53,18 +53,6 @@
                 </span>
               </div>
               <div class="field-row">
-                <span class="field-label">红方</span>
-                <span class="field-val" :title="displayTaskValue(task.meCountry)">
-                  {{ displayTaskValue(task.meCountry) }}
-                </span>
-              </div>
-              <div class="field-row">
-                <span class="field-label">敌方</span>
-                <span class="field-val field-val--enemy" :title="displayTaskValue(task.enemyCountry)">
-                  {{ displayTaskValue(task.enemyCountry) }}
-                </span>
-              </div>
-              <div class="field-row">
                 <span class="field-label">开始时间</span>
                 <span class="field-val field-val--time">{{ formatTaskDate(task.beginDate) }}</span>
               </div>
@@ -72,17 +60,17 @@
                 <span class="field-label">结束时间</span>
                 <span class="field-val field-val--time">{{ formatTaskDate(task.endDate) }}</span>
               </div>
-              <div class="field-row">
-                <span class="field-label">任务概述</span>
-                <span class="field-val field-val--desc" :title="displayTaskValue(task.description)">
-                  {{ displayTaskValue(task.description) }}
-                </span>
-              </div>
-              <div class="field-row">
-                <span class="field-label">关注状态</span>
-                <span class="field-val" :class="task.focusStatus === 1 ? 'is-focus' : 'is-muted'">
-                  {{ task.focusStatus === 1 ? '已关注' : '未关注' }}
-                </span>
+              <div class="field-row field-row--progress">
+                <span class="field-label">算法进度</span>
+                <div class="field-val field-val--progress">
+                  <template v-if="getTaskProgress(task)">
+                    <el-progress :percentage="getTaskProgressPercent(getTaskProgress(task))"
+                      :status="isTaskProgressComplete(getTaskProgress(task)) ? 'success' : undefined"
+                      :stroke-width="6" class="task-progress-bar" />
+                    <span v-if="getTaskProgress(task)?.mes" class="progress-mes">{{ getTaskProgress(task)?.mes }}</span>
+                  </template>
+                  <span v-else class="is-muted">未开始</span>
+                </div>
               </div>
             </div>
           </div>
@@ -112,11 +100,12 @@
  * - 顶部提供添加场景、修改当前场景
  * - 点击任务一键切换全局当前任务，联动刷新全局 Store 方案与矩阵数据
  */
-import { ref, watch } from 'vue'
+import { onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getTaskList } from '@/api/dashboard'
 import type { BattleForm, TaskForm } from '@/types/dashboard'
 import type { MatrixResult } from '@/api/electronic'
+import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskEditDialog from '@/components/BattleSituation/TaskEditDialog.vue'
 import SceneEditDialog from '@/components/BattleSituation/SceneEditDialog.vue'
@@ -136,6 +125,15 @@ defineEmits<{
 
 /** 布局 Store，用于读取当前战场、当前任务及持久化状态。 */
 const store = useLayoutStore()
+
+const {
+  getTaskProgress,
+  getTaskProgressPercent,
+  isTaskProgressComplete,
+  startTaskProgressPolling,
+  stopAllTaskProgressPolling,
+  resumeTaskProgressPollingForTasks,
+} = useTaskProgressPolling()
 
 /** 当前战场下的任务列表数据 */
 const taskList = ref<TaskForm[]>([])
@@ -174,6 +172,7 @@ const loadBattleTasks = async () => {
     const res = await getTaskList(battleId)
     if (res.code === 200 && Array.isArray(res.data)) {
       taskList.value = res.data
+      await resumeTaskProgressPollingForTasks(res.data)
     } else {
       taskList.value = store.battle?.tasks || []
     }
@@ -291,8 +290,13 @@ const openEditTask = (task: TaskForm) => {
  * @param updated 提交后的任务数据
  */
 const handleTaskSaved = async (updated: TaskForm) => {
+  const isCreate = !taskList.value.some((item) => item.id === updated.id)
   await loadBattleTasks()
   if (!updated.id) return
+
+  if (isCreate) {
+    await startTaskProgressPolling(updated.id)
+  }
 
   const latest = taskList.value.find((item) => item.id === updated.id) || updated
   const isCurrentTask = store.activedTask?.id === updated.id
@@ -307,10 +311,9 @@ const handleTaskSaved = async (updated: TaskForm) => {
   }
 
   try {
-    if (isNewTask) {
-      await store.ensureActiveZhchPlan(true)
+    if (store.selectedSatSeries) {
+      await store.fetchMatrixForCurrentScope(true)
     }
-    await store.fetchMatrixForCurrentScope(true)
   } catch (error) {
     console.error('刷新任务矩阵失败:', error)
   }
@@ -329,14 +332,19 @@ const selectTask = async (task: TaskForm) => {
     store.setActivedTask(task)
     store.setSelectedSatSeries('')
     ElMessage.success(`已切换当前任务：${task.name}`)
-    await store.ensureActiveZhchPlan(true)
-    await store.fetchMatrixForCurrentScope(true)
+    if (store.selectedSatSeries) {
+      await store.fetchMatrixForCurrentScope(true)
+    }
   } catch (err) {
     console.error('切换任务失败:', err)
   } finally {
     taskSwitching.value = false
   }
 }
+
+onUnmounted(() => {
+  stopAllTaskProgressPolling()
+})
 </script>
 
 <style scoped lang="scss">
@@ -609,6 +617,27 @@ const selectTask = async (task: TaskForm) => {
             &.is-muted {
               color: #64748b;
             }
+
+            &.field-val--progress {
+              display: flex;
+              flex-direction: column;
+              gap: 4px;
+            }
+          }
+
+          .field-row--progress {
+            align-items: center;
+          }
+
+          .task-progress-bar {
+            width: 100%;
+          }
+
+          .progress-mes {
+            font-size: 11px;
+            font-weight: 500;
+            color: #7dd3fc;
+            line-height: 1.3;
           }
         }
 

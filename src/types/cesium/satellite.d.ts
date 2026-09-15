@@ -10,7 +10,7 @@ interface SatelliteInfo {
     altitude: number
   }
 }
-interface Satellite {
+export interface Satellite {
   get_id: string
   norad: number
   description: string

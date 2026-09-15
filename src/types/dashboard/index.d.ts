@@ -13,6 +13,10 @@ interface TaskForm {
   meCountryShow: string[]
   enemyCountryShow: string[]
   focusStatus: number
+  /** 链路时延（分钟） */
+  delayMin?: number
+  /** 覆盖率（0-100） */
+  coverage?: number
   algorithmProgressEntity?: {
     _id: string
     taskId: number

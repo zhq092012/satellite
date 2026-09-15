@@ -1,6 +1,6 @@
 <template>
-  <el-dialog v-model="visible" :title="dialogTitle" fullscreen append-to-body destroy-on-close
-    class="task-edit-dialog" modal-class="task-edit-dialog-modal" @closed="handleClosed">
+  <el-dialog v-model="visible" :title="dialogTitle" fullscreen append-to-body destroy-on-close class="task-edit-dialog"
+    modal-class="task-edit-dialog-modal" @closed="handleClosed">
     <div class="task-edit-layout">
       <nav class="task-edit-nav" aria-label="任务配置菜单">
         <button v-for="item in taskEditMenus" :key="item.key" type="button" class="task-edit-nav-item"
@@ -20,62 +20,54 @@
                 placeholder="请输入任务概述" />
             </el-form-item>
             <el-form-item label="开始时间" prop="beginDate">
-              <input class="task-datetime-input" type="datetime-local" step="1"
+              <input class="task-datetime-input" type="datetime-local" step="60"
                 :value="toDatetimeLocalValue(taskForm.beginDate)"
                 @input="handleBeginInput(($event.target as HTMLInputElement).value)" />
             </el-form-item>
             <el-form-item label="结束时间" prop="endDate">
-              <input class="task-datetime-input" type="datetime-local" step="1"
+              <input class="task-datetime-input" type="datetime-local" step="60"
                 :value="toDatetimeLocalValue(taskForm.endDate)"
                 @input="handleEndInput(($event.target as HTMLInputElement).value)" />
             </el-form-item>
-            <el-form-item label="任务时长" class="metric-form-item">
-              <div class="duration-edit">
-                <CyberMetricSlider v-model="durationHours" :min="1" :max="durationMaxHours" :step="1" variant="delay"
-                  aria-label="任务时长小时数" />
-                <span class="duration-edit__text">{{ durationText }}</span>
+            <el-form-item label="任务时长">
+              <div class="metric-input-row">
+                <el-input-number v-model="durationHours" :min="1" :max="8760" :step="1" :controls="true"
+                  controls-position="right" class="metric-input-number" @change="handleDurationHoursChange" />
+                <span class="metric-input-unit">小时</span>
               </div>
             </el-form-item>
-            <el-form-item label="威胁度" class="metric-form-item">
-              <div class="duration-edit">
-                <CyberMetricSlider v-model="metricThreat" :min="0" :max="100" :step="1" variant="threat"
-                  aria-label="威胁度" />
-                <span class="duration-edit__text">{{ metricThreat }}分</span>
+            <el-form-item label="链路时延">
+              <div class="metric-input-row">
+                <el-input-number v-model="linkDelayMin" :min="1" :max="4320" :step="1" :controls="true"
+                  controls-position="right" class="metric-input-number" />
+                <span class="metric-input-unit">分钟</span>
               </div>
             </el-form-item>
-            <el-form-item label="链路时长" class="metric-form-item">
-              <div class="duration-edit">
-                <CyberMetricSlider v-model="metricLinkHours" :min="1" :max="72" :step="1" variant="delay"
-                  aria-label="链路时长小时数" />
-                <span class="duration-edit__text">{{ metricLinkDurationText }}</span>
+            <el-form-item label="覆盖率">
+              <div class="metric-input-row">
+                <el-input-number v-model="taskCoverage" :min="0" :max="100" :step="1" :controls="true"
+                  controls-position="right" class="metric-input-number" />
+                <span class="metric-input-unit">%</span>
               </div>
             </el-form-item>
-            <el-form-item label="覆盖率" class="metric-form-item">
-              <div class="duration-edit">
-                <CyberMetricSlider v-model="metricCoverage" :min="0" :max="100" :step="1" variant="coverage"
-                  aria-label="覆盖率" />
-                <span class="duration-edit__text">{{ metricCoverage }}%</span>
-              </div>
-            </el-form-item>
-            <el-form-item label="卫星类型">
-              <el-select v-model="taskForm.targetTypeShow" multiple placeholder="请选择作战目标"
-                popper-class="task-edit-select-popper" style="width: 100%">
+            <el-form-item label="卫星类型" prop="targetTypeShow">
+              <el-select v-model="taskForm.targetTypeShow" multiple placeholder="请选择卫星类型"
+                popper-class="task-edit-select-popper" style="width: 100%" @change="handleTargetTypeShowChange">
                 <el-option v-for="item in satelliteTypes" :key="item" :label="item" :value="item" />
               </el-select>
             </el-form-item>
-            <el-form-item label="红方" prop="meCountry">
-              <el-select v-model="taskForm.meCountryShow" multiple collapse-tags collapse-tags-tooltip filterable
-                placeholder="请选择红方国家" popper-class="task-edit-select-popper" style="width: 100%"
-                @change="syncCountryFields">
-                <el-option v-for="item in countryOptions" :key="`me-${item}`" :label="item" :value="item" />
-              </el-select>
+            <el-form-item label="红方" prop="meCountryShow">
+              <el-checkbox-group v-model="taskForm.meCountryShow" class="country-checkbox-group"
+                @change="handleCountryShowChange">
+                <el-checkbox v-for="item in countryOptions" :key="`me-${item}`" :value="item">{{ item }}</el-checkbox>
+              </el-checkbox-group>
             </el-form-item>
-            <el-form-item label="蓝方" prop="enemyCountry">
-              <el-select v-model="taskForm.enemyCountryShow" multiple collapse-tags collapse-tags-tooltip filterable
-                placeholder="请选择蓝方国家" popper-class="task-edit-select-popper" style="width: 100%"
-                @change="syncCountryFields">
-                <el-option v-for="item in countryOptions" :key="`enemy-${item}`" :label="item" :value="item" />
-              </el-select>
+            <el-form-item label="蓝方" prop="enemyCountryShow">
+              <el-checkbox-group v-model="taskForm.enemyCountryShow" class="country-checkbox-group"
+                @change="handleCountryShowChange">
+                <el-checkbox v-for="item in countryOptions" :key="`enemy-${item}`" :value="item">{{ item
+                  }}</el-checkbox>
+              </el-checkbox-group>
             </el-form-item>
             <el-form-item label="设置关注">
               <el-switch v-model="taskForm.focusStatus" :active-value="1" :inactive-value="0" />
@@ -83,17 +75,21 @@
           </el-form>
         </div>
 
-        <TaskAssembleTab v-show="activeTab === 'satellite'" kind="satellite" :reset-key="assembleResetKey" />
-        <TaskAssembleTab v-show="activeTab === 'station'" kind="station" :reset-key="assembleResetKey" />
-        <TaskAssembleTab v-show="activeTab === 'center'" kind="center" :reset-key="assembleResetKey" />
-        <TaskLinkAssembleTab v-show="activeTab === 'link'" :reset-key="assembleResetKey" />
-        <TaskAssembleTab v-show="activeTab === 'weapon'" kind="weapon" :reset-key="assembleResetKey" />
+        <TaskAssembleTab ref="satelliteAssembleRef" v-show="activeTab === 'satellite'" kind="satellite"
+          :reset-key="assembleResetKey" :enemy-countries="taskForm.enemyCountryShow"
+          :target-types="taskForm.targetTypeShow" />
+        <TaskAssembleTab ref="stationAssembleRef" v-show="activeTab === 'station'" kind="station"
+          :reset-key="assembleResetKey" />
+        <TaskAssembleTab ref="centerAssembleRef" v-show="activeTab === 'center'" kind="center"
+          :reset-key="assembleResetKey" />
+        <TaskAssembleTab ref="weaponAssembleRef" v-show="activeTab === 'weapon'" kind="weapon"
+          :reset-key="assembleResetKey" />
       </div>
     </div>
     <template #footer>
       <div class="task-edit-footer">
         <el-button class="task-edit-btn task-edit-btn--ghost" @click="visible = false">取 消</el-button>
-        <el-button class="task-edit-btn task-edit-btn--primary" type="primary" :loading="submitting"
+        <el-button v-if="!isEdit" class="task-edit-btn task-edit-btn--primary" type="primary" :loading="submitting"
           @click="handleSubmit">
           保 存
         </el-button>
@@ -106,15 +102,14 @@
 import { computed, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { getBattleCountrys, createTask, updateTask } from '@/api/dashboard'
+import { getBattleCountrys } from '@/api/dashboard'
+import { addTask } from '@/api/task/task'
 import type { TaskForm } from '@/types/dashboard'
 import { useLayoutStore } from '@/store/modules/layout'
-import CyberMetricSlider from '@/components/BattleSituation/CyberMetricSlider.vue'
 import TaskAssembleTab from '@/components/BattleSituation/TaskAssembleTab.vue'
-import TaskLinkAssembleTab from '@/components/BattleSituation/TaskLinkAssembleTab.vue'
 
 /** 任务弹窗左侧菜单 key。 */
-type TaskEditTabKey = 'basic' | 'satellite' | 'station' | 'center' | 'link' | 'weapon'
+type TaskEditTabKey = 'basic' | 'satellite' | 'station' | 'center' | 'weapon'
 
 /** 左侧竖向菜单项。 */
 interface TaskEditMenuItem {
@@ -127,7 +122,12 @@ interface TaskEditMenuItem {
 const store = useLayoutStore()
 
 /** 作战目标可选项（与任务创建五大类一致）。 */
-const SATELLITE_TYPES = ['侦察', '导航'] as const
+const SATELLITE_TYPES = ['侦察', '通信'] as const
+
+/** 新建任务默认红方国家 */
+const DEFAULT_ME_COUNTRIES = ['中国'] as const
+/** 新建任务默认蓝方国家 */
+const DEFAULT_ENEMY_COUNTRIES = ['美国'] as const
 
 const props = defineProps<{
   /** 对话框是否可见。 */
@@ -162,20 +162,41 @@ const taskForm = reactive<TaskForm>({
   endDate: '',
   targetType: '',
   targetTypeShow: [],
-  meCountry: '',
-  meCountryShow: [],
-  enemyCountry: '',
-  enemyCountryShow: [],
+  meCountry: DEFAULT_ME_COUNTRIES.join(','),
+  meCountryShow: [...DEFAULT_ME_COUNTRIES],
+  enemyCountry: DEFAULT_ENEMY_COUNTRIES.join(','),
+  enemyCountryShow: [...DEFAULT_ENEMY_COUNTRIES],
   steps: '',
   focusStatus: 0,
+  delayMin: 60,
+  coverage: 50,
 })
 
 /** 任务表单校验规则。 */
 const formRules = reactive<FormRules<TaskForm>>({
   name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
   description: [{ required: true, message: '请输入任务概述', trigger: 'blur' }],
-  meCountry: [{ required: true, message: '请选择红方国家', trigger: 'change' }],
-  enemyCountry: [{ required: true, message: '请选择蓝方国家', trigger: 'change' }],
+  targetTypeShow: [{
+    type: 'array',
+    required: true,
+    min: 1,
+    message: '请选择卫星类型',
+    trigger: 'change',
+  }],
+  meCountryShow: [{
+    type: 'array',
+    required: true,
+    min: 1,
+    message: '请选择红方国家',
+    trigger: 'change',
+  }],
+  enemyCountryShow: [{
+    type: 'array',
+    required: true,
+    min: 1,
+    message: '请选择蓝方国家',
+    trigger: 'change',
+  }],
   beginDate: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
   endDate: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
 })
@@ -183,8 +204,17 @@ const formRules = reactive<FormRules<TaskForm>>({
 /** 对话框可见性与 v-model 同步。 */
 const visible = ref(false)
 
+/** 是否为查看/编辑模式（当前后端仅支持新增，编辑时隐藏保存按钮）。 */
+const isEdit = computed(() => !!props.isEdit)
+
 /** 弹窗标题：添加与修改分开展示。 */
-const dialogTitle = computed(() => (props.isEdit ? '修改任务' : '添加任务'))
+const dialogTitle = computed(() => (isEdit.value ? '查看任务（暂不支持修改）' : '添加任务'))
+
+/** 各装配页组件引用，用于提交时汇总已选资源。 */
+const satelliteAssembleRef = ref<InstanceType<typeof TaskAssembleTab> | null>(null)
+const stationAssembleRef = ref<InstanceType<typeof TaskAssembleTab> | null>(null)
+const centerAssembleRef = ref<InstanceType<typeof TaskAssembleTab> | null>(null)
+const weaponAssembleRef = ref<InstanceType<typeof TaskAssembleTab> | null>(null)
 
 /** 左侧竖向菜单。 */
 const taskEditMenus: TaskEditMenuItem[] = [
@@ -192,7 +222,6 @@ const taskEditMenus: TaskEditMenuItem[] = [
   { key: 'satellite', label: '卫星装配' },
   { key: 'station', label: '地面站装配' },
   { key: 'center', label: '数据中心装配' },
-  { key: 'link', label: '链路装配' },
   { key: 'weapon', label: '武器装配' },
 ]
 
@@ -219,7 +248,29 @@ watch(visible, (open) => {
 })
 
 /**
- * 将任务时间转为 datetime-local 所需的 `YYYY-MM-DDTHH:mm:ss`。
+ * 规范化时间字符串为任务提交格式（不含秒）。
+ *
+ * @param value 原始时间
+ * @returns `YYYY-MM-DD HH:mm` 或空串
+ */
+const normalizeDateTime = (value?: string): string => {
+  if (!value) return ''
+  const trimmed = value.trim()
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(trimmed)) return trimmed
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(trimmed)) return trimmed.slice(0, 16)
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+    const [datePart, timePart] = trimmed.replace('T', ' ').split(' ')
+    return `${datePart} ${timePart.slice(0, 5)}`
+  }
+  const ts = new Date(trimmed.replace(/-/g, '/')).getTime()
+  if (!Number.isFinite(ts) || Number.isNaN(ts)) return trimmed
+  const d = new Date(ts)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/**
+ * 将任务时间转为 datetime-local 所需的 `YYYY-MM-DDTHH:mm`。
  *
  * @param value 任务时间字符串
  * @returns 可供原生时间输入回填的值
@@ -233,7 +284,7 @@ const toDatetimeLocalValue = (value?: string): string => {
  * 将 datetime-local 值转回任务时间格式。
  *
  * @param value 原生时间输入值
- * @returns `YYYY-MM-DD HH:mm:ss`
+ * @returns `YYYY-MM-DD HH:mm`
  */
 const fromDatetimeLocalValue = (value?: string): string => {
   if (!value) return ''
@@ -257,75 +308,72 @@ const parseTaskTimeMs = (value?: string): number => {
  * 将 Date 格式化为任务时间字符串。
  *
  * @param date 日期对象
- * @returns `YYYY-MM-DD HH:mm:ss`
+ * @returns `YYYY-MM-DD HH:mm`
  */
 const formatDateToTaskTime = (date: Date): string => {
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 /**
- * 当前任务时长（小时，至少 1）。
+ * 根据起止时间计算任务时长（小时，至少 1）。
+ *
+ * @returns 小时数
  */
-const durationHours = computed({
-  get: () => {
-    const beginMs = parseTaskTimeMs(taskForm.beginDate)
-    const endMs = parseTaskTimeMs(taskForm.endDate)
-    if (!beginMs || !endMs || endMs <= beginMs) return 1
-    return Math.max(1, Math.round((endMs - beginMs) / 3600000))
-  },
-  set: (hours: number) => {
-    const beginMs = parseTaskTimeMs(taskForm.beginDate)
-    if (!beginMs) return
-    const safeHours = Math.max(1, Math.round(hours))
-    taskForm.endDate = formatDateToTaskTime(new Date(beginMs + safeHours * 3600000))
-  },
-})
-
-/**
- * 时长滑条上限：至少 72 小时，并覆盖当前时长。
- */
-const durationMaxHours = computed(() => Math.max(72, durationHours.value, 168))
-
-/**
- * 时长展示文案。
- */
-const durationText = computed(() => {
-  const hours = durationHours.value
-  const days = Math.floor(hours / 24)
-  const rest = hours % 24
-  if (days > 0) return `${days} 天 ${rest} 小时`
-  return `${hours} 小时`
-})
-
-/**
- * 前端占位指标：威胁度、链路时长、覆盖率。接口未就绪，仅页面展示，不随任务提交。
- */
-const metricThreat = ref(50)
-/** 链路时长小时数（占位）。 */
-const metricLinkHours = ref(1)
-/** 覆盖率百分数（占位）。 */
-const metricCoverage = ref(50)
-
-/**
- * 链路时长展示文案。
- */
-const metricLinkDurationText = computed(() => {
-  const hours = metricLinkHours.value
-  const days = Math.floor(hours / 24)
-  const rest = hours % 24
-  if (days > 0) return `${days} 天 ${rest} 小时`
-  return `${hours} 小时`
-})
-
-/**
- * 将占位指标恢复为默认值。
- */
-const resetMetricSliders = () => {
-  metricThreat.value = 50
-  metricLinkHours.value = 1
-  metricCoverage.value = 50
+const calcDurationHoursFromDates = (): number => {
+  const beginMs = parseTaskTimeMs(taskForm.beginDate)
+  const endMs = parseTaskTimeMs(taskForm.endDate)
+  if (!beginMs || !endMs || endMs <= beginMs) return 1
+  return Math.max(1, Math.round((endMs - beginMs) / 3600000))
 }
+
+/** 任务时长输入值；起止时间变化时自动重算。 */
+const durationHours = ref(1)
+
+/** 起止时间变动时，同步重算任务时长显示。 */
+watch(
+  () => [taskForm.beginDate, taskForm.endDate] as const,
+  () => {
+    durationHours.value = calcDurationHoursFromDates()
+  },
+  { immediate: true }
+)
+
+/**
+ * 手动修改任务时长时，联动更新结束时间。
+ *
+ * @param value 小时数
+ */
+const handleDurationHoursChange = (value: number | undefined) => {
+  if (value == null || Number.isNaN(value)) return
+  const beginMs = parseTaskTimeMs(taskForm.beginDate)
+  if (!beginMs) return
+  const safeHours = Math.max(1, Math.round(value))
+  durationHours.value = safeHours
+  taskForm.endDate = formatDateToTaskTime(new Date(beginMs + safeHours * 3600000))
+}
+
+
+
+/** 任务指标默认值：链路时延（分钟）、覆盖率（%）。 */
+const DEFAULT_DELAY_MIN = 60
+const DEFAULT_COVERAGE = 50
+
+/** 链路时延（分钟），与 taskForm.delayMin 双向同步。 */
+const linkDelayMin = computed({
+  get: () => taskForm.delayMin ?? DEFAULT_DELAY_MIN,
+  set: (value: number) => {
+    taskForm.delayMin = value
+  },
+})
+
+/** 覆盖率（%），与 taskForm.coverage 双向同步。 */
+const taskCoverage = computed({
+  get: () => taskForm.coverage ?? DEFAULT_COVERAGE,
+  set: (value: number) => {
+    taskForm.coverage = value
+  },
+})
 
 /**
  * 更新开始时间；若结束不晚于开始，则按当前时长顺延结束时间。
@@ -369,24 +417,6 @@ const splitCsv = (value?: string): string[] =>
     .filter(Boolean)
 
 /**
- * 规范化时间字符串，补齐秒位以便日期选择器回填。
- *
- * @param value 原始时间
- * @returns `YYYY-MM-DD HH:mm:ss` 或空串
- */
-const normalizeDateTime = (value?: string): string => {
-  if (!value) return ''
-  const trimmed = value.trim()
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(trimmed)) return trimmed
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(trimmed)) return `${trimmed}:00`
-  const ts = new Date(trimmed.replace(/-/g, '/')).getTime()
-  if (!Number.isFinite(ts) || Number.isNaN(ts)) return trimmed
-  const d = new Date(ts)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-}
-
-/**
  * 重置为当前场景下的空白任务（添加模式）。
  */
 const resetCreateForm = () => {
@@ -399,14 +429,15 @@ const resetCreateForm = () => {
     endDate: '',
     targetType: '',
     targetTypeShow: [],
-    meCountry: '',
-    meCountryShow: [],
-    enemyCountry: '',
-    enemyCountryShow: [],
+    meCountry: DEFAULT_ME_COUNTRIES.join(','),
+    meCountryShow: [...DEFAULT_ME_COUNTRIES],
+    enemyCountry: DEFAULT_ENEMY_COUNTRIES.join(','),
+    enemyCountryShow: [...DEFAULT_ENEMY_COUNTRIES],
     steps: '',
     focusStatus: 0,
+    delayMin: DEFAULT_DELAY_MIN,
+    coverage: DEFAULT_COVERAGE,
   })
-  resetMetricSliders()
 }
 
 /**
@@ -426,21 +457,37 @@ const fillForm = (task: TaskForm | null) => {
     targetTypeShow: task.targetTypeShow?.length ? [...task.targetTypeShow] : splitCsv(task.targetType),
     steps: task.steps || '',
     focusStatus: Number(task.focusStatus) === 1 ? 1 : 0,
+    delayMin: Number.isFinite(task.delayMin) ? Number(task.delayMin) : DEFAULT_DELAY_MIN,
+    coverage: Number.isFinite(task.coverage) ? Number(task.coverage) : DEFAULT_COVERAGE,
   })
   const begin = normalizeDateTime(task.beginDate)
   const end = normalizeDateTime(task.endDate)
   taskForm.beginDate = begin
   taskForm.endDate = end
   syncCountryFields()
-  resetMetricSliders()
 }
 
 /**
- * 将多选国家同步回逗号分隔字段，供校验与提交使用。
+ * 将多选国家同步回逗号分隔字段，供提交使用。
  */
 const syncCountryFields = () => {
   taskForm.meCountry = (taskForm.meCountryShow || []).join(',')
   taskForm.enemyCountry = (taskForm.enemyCountryShow || []).join(',')
+}
+
+/**
+ * 卫星类型变化：刷新校验状态。
+ */
+const handleTargetTypeShowChange = () => {
+  formRef.value?.validateField('targetTypeShow').catch(() => undefined)
+}
+
+/**
+ * 国家勾选变化：同步提交字段并刷新对应表单项校验状态。
+ */
+const handleCountryShowChange = () => {
+  syncCountryFields()
+  formRef.value?.validateField(['meCountryShow', 'enemyCountryShow']).catch(() => undefined)
 }
 
 /**
@@ -481,10 +528,65 @@ const resolveCreatedTaskId = (data: unknown): number | undefined => {
 }
 
 /**
- * 校验并提交任务：添加走 saveTask，修改走 updateTask。
+ * 汇总各装配页数据，构建算法新增任务请求体（仅传系列，不传卫星 ID）。
+ * @returns 请求体；校验失败时返回 null
+ */
+type AddTaskPayload = Parameters<typeof addTask>[0]
+
+const buildAddTaskPayload = (): AddTaskPayload | null => {
+  syncCountryFields()
+  const targetTypeValue = (taskForm.targetTypeShow || []).join(',')
+
+  const seriesList = satelliteAssembleRef.value?.getAssembledSeries() ?? []
+  const stations = stationAssembleRef.value?.getAssembledRows() ?? []
+  const centers = centerAssembleRef.value?.getAssembledRows() ?? []
+  const weapons = weaponAssembleRef.value?.getAssembledRows() ?? []
+
+  if (!seriesList.length) {
+    ElMessage.warning('请至少选择一个卫星系列')
+    activeTab.value = 'satellite'
+    return null
+  }
+
+  const receiveIds = stations.map((row) => row.id)
+  const stationIds = centers.map((row) => row.id)
+  const weaponIds = weapons.map((row) => row.id)
+
+  const resources = seriesList.map((series) => ({
+    series,
+    receiveIds,
+    stationIds,
+  }))
+
+  return {
+    battleId: store.battle?.id as number,
+    meCountry: taskForm.meCountry,
+    enemyCountry: taskForm.enemyCountry,
+    meCountryShow: [...(taskForm.meCountryShow || [])],
+    enemyCountryShow: [...(taskForm.enemyCountryShow || [])],
+    targetTypeNew: targetTypeValue,
+    name: taskForm.name,
+    description: taskForm.description,
+    beginDate: normalizeDateTime(taskForm.beginDate),
+    endDate: normalizeDateTime(taskForm.endDate),
+    targetType: targetTypeValue,
+    coverage: taskCoverage.value,
+    delayMin: linkDelayMin.value,
+    weaponIds,
+    resources,
+  }
+}
+
+/**
+ * 校验并提交任务：目前仅支持新增（addTask），修改接口未就绪。
  */
 const handleSubmit = async () => {
   if (!formRef.value) return
+  if (props.isEdit) {
+    ElMessage.warning('任务修改接口暂未开放，请新建任务')
+    return
+  }
+  syncCountryFields()
   await formRef.value.validate(async (valid) => {
     if (!valid) {
       activeTab.value = 'basic'
@@ -501,41 +603,44 @@ const handleSubmit = async () => {
       ElMessage.warning('结束时间必须晚于开始时间')
       return
     }
-    const isEditMode = !!props.isEdit && !!taskForm.id
-    if (!isEditMode && !store.battle?.id) {
+    if (!store.battle?.id) {
       ElMessage.warning('请先选择当前场景后再添加任务')
       return
     }
+
+    const taskPayload = buildAddTaskPayload()
+    if (!taskPayload) return
+
     submitting.value = true
-    const actionLabel = isEditMode ? '修改任务' : '添加任务'
     try {
-      const payload: TaskForm = {
-        ...taskForm,
-        battleId: isEditMode ? taskForm.battleId : (store.battle?.id as number),
-        meCountry: (taskForm.meCountryShow || []).join(','),
-        enemyCountry: (taskForm.enemyCountryShow || []).join(','),
-        targetType: (taskForm.targetTypeShow || []).join(','),
-        steps: taskForm.steps || '',
-      }
-      if (!isEditMode) {
-        delete payload.id
-      }
-      const res = isEditMode ? await updateTask(payload) : await createTask(payload)
+      const res = await addTask(taskPayload)
       if (res.code === 200) {
-        const savedTask: TaskForm = { ...payload }
-        if (!isEditMode) {
-          const createdId = resolveCreatedTaskId(res.data)
-          if (createdId != null) savedTask.id = createdId
+        const savedTask: TaskForm = {
+          ...taskForm,
+          battleId: taskPayload.battleId,
+          beginDate: taskPayload.beginDate,
+          endDate: taskPayload.endDate,
+          meCountry: taskPayload.meCountry,
+          enemyCountry: taskPayload.enemyCountry,
+          meCountryShow: [...taskPayload.meCountryShow],
+          enemyCountryShow: [...taskPayload.enemyCountryShow],
+          targetType: taskPayload.targetType,
+          targetTypeShow: [...(taskForm.targetTypeShow || [])],
+          steps: taskForm.steps || '',
+          delayMin: taskPayload.delayMin,
+          coverage: taskPayload.coverage,
         }
-        ElMessage.success(`${actionLabel}成功`)
+        const createdId = resolveCreatedTaskId(res.data)
+        if (createdId != null) savedTask.id = createdId
+        ElMessage.success('添加任务成功')
         visible.value = false
         emit('saved', savedTask)
       } else {
-        ElMessage.error(res.msg || `${actionLabel}失败`)
+        ElMessage.error(res.msg || '添加任务失败')
       }
     } catch (error) {
-      console.error(`${actionLabel}失败:`, error)
-      ElMessage.error(`${actionLabel}失败`)
+      console.error('添加任务失败:', error)
+      ElMessage.error('添加任务失败')
     } finally {
       submitting.value = false
     }
@@ -681,8 +786,7 @@ const handleSubmit = async () => {
     overflow: auto;
   }
 
-  .task-assemble-tab,
-  .task-link-assemble {
+  .task-assemble-tab {
     flex: 1;
     min-height: 0;
     overflow: hidden;
@@ -712,6 +816,18 @@ const handleSubmit = async () => {
       margin: 0 !important;
       font-size: 13px;
       line-height: 32px;
+    }
+  }
+
+  .task-edit-form {
+    --el-form-item-margin-bottom: 16px;
+
+    .atlas-app-form-item {
+      margin-bottom: 16px;
+    }
+
+    .atlas-app-form-item:last-child {
+      margin-bottom: 0;
     }
   }
 
@@ -839,30 +955,72 @@ const handleSubmit = async () => {
     }
   }
 
-  .metric-form-item.atlas-app-form-item {
-    margin-bottom: 6px;
-  }
-
-  .duration-edit {
+  .country-checkbox-group {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 10px 18px;
     width: 100%;
+    min-height: 40px;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    border-radius: 6px;
+    background: rgba(8, 20, 36, 0.9);
+    box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.32) inset;
 
-    .cyber-metric-slider {
-      flex: 1;
-      min-width: 0;
-      padding: 4px 6px 4px 2px;
+    .atlas-app-checkbox {
+      margin-right: 0;
+      height: auto;
+    }
+
+    .atlas-app-checkbox__label {
+      color: #e2efff;
+      font-size: 13px;
+      padding-left: 8px;
+    }
+
+    .atlas-app-checkbox__input.is-checked + .atlas-app-checkbox__label {
+      color: #7dd3fc;
+    }
+
+    .atlas-app-checkbox__inner {
+      background-color: rgba(8, 20, 36, 0.9);
+      border-color: rgba(0, 225, 255, 0.45);
+    }
+
+    .atlas-app-checkbox__input.is-checked .atlas-app-checkbox__inner {
+      background-color: #00e1ff;
+      border-color: #00e1ff;
+    }
+
+    .atlas-app-checkbox__input.is-checked .atlas-app-checkbox__inner::after {
+      border-color: #08202c;
     }
   }
 
-  .duration-edit__text {
+  .metric-input-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .metric-input-number {
+    width: 180px;
+  }
+
+  .metric-input-unit {
     flex-shrink: 0;
-    min-width: 88px;
     font-size: 13px;
+    color: #9ecfe8;
+    white-space: nowrap;
+  }
+
+  .metric-input-hint {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
     color: #7dd3fc;
-    text-align: right;
     white-space: nowrap;
   }
 
