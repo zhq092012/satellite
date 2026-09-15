@@ -99,14 +99,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { getBattleCountrys } from '@/api/dashboard'
 import { addTask } from '@/api/task/task'
 import type { TaskForm } from '@/types/dashboard'
 import { useLayoutStore } from '@/store/modules/layout'
-import TaskAssembleTab from '@/components/BattleSituation/TaskAssembleTab.vue'
+import TaskAssembleTab, { type TaskAssembleRow } from '@/components/BattleSituation/TaskAssembleTab.vue'
 
 /** 任务弹窗左侧菜单 key。 */
 type TaskEditTabKey = 'basic' | 'satellite' | 'station' | 'center' | 'weapon'
@@ -410,6 +410,62 @@ const handleEndInput = (value: string) => {
  * @param value 原始字符串
  * @returns 去空白后的数组
  */
+/**
+ * 根据 ID 创建装配占位行（编辑回显时候选池尚未加载）。
+ *
+ * @param id 资源 ID
+ * @param name 展示名称，缺省与 ID 相同
+ * @returns 占位装配行
+ */
+const createPlaceholderRow = (id: string, name?: string): TaskAssembleRow => ({
+  id,
+  name: name || id,
+  series: '',
+  type: '--',
+  country: '--',
+  extra1: '--',
+  extra2: '--',
+})
+
+/**
+ * 根据卫星系列创建装配行（编辑回显卫星系列）。
+ *
+ * @param series 系列名称
+ * @returns 卫星系列装配行
+ */
+const createSatelliteSeriesRow = (series: string): TaskAssembleRow => ({
+  id: series,
+  name: series,
+  series,
+  type: '--',
+  country: '--',
+  extra1: '--',
+  extra2: '--',
+})
+
+/**
+ * 从任务 resources / weaponIds 恢复各装配页已选资源。
+ *
+ * @param task 列表接口返回的任务对象
+ */
+const restoreAssembleFromTask = (task: TaskForm) => {
+  const resources = task.resources ?? []
+  const weaponIds = task.weaponIds ?? []
+
+  const satelliteRows = resources
+    .map((item) => item.series)
+    .filter(Boolean)
+    .map((series) => createSatelliteSeriesRow(series))
+
+  const receiveIds = [...new Set(resources.flatMap((item) => item.receiveIds ?? []))]
+  const stationIds = [...new Set(resources.flatMap((item) => item.stationIds ?? []))]
+
+  satelliteAssembleRef.value?.setAssembledRows(satelliteRows)
+  stationAssembleRef.value?.setAssembledRows(receiveIds.map((id) => createPlaceholderRow(id)))
+  centerAssembleRef.value?.setAssembledRows(stationIds.map((id) => createPlaceholderRow(id)))
+  weaponAssembleRef.value?.setAssembledRows(weaponIds.map((id) => createPlaceholderRow(id)))
+}
+
 const splitCsv = (value?: string): string[] =>
   (value || '')
     .split(',')
@@ -454,17 +510,28 @@ const fillForm = (task: TaskForm | null) => {
     ...task,
     meCountryShow: task.meCountryShow?.length ? [...task.meCountryShow] : splitCsv(task.meCountry),
     enemyCountryShow: task.enemyCountryShow?.length ? [...task.enemyCountryShow] : splitCsv(task.enemyCountry),
-    targetTypeShow: task.targetTypeShow?.length ? [...task.targetTypeShow] : splitCsv(task.targetType),
+    targetTypeShow: task.targetTypeShow?.length
+      ? [...task.targetTypeShow]
+      : splitCsv(task.targetTypeNew || task.targetType),
     steps: task.steps || '',
     focusStatus: Number(task.focusStatus) === 1 ? 1 : 0,
     delayMin: Number.isFinite(task.delayMin) ? Number(task.delayMin) : DEFAULT_DELAY_MIN,
     coverage: Number.isFinite(task.coverage) ? Number(task.coverage) : DEFAULT_COVERAGE,
+    weaponIds: task.weaponIds ? [...task.weaponIds] : [],
+    resources: task.resources ? task.resources.map((item) => ({
+      series: item.series,
+      receiveIds: [...(item.receiveIds ?? [])],
+      stationIds: [...(item.stationIds ?? [])],
+    })) : [],
   })
   const begin = normalizeDateTime(task.beginDate)
   const end = normalizeDateTime(task.endDate)
   taskForm.beginDate = begin
   taskForm.endDate = end
   syncCountryFields()
+  void nextTick(() => {
+    restoreAssembleFromTask(task)
+  })
 }
 
 /**
@@ -622,13 +689,20 @@ const handleSubmit = async () => {
           endDate: taskPayload.endDate,
           meCountry: taskPayload.meCountry,
           enemyCountry: taskPayload.enemyCountry,
-          meCountryShow: [...taskPayload.meCountryShow],
-          enemyCountryShow: [...taskPayload.enemyCountryShow],
+          meCountryShow: [...(taskPayload.meCountryShow ?? [])],
+          enemyCountryShow: [...(taskPayload.enemyCountryShow ?? [])],
           targetType: taskPayload.targetType,
+          targetTypeNew: taskPayload.targetTypeNew,
           targetTypeShow: [...(taskForm.targetTypeShow || [])],
           steps: taskForm.steps || '',
           delayMin: taskPayload.delayMin,
           coverage: taskPayload.coverage,
+          weaponIds: [...taskPayload.weaponIds],
+          resources: taskPayload.resources.map((item) => ({
+            series: item.series,
+            receiveIds: [...item.receiveIds],
+            stationIds: [...item.stationIds],
+          })),
         }
         const createdId = resolveCreatedTaskId(res.data)
         if (createdId != null) savedTask.id = createdId

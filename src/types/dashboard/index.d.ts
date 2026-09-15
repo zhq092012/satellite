@@ -1,3 +1,13 @@
+/** 任务装配资源项 */
+interface TaskResourceItem {
+  /** 卫星系列名称 */
+  series: string
+  /** 接收站 ID 列表 */
+  receiveIds: string[]
+  /** 发射站/数据中心 ID 列表 */
+  stationIds: string[]
+}
+
 interface TaskForm {
   id?: number
   battleId: number
@@ -6,6 +16,8 @@ interface TaskForm {
   beginDate: string
   endDate: string
   targetType: string
+  /** 卫星类型新字段 */
+  targetTypeNew?: string
   steps: string //作战步骤
   targetTypeShow: string[]
   meCountry: string
@@ -17,14 +29,22 @@ interface TaskForm {
   delayMin?: number
   /** 覆盖率（0-100） */
   coverage?: number
+  /** 武器 ID 列表 */
+  weaponIds?: string[]
+  /** 装配资源 */
+  resources?: TaskResourceItem[]
+  /** 国家汇总 */
+  country?: string
+  createTime?: string
+  updateTime?: string
   algorithmProgressEntity?: {
     _id: string
     taskId: number
-    totalStatus: '进行中' | '完成'
+    totalStatus: string
     totalMin: number | null
-    transitStatus: '进行中' | '完成'
+    transitStatus: string
     transitMin: number | null
-    threatAndStrikeStatus: '进行中' | '完成'
+    threatAndStrikeStatus: string
     threatAndStrikeMin: number | null
     mes: string | null
   }

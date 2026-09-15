@@ -819,6 +819,26 @@ const loadWeaponCandidates = async () => {
 /**
  * 按当前种类加载候选资源池。
  */
+/**
+ * 将已装配占位行与候选池按 ID 对齐，补全名称等展示字段。
+ */
+const enrichAssembledFromPool = () => {
+  if (!assembledRows.value.length) return
+  const poolById = new Map<string, TaskAssembleRow>()
+  const pools = isSatelliteKind.value
+    ? candidatePool.satellite
+    : props.kind === 'center'
+      ? candidatePool.center
+      : props.kind === 'station'
+        ? candidatePool.station
+        : candidatePool.weapon
+  pools.forEach((row) => poolById.set(row.id, row))
+  assembledRows.value = assembledRows.value.map((row) => {
+    const matched = poolById.get(row.id)
+    return matched ? { ...matched } : row
+  })
+}
+
 const loadCandidatePool = async () => {
   if (isSatelliteKind.value) {
     if (seriesQueryCountries.value.length) {
@@ -837,6 +857,7 @@ const loadCandidatePool = async () => {
     } else if (isWeaponKind.value) {
       await loadWeaponCandidates()
     }
+    enrichAssembledFromPool()
   } finally {
     listLoading.value = false
   }
@@ -1103,9 +1124,22 @@ const getAssembledRows = (): TaskAssembleRow[] => assembledRows.value
 const getAssembledSeries = (): string[] =>
   assembledRows.value.map((row) => row.series || row.name).filter(Boolean)
 
+/**
+ * 回显已装配资源行（编辑任务时由弹窗调用）。
+ *
+ * @param rows 已装配资源列表
+ */
+const setAssembledRows = (rows: TaskAssembleRow[]) => {
+  assembledRows.value = rows.map((row) => ({ ...row }))
+  assembledSelection.value = []
+  candidateTableRef.value?.clearSelection()
+  enrichAssembledFromPool()
+}
+
 defineExpose({
   getAssembledRows,
   getAssembledSeries,
+  setAssembledRows,
 })
 </script>
 
