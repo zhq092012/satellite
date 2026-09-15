@@ -26,9 +26,7 @@
     <div class="floating-panel floating-panel--right" :class="{ 'is-collapsed': isRightCollapsed }">
       <div class="panel-inner">
         <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad"
-          :selected-transmission-link-id="selectedTransmissionLinkId"
-          @clear-satellite-selection="handleSelectSatellite(null)" @select-satellite="handleSelectSatellite"
-          @select-transmission-link="handleSelectTransmissionLink" />
+          @clear-satellite-selection="handleSelectSatellite(null)" @select-satellite="handleSelectSatellite" />
       </div>
       <!-- 折叠/展开控制按钮 -->
       <button type="button" class="toggle-btn toggle-btn--right" :title="isRightCollapsed ? '展开右侧面板' : '收起右侧面板'"
