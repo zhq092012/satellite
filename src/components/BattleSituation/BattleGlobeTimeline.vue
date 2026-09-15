@@ -1,7 +1,7 @@
 <template>
   <div class="battle-globe-timeline" v-if="taskStartMs && taskEndMs > taskStartMs">
     <div class="timeline-header">
-      <span class="header-title">任务时间标尺</span>
+      <span class="header-title">时间轴</span>
       <span v-if="displayTimeMs" class="current-time-tag">
         {{ formatTimelineTime(displayTimeMs) }}
       </span>

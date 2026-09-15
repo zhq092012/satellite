@@ -124,7 +124,7 @@ export const resumeTaskProgressPollingForTasks = async (tasks: TaskForm[]): Prom
 
     const cached = taskProgressMap[task.id]
     const entity = task.algorithmProgressEntity
-    if (isTaskProgressComplete(cached) || isTaskProgressComplete(entity)) continue
+    if (isTaskProgressComplete(cached) || isTaskProgressComplete(entity as unknown as TaskProgressInfo)) continue
 
     const shouldPoll =
       !!cached ||

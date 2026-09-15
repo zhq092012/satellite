@@ -10,6 +10,7 @@ import { type ChainNode } from '@/utils/satelliteFullChainAnalysis'
 import { prefetchSeriesTransmissionLinks } from '@/utils/prefetchTransmissionLinks'
 import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
+import type { SatelliteDetail } from '@/types/cesium/satellite'
 
 interface State {
   activetab: string //当前激活的Tab页

@@ -248,6 +248,7 @@ import {
 import type { BattleForm, TaskForm } from '@/types/dashboard'
 import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
+import type { TaskSteps } from '@/types/cesium/satellite'
 
 /** Store 状态对象 */
 const store = useLayoutStore()

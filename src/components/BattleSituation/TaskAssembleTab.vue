@@ -7,7 +7,7 @@
       </div>
       <span v-if="!apiEnabled" class="assemble-api-tag">接口待接入</span>
     </div>
-
+    <!-- 卫星装配页工具栏 -->
     <div class="assemble-toolbar">
       <el-button v-if="crudEnabled" class="task-edit-btn task-edit-btn--primary" type="primary" size="small"
         @click="openCreateDialog">
@@ -34,8 +34,10 @@
       <span class="assemble-count">{{ isSatelliteKind ? `已选系列 ${assembledRows.length} 个` : `已装配 ${assembledRows.length}
         项` }}</span>
     </div>
-
+  
+    <!-- 卫星装配页内容 -->
     <div class="assemble-split">
+      <!-- 卫星装配页左侧内容 -->
       <section class="assemble-pane">
         <div class="assemble-pane-head">
           <span>{{ isSatelliteKind ? '系列卫星预览' : '待选资源' }}</span>

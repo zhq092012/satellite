@@ -1067,6 +1067,7 @@ import {
   getSatelliteProfileNewsList,
 } from '@/api/profile/satellite-profile-api'
 import type { SatelliteNode, SatelliteRelation } from '@/types/dashboard'
+import type { SatelliteDetail, SatelliteTle } from '@/types/cesium/satellite'
 
 const props = withDefaults(
   defineProps<{

@@ -23,6 +23,7 @@ import { parseMissionWindowDate } from '@/utils/tools/dateFormat'
 import { buildSatelliteInfoBoxDescription } from '@/utils/tools/infoBoxBuilder'
 import type { Weapon } from '@/types/dashboard'
 import type { BlueSatelliteRecord, SatelliteRelationItem } from '@/types/strike'
+import type { SatelliteDetail } from '@/types/cesium/satellite'
 
 /**
  * tips:由于在这个业务场景中，地面站被统一适配并存放在了 blueSatellites 集合中（将它的 satType 设为 '基站'，高度 altitude 设为 100 ），

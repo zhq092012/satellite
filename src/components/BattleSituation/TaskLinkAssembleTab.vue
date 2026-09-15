@@ -283,6 +283,7 @@ import {
 } from '@/api/dashboard'
 import { getGroundStationList, type BaseStationInfo } from '@/api/system/satellite-system-api'
 import { getOrbitType } from '@/utils/tools/satellite'
+import type { Satellite } from '@/types/cesium/satellite'
 
 /** 链路拓扑。 */
 type LinkAssembleMode = 'direct' | 'relay'

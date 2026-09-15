@@ -3,9 +3,10 @@
  * 根据武器类型和打击阶段计算视觉样式（颜色、线宽、材质等）
  */
 import * as Cesium from 'cesium'
-import type { StrikePhase, StrikeTypeStyle } from '../types'
+
 import { parseMissionWindowDate } from './dateFormat'
 import type { StrikePlanV2MissionWindowItem } from '@/api/strikePlan/satellite-strikeplan-api'
+import type { StrikePhase, StrikeTypeStyle } from '@/types/strike'
 
 
 /**
