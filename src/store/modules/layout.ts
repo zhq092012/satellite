@@ -6,7 +6,7 @@ import {
   type ZhchPlanLevelSeriesEntity,
   type ZhchPlanResp,
 } from '@/api/electronic'
-import { mergeMatrixResults } from '@/utils/satelliteFullChainAnalysis'
+import { mergeMatrixResults, type ChainNode } from '@/utils/satelliteFullChainAnalysis'
 import { prefetchSeriesTransmissionLinks } from '@/utils/prefetchTransmissionLinks'
 import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
@@ -69,6 +69,33 @@ interface State {
   showOurWeapons: boolean
   /** 右侧面板选中的我方武器（用于地图定位） */
   selectedOurWeapon: { id?: string; name: string; latitude: number; longitude: number; range?: number } | null
+  /**
+   * 从整体态势链路跳转到打击窗口分析时携带的当前链路快照。
+   * 为空表示未聚焦具体链路，打击窗口页展示全部窗口卡片。
+   */
+  focusedStrikeLink: FocusedStrikeLinkSnapshot | null
+}
+
+/**
+ * 打击窗口分析页顶部展示的当前链路快照。
+ */
+export interface FocusedStrikeLinkSnapshot {
+  /** 链路唯一标识 */
+  id: string
+  /** 节点路径文案（卫星 → 中继 → 地面站 → 数据中心） */
+  pathText: string
+  /** 链路时长展示 */
+  durationText: string
+  /** 传输时间区间 */
+  transmitTime: string
+  /** 状态文案 */
+  statusText: string
+  /** 是否阻断 */
+  blocked: boolean
+  /** 打击武器名称（多个以顿号分隔） */
+  weaponNames: string
+  /** 链路节点序列，用于匹配相关打击窗口 */
+  nodes: ChainNode[]
 }
 
 /** 综合打击方案可选用途类型（与 StrikePlanGenerator 选项一致） */
@@ -133,6 +160,7 @@ export const useLayoutStore = defineStore('layout-store', {
       activeZhchUsageType: '军用',
       showOurWeapons: true,
       selectedOurWeapon: null,
+      focusedStrikeLink: null,
     }
   },
   getters: {
@@ -524,6 +552,21 @@ export const useLayoutStore = defineStore('layout-store', {
       this.selectedAnalysisNorad = norad
       this.topoFocusNorad = norad
       this.mainActiveTab = '态势拓扑分析'
+    },
+    /**
+     * 写入从整体态势带入打击窗口分析的当前链路。
+     * @param snapshot 链路快照；传 null 表示取消聚焦并展示全部窗口
+     */
+    setFocusedStrikeLink(snapshot: FocusedStrikeLinkSnapshot | null) {
+      this.focusedStrikeLink = snapshot
+    },
+    /**
+     * 从整体态势链路跳转到打击窗口分析，并先展示该链路、再展示相关窗口。
+     * @param snapshot 当前选中的链路快照
+     */
+    navigateToWeaponWindows(snapshot: FocusedStrikeLinkSnapshot) {
+      this.focusedStrikeLink = snapshot
+      this.mainActiveTab = '打击窗口分析'
     },
     /**
      * 从打击窗口分析跳转到整体态势，并默认开启我方武器图层

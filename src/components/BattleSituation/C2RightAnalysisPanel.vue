@@ -82,8 +82,15 @@
             </el-select>
           </div>
           <el-table :data="filteredLinks" size="small" height="240" highlight-current-row row-key="id"
-            class="asset-table" :row-class-name="linkRowClassName" empty-text="当前筛选下暂无链路"
-            @row-click="handleLinkRowClick">
+            class="asset-table sat-table" :expand-row-keys="expandedLinkKeys" :row-class-name="linkRowClassName"
+            empty-text="当前筛选下暂无链路" @row-click="handleLinkRowClick">
+            <el-table-column type="expand" width="1">
+              <template #default="{ row }">
+                <div class="sat-row-actions" @click.stop>
+                  <button type="button" class="sat-action-btn" @click="goWeaponWindowAnalysis(row)">查看武器窗口</button>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column prop="pathText" label="链路路径" min-width="200">
               <template #default="{ row }">
                 <!-- 始终用 tooltip 展示完整路径，避免表格溢出检测失败导致无法查看 -->
@@ -438,6 +445,14 @@ const expandedSatKeys = computed<(string | number)[]>(() => {
   return props.selectedSatelliteNorad != null ? [props.selectedSatelliteNorad] : []
 })
 
+/**
+ * 当前展开操作栏的链路行 key，与选中链路同步。
+ * @returns 选中链路 ID 组成的展开 key 列表
+ */
+const expandedLinkKeys = computed<(string | number)[]>(() => {
+  return props.selectedTransmissionLinkId ? [props.selectedTransmissionLinkId] : []
+})
+
 /** 去重后的卫星列表 */
 const satelliteRows = computed<SituationSatelliteRow[]>(() => {
   const matrix = activeMatrix.value
@@ -705,6 +720,23 @@ const goTopoAnalysis = () => {
  */
 const goGanttAnalysis = () => {
   void router.push('/home/gantt')
+}
+
+/**
+ * 跳转到打击窗口分析：携带当前链路，先展示该链路再展示相关窗口。
+ * @param row 当前展开的链路行
+ */
+const goWeaponWindowAnalysis = (row: SituationLinkRow) => {
+  store.navigateToWeaponWindows({
+    id: row.id,
+    pathText: row.pathText,
+    durationText: row.durationText,
+    transmitTime: row.transmitTime,
+    statusText: row.statusText,
+    blocked: row.blocked,
+    weaponNames: row.raw?.weaponNames || '',
+    nodes: row.raw?.nodes || [],
+  })
 }
 
 /**

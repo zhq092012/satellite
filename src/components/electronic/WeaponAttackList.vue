@@ -11,7 +11,7 @@
       <div class="header-center">
         <div class="stat-badge-item">
           <span class="label">打击计划总数:</span>
-          <span class="value glow-text-cyan">{{ filteredPlans.length }} / {{ attackPlans.length }} 项</span>
+          <span class="value glow-text-cyan">{{ displayPlans.length }} / {{ attackPlans.length }} 项</span>
         </div>
         <div class="stat-badge-item">
           <span class="label">攻击武器种类:</span>
@@ -24,12 +24,6 @@
       </div>
 
       <div class="header-right">
-        <!-- 视图模式切换 Tab -->
-        <el-radio-group v-model="activeViewTab" size="small" class="view-switch-radio">
-          <el-radio-button value="snake">S型打击时序流</el-radio-button>
-          <el-radio-button value="card">📋 窗口卡片</el-radio-button>
-        </el-radio-group>
-
         <el-input v-model="searchKeyword" placeholder="请输入搜索信息" prefix-icon="Search" clearable size="small"
           class="search-input" />
       </div>
@@ -94,17 +88,53 @@
       </el-button>
     </div>
 
-    <!-- 主体区域：打击计划卡片/表格展示 或 S型时序流程展示 -->
-    <div class="attack-body" :class="{ 'attack-body--snake': activeViewTab === 'snake' }">
-      <div v-if="filteredPlans.length === 0" class="empty-container">
-        <div class="empty-icon">🛡️</div>
-        <div class="empty-text">当前暂无匹配的武器打击计划与时间窗口数据</div>
+    <!-- 主体区域：当前链路 + 窗口卡片 -->
+    <div class="attack-body">
+      <!-- 从整体态势链路跳转时，优先展示当前链路 -->
+      <div v-if="focusedStrikeLink" class="focused-link-panel">
+        <div class="focused-link-head">
+          <div class="focused-link-title">
+            <span class="focused-link-icon">🔗</span>
+            <span>当前链路</span>
+            <span class="focused-link-status" :class="focusedStrikeLink.blocked ? 'is-blocked' : 'is-ok'">
+              {{ focusedStrikeLink.statusText }}
+            </span>
+          </div>
+          <el-button size="small" type="info" plain class="clear-focus-btn" @click="clearFocusedStrikeLink">
+            查看全部窗口
+          </el-button>
+        </div>
+        <div class="focused-link-path" :title="focusedStrikeLink.pathText">{{ focusedStrikeLink.pathText }}</div>
+        <div class="focused-link-nodes">
+          <template v-for="(node, nIdx) in focusedStrikeLink.nodes" :key="node.layer + '-' + node.id + '-' + nIdx">
+            <span class="link-node-chip" :class="'link-node-chip--' + node.layer">
+              <span class="link-node-layer">{{ getChainLayerLabel(node.layer) }}</span>
+              <span class="link-node-name">{{ node.name }}</span>
+            </span>
+            <span v-if="nIdx < focusedStrikeLink.nodes.length - 1" class="link-node-arrow">→</span>
+          </template>
+        </div>
+        <div class="focused-link-meta">
+          <span>链路时长：{{ focusedStrikeLink.durationText || '—' }}</span>
+          <span>传输时间：{{ focusedStrikeLink.transmitTime || '—' }}</span>
+          <span v-if="focusedStrikeLink.weaponNames">关联武器：{{ focusedStrikeLink.weaponNames }}</span>
+        </div>
       </div>
 
-      <template v-else>
-        <!-- Tab 1: 卡片列表视图 -->
-        <div v-show="activeViewTab === 'card'" class="plans-grid">
-          <div v-for="(plan, index) in filteredPlans" :key="plan.weaponName + plan.target + index" class="plan-card"
+      <div v-if="focusedStrikeLink" class="related-windows-title">
+        与当前链路节点相关的打击窗口
+        <span class="related-windows-count">共 {{ displayPlans.length }} 项</span>
+      </div>
+
+      <div v-if="displayPlans.length === 0" class="empty-container">
+        <div class="empty-icon">🛡️</div>
+        <div class="empty-text">
+          {{ focusedStrikeLink ? '当前链路节点暂无匹配的武器打击窗口' : '当前暂无匹配的武器打击计划与时间窗口数据' }}
+        </div>
+      </div>
+
+      <div v-else class="plans-grid">
+          <div v-for="(plan, index) in displayPlans" :key="plan.weaponName + plan.target + index" class="plan-card"
             :class="getCardClass(plan.weaponType)">
             <!-- 概要信息：武器 → 目标 → 窗口 → 持续时长 → 攻击角度 -->
             <div class="plan-summary-row">
@@ -180,163 +210,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Tab 2: S型时序流程图 (蛇形时间协同链) -->
-        <div v-show="activeViewTab === 'snake'" class="snake-flow-view-container">
-          <!-- S型流程图顶部控制工具栏 -->
-          <div class="snake-flow-toolbar">
-            <div class="toolbar-left">
-              <span class="toolbar-icon">⚡</span>
-              <span class="toolbar-title">S型打击时序协同流程链</span>
-              <span class="toolbar-divider"></span>
-              <span class="toolbar-stat">
-                时序总节点 <strong>{{ snakeStrikeSteps.length }}</strong> 步 ·
-                协同武器 <strong>{{ filteredWeaponTypeCount }}</strong> 种 ·
-                打击目标 <strong>{{ filteredTargetCount }}</strong> 个
-              </span>
-              <span class="toolbar-divider"></span>
-              <span class="toolbar-time-span">
-                ⏱️ 起止跨度：<strong class="time-range-text">{{ snakeTimeSpanText }}</strong>
-              </span>
-            </div>
-
-            <div class="toolbar-right">
-              <div class="toolbar-filter-inline">
-                <span class="filter-label-inline">高亮武器</span>
-                <el-select v-model="snakeWeaponFilter" size="small" placeholder="全部武器" clearable class="snake-weapon-select">
-                  <el-option label="全部武器协同" value="" />
-                  <el-option v-for="w in availableWeaponsInSteps" :key="w" :label="w" :value="w" />
-                </el-select>
-              </div>
-
-              <div class="toolbar-btn-group">
-                <button class="tool-btn" :class="{ active: snakeCols === 3 }" @click="snakeCols = 3" title="每行3个节点">3列</button>
-                <button class="tool-btn" :class="{ active: snakeCols === 4 }" @click="snakeCols = 4" title="每行4个节点">4列</button>
-              </div>
-
-              <div class="toolbar-btn-group">
-                <button class="tool-btn" @click="scrollSnakeToTop" title="滚动到流程开始">⬆️ 顶部</button>
-                <button class="tool-btn" @click="scrollSnakeToBottom" title="滚动到流程结束">⬇️ 底部</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- 蛇形时序流动主体容器 (支持纵向平滑无限滚动) -->
-          <div class="snake-flow-scroll-area" ref="snakeScrollContainerRef">
-            <div class="snake-flow-track-wrapper">
-              <div
-                v-for="(row, rIdx) in snakeRows"
-                :key="'row-' + rIdx"
-                class="snake-flow-row"
-                :class="[`direction-${row.direction}`, { 'last-row': row.isLastRow }]"
-              >
-                <!-- S型折返连接管道 (右侧掉头至下一行) -->
-                <div v-if="!row.isLastRow && row.direction === 'ltr'" class="snake-turn-track snake-turn-track--right">
-                  <div class="turn-glow-dot turn-glow-dot--down"></div>
-                </div>
-
-                <!-- S型折返连接管道 (左侧掉头至下一行) -->
-                <div v-if="!row.isLastRow && row.direction === 'rtl'" class="snake-turn-track snake-turn-track--left">
-                  <div class="turn-glow-dot turn-glow-dot--down"></div>
-                </div>
-
-                <!-- 行内打击节点卡片及横向导线 (使用 template 扁平排列，确保所有卡片槽位宽度完全一致) -->
-                <template
-                  v-for="(step, itemIdx) in row.items"
-                  :key="step.planId + '-' + step.stepIndex"
-                >
-                  <!-- 单个打击节点卡片槽位 -->
-                  <div class="snake-step-slot">
-                    <!-- 打击节点卡片 -->
-                    <div
-                      class="snake-node-card"
-                      :class="[
-                        getCardClass(step.weaponType),
-                        {
-                          'is-highlighted': !snakeWeaponFilter || snakeWeaponFilter === step.weaponName,
-                          'is-dimmed': snakeWeaponFilter && snakeWeaponFilter !== step.weaponName,
-                        }
-                      ]"
-                    >
-                      <!-- 卡片头部：时序序号 + 起止时间 + 时长 -->
-                      <div class="node-card-header">
-                        <div class="step-badge-wrap">
-                          <span class="step-badge">#{{ step.stepIndex < 10 ? '0' + step.stepIndex : step.stepIndex }}</span>
-                        </div>
-                        <div class="time-range-wrap">
-                          <span class="time-text">{{ step.timeRangeShort }}</span>
-                        </div>
-                        <span class="duration-badge">{{ step.duration }}</span>
-                      </div>
-
-                      <!-- 卡片主体：打击武器 ──(打击向量)──▶ 目标对象 -->
-                      <div class="node-card-body">
-                        <!-- 武器发起端 -->
-                        <div class="subject-box weapon-box">
-                          <span class="subject-type-badge" :class="getBadgeClass(step.weaponType)">
-                            {{ step.weaponType || '定向能' }}
-                          </span>
-                          <span class="subject-name" :title="step.weaponName">{{ step.weaponName }}</span>
-                        </div>
-
-                        <!-- 打击向量指示 (能量光束/攻击角度) -->
-                        <div class="strike-vector-arrow">
-                          <span class="vector-angle">仰角 {{ step.angle }}°</span>
-                          <div class="vector-line">
-                            <span class="vector-beam"></span>
-                            <span class="vector-head">▶</span>
-                          </div>
-                        </div>
-
-                        <!-- 目标接收端 -->
-                        <div class="subject-box target-box">
-                          <span class="subject-type-badge target-badge" :class="'target-badge--' + step.targetCategory">
-                            {{ step.targetCategory }}
-                          </span>
-                          <span class="subject-name target-name" :title="step.target">
-                            {{ getTargetIcon(step.targetCategory) }} {{ step.target }}
-                          </span>
-                        </div>
-                      </div>
-
-                      <!-- 卡片底部：所属计划窗口 + 并行/接续协同状态 -->
-                      <div class="node-card-footer">
-                        <span
-                          class="coordination-tag"
-                          :class="step.isParallelWithPrev ? 'tag--parallel' : 'tag--sequential'"
-                        >
-                          {{ step.isParallelWithPrev ? '🟡 并行协同打击' : '🟢 阶段接续打击' }}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- 行内横向连接导线 (除当前行最后一个卡片外) -->
-                  <div
-                    v-if="itemIdx < row.items.length - 1"
-                    class="snake-inline-connector"
-                    :class="row.direction === 'ltr' ? 'connector--ltr' : 'connector--rtl'"
-                  >
-                    <span class="connector-line"></span>
-                    <span class="connector-arrow">{{ row.direction === 'ltr' ? '▶' : '◀' }}</span>
-                  </div>
-                </template>
-              </div>
-            </div>
-          </div>
-
-          <!-- 底部图例与操作提示 -->
-          <div class="snake-flow-legend">
-            <div class="legend-items">
-              <span class="legend-item"><span class="legend-dot dot-weapon"></span>打击武器 (发起端)</span>
-              <span class="legend-item"><span class="legend-dot dot-target"></span>打击目标 (接收站/卫星/中继)</span>
-              <span class="legend-item"><span class="legend-badge-sample sample-seq">🟢 阶段接续</span>按时间次序发起</span>
-              <span class="legend-item"><span class="legend-badge-sample sample-par">🟡 并行协同</span>多武器重叠时段打击</span>
-            </div>
-            <span class="legend-tip">💡 提示：流程严格依据开始时间时序排列，顺沿S型轨道向下延伸，可垂直平滑滚动查看全量作战流程</span>
-          </div>
-        </div>
-      </template>
     </div>
   </div>
 </template>
@@ -360,17 +233,68 @@ const props = withDefaults(defineProps<Props>(), {
 
 const store = useLayoutStore()
 
-/** 当前激活的视图 Tab ('card': 卡片表格, 'snake': S型打击时序流) */
-const activeViewTab = ref<'card' | 'snake'>('snake')
+/** 链路节点图层 → 展示名称 */
+const CHAIN_LAYER_LABELS: Record<string, string> = {
+  SAT: '卫星',
+  RELAY: '中继卫星',
+  RECEIVE: '接收站',
+  STATION: '数据中心',
+}
 
-/** S型时序流程：每行卡片列数（默认4列） */
-const snakeCols = ref<number>(4)
+/**
+ * 将链路节点图层编码转为中文标签。
+ * @param layer 节点图层（SAT / RELAY / RECEIVE / STATION）
+ * @returns 展示名称
+ */
+const getChainLayerLabel = (layer: string): string => {
+  return CHAIN_LAYER_LABELS[layer] || layer
+}
 
-/** S型时序流程：单武器高亮/聚焦过滤 */
-const snakeWeaponFilter = ref<string>('')
+/** 从整体态势带入的当前链路；为空时展示全部窗口卡片 */
+const focusedStrikeLink = computed(() => store.focusedStrikeLink)
 
-/** S型时序流程滚动容器引用 */
-const snakeScrollContainerRef = ref<HTMLDivElement | null>(null)
+/**
+ * 规范化节点/目标匹配键（去空白、小写）。
+ * @param value 原始名称或 ID
+ * @returns 匹配键
+ */
+const normalizeMatchKey = (value?: string | number | null): string => {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+/** 当前链路节点名称与 ID 集合，用于筛选相关打击窗口 */
+const focusedLinkNodeKeys = computed<Set<string> | null>(() => {
+  const link = focusedStrikeLink.value
+  if (!link) return null
+  const keys = new Set<string>()
+  link.nodes.forEach((node) => {
+    const name = normalizeMatchKey(node.name)
+    const id = normalizeMatchKey(node.id)
+    if (name) keys.add(name)
+    if (id) keys.add(id)
+  })
+  return keys
+})
+
+/**
+ * 判断打击计划目标是否落在当前链路节点上。
+ * @param plan 打击计划
+ * @returns 是否与当前链路节点相关
+ */
+const isPlanRelatedToFocusedLink = (plan: AttackPlanItem): boolean => {
+  const keys = focusedLinkNodeKeys.value
+  if (!keys) return true
+  const target = normalizeMatchKey(plan.target)
+  const targetId = normalizeMatchKey(plan.targetId)
+  return (!!target && keys.has(target)) || (!!targetId && keys.has(targetId))
+}
+
+/**
+ * 取消链路聚焦，恢复展示全部窗口卡片。
+ */
+const clearFocusedStrikeLink = () => {
+  store.setFocusedStrikeLink(null)
+}
 
 // [变量用途]
 // 组件内部自主管理的 MatrixResult 矩阵数据引用
@@ -542,13 +466,13 @@ const groundStationOptions = computed<string[]>(() => {
 
 /** 筛选后武器种类数 */
 const filteredWeaponTypeCount = computed(() => {
-  const types = new Set(filteredPlans.value.map((p) => p.weaponType).filter(Boolean))
+  const types = new Set(displayPlans.value.map((p) => p.weaponType).filter(Boolean))
   return types.size
 })
 
 /** 筛选后受打击目标数 */
 const filteredTargetCount = computed(() => {
-  const targets = new Set(filteredPlans.value.map((p) => p.target).filter(Boolean))
+  const targets = new Set(displayPlans.value.map((p) => p.target).filter(Boolean))
   return targets.size
 })
 
@@ -673,6 +597,14 @@ const filteredPlans = computed<AttackPlanItem[]>(() => {
   })
 
   return list
+})
+
+/**
+ * 当前页实际展示的打击计划：有聚焦链路时仅保留目标落在该链路节点上的窗口。
+ */
+const displayPlans = computed<AttackPlanItem[]>(() => {
+  if (!focusedStrikeLink.value) return filteredPlans.value
+  return filteredPlans.value.filter((plan) => isPlanRelatedToFocusedLink(plan))
 })
 
 /**
@@ -825,203 +757,6 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   return formatDuration(plan.beginTime, plan.endTime)
 }
 
-/**
- * S型时序流程单个作战节点结构
- */
-interface SnakeStrikeStep {
-  stepIndex: number
-  planId: string
-  weaponName: string
-  weaponType: string
-  target: string
-  targetType?: string
-  targetCategory: PlanTargetCategory
-  windowIndex: number
-  totalWindowsInPlan: number
-  startTime: string
-  endTime: string
-  duration: string
-  durationSecs: number
-  angle?: number | string
-  timeRangeShort: string
-  dateLabel: string
-  isParallelWithPrev?: boolean
-}
-
-/**
- * 转换所有经过筛选的打击计划为全局按时间升序串联的时序打击步骤
- */
-const snakeStrikeSteps = computed<SnakeStrikeStep[]>(() => {
-  const plans = filteredPlans.value
-  if (!plans.length) return []
-
-  const rawSteps: {
-    planId: string
-    weaponName: string
-    weaponType: string
-    target: string
-    targetType?: string
-    targetCategory: PlanTargetCategory
-    windowIndex: number
-    totalWindowsInPlan: number
-    startTime: string
-    endTime: string
-    duration: string
-    durationSecs: number
-    angle?: number | string
-  }[] = []
-
-  plans.forEach((plan, pIdx) => {
-    const wName = plan.weaponName || '未知武器'
-    const wType = plan.weaponType || '定向能'
-    const tName = plan.target || '未知目标'
-    const tCat = resolvePlanTargetCategory(plan.targetType)
-    const angle = plan.angle || 0
-
-    if (plan.windows && plan.windows.length > 0) {
-      const totalWins = plan.windows.length
-      plan.windows.forEach((win: any, wIdx: number) => {
-        const start = getWindowStart(win)
-        const end = getWindowEnd(win)
-        const dur = formatDuration(start, end)
-        const durSecs = parsePlanTimeMs(end) - parsePlanTimeMs(start)
-        rawSteps.push({
-          planId: `plan-${pIdx}-win-${wIdx}`,
-          weaponName: wName,
-          weaponType: wType,
-          target: tName,
-          targetType: plan.targetType,
-          targetCategory: tCat,
-          windowIndex: wIdx + 1,
-          totalWindowsInPlan: totalWins,
-          startTime: start,
-          endTime: end,
-          duration: dur,
-          durationSecs: Math.max(durSecs / 1000, 0),
-          angle,
-        })
-      })
-    } else {
-      const start = plan.beginTime || ''
-      const end = plan.endTime || ''
-      const dur = formatDuration(start, end)
-      rawSteps.push({
-        planId: `plan-${pIdx}`,
-        weaponName: wName,
-        weaponType: wType,
-        target: tName,
-        targetType: plan.targetType,
-        targetCategory: tCat,
-        windowIndex: 1,
-        totalWindowsInPlan: 1,
-        startTime: start,
-        endTime: end,
-        duration: dur,
-        durationSecs: Math.max((parsePlanTimeMs(end) - parsePlanTimeMs(start)) / 1000, 0),
-        angle,
-      })
-    }
-  })
-
-  // 关键：严格按开始时间升序排列时序
-  rawSteps.sort((a, b) => {
-    const tA = parsePlanTimeMs(a.startTime)
-    const tB = parsePlanTimeMs(b.startTime)
-    if (tA !== tB) return tA - tB
-    return parsePlanTimeMs(a.endTime) - parsePlanTimeMs(b.endTime)
-  })
-
-  return rawSteps.map((step, idx) => {
-    const startShort = step.startTime.length >= 19 ? step.startTime.substring(5, 19) : step.startTime
-    const endShort = step.endTime.length >= 19 ? step.endTime.substring(11, 19) : step.endTime
-    const dateLabel = step.startTime.length >= 10 ? step.startTime.substring(0, 10) : ''
-
-    const prev = rawSteps[idx - 1]
-    const isParallel = prev ? parsePlanTimeMs(step.startTime) < parsePlanTimeMs(prev.endTime) : false
-
-    return {
-      ...step,
-      stepIndex: idx + 1,
-      timeRangeShort: `${startShort} ~ ${endShort}`,
-      dateLabel,
-      isParallelWithPrev: isParallel,
-    }
-  })
-})
-
-/** 当前时序节点涉及的武器名称列表（用于高亮筛选） */
-const availableWeaponsInSteps = computed(() => {
-  const set = new Set<string>()
-  snakeStrikeSteps.value.forEach((s) => {
-    if (s.weaponName) set.add(s.weaponName)
-  })
-  return Array.from(set)
-})
-
-/** 起止时间跨度文本 */
-const snakeTimeSpanText = computed(() => {
-  const steps = snakeStrikeSteps.value
-  if (!steps.length) return '—'
-  const earliest = steps[0].startTime
-  const latest = steps.reduce((max, s) => (parsePlanTimeMs(s.endTime) > parsePlanTimeMs(max) ? s.endTime : max), steps[0].endTime)
-  const eShort = earliest.length >= 19 ? earliest.substring(5, 19) : earliest
-  const lShort = latest.length >= 19 ? latest.substring(5, 19) : latest
-  return `${eShort} → ${lShort}`
-})
-
-/**
- * 将一维时序节点数组切片为蛇形交替行 (LTR -> RTL -> LTR...)
- */
-const snakeRows = computed(() => {
-  const steps = snakeStrikeSteps.value
-  const cols = snakeCols.value || 3
-  const rows: {
-    rowIndex: number
-    direction: 'ltr' | 'rtl'
-    items: SnakeStrikeStep[]
-    isLastRow: boolean
-  }[] = []
-
-  for (let i = 0; i < steps.length; i += cols) {
-    const rowIndex = Math.floor(i / cols)
-    const direction = rowIndex % 2 === 0 ? 'ltr' : 'rtl'
-    const chunk = steps.slice(i, i + cols)
-    const isLastRow = i + cols >= steps.length
-
-    rows.push({
-      rowIndex,
-      direction,
-      items: chunk,
-      isLastRow,
-    })
-  }
-  return rows
-})
-
-/** 滚动到 S 型流程顶部 */
-const scrollSnakeToTop = () => {
-  if (snakeScrollContainerRef.value) {
-    snakeScrollContainerRef.value.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-}
-
-/** 滚动到 S 型流程底部 */
-const scrollSnakeToBottom = () => {
-  if (snakeScrollContainerRef.value) {
-    snakeScrollContainerRef.value.scrollTo({
-      top: snakeScrollContainerRef.value.scrollHeight,
-      behavior: 'smooth',
-    })
-  }
-}
-
-/** 获取目标类型图标 */
-const getTargetIcon = (cat?: PlanTargetCategory | string) => {
-  if (cat === '接收站' || cat === '数据中心') return '📡'
-  if (cat === '中继卫星') return '🛰️'
-  return '🛰️'
-}
-
 </script>
 
 <style lang="scss" scoped>
@@ -1108,28 +843,6 @@ const getTargetIcon = (cat?: PlanTargetCategory | string) => {
     gap: 12px;
     flex-shrink: 0;
 
-    .view-switch-radio {
-      flex-shrink: 0;
-      white-space: nowrap;
-
-      :deep(.atlas-app-radio-button__inner) {
-        background-color: rgba(8, 14, 26, 0.85);
-        border-color: rgba(0, 225, 255, 0.3);
-        color: #94a3b8;
-        font-size: 13px;
-        font-weight: 600;
-        padding: 6px 14px;
-        transition: all 0.2s ease;
-      }
-
-      :deep(.atlas-app-radio-button__original-radio:checked + .atlas-app-radio-button__inner) {
-        background: linear-gradient(135deg, rgba(0, 225, 255, 0.25), rgba(6, 182, 212, 0.4));
-        border-color: #00e1ff;
-        color: #00e1ff;
-        box-shadow: 0 0 10px rgba(0, 225, 255, 0.3) inset, 0 0 8px rgba(0, 225, 255, 0.25);
-        text-shadow: 0 0 6px rgba(0, 225, 255, 0.6);
-      }
-    }
   }
 
   .search-input {
@@ -1234,6 +947,139 @@ const getTargetIcon = (cat?: PlanTargetCategory | string) => {
     background: rgba(0, 225, 255, 0.3);
     border-radius: 3px;
   }
+}
+
+
+.focused-link-panel {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  background: rgba(13, 22, 42, 0.9);
+  border: 1px solid rgba(0, 225, 255, 0.28);
+  border-radius: 8px;
+}
+
+.focused-link-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.focused-link-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #00e1ff;
+}
+
+.focused-link-icon {
+  font-size: 16px;
+}
+
+.focused-link-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+
+  &.is-ok {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.15);
+  }
+
+  &.is-blocked {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.15);
+  }
+}
+
+.clear-focus-btn {
+  font-size: 13px;
+}
+
+.focused-link-path {
+  font-size: 14px;
+  color: #e2e8f0;
+  line-height: 1.5;
+  margin-bottom: 10px;
+  word-break: break-all;
+}
+
+.focused-link-nodes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.link-node-chip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(8, 14, 26, 0.8);
+  border: 1px solid rgba(0, 225, 255, 0.2);
+}
+
+.link-node-chip--SAT {
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.link-node-chip--RELAY {
+  border-color: rgba(167, 139, 250, 0.45);
+}
+
+.link-node-chip--RECEIVE {
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.link-node-chip--STATION {
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.link-node-layer {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.link-node-name {
+  font-size: 13px;
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.link-node-arrow {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.focused-link-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.related-windows-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.related-windows-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fde047;
 }
 
 .empty-container {
@@ -1561,556 +1407,4 @@ const getTargetIcon = (cat?: PlanTargetCategory | string) => {
   text-shadow: 0 0 6px rgba(248, 113, 113, 0.4);
 }
 
-.attack-body--snake {
-  padding: 12px 20px 16px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  height: 100%;
-}
-
-.snake-flow-view-container {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: rgba(10, 18, 34, 0.75);
-  border: 1px solid rgba(0, 225, 255, 0.2);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-
-  .snake-flow-toolbar {
-    height: 48px;
-    padding: 0 18px;
-    background: linear-gradient(90deg, rgba(8, 16, 32, 0.95) 0%, rgba(15, 28, 54, 0.85) 100%);
-    border-bottom: 1px solid rgba(0, 225, 255, 0.15);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-
-    .toolbar-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-
-      .toolbar-icon {
-        font-size: 18px;
-      }
-
-      .toolbar-title {
-        font-size: 15px;
-        font-weight: 700;
-        color: #00e1ff;
-      }
-
-      .toolbar-divider {
-        width: 1px;
-        height: 16px;
-        background: rgba(0, 225, 255, 0.25);
-        margin: 0 4px;
-      }
-
-      .toolbar-stat {
-        font-size: 13px;
-        color: #94a3b8;
-
-        strong {
-          color: #fde047;
-          font-weight: 700;
-        }
-      }
-
-      .toolbar-time-span {
-        font-size: 13px;
-        color: #94a3b8;
-
-        .time-range-text {
-          color: #38bdf8;
-          font-family: monospace;
-          font-weight: 700;
-        }
-      }
-    }
-
-    .toolbar-right {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-
-      .toolbar-filter-inline {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-
-        .filter-label-inline {
-          font-size: 12px;
-          color: #94a3b8;
-          white-space: nowrap;
-        }
-
-        .snake-weapon-select {
-          width: 130px;
-        }
-      }
-
-      .toolbar-btn-group {
-        display: inline-flex;
-        align-items: center;
-        background: rgba(8, 14, 26, 0.85);
-        border: 1px solid rgba(0, 225, 255, 0.28);
-        border-radius: 4px;
-        overflow: hidden;
-
-        .tool-btn {
-          padding: 4px 12px;
-          background: transparent;
-          border: none;
-          border-right: 1px solid rgba(0, 225, 255, 0.18);
-          color: #94eaff;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          outline: none;
-
-          &:last-child {
-            border-right: none;
-          }
-
-          &:hover {
-            color: #ffffff;
-            background: rgba(0, 225, 255, 0.18);
-          }
-
-          &.active {
-            color: #ffffff;
-            background: rgba(0, 225, 255, 0.35);
-            font-weight: 700;
-            box-shadow: inset 0 0 8px rgba(0, 225, 255, 0.4);
-          }
-
-          &:active {
-            background: rgba(0, 225, 255, 0.45);
-          }
-        }
-      }
-    }
-  }
-
-  .snake-flow-scroll-area {
-    flex: 1;
-    width: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 24px 36px 36px;
-    background: radial-gradient(circle at 50% 30%, #0d1a33 0%, #060b18 100%);
-    position: relative;
-    box-sizing: border-box;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: rgba(6, 11, 24, 0.8);
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: rgba(0, 225, 255, 0.3);
-      border-radius: 3px;
-
-      &:hover {
-        background: rgba(0, 225, 255, 0.6);
-      }
-    }
-  }
-
-  .snake-flow-track-wrapper {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    position: relative;
-  }
-
-  .snake-flow-row {
-    display: flex;
-    align-items: center;
-    position: relative;
-    margin-bottom: 48px;
-    padding: 0 44px;
-
-    &.direction-ltr {
-      flex-direction: row;
-    }
-
-    &.direction-rtl {
-      flex-direction: row-reverse;
-    }
-
-    &.last-row {
-      margin-bottom: 12px;
-    }
-
-    .snake-turn-track {
-      position: absolute;
-      width: 44px;
-      height: calc(100% + 48px);
-      pointer-events: none;
-      z-index: 1;
-
-      &.snake-turn-track--right {
-        right: 0;
-        top: 50%;
-        border-top: 3px solid rgba(0, 225, 255, 0.7);
-        border-right: 3px solid #00e1ff;
-        border-bottom: 3px solid rgba(0, 225, 255, 0.7);
-        border-left: none;
-        border-radius: 0 32px 32px 0;
-        box-shadow: 4px 0 12px rgba(0, 225, 255, 0.3);
-
-        .turn-glow-dot--down {
-          right: -4px;
-          left: auto;
-        }
-      }
-
-      &.snake-turn-track--left {
-        left: 0;
-        top: 50%;
-        border-top: 3px solid rgba(0, 225, 255, 0.7);
-        border-left: 3px solid #00e1ff;
-        border-bottom: 3px solid rgba(0, 225, 255, 0.7);
-        border-right: none;
-        border-radius: 32px 0 0 32px;
-        box-shadow: -4px 0 12px rgba(0, 225, 255, 0.3);
-
-        .turn-glow-dot--down {
-          left: -4px;
-          right: auto;
-        }
-      }
-
-      .turn-glow-dot {
-        position: absolute;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #00e1ff;
-        box-shadow: 0 0 8px #00e1ff;
-        top: 50%;
-        transform: translateY(-50%);
-      }
-    }
-
-    .snake-step-slot {
-      display: flex;
-      align-items: stretch;
-      flex: 1 1 0;
-      min-width: 0;
-      position: relative;
-      z-index: 2;
-
-      .snake-node-card {
-        width: 100%;
-        min-width: 0;
-        background: linear-gradient(135deg, rgba(13, 23, 44, 0.95) 0%, rgba(8, 16, 32, 0.98) 100%);
-        border: 1.5px solid rgba(0, 225, 255, 0.35);
-        border-radius: 8px;
-        padding: 10px 14px;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), inset 0 0 12px rgba(0, 225, 255, 0.05);
-        transition: all 0.25s ease;
-        cursor: pointer;
-        box-sizing: border-box;
-
-        &:hover {
-          transform: translateY(-3px);
-          border-color: #00e1ff;
-          box-shadow: 0 8px 24px rgba(0, 225, 255, 0.35);
-        }
-
-        &.is-dimmed {
-          opacity: 0.32;
-          filter: grayscale(40%);
-        }
-
-        &.is-highlighted {
-          border-color: #00e1ff;
-          box-shadow: 0 0 16px rgba(0, 225, 255, 0.35);
-        }
-
-        .node-card-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          margin-bottom: 8px;
-          padding-bottom: 6px;
-          border-bottom: 1px solid rgba(0, 225, 255, 0.15);
-
-          .step-badge-wrap {
-            .step-badge {
-              font-size: 13px;
-              font-weight: 800;
-              color: #00e1ff;
-              background: rgba(0, 225, 255, 0.15);
-              padding: 2px 8px;
-              border-radius: 12px;
-              border: 1px solid rgba(0, 225, 255, 0.4);
-            }
-          }
-
-          .time-range-wrap {
-            flex: 1;
-            text-align: center;
-
-            .time-text {
-              font-size: 13px;
-              font-weight: 700;
-              color: #ffffff;
-              font-family: monospace;
-              letter-spacing: 0.3px;
-            }
-          }
-
-          .duration-badge {
-            font-size: 12px;
-            font-weight: 700;
-            color: #34d399;
-            background: rgba(52, 211, 153, 0.15);
-            padding: 2px 6px;
-            border-radius: 4px;
-            border: 1px solid rgba(52, 211, 153, 0.3);
-          }
-        }
-
-        .node-card-body {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          margin-bottom: 8px;
-          background: rgba(6, 12, 24, 0.65);
-          border-radius: 6px;
-          padding: 6px 10px;
-          border: 1px solid rgba(255, 255, 255, 0.06);
-
-          .subject-box {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            max-width: 42%;
-            min-width: 0;
-
-            .subject-type-badge {
-              font-size: 11px;
-              font-weight: 700;
-              padding: 1px 6px;
-              border-radius: 3px;
-              width: fit-content;
-              white-space: nowrap;
-
-              &.target-badge {
-                background: rgba(248, 113, 113, 0.2);
-                color: #f87171;
-                border: 1px solid rgba(248, 113, 113, 0.4);
-
-                &--接收站,
-                &--数据中心 {
-                  background: rgba(56, 189, 248, 0.2);
-                  color: #38bdf8;
-                  border-color: rgba(56, 189, 248, 0.4);
-                }
-
-                &--中继卫星 {
-                  background: rgba(168, 85, 247, 0.2);
-                  color: #c084fc;
-                  border-color: rgba(168, 85, 247, 0.4);
-                }
-              }
-            }
-
-            .subject-name {
-              font-size: 14px;
-              font-weight: 700;
-              color: #ffffff;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-
-              &.target-name {
-                color: #fca5a5;
-              }
-            }
-          }
-
-          .strike-vector-arrow {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            min-width: 64px;
-
-            .vector-angle {
-              font-size: 11px;
-              white-space: nowrap;
-              font-weight: 700;
-              color: #fbbf24;
-              margin-bottom: 2px;
-            }
-
-            .vector-line {
-              display: flex;
-              align-items: center;
-              width: 100%;
-
-              .vector-beam {
-                flex: 1;
-                height: 2px;
-                background: linear-gradient(90deg, #38bdf8, #f87171);
-                box-shadow: 0 0 6px rgba(56, 189, 248, 0.5);
-              }
-
-              .vector-head {
-                font-size: 10px;
-                color: #f87171;
-                margin-left: -2px;
-              }
-            }
-          }
-        }
-
-        .node-card-footer {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          font-size: 12px;
-          color: #94a3b8;
-
-          .plan-window-tag {
-            color: #cbd5e1;
-
-            strong {
-              color: #00e1ff;
-              font-weight: 700;
-            }
-          }
-
-          .coordination-tag {
-            padding: 1px 6px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: 600;
-
-            &.tag--parallel {
-              background: rgba(245, 158, 11, 0.18);
-              color: #fbbf24;
-              border: 1px solid rgba(245, 158, 11, 0.35);
-            }
-
-            &.tag--sequential {
-              background: rgba(16, 185, 129, 0.18);
-              color: #34d399;
-              border: 1px solid rgba(16, 185, 129, 0.35);
-            }
-          }
-        }
-      }
-    }
-
-    .snake-inline-connector {
-      display: flex;
-      align-items: center;
-      width: 32px;
-      margin: 0 6px;
-      flex-shrink: 0;
-      position: relative;
-      z-index: 2;
-
-      /* 第二排从右往左：三角在短横线左侧（流向的前方） */
-      &.connector--rtl {
-        flex-direction: row-reverse;
-      }
-
-      .connector-line {
-        flex: 1;
-        height: 2px;
-        background: linear-gradient(90deg, rgba(0, 225, 255, 0.3), rgba(0, 225, 255, 0.8), rgba(0, 225, 255, 0.3));
-        box-shadow: 0 0 6px rgba(0, 225, 255, 0.4);
-      }
-
-      .connector-arrow {
-        color: #00e1ff;
-        font-size: 11px;
-        font-weight: 800;
-        text-shadow: 0 0 6px #00e1ff;
-        margin: 0 -2px;
-      }
-    }
-  }
-
-  .snake-flow-legend {
-    height: 40px;
-    padding: 0 18px;
-    background: rgba(8, 14, 26, 0.95);
-    border-top: 1px solid rgba(0, 225, 255, 0.14);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 13px;
-    color: #94a3b8;
-    flex-shrink: 0;
-
-    .legend-items {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-
-      .legend-item {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-
-        .legend-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-
-          &.dot-weapon {
-            background: #38bdf8;
-            box-shadow: 0 0 6px #38bdf8;
-          }
-
-          &.dot-target {
-            background: #f87171;
-            box-shadow: 0 0 6px #f87171;
-          }
-        }
-
-        .legend-badge-sample {
-          font-size: 11px;
-          padding: 1px 6px;
-          border-radius: 3px;
-
-          &.sample-seq {
-            background: rgba(16, 185, 129, 0.2);
-            color: #34d399;
-          }
-
-          &.sample-par {
-            background: rgba(245, 158, 11, 0.2);
-            color: #fbbf24;
-          }
-        }
-      }
-    }
-
-    .legend-tip {
-      color: #64748b;
-      font-size: 11px;
-    }
-  }
-}
 </style>
