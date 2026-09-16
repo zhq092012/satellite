@@ -328,8 +328,27 @@ export function resolveBattleSpaceLabelPosition(
   return null
 }
 
-// 标记战场
-export function markBattleArea(viewer: Cesium.Viewer, battle: BattleForm | null, orbit_altitude_km: number = 24000000) {
+/** 战场区域标记可选配置 */
+export interface MarkBattleAreaOptions {
+  /** 是否将多边形/边线贴地，避免开启 globe 深度检测后被地形遮挡 */
+  clampToGround?: boolean
+}
+
+/**
+ * 在地球上标记战场区域并调整初始视角。
+ *
+ * @param viewer Cesium Viewer
+ * @param battle 战场表单数据
+ * @param orbit_altitude_km 初始俯视高度（米）
+ * @param options 可选渲染配置
+ */
+export function markBattleArea(
+  viewer: Cesium.Viewer,
+  battle: BattleForm | null,
+  orbit_altitude_km: number = 24000000,
+  options?: MarkBattleAreaOptions
+) {
+  const clampToGround = options?.clampToGround ?? false
   if (!viewer || (viewer as any).isDestroyed?.() || battle === null) return
 
   /** 先清掉旧战场面，避免每次 markBattle 再叠加一份 Polygon/Polyline 几何体 */
@@ -376,13 +395,16 @@ export function markBattleArea(viewer: Cesium.Viewer, battle: BattleForm | null,
         polygon: {
           hierarchy: new Cesium.PolygonHierarchy(points),
           material: new Cesium.ColorMaterialProperty(Cesium.Color.ORANGE.withAlpha(0.3)),
-          perPositionHeight: true,
+          ...(clampToGround
+            ? { heightReference: Cesium.HeightReference.CLAMP_TO_TERRAIN }
+            : { perPositionHeight: true }),
           distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 150000000),
         },
         polyline: {
           positions: [...points, points[0]], // 闭合线
           width: 2,
           material: new Cesium.ColorMaterialProperty(Cesium.Color.RED),
+          ...(clampToGround ? { clampToGround: true } : {}),
           distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 150000000),
         },
       })

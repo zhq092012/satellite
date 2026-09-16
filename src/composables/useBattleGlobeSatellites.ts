@@ -256,7 +256,8 @@ export const useBattleGlobeSatellites = (
         position,
         pixelSize: 6,
         color: SATELLITE_POINT_COLOR,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        // 始终参与深度检测，被地球遮挡的背面卫星不再穿透绘制
+        disableDepthTestDistance: 0,
         show: false,
       })
       const label = labelCollection.add({
@@ -272,7 +273,7 @@ export const useBattleGlobeSatellites = (
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, -10),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        disableDepthTestDistance: 0,
         show: false,
       })
 

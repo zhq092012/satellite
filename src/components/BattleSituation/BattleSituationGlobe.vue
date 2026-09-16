@@ -151,15 +151,15 @@ const restoreOverviewView = () => {
       destination,
       orientation: orientation
         ? {
-            heading: orientation.heading,
-            pitch: orientation.pitch,
-            roll: orientation.roll,
-          }
+          heading: orientation.heading,
+          pitch: orientation.pitch,
+          roll: orientation.roll,
+        }
         : {
-            heading: 0,
-            pitch: -Cesium.Math.toRadians(90),
-            roll: 0,
-          },
+          heading: 0,
+          pitch: -Cesium.Math.toRadians(90),
+          roll: 0,
+        },
       duration: 1.2,
     })
     viewer.scene.requestRender()
@@ -167,7 +167,7 @@ const restoreOverviewView = () => {
   }
 
   if (store.battle) {
-    markBattleArea(viewer, store.battle)
+    markBattleArea(viewer, store.battle, 24000000, { clampToGround: true })
     viewer.scene.requestRender()
     return
   }
@@ -179,12 +179,46 @@ defineExpose({
   restoreOverviewView,
 })
 
+/** 战场名称标签锚点（用于椭球遮挡判断） */
+let battleLabelAnchor: Cesium.Cartesian3 | null = null
+
+/**
+ * 根据相机位置更新战场名称标签可见性，避免地球背面仍显示。
+ */
+const updateBattleLabelOcclusion = () => {
+  const viewer = viewerRef.value
+  if (!viewer || viewer.isDestroyed() || !battleLabelAnchor) return
+
+  const entity = viewer.entities.getById('battle-area-label')
+  if (!entity) return
+
+  const occluder = new Cesium.EllipsoidalOccluder(
+    Cesium.Ellipsoid.WGS84,
+    viewer.camera.positionWC
+  )
+  const visible = occluder.isPointVisible(battleLabelAnchor)
+  if (entity.show !== visible) {
+    entity.show = visible
+    viewer.scene.requestRender()
+  }
+}
+
+/**
+ * 注册战场名称标签遮挡更新监听。
+ */
+const ensureBattleLabelOcclusionListener = () => {
+  const viewer = viewerRef.value
+  if (!viewer || viewer.isDestroyed() || battleLabelAnimRemover) return
+  battleLabelAnimRemover = viewer.scene.postUpdate.addEventListener(updateBattleLabelOcclusion)
+}
+
 /**
  * 移除场景名称标注实体。
  */
 const clearBattleLabel = () => {
   battleLabelAnimRemover?.()
   battleLabelAnimRemover = null
+  battleLabelAnchor = null
 
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed()) return
@@ -217,6 +251,7 @@ const renderBattleLabel = () => {
   }
 
   clearBattleLabel()
+  battleLabelAnchor = Cesium.Cartesian3.clone(labelPosition)
   viewer.entities.add({
     id: 'battle-area-label',
     position: labelPosition,
@@ -230,9 +265,13 @@ const renderBattleLabel = () => {
       horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
       verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
       heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      // 参与地球深度检测；Infinity 会导致标签穿透地球背面
+      disableDepthTestDistance: 0,
       pixelOffset: new Cesium.Cartesian2(0, -4),
     },
   })
+  ensureBattleLabelOcclusionListener()
+  updateBattleLabelOcclusion()
 }
 
 /**
@@ -244,7 +283,7 @@ const renderBattleArea = () => {
 
   try {
     if (store.battle) {
-      markBattleArea(viewer, store.battle)
+      markBattleArea(viewer, store.battle, 24000000, { clampToGround: true })
       renderBattleLabel()
       if (!store.battleCenterCartensian && !resolveBattleSpaceLabelPosition(store.battle)) {
         flyToDefaultEarthView()
@@ -295,7 +334,8 @@ const initViewer = async () => {
         credit: 'credit',
       })
     )
-    viewer.scene.globe.depthTestAgainstTerrain = false
+    // 地球写入深度缓冲：背面轨道卫星参与深度检测后不再穿透地球
+    viewer.scene.globe.depthTestAgainstTerrain = true
     viewer.scene.globe.showSkirts = false
     viewer.scene.fog.enabled = false
 

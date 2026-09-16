@@ -10,8 +10,11 @@ const LOD_MID_DISTANCE = 8_000_000
 const LOD_FAR_DISTANCE = 50_000_000
 /** 视锥体剔除包围球半径（米） */
 const FRUSTUM_BOUNDING_RADIUS = 30_000
-/** 武器点离地高度（米），避免与地面 z-fighting */
-const WEAPON_SURFACE_HEIGHT_M = 120
+/**
+ * 贴地标签三点深度检测距离（米）。
+ * 相机距地面较近时，保证 CLAMP_TO_GROUND 标签任一角可见则整体可见。
+ */
+const WEAPON_LABEL_THREE_POINT_DEPTH_TEST_DISTANCE = 5000
 /** 武器点默认颜色 */
 const WEAPON_POINT_COLOR = Cesium.Color.fromCssColorString('#ff3333')
 /** 选中武器相机距离（米） */
@@ -69,11 +72,8 @@ export const useBattleGlobeWeapons = (
    * @returns 世界坐标或 null
    */
   const resolveWeaponPosition = (weapon: BattleGlobeWeapon): Cesium.Cartesian3 | null => {
-    const position = Cesium.Cartesian3.fromDegrees(
-      weapon.longitude,
-      weapon.latitude,
-      WEAPON_SURFACE_HEIGHT_M
-    )
+    // 高度由 Label.heightReference 贴地；Point 关闭自身深度检测后由背面剔除控制可见性
+    const position = Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 0)
     if (!isFiniteCartesian(position) || Cesium.Cartesian3.magnitude(position) < 1) {
       return null
     }
@@ -189,7 +189,12 @@ export const useBattleGlobeWeapons = (
       pointCollection = viewer.scene.primitives.add(new Cesium.PointPrimitiveCollection())
     }
     if (!labelCollection || labelCollection.isDestroyed()) {
-      labelCollection = viewer.scene.primitives.add(new Cesium.LabelCollection({ scene: viewer.scene }))
+      labelCollection = viewer.scene.primitives.add(
+        new Cesium.LabelCollection({
+          scene: viewer.scene,
+          threePointDepthTestDistance: WEAPON_LABEL_THREE_POINT_DEPTH_TEST_DISTANCE,
+        })
+      )
     }
   }
 
@@ -217,6 +222,7 @@ export const useBattleGlobeWeapons = (
         position,
         pixelSize: 6,
         color: WEAPON_POINT_COLOR,
+        // 关闭 Point 自身深度检测，避免被地形遮挡；背面可见性由 isPositionFacingCamera 控制
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         show: false,
       })
@@ -233,6 +239,7 @@ export const useBattleGlobeWeapons = (
         horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, -10),
+        heightReference: Cesium.HeightReference.CLAMP_TO_TERRAIN,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         show: false,
       })
