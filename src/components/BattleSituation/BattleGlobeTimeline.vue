@@ -1,7 +1,28 @@
 <template>
   <div class="battle-globe-timeline" v-if="taskStartMs && taskEndMs > taskStartMs">
     <div class="timeline-header">
-      <span class="header-title">时间轴</span>
+      <div class="header-left">
+        <span class="header-title">时间轴</span>
+        <div class="timeline-controls">
+          <button type="button" class="control-btn" :title="isPlaying ? '暂停' : '播放'" @click="emit('toggle-play')">
+            <span class="control-btn-icon">{{ isPlaying ? '⏸' : '▶' }}</span>
+            <span>{{ isPlaying ? '暂停' : '播放' }}</span>
+          </button>
+          <div class="speed-group">
+            <span class="speed-label">速度</span>
+            <button
+              v-for="option in speedOptions"
+              :key="option"
+              type="button"
+              class="speed-btn"
+              :class="{ 'is-active': playbackSpeed === option }"
+              @click="emit('speed-change', option)"
+            >
+              {{ option }}x
+            </button>
+          </div>
+        </div>
+      </div>
       <span v-if="displayTimeMs" class="current-time-tag">
         {{ formatTimelineTime(displayTimeMs) }}
       </span>
@@ -34,24 +55,39 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, withDefaults } from 'vue'
 import { formatTimelineTime, msToRatio } from '@/utils/satelliteTimelineMarkers'
 
 /**
  * 整体态势任务时间轴（纯展示组件，无播放与矩阵业务逻辑）。
  */
-const props = defineProps<{
-  /** 任务开始时间字符串 */
-  taskStart: string
-  /** 任务结束时间字符串 */
-  taskEnd: string
-  /** 当前时刻（毫秒），用于游标展示 */
-  currentTimeMs?: number | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    /** 任务开始时间字符串 */
+    taskStart: string
+    /** 任务结束时间字符串 */
+    taskEnd: string
+    /** 当前时刻（毫秒），用于游标展示 */
+    currentTimeMs?: number | null
+    /** 是否正在播放 */
+    isPlaying?: boolean
+    /** 播放倍速 */
+    playbackSpeed?: number
+  }>(),
+  {
+    isPlaying: false,
+    playbackSpeed: 1,
+  }
+)
+
+/** 可选播放倍速 */
+const speedOptions = [1, 2, 5, 10]
 
 /** 点击时间轴时通知父组件更新当前时刻 */
 const emit = defineEmits<{
   (e: 'time-change', ms: number): void
+  (e: 'toggle-play'): void
+  (e: 'speed-change', speed: number): void
 }>()
 
 /** 时间轴轨道 DOM 引用 */
@@ -174,12 +210,87 @@ const handleTrackClick = (event: MouseEvent) => {
   margin-bottom: 2px;
   gap: 8px;
 
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
   .header-title {
     font-size: 12px;
     font-weight: 600;
     color: #40f2ff;
     letter-spacing: 0.3px;
     line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .timeline-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .control-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 225, 255, 0.35);
+    background: rgba(0, 225, 255, 0.08);
+    color: #7dd3fc;
+    font-size: 11px;
+    cursor: pointer;
+
+    &:hover {
+      background: rgba(0, 225, 255, 0.18);
+      color: #ffffff;
+    }
+  }
+
+  .control-btn-icon {
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  .speed-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .speed-label {
+    font-size: 10px;
+    color: #64748b;
+    white-space: nowrap;
+  }
+
+  .speed-btn {
+    min-width: 30px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 225, 255, 0.2);
+    background: rgba(8, 20, 36, 0.6);
+    color: #94a3b8;
+    font-size: 10px;
+    cursor: pointer;
+
+    &.is-active {
+      color: #40f2ff;
+      border-color: rgba(64, 242, 255, 0.65);
+      background: rgba(0, 225, 255, 0.16);
+    }
+
+    &:hover {
+      color: #ffffff;
+      border-color: rgba(64, 242, 255, 0.45);
+    }
   }
 
   .current-time-tag {

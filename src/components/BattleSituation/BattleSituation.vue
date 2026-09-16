@@ -2,7 +2,21 @@
   <div class="battle-situation-container">
     <!-- 1. 地球底图 + 当前场景区域标记 -->
     <div class="map-globe-layer">
-      <BattleSituationGlobe />
+      <BattleSituationGlobe ref="globeRef" :satellites="globeSatellites" :weapons="globeWeapons"
+        :current-time-ms="currentTimeMs" :selected-norad="selectedNorad" :selected-weapon-id="selectedWeaponId"
+        :task-start-ms="taskStartMs" :task-end-ms="taskEndMs" />
+
+      <div v-if="selectedNorad" class="globe-selected-bar">
+        <span class="globe-selected-label">选中卫星：</span>
+        <span class="globe-selected-name">{{ selectedSatelliteName }}</span>
+        <button type="button" class="globe-clear-btn" @click="handleClearSelectedSatellite">清除</button>
+      </div>
+
+      <div v-if="selectedWeaponId" class="globe-selected-bar globe-selected-bar--weapon">
+        <span class="globe-selected-label">选中武器：</span>
+        <span class="globe-selected-name globe-selected-name--weapon">{{ selectedWeaponName }}</span>
+        <button type="button" class="globe-clear-btn" @click="handleClearSelectedWeapon">清除</button>
+      </div>
     </div>
 
     <!-- 2. 悬浮左侧控制面板 -->
@@ -24,7 +38,9 @@
     <div class="floating-panel floating-panel--right" :class="{ 'is-collapsed': isRightCollapsed }">
       <div class="panel-inner">
         <C2RightAnalysisPanel :analysis-data="taskAnalysisData" :algorithm-complete="algorithmComplete"
-          :analysis-loading="taskAnalysisLoading" />
+          :analysis-loading="taskAnalysisLoading" :selected-norad="selectedNorad"
+          :selected-weapon-id="selectedWeaponId" @select-satellite="handleSelectSatellite"
+          @select-weapon="handleSelectWeapon" />
       </div>
       <button type="button" class="toggle-btn toggle-btn--right" :title="isRightCollapsed ? '展开右侧面板' : '收起右侧面板'"
         @click="isRightCollapsed = !isRightCollapsed">
@@ -52,14 +68,24 @@
 
       <div class="timeline-inner">
         <BattleGlobeTimeline :task-start="taskTimeRange.start" :task-end="taskTimeRange.end"
-          :current-time-ms="currentTimeMs" @time-change="handleTimelineTimeChange" />
+          :current-time-ms="currentTimeMs" :is-playing="isTimelinePlaying" :playback-speed="playbackSpeed"
+          @time-change="handleTimelineTimeChange" @toggle-play="handleToggleTimelinePlay"
+          @speed-change="handlePlaybackSpeedChange" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, ref, watch } from 'vue'
+import {
+  buildBattleGlobeSatellites,
+  buildBattleGlobeSatellitesFromMatrix,
+} from '@/utils/buildBattleGlobeSatellites'
+import {
+  buildBattleGlobeWeapons,
+  buildBattleGlobeWeaponsFromMatrix,
+} from '@/utils/buildBattleGlobeWeapons'
+import { computed, nextTick, onActivated, onBeforeUnmount, ref, watch } from 'vue'
 import { ArrowDown, ArrowUp, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
@@ -84,8 +110,26 @@ const isTimelineCollapsed = ref(false)
 /** 当前选中的卫星 NORAD（仅用于右侧面板高亮） */
 const selectedNorad = ref<number | null>(null)
 
+/** 当前选中的武器 ID */
+const selectedWeaponId = ref<string | null>(null)
+
 /** 时间轴当前时刻（毫秒） */
 const currentTimeMs = ref(0)
+
+/** 时间轴是否正在播放 */
+const isTimelinePlaying = ref(false)
+
+/** 时间轴播放倍速 */
+const playbackSpeed = ref(1)
+
+/** 播放循环句柄 */
+let playbackRafId: number | null = null
+
+/** 上一帧播放时间戳 */
+let lastPlaybackFrameMs = 0
+
+/** 选中卫星前是否正在播放（清除后用于恢复） */
+let wasPlayingBeforeSelection = false
 
 /** 算法矩阵数据 */
 const matrixData = computed<MatrixResult | null>(() => store.matrixData)
@@ -106,6 +150,45 @@ const taskTimeRange = computed(() => {
   return { start: task.beginDate, end: task.endDate }
 })
 
+/** 任务开始时间（毫秒） */
+const taskStartMs = computed(() => parseTaskTimeMs(taskTimeRange.value?.start))
+
+/** 任务结束时间（毫秒） */
+const taskEndMs = computed(() => parseTaskTimeMs(taskTimeRange.value?.end))
+
+/** 地球渲染卫星列表（优先任务分析全量数据，兜底当前系列矩阵） */
+const globeSatellites = computed(() => {
+  const fromAnalysis = buildBattleGlobeSatellites(taskAnalysisData.value)
+  if (fromAnalysis.length) return fromAnalysis
+  return buildBattleGlobeSatellitesFromMatrix(matrixData.value)
+})
+
+/** 地球渲染武器列表（优先任务分析全量数据，兜底当前系列矩阵） */
+const globeWeapons = computed(() => {
+  const fromAnalysis = buildBattleGlobeWeapons(taskAnalysisData.value)
+  if (fromAnalysis.length) return fromAnalysis
+  return buildBattleGlobeWeaponsFromMatrix(matrixData.value)
+})
+
+/** 地球组件引用 */
+const globeRef = ref<{ restoreOverviewView: () => void } | null>(null)
+
+/** 当前选中卫星名称 */
+const selectedSatelliteName = computed(() => {
+  if (!selectedNorad.value) return ''
+  const fromGlobe = globeSatellites.value.find((sat) => sat.norad === selectedNorad.value)
+  if (fromGlobe?.name) return fromGlobe.name
+  const fromMatrix = matrixData.value?.initMatrixList?.find((sat) => sat.norad === selectedNorad.value)
+  return fromMatrix?.name || `Sat-${selectedNorad.value}`
+})
+
+/** 当前选中武器名称 */
+const selectedWeaponName = computed(() => {
+  if (!selectedWeaponId.value) return ''
+  const fromGlobe = globeWeapons.value.find((weapon) => weapon.id === selectedWeaponId.value)
+  return fromGlobe?.name || selectedWeaponId.value
+})
+
 /**
  * 解析任务时间为毫秒。
  *
@@ -124,7 +207,93 @@ const parseTaskTimeMs = (value?: string): number => {
  * @param ms 目标时刻
  */
 const handleTimelineTimeChange = (ms: number) => {
+  stopTimelinePlayback()
   currentTimeMs.value = ms
+}
+
+/**
+ * 停止时间轴播放循环。
+ */
+const stopTimelinePlayback = () => {
+  isTimelinePlaying.value = false
+  if (playbackRafId != null) {
+    cancelAnimationFrame(playbackRafId)
+    playbackRafId = null
+  }
+}
+
+/**
+ * 启动时间轴播放循环。
+ */
+const startTimelinePlayback = () => {
+  const start = taskStartMs.value
+  const end = taskEndMs.value
+  if (!start || !end || end <= start) return
+
+  if (currentTimeMs.value >= end) {
+    currentTimeMs.value = start
+  }
+
+  isTimelinePlaying.value = true
+  lastPlaybackFrameMs = performance.now()
+
+  const tick = (now: number) => {
+    if (!isTimelinePlaying.value) return
+
+    const delta = now - lastPlaybackFrameMs
+    lastPlaybackFrameMs = now
+    const next = currentTimeMs.value + delta * playbackSpeed.value
+
+    if (next >= end) {
+      currentTimeMs.value = end
+      stopTimelinePlayback()
+      return
+    }
+
+    currentTimeMs.value = next
+    playbackRafId = requestAnimationFrame(tick)
+  }
+
+  playbackRafId = requestAnimationFrame(tick)
+}
+
+/**
+ * 切换时间轴播放/暂停。
+ */
+const handleToggleTimelinePlay = () => {
+  if (isTimelinePlaying.value) {
+    stopTimelinePlayback()
+    return
+  }
+  startTimelinePlayback()
+}
+
+/**
+ * 更新时间轴播放倍速。
+ *
+ * @param speed 播放倍速
+ */
+const handlePlaybackSpeedChange = (speed: number) => {
+  playbackSpeed.value = speed
+}
+
+/**
+ * 处理选中目标时的播放暂停逻辑。
+ *
+ * @param hadSelection 选中前是否已有卫星/武器选中
+ * @param hasNewSelection 是否正在选中新目标
+ */
+const handleSelectionPlayback = (hadSelection: boolean, hasNewSelection: boolean) => {
+  if (hasNewSelection && !hadSelection) {
+    wasPlayingBeforeSelection = isTimelinePlaying.value
+    if (isTimelinePlaying.value) {
+      stopTimelinePlayback()
+    }
+    return
+  }
+  if (hasNewSelection && isTimelinePlaying.value) {
+    stopTimelinePlayback()
+  }
 }
 
 /**
@@ -132,9 +301,70 @@ const handleTimelineTimeChange = (ms: number) => {
  *
  * @param norad 卫星 NORAD；null 表示取消
  */
-const handleSelectSatellite = (norad: number | null) => {
+const handleSelectSatellite = async (norad: number | null) => {
+  const previousNorad = selectedNorad.value
+  const hadSelection = previousNorad != null || selectedWeaponId.value != null
+
+  if (norad != null && previousNorad === norad) {
+    selectedNorad.value = null
+    store.setSelectedAnalysisNorad(null)
+    await nextTick()
+    selectedNorad.value = norad
+    store.setSelectedAnalysisNorad(norad)
+    return
+  }
+
+  if (norad != null) {
+    handleSelectionPlayback(hadSelection, true)
+    selectedWeaponId.value = null
+  }
+
   selectedNorad.value = norad
   store.setSelectedAnalysisNorad(norad)
+}
+
+/**
+ * 选中武器并定位地球。
+ *
+ * @param weaponId 武器 ID
+ */
+const handleSelectWeapon = (weaponId: string | null) => {
+  if (!weaponId) return
+
+  const hadSelection = selectedNorad.value != null || selectedWeaponId.value != null
+  if (selectedWeaponId.value === weaponId) return
+
+  handleSelectionPlayback(hadSelection, true)
+  selectedNorad.value = null
+  store.setSelectedAnalysisNorad(null)
+  selectedWeaponId.value = weaponId
+}
+
+/**
+ * 清除选中卫星并恢复战场初始俯视视角。
+ */
+const handleClearSelectedSatellite = () => {
+  selectedNorad.value = null
+  store.setSelectedAnalysisNorad(null)
+  globeRef.value?.restoreOverviewView()
+
+  if (wasPlayingBeforeSelection) {
+    wasPlayingBeforeSelection = false
+    startTimelinePlayback()
+  }
+}
+
+/**
+ * 清除选中武器并恢复战场初始俯视视角。
+ */
+const handleClearSelectedWeapon = () => {
+  selectedWeaponId.value = null
+  globeRef.value?.restoreOverviewView()
+
+  if (wasPlayingBeforeSelection) {
+    wasPlayingBeforeSelection = false
+    startTimelinePlayback()
+  }
 }
 
 /** 矩阵加载序号，用于丢弃过期响应 */
@@ -164,6 +394,7 @@ const loadMatrixForCurrentScope = async () => {
   if (!taskId) {
     store.clearMatrixData()
     selectedNorad.value = null
+    selectedWeaponId.value = null
     store.setSelectedAnalysisNorad(null)
     return
   }
@@ -173,6 +404,7 @@ const loadMatrixForCurrentScope = async () => {
     const data = await store.fetchMatrixForCurrentScope()
     if (loadToken !== matrixLoadToken) return
     selectedNorad.value = null
+    selectedWeaponId.value = null
     store.setSelectedAnalysisNorad(null)
     if (!data) {
       console.warn('当前系列矩阵加载失败')
@@ -186,10 +418,17 @@ const loadMatrixForCurrentScope = async () => {
 watch(
   taskTimeRange,
   (range) => {
+    stopTimelinePlayback()
+    wasPlayingBeforeSelection = false
+    selectedWeaponId.value = null
     currentTimeMs.value = range ? parseTaskTimeMs(range.start) : 0
   },
   { immediate: true }
 )
+
+onBeforeUnmount(() => {
+  stopTimelinePlayback()
+})
 
 /** 系列/任务变化时重新加载矩阵 */
 watch(
@@ -259,6 +498,68 @@ onActivated(() => {
     z-index: 1;
     overflow: hidden;
     background: #020617;
+  }
+
+  .globe-selected-bar {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 12;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(520px, calc(100% - 32px));
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: rgba(8, 20, 36, 0.88);
+    border: 1px solid rgba(0, 225, 255, 0.35);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    pointer-events: auto;
+  }
+
+  .globe-selected-label {
+    font-size: 13px;
+    color: #94a3b8;
+    white-space: nowrap;
+  }
+
+  .globe-selected-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fbbf24;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .globe-selected-bar--weapon {
+    border-color: rgba(248, 113, 113, 0.45);
+  }
+
+  .globe-selected-name--weapon {
+    color: #f87171;
+  }
+
+  .globe-clear-btn {
+    flex-shrink: 0;
+    height: 26px;
+    padding: 0 12px;
+    border-radius: 4px;
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    background: rgba(248, 113, 113, 0.12);
+    color: #fca5a5;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(248, 113, 113, 0.24);
+      color: #ffffff;
+      border-color: #f87171;
+    }
   }
 
   .floating-panel {

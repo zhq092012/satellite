@@ -6,12 +6,44 @@
 
 <script setup lang="ts">
 import * as Cesium from 'cesium'
-import { markBattleArea } from '@/utils/tools/functionTool'
+import { markBattleArea, resolveBattleSpaceLabelPosition } from '@/utils/tools/functionTool'
 import { useLayoutStore } from '@/store/modules/layout'
-import { onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useBattleGlobeSatellites } from '@/composables/useBattleGlobeSatellites'
+import { useBattleGlobeWeapons } from '@/composables/useBattleGlobeWeapons'
+import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
+import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
+import { computed, onActivated, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
 /** 地图瓦片服务地址 */
 const MATERIAL_URL = import.meta.env.VITE_MATERIAL_URL
+
+const props = withDefaults(
+  defineProps<{
+    /** 任务分析卫星列表（含 TLE） */
+    satellites?: BattleGlobeSatellite[]
+    /** 当前推演时刻（毫秒） */
+    currentTimeMs?: number
+    /** 当前选中卫星 NORAD */
+    selectedNorad?: number | null
+    /** 武器列表 */
+    weapons?: BattleGlobeWeapon[]
+    /** 当前选中武器 ID */
+    selectedWeaponId?: string | null
+    /** 任务开始时间（毫秒） */
+    taskStartMs?: number
+    /** 任务结束时间（毫秒） */
+    taskEndMs?: number
+  }>(),
+  {
+    satellites: () => [],
+    currentTimeMs: 0,
+    selectedNorad: null,
+    weapons: () => [],
+    selectedWeaponId: null,
+    taskStartMs: 0,
+    taskEndMs: 0,
+  }
+)
 
 /** 全局布局 Store */
 const store = useLayoutStore()
@@ -22,11 +54,26 @@ const cesiumContainer = ref<HTMLElement | null>(null)
 const creditEl = ref<HTMLElement | null>(null)
 
 /** Cesium Viewer 实例 */
-let viewer: Cesium.Viewer | null = null
+const viewerRef = shallowRef<Cesium.Viewer | null>(null)
 /** 容器尺寸监听 */
 let resizeObserver: ResizeObserver | null = null
 /** 初始化互斥锁 */
 let viewerInitializing = false
+
+/** 卫星渲染逻辑 */
+useBattleGlobeSatellites(
+  viewerRef,
+  computed(() => props.satellites),
+  computed(() => props.currentTimeMs),
+  computed(() => props.selectedNorad)
+)
+
+/** 武器渲染逻辑 */
+useBattleGlobeWeapons(
+  viewerRef,
+  computed(() => props.weapons),
+  computed(() => props.selectedWeaponId)
+)
 
 /**
  * 判断容器是否具备有效尺寸。
@@ -43,6 +90,7 @@ const hasValidContainerSize = (el: HTMLElement | null): boolean => {
  * 同步 Viewer 渲染循环与容器尺寸。
  */
 const syncViewerRenderLoop = () => {
+  const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed() || !cesiumContainer.value) return
   const canRender = hasValidContainerSize(cesiumContainer.value)
   viewer.useDefaultRenderLoop = canRender
@@ -53,9 +101,33 @@ const syncViewerRenderLoop = () => {
 }
 
 /**
+ * 同步 Cesium 时钟到任务时间范围与当前推演时刻。
+ */
+const syncViewerClock = () => {
+  const viewer = viewerRef.value
+  if (!viewer || viewer.isDestroyed()) return
+
+  const startMs = props.taskStartMs || 0
+  const endMs = props.taskEndMs || 0
+  if (!startMs || !endMs || endMs <= startMs) return
+
+  const start = Cesium.JulianDate.fromDate(new Date(startMs))
+  const stop = Cesium.JulianDate.fromDate(new Date(endMs))
+  const current = Cesium.JulianDate.fromDate(new Date(props.currentTimeMs || startMs))
+
+  viewer.clock.startTime = start.clone()
+  viewer.clock.stopTime = stop.clone()
+  viewer.clock.currentTime = current.clone()
+  viewer.clock.clockRange = Cesium.ClockRange.CLAMPED
+  viewer.clock.shouldAnimate = false
+  viewer.clock.multiplier = 1
+}
+
+/**
  * 飞到默认地球视角（无场景区域或区域无效时使用）。
  */
 const flyToDefaultEarthView = () => {
+  const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed()) return
   viewer.camera.flyTo({
     destination: Cesium.Cartesian3.fromDegrees(120, 24, 18000000),
@@ -64,9 +136,57 @@ const flyToDefaultEarthView = () => {
 }
 
 /**
+ * 恢复战场初始俯视视角（清除卫星选中后使用）。
+ */
+const restoreOverviewView = () => {
+  const viewer = viewerRef.value
+  if (!viewer || viewer.isDestroyed()) return
+
+  viewer.camera.cancelFlight()
+  const destination = store.battleCenterCartensian
+  const orientation = store.battleCenterOritentation
+
+  if (destination) {
+    viewer.camera.flyTo({
+      destination,
+      orientation: orientation
+        ? {
+            heading: orientation.heading,
+            pitch: orientation.pitch,
+            roll: orientation.roll,
+          }
+        : {
+            heading: 0,
+            pitch: -Cesium.Math.toRadians(90),
+            roll: 0,
+          },
+      duration: 1.2,
+    })
+    viewer.scene.requestRender()
+    return
+  }
+
+  if (store.battle) {
+    markBattleArea(viewer, store.battle)
+    viewer.scene.requestRender()
+    return
+  }
+
+  flyToDefaultEarthView()
+}
+
+defineExpose({
+  restoreOverviewView,
+})
+
+/**
  * 移除场景名称标注实体。
  */
 const clearBattleLabel = () => {
+  battleLabelAnimRemover?.()
+  battleLabelAnimRemover = null
+
+  const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed()) return
   const labelEntity = viewer.entities.getById('battle-area-label')
   if (labelEntity) {
@@ -74,28 +194,43 @@ const clearBattleLabel = () => {
   }
 }
 
+/** 战场名称漂浮动画监听移除函数（保留清理钩子） */
+let battleLabelAnimRemover: (() => void) | null = null
+
 /**
- * 在场景区域中心添加名称标注。
+ * 在战场区域北侧外部添加贴地名称标注（如「台湾战场2」）。
  */
 const renderBattleLabel = () => {
+  const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed() || !store.battle?.name) return
-  const center = store.battleCenterCartensian
-  if (!center) return
+
+  const labelPosition = resolveBattleSpaceLabelPosition(store.battle, store.battleCenterCartensian)
+  if (!labelPosition) return
+
+  const cartographic = Cesium.Cartographic.fromCartesian(labelPosition)
+  if (
+    !Number.isFinite(cartographic.longitude) ||
+    !Number.isFinite(cartographic.latitude) ||
+    !Number.isFinite(cartographic.height)
+  ) {
+    return
+  }
 
   clearBattleLabel()
   viewer.entities.add({
     id: 'battle-area-label',
-    position: center,
+    position: labelPosition,
     label: {
       text: store.battle.name,
-      font: '14px sans-serif',
-      fillColor: Cesium.Color.CYAN,
-      outlineColor: Cesium.Color.BLACK,
+      font: 'bold 14px "Microsoft YaHei", sans-serif',
+      fillColor: Cesium.Color.fromCssColorString('#ff3333'),
+      outlineColor: Cesium.Color.fromCssColorString('#1a0000'),
       outlineWidth: 2,
       style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
       verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-      pixelOffset: new Cesium.Cartesian2(0, -12),
-      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      pixelOffset: new Cesium.Cartesian2(0, -4),
     },
   })
 }
@@ -104,18 +239,22 @@ const renderBattleLabel = () => {
  * 根据当前场景绘制区域并调整视角。
  */
 const renderBattleArea = () => {
+  const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed()) return
 
-  clearBattleLabel()
-
-  if (store.battle) {
-    markBattleArea(viewer, store.battle)
-    if (store.battleCenterCartensian) {
+  try {
+    if (store.battle) {
+      markBattleArea(viewer, store.battle)
       renderBattleLabel()
+      if (!store.battleCenterCartensian && !resolveBattleSpaceLabelPosition(store.battle)) {
+        flyToDefaultEarthView()
+      }
     } else {
+      clearBattleLabel()
       flyToDefaultEarthView()
     }
-  } else {
+  } catch (error) {
+    console.error('渲染战场区域失败:', error)
     flyToDefaultEarthView()
   }
 
@@ -123,15 +262,15 @@ const renderBattleArea = () => {
 }
 
 /**
- * 初始化 Cesium Viewer（仅地球底图 + 场景区域标记，不加载卫星业务）。
+ * 初始化 Cesium Viewer（地球底图 + 场景区域 + 卫星 Point 渲染）。
  */
 const initViewer = async () => {
-  if ((viewer && !viewer.isDestroyed()) || viewerInitializing || !cesiumContainer.value) return
+  if ((viewerRef.value && !viewerRef.value.isDestroyed()) || viewerInitializing || !cesiumContainer.value) return
   if (!hasValidContainerSize(cesiumContainer.value)) return
 
   viewerInitializing = true
   try {
-    viewer = new Cesium.Viewer(cesiumContainer.value, {
+    const viewer = new Cesium.Viewer(cesiumContainer.value, {
       scene3DOnly: true,
       geocoder: false,
       homeButton: false,
@@ -157,16 +296,21 @@ const initViewer = async () => {
       })
     )
     viewer.scene.globe.depthTestAgainstTerrain = false
+    viewer.scene.globe.showSkirts = false
+    viewer.scene.fog.enabled = false
+
+    viewerRef.value = viewer
 
     resizeObserver = new ResizeObserver(() => {
       syncViewerRenderLoop()
-      if (!viewer && cesiumContainer.value && hasValidContainerSize(cesiumContainer.value)) {
+      if (!viewerRef.value && cesiumContainer.value && hasValidContainerSize(cesiumContainer.value)) {
         void initViewer()
       }
     })
     resizeObserver.observe(cesiumContainer.value)
 
     syncViewerRenderLoop()
+    syncViewerClock()
     renderBattleArea()
   } finally {
     viewerInitializing = false
@@ -178,10 +322,11 @@ const initViewer = async () => {
  */
 const refreshAfterActivate = () => {
   syncViewerRenderLoop()
-  if (!viewer || viewer.isDestroyed()) {
+  if (!viewerRef.value || viewerRef.value.isDestroyed()) {
     void initViewer()
     return
   }
+  syncViewerClock()
   renderBattleArea()
 }
 
@@ -207,13 +352,36 @@ watch(
   }
 )
 
+watch(
+  () => store.battle?.name,
+  () => {
+    renderBattleLabel()
+  }
+)
+
+watch(
+  () => store.battleCenterCartensian,
+  () => {
+    renderBattleLabel()
+  }
+)
+
+watch(
+  () => [props.currentTimeMs, props.taskStartMs, props.taskEndMs] as const,
+  () => {
+    syncViewerClock()
+    viewerRef.value?.scene.requestRender()
+  }
+)
+
 onBeforeUnmount(() => {
+  clearBattleLabel()
   resizeObserver?.disconnect()
   resizeObserver = null
-  if (viewer && !viewer.isDestroyed()) {
-    viewer.destroy()
+  if (viewerRef.value && !viewerRef.value.isDestroyed()) {
+    viewerRef.value.destroy()
   }
-  viewer = null
+  viewerRef.value = null
 })
 </script>
 

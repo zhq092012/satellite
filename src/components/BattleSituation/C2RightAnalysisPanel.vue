@@ -93,7 +93,11 @@
           <el-table-column label="卫星" width="98" class-name="sat-name-column">
             <template #default="{ row }">
               <el-tooltip :content="row.name" placement="left" :show-after="200">
-                <span class="sat-name-wrap">{{ row.name }}</span>
+                <button type="button" class="sat-name-wrap"
+                  :class="{ 'sat-name-wrap--selected': selectedNorad === row.norad }"
+                  @click="emit('select-satellite', row.norad)">
+                  {{ row.name }}
+                </button>
               </el-tooltip>
             </template>
           </el-table-column>
@@ -189,7 +193,12 @@
 
             <el-table-column label="武器" min-width="0" show-overflow-tooltip>
               <template #default="{ row }">
-                <span class="plan-weapon-text">{{ row.weaponName }}</span>
+                <span v-if="row.weaponId" class="plan-weapon-text plan-weapon-text--clickable"
+                  :class="{ 'plan-weapon-text--selected': selectedWeaponId === row.weaponId }"
+                  @click="emit('select-weapon', row.weaponId)">
+                  {{ row.weaponName }}
+                </span>
+                <span v-else class="plan-weapon-text">{{ row.weaponName }}</span>
               </template>
             </el-table-column>
 
@@ -336,6 +345,16 @@ const props = defineProps<{
   algorithmComplete: boolean
   /** 分析结果是否正在加载 */
   analysisLoading?: boolean
+  /** 当前选中的卫星 NORAD */
+  selectedNorad?: number | null
+  /** 当前选中的武器 ID */
+  selectedWeaponId?: string | null
+}>()
+
+/** 选中右侧卫星/武器时通知父组件定位地球 */
+const emit = defineEmits<{
+  (e: 'select-satellite', norad: number): void
+  (e: 'select-weapon', weaponId: string): void
 }>()
 
 /**
@@ -654,13 +673,27 @@ const displayedLinkChainTableRows = computed(() => {
 
 .sat-name-wrap {
   display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
   font-size: 11px;
   line-height: 1.4;
   color: #e2efff;
   word-break: break-all;
   white-space: normal;
   text-align: left;
-  cursor: default;
+  cursor: pointer;
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+
+  &:hover {
+    color: #7dd3fc;
+  }
+
+  &--selected {
+    color: #fbbf24;
+    text-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
+  }
 }
 
 .table-more-actions {
@@ -817,6 +850,21 @@ const displayedLinkChainTableRows = computed(() => {
   white-space: normal;
   line-height: 1.35;
   overflow: hidden;
+}
+
+.plan-weapon-text--clickable {
+  cursor: pointer;
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+
+  &:hover {
+    color: #fde68a;
+    text-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
+  }
+}
+
+.plan-weapon-text--selected {
+  color: #f87171;
+  text-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
 }
 
 .plan-time-text {

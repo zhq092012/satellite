@@ -163,6 +163,171 @@ export function buildSegmentedTrack(
 
   return { track: property, segments: segmentCartesians, segmentRanges }
 }
+/** 战场名称离地高度（米），配合 CLAMP_TO_GROUND 紧贴地表显示 */
+const BATTLE_SPACE_LABEL_ALTITUDE_M = 50
+
+/** 战场名称标签与区域边界的最小间距（度） */
+const BATTLE_LABEL_BOUNDS_MARGIN_DEG = 0.08
+
+/**
+ * 从战场区域 JSON 解析地理中心点。
+ *
+ * @param battle 战场表单
+ * @returns 经纬度中心；无法解析时返回 null
+ */
+/**
+ * 从多边形坐标项中解析经纬度。
+ *
+ * @param point 坐标项（数组或 {lon,lat} 对象）
+ * @returns 经纬度或 null
+ */
+const parseLonLatPoint = (point: unknown): { lon: number; lat: number } | null => {
+  if (Array.isArray(point) && point.length >= 2) {
+    const lon = Number(point[0])
+    const lat = Number(point[1])
+    if (Number.isFinite(lon) && Number.isFinite(lat)) return { lon, lat }
+  }
+  if (point && typeof point === 'object') {
+    const record = point as { lon?: number; lng?: number; lat?: number }
+    const lon = typeof record.lon === 'number' ? record.lon : typeof record.lng === 'number' ? record.lng : NaN
+    const lat = typeof record.lat === 'number' ? record.lat : NaN
+    if (Number.isFinite(lon) && Number.isFinite(lat)) return { lon, lat }
+  }
+  return null
+}
+
+export function resolveBattleGeoCenter(battle: BattleForm | null): { lon: number; lat: number } | null {
+  if (!battle) return null
+
+  if (battle.createAreaMode === '多边形' && battle.area) {
+    try {
+      const polygons = JSON.parse(battle.area) as { lonlats?: unknown[] }[]
+      const coords = polygons.flatMap((polygon) => polygon.lonlats || []).map(parseLonLatPoint).filter(Boolean) as {
+        lon: number
+        lat: number
+      }[]
+      if (coords.length) {
+        const lon = coords.reduce((sum, point) => sum + point.lon, 0) / coords.length
+        const lat = coords.reduce((sum, point) => sum + point.lat, 0) / coords.length
+        if (Number.isFinite(lon) && Number.isFinite(lat)) return { lon, lat }
+      }
+    } catch {
+      // ignore parse error
+    }
+  }
+
+  if (battle.circleJSON) {
+    try {
+      const circles = JSON.parse(battle.circleJSON) as { center?: unknown }[]
+      const center = parseLonLatPoint(circles[0]?.center)
+      if (center) return center
+    } catch {
+      // ignore parse error
+    }
+  }
+
+  return null
+}
+
+/**
+ * 收集战场区域全部经纬度坐标点。
+ *
+ * @param battle 战场表单
+ * @returns 区域坐标列表
+ */
+function collectBattleGeoCoords(battle: BattleForm | null): { lon: number; lat: number }[] {
+  const coords: { lon: number; lat: number }[] = []
+  if (!battle) return coords
+
+  if (battle.createAreaMode === '多边形' && battle.area) {
+    try {
+      const polygons = JSON.parse(battle.area) as { lonlats?: unknown[] }[]
+      polygons
+        .flatMap((polygon) => polygon.lonlats || [])
+        .forEach((point) => {
+          const parsed = parseLonLatPoint(point)
+          if (parsed) coords.push(parsed)
+        })
+    } catch {
+      // ignore parse error
+    }
+  }
+
+  if (battle.circleJSON) {
+    try {
+      const circles = JSON.parse(battle.circleJSON) as { center?: unknown; radiusKm?: number }[]
+      circles.forEach((circle) => {
+        const center = parseLonLatPoint(circle.center)
+        const radiusKm = typeof circle.radiusKm === 'number' ? circle.radiusKm : 0
+        if (center && radiusKm > 0) {
+          const latOffset = radiusKm / 111
+          const lonOffset = radiusKm / (111 * Math.cos(Cesium.Math.toRadians(center.lat)))
+          coords.push({ lon: center.lon - lonOffset, lat: center.lat - latOffset })
+          coords.push({ lon: center.lon + lonOffset, lat: center.lat + latOffset })
+        } else if (center) {
+          coords.push(center)
+        }
+      })
+    } catch {
+      // ignore parse error
+    }
+  }
+
+  return coords
+}
+
+/**
+ * 计算战场名称标签锚点（置于区域北侧外部，避免遮挡多边形）。
+ *
+ * @param battle 战场表单
+ * @returns 标签经纬度锚点；无法解析时返回 null
+ */
+export function resolveBattleLabelGeoAnchor(battle: BattleForm | null): { lon: number; lat: number } | null {
+  const coords = collectBattleGeoCoords(battle)
+  if (!coords.length) return resolveBattleGeoCenter(battle)
+
+  let minLon = Infinity
+  let maxLon = -Infinity
+  let minLat = Infinity
+  let maxLat = -Infinity
+  coords.forEach(({ lon, lat }) => {
+    minLon = Math.min(minLon, lon)
+    maxLon = Math.max(maxLon, lon)
+    minLat = Math.min(minLat, lat)
+    maxLat = Math.max(maxLat, lat)
+  })
+
+  const centerLon = (minLon + maxLon) / 2
+  const latSpan = maxLat - minLat
+  const margin = Math.max(latSpan * 0.25, BATTLE_LABEL_BOUNDS_MARGIN_DEG)
+
+  return { lon: centerLon, lat: maxLat + margin }
+}
+
+/**
+ * 计算战场名称贴地标签的三维坐标。
+ *
+ * @param battle 战场表单
+ * @param fallbackCenter 已缓存的战场中心（可选，仅取经纬度）
+ * @returns 贴地标签坐标
+ */
+export function resolveBattleSpaceLabelPosition(
+  battle: BattleForm | null,
+  fallbackCenter?: Cesium.Cartesian3 | null
+): Cesium.Cartesian3 | null {
+  const anchor = resolveBattleLabelGeoAnchor(battle)
+  if (anchor) {
+    return Cesium.Cartesian3.fromDegrees(anchor.lon, anchor.lat, BATTLE_SPACE_LABEL_ALTITUDE_M)
+  }
+  if (fallbackCenter && Cesium.Cartesian3.magnitude(fallbackCenter) > 1) {
+    const carto = Cesium.Cartographic.fromCartesian(fallbackCenter)
+    if (Number.isFinite(carto.longitude) && Number.isFinite(carto.latitude)) {
+      return Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, BATTLE_SPACE_LABEL_ALTITUDE_M)
+    }
+  }
+  return null
+}
+
 // 标记战场
 export function markBattleArea(viewer: Cesium.Viewer, battle: BattleForm | null, orbit_altitude_km: number = 24000000) {
   if (!viewer || (viewer as any).isDestroyed?.() || battle === null) return

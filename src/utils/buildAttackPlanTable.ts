@@ -1,4 +1,5 @@
 import type { AttackPlan, SatelliteAnalysisData } from '@/api/task/task'
+import { buildBattleGlobeWeapons, resolveWeaponIdByName } from '@/utils/buildBattleGlobeWeapons'
 import { parseFeedbackTimestamp } from '@/utils/zhchPlanDisplay'
 
 /** 打击计划默认展示条数 */
@@ -14,6 +15,8 @@ export interface AttackPlanTableRow {
   targetType: string
   /** 武器名称 */
   weaponName: string
+  /** 武器 ID（用于地球定位） */
+  weaponId: string | null
   /** 打击开始时间 */
   beginTime: string
   /** 打击结束时间 */
@@ -31,7 +34,11 @@ export interface AttackPlanTableRow {
  * @param index 序号（用于生成唯一 id）
  * @returns 表格行
  */
-const toAttackPlanRow = (plan: AttackPlan, index: number): AttackPlanTableRow => {
+const toAttackPlanRow = (
+  plan: AttackPlan,
+  index: number,
+  weaponId: string | null
+): AttackPlanTableRow => {
   const beginTime = plan.beginTime || '--'
   const endTime = plan.endTime || '--'
   const parsedBeginMs = parseFeedbackTimestamp(plan.beginTime)
@@ -42,6 +49,7 @@ const toAttackPlanRow = (plan: AttackPlan, index: number): AttackPlanTableRow =>
     target: plan.target || '--',
     targetType: plan.targetType || '',
     weaponName: plan.weaponName || '--',
+    weaponId,
     beginTime,
     endTime,
     beginTimeMs: parsedBeginMs ?? Number.MAX_SAFE_INTEGER,
@@ -60,12 +68,13 @@ export const buildAttackPlanTableRows = (
 ): AttackPlanTableRow[] => {
   if (!data) return []
 
+  const globeWeapons = buildBattleGlobeWeapons(data)
   const rows: AttackPlanTableRow[] = []
   let index = 0
 
   ;(data.levelSeriesEntities || []).forEach((entity) => {
     ;(entity?.attackPlanList || []).forEach((plan) => {
-      rows.push(toAttackPlanRow(plan, index))
+      rows.push(toAttackPlanRow(plan, index, resolveWeaponIdByName(globeWeapons, plan.weaponName)))
       index += 1
     })
   })
