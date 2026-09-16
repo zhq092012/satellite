@@ -8,6 +8,8 @@ import {
 } from '@/api/electronic'
 import { type ChainNode } from '@/utils/satelliteFullChainAnalysis'
 import { prefetchSeriesTransmissionLinks } from '@/utils/prefetchTransmissionLinks'
+import { getTaskMatrix, type SatelliteAnalysisData } from '@/api/task/task'
+import { isTaskProgressComplete, taskProgressMap } from '@/composables/useTaskProgressPolling'
 import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import type { SatelliteDetail } from '@/types/cesium/satellite'
@@ -44,6 +46,12 @@ interface State {
 
   /** [全局共享] 四个 Tab 页共用的算法侦察/打击矩阵查询结果 */
   matrixData: MatrixResult | null
+  /** 当前任务算法分析结果（getTaskMatrix） */
+  taskAnalysisData: SatelliteAnalysisData | null
+  /** 任务算法分析结果加载状态 */
+  taskAnalysisLoading: boolean
+  /** 任务分析结果对应的任务 ID */
+  taskAnalysisTaskId: number | null
   /** [全局共享] 算法矩阵加载状态 */
   matrixLoading: boolean
   /** [全局共享] 算法矩阵当前查询条件 Key 缓存 */
@@ -148,6 +156,9 @@ export const useLayoutStore = defineStore('layout-store', {
       satelliteTotal: 0,
 
       matrixData: null,
+      taskAnalysisData: null,
+      taskAnalysisLoading: false,
+      taskAnalysisTaskId: null,
       matrixLoading: false,
       matrixQueryKey: '',
       matrixFetchToken: 0,
@@ -344,6 +355,62 @@ export const useLayoutStore = defineStore('layout-store', {
     clearMatrixData() {
       this.matrixData = null
       this.matrixQueryKey = ''
+    },
+    /**
+     * 判断指定任务的算法进度是否已全部完成。
+     * @param task 任务对象
+     */
+    isTaskAlgorithmComplete(task?: TaskForm | null): boolean {
+      if (!task?.id) return false
+      const progress = taskProgressMap[task.id] ?? task.algorithmProgressEntity
+      return isTaskProgressComplete(progress as Parameters<typeof isTaskProgressComplete>[0])
+    },
+    /**
+     * 清空当前任务算法分析结果缓存。
+     */
+    clearTaskAnalysisData() {
+      this.taskAnalysisData = null
+      this.taskAnalysisTaskId = null
+    },
+    /**
+     * 按任务 ID 拉取算法分析结果（getTaskMatrix）。
+     * 算法未完成时不会请求接口，并清空已有分析数据。
+     * @param force 是否强制重新请求
+     */
+    async fetchTaskAnalysis(force = false): Promise<SatelliteAnalysisData | null> {
+      const task = this.activedTask
+      const taskId = task?.id
+      if (!taskId) {
+        this.clearTaskAnalysisData()
+        return null
+      }
+
+      if (!this.isTaskAlgorithmComplete(task)) {
+        this.clearTaskAnalysisData()
+        return null
+      }
+
+      if (!force && this.taskAnalysisTaskId === taskId && this.taskAnalysisData) {
+        return this.taskAnalysisData
+      }
+
+      this.taskAnalysisLoading = true
+      try {
+        const res = await getTaskMatrix({ taskId: String(taskId) })
+        if (res.code === 200 && res.data) {
+          this.taskAnalysisData = res.data
+          this.taskAnalysisTaskId = taskId
+          return res.data
+        }
+        this.clearTaskAnalysisData()
+        return null
+      } catch (err) {
+        console.error('获取任务算法分析结果失败:', err)
+        this.clearTaskAnalysisData()
+        return null
+      } finally {
+        this.taskAnalysisLoading = false
+      }
     },
     /**
      * 生成当前矩阵查询范围 Key（任务 + 类型 + 系列）

@@ -4,9 +4,9 @@
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
         <el-tab-pane label="场景管理" name="battles" />
         <el-tab-pane label="卫星管理" name="satellites" />
-        <el-tab-pane label="武器管理" name="weapons" />
         <el-tab-pane label="地面站管理" name="ground-stations" />
         <el-tab-pane label="数据中心管理" name="data-centers" />
+        <el-tab-pane label="武器管理" name="weapons" />
         <el-tab-pane label="用户管理" name="users" />
         <el-tab-pane label="角色管理" name="roles" />
         <el-tab-pane label="菜单管理" name="menus" />

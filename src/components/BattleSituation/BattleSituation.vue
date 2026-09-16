@@ -23,8 +23,8 @@
     <!-- 3. 悬浮右侧分析面板 -->
     <div class="floating-panel floating-panel--right" :class="{ 'is-collapsed': isRightCollapsed }">
       <div class="panel-inner">
-        <C2RightAnalysisPanel :matrix-data="matrixData" :selected-satellite-norad="selectedNorad"
-          @clear-satellite-selection="handleSelectSatellite(null)" @select-satellite="handleSelectSatellite" />
+        <C2RightAnalysisPanel :analysis-data="taskAnalysisData" :algorithm-complete="algorithmComplete"
+          :analysis-loading="taskAnalysisLoading" />
       </div>
       <button type="button" class="toggle-btn toggle-btn--right" :title="isRightCollapsed ? '展开右侧面板' : '收起右侧面板'"
         @click="isRightCollapsed = !isRightCollapsed">
@@ -65,6 +65,7 @@ import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
 import BattleGlobeTimeline from '@/components/BattleSituation/BattleGlobeTimeline.vue'
 import BattleSituationGlobe from '@/components/BattleSituation/BattleSituationGlobe.vue'
+import { taskProgressMap } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
@@ -88,6 +89,15 @@ const currentTimeMs = ref(0)
 
 /** 算法矩阵数据 */
 const matrixData = computed<MatrixResult | null>(() => store.matrixData)
+
+/** 任务算法分析结果 */
+const taskAnalysisData = computed(() => store.taskAnalysisData)
+
+/** 任务分析结果加载状态 */
+const taskAnalysisLoading = computed(() => store.taskAnalysisLoading)
+
+/** 当前任务算法是否已完成 */
+const algorithmComplete = computed(() => store.isTaskAlgorithmComplete(store.activedTask))
 
 /** 当前任务时间范围 */
 const taskTimeRange = computed(() => {
@@ -129,6 +139,22 @@ const handleSelectSatellite = (norad: number | null) => {
 
 /** 矩阵加载序号，用于丢弃过期响应 */
 let matrixLoadToken = 0
+
+/** 任务分析加载序号，用于丢弃过期响应 */
+let taskAnalysisLoadToken = 0
+
+/**
+ * 按当前任务算法进度拉取分析结果。
+ */
+const loadTaskAnalysis = async () => {
+  const loadToken = ++taskAnalysisLoadToken
+  try {
+    await store.fetchTaskAnalysis()
+    if (loadToken !== taskAnalysisLoadToken) return
+  } catch (err) {
+    console.error('获取任务算法分析结果失败:', err)
+  }
+}
 
 /**
  * 按当前系列筛选范围加载矩阵数据。
@@ -177,8 +203,28 @@ watch(
 watch(
   () => store.activedTask?.id,
   (taskId, prevTaskId) => {
-    if (!taskId || taskId === prevTaskId) return
+    if (!taskId) {
+      store.clearTaskAnalysisData()
+      return
+    }
+    if (taskId === prevTaskId) return
     void loadMatrixForCurrentScope()
+    void loadTaskAnalysis()
+  },
+  { immediate: true }
+)
+
+/** 算法进度完成后自动拉取分析结果 */
+watch(
+  () => {
+    const taskId = store.activedTask?.id
+    if (!taskId) return ''
+    const progress = taskProgressMap[taskId] ?? store.activedTask?.algorithmProgressEntity
+    return `${taskId}:${progress?.totalStatus}:${progress?.transitStatus}:${progress?.threatAndStrikeStatus}`
+  },
+  () => {
+    if (!algorithmComplete.value) return
+    void loadTaskAnalysis()
   }
 )
 
@@ -189,13 +235,16 @@ onActivated(() => {
   if (!store.matrixData) {
     void loadMatrixForCurrentScope()
   }
+  if (!store.taskAnalysisData && algorithmComplete.value) {
+    void loadTaskAnalysis()
+  }
 })
 </script>
 
 <style lang="scss" scoped>
 .battle-situation-container {
   --c2-left-panel-width: 440px;
-  --c2-right-panel-width: 450px;
+  --c2-right-panel-width: 500px;
   --c2-timeline-side-gap: 24px;
 
   position: relative;

@@ -16,8 +16,8 @@ export interface TaskProgressInfo {
   mes?: string
 }
 
-/** 各任务 ID 对应的最新进度快照。 */
-const taskProgressMap = reactive<Record<number, TaskProgressInfo>>({})
+/** 各任务 ID 对应的最新进度快照（模块级共享，供态势页监听进度完成）。 */
+export const taskProgressMap = reactive<Record<number, TaskProgressInfo>>({})
 
 /** 各任务 ID 对应的轮询定时器。 */
 const taskProgressTimerMap = new Map<number, ReturnType<typeof setInterval>>()
