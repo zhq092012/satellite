@@ -128,6 +128,10 @@ const SATELLITE_TYPES = ['侦察', '通信'] as const
 const DEFAULT_ME_COUNTRIES = ['中国'] as const
 /** 新建任务默认蓝方国家 */
 const DEFAULT_ENEMY_COUNTRIES = ['美国'] as const
+/** 新建任务默认卫星类型（侦察、通信全选） */
+const DEFAULT_TARGET_TYPES = [...SATELLITE_TYPES] as string[]
+/** 新建任务默认时长（小时） */
+const DEFAULT_TASK_DURATION_HOURS = 8
 
 const props = defineProps<{
   /** 对话框是否可见。 */
@@ -328,7 +332,7 @@ const calcDurationHoursFromDates = (): number => {
 }
 
 /** 任务时长输入值；起止时间变化时自动重算。 */
-const durationHours = ref(1)
+const durationHours = ref(DEFAULT_TASK_DURATION_HOURS)
 
 /** 起止时间变动时，同步重算任务时长显示。 */
 watch(
@@ -473,18 +477,44 @@ const splitCsv = (value?: string): string[] =>
     .filter(Boolean)
 
 /**
+ * 获取新建任务默认开始时间（当天 08:00）。
+ *
+ * @returns `YYYY-MM-DD HH:mm` 格式时间
+ */
+const createDefaultBeginDate = (): string => {
+  const now = new Date()
+  const begin = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0, 0)
+  return formatDateToTaskTime(begin)
+}
+
+/**
+ * 根据开始时间与任务时长计算结束时间。
+ *
+ * @param beginDate 开始时间
+ * @param hours 任务时长（小时）
+ * @returns `YYYY-MM-DD HH:mm` 格式时间
+ */
+const createDefaultEndDate = (beginDate: string, hours: number): string => {
+  const beginMs = parseTaskTimeMs(beginDate)
+  if (!beginMs) return ''
+  return formatDateToTaskTime(new Date(beginMs + hours * 3600000))
+}
+
+/**
  * 重置为当前场景下的空白任务（添加模式）。
  */
 const resetCreateForm = () => {
+  const beginDate = createDefaultBeginDate()
+  const endDate = createDefaultEndDate(beginDate, DEFAULT_TASK_DURATION_HOURS)
   Object.assign(taskForm, {
     id: undefined,
     battleId: store.battle?.id ?? -1,
     name: '',
     description: '',
-    beginDate: '',
-    endDate: '',
-    targetType: '',
-    targetTypeShow: [],
+    beginDate,
+    endDate,
+    targetType: DEFAULT_TARGET_TYPES.join(','),
+    targetTypeShow: [...DEFAULT_TARGET_TYPES],
     meCountry: DEFAULT_ME_COUNTRIES.join(','),
     meCountryShow: [...DEFAULT_ME_COUNTRIES],
     enemyCountry: DEFAULT_ENEMY_COUNTRIES.join(','),
@@ -494,6 +524,7 @@ const resetCreateForm = () => {
     delayMin: DEFAULT_DELAY_MIN,
     coverage: DEFAULT_COVERAGE,
   })
+  durationHours.value = DEFAULT_TASK_DURATION_HOURS
 }
 
 /**

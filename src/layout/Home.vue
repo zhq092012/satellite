@@ -61,7 +61,7 @@ const menuTabs: MenuTabItem[] = [
   { key: '态势拓扑分析', name: '态势拓扑分析', icon: '🕸️', path: '/home/topo', component: ElectronicWarfareG6 },
   { key: '甘特图分析', name: '甘特图分析', icon: '📊', path: '/home/gantt', component: SatelliteGantt },
   { key: '打击窗口分析', name: '打击窗口分析', icon: '🎯', path: '/home/windows', component: WeaponAttackList },
-  { key: '打击方案生成', name: '打击方案生成', icon: '⚔️', path: '/home/strike-plan', component: StrikePlanGenerator },
+  { key: '打击方案管理', name: '打击方案管理', icon: '⚔️', path: '/home/strike-plan', component: StrikePlanGenerator },
 ]
 
 /** [变量说明] 路由 path → 分析页 Key */

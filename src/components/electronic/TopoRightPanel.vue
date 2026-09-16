@@ -23,7 +23,7 @@
     <template v-if="activeTab === 'priority'">
       <div v-if="!matrixData" class="empty-box">
         <span class="empty-icon">📡</span>
-        <p>暂无矩阵数据，请先选择任务与卫星系列</p>
+        <p>暂无分析数据，请先选择任务与卫星系列</p>
       </div>
 
       <div v-else-if="!top3PriorityLinks.length" class="empty-box">

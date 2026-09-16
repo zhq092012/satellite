@@ -5,10 +5,10 @@
       <div class="toolbar-header">
         <div class="toolbar-title">
           <span class="icon">🌐</span>
-          <span class="text">战场与作战任务统一管理</span>
+          <span class="text">场景与任务统一管理</span>
         </div>
         <div class="toolbar-actions">
-          <el-button type="primary" icon="Plus" round @click="handleCreateBattle"> 新建战场 </el-button>
+          <el-button type="primary" icon="Plus" round @click="handleCreateBattle"> 新建场景 </el-button>
           <el-button icon="Refresh" circle @click="loadBattleList" />
         </div>
       </div>
@@ -16,10 +16,10 @@
 
     <!-- 战场列表与所属任务列表 -->
     <div class="battle-list-box">
-      <el-empty v-if="battleList.length === 0" description="暂无战场数据，请点击右上角新建战场" />
+      <el-empty v-if="battleList.length === 0" description="暂无场景数据，请点击右上角新建场景" />
 
       <div v-for="battle in battleList" :key="battle.id" class="battle-card">
-        <!-- 战场卡片头部 -->
+        <!-- 场景卡片头部 -->
         <div class="battle-card-header" @click="toggleBattleExpand(battle.id)">
           <div class="header-left">
             <el-icon class="expand-icon" :class="{ 'is-expanded': isBattleExpanded(battle.id) }">
@@ -29,13 +29,17 @@
             <el-tag size="small" type="info" round class="battle-desc-tag">
               {{ battle.description || '无概述' }}
             </el-tag>
-          </div>
-          <div class="header-right" @click.stop>
-            <el-button type="primary" icon="Plus" size="small" plain round @click.stop="handleCreateTask(battle)">
+            <el-button type="primary" size="small" plain round class="create-task-btn" @click.stop="handleCreateTask(battle)">
               新建任务
             </el-button>
-            <el-button type="success" icon="Edit" size="small" circle @click.stop="handleEditBattle(battle)" />
-            <el-button type="danger" icon="Delete" size="small" circle @click.stop="handleDeleteBattle(battle.id)" />
+          </div>
+          <div class="header-right" @click.stop>
+            <el-button type="success" size="small" plain round @click.stop="handleEditBattle(battle)">
+              编辑场景
+            </el-button>
+            <el-button type="danger" size="small" plain round @click.stop="handleDeleteBattle(battle.id)">
+              删除场景
+            </el-button>
           </div>
         </div>
 
@@ -68,16 +72,14 @@
                   <span v-else class="text-muted">未开始或未获取</span>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="160" fixed="right" align="center">
+              <el-table-column label="操作" width="300" fixed="right" align="center">
                 <template #default="scope">
                   <div class="table-action-group">
-                    <el-button type="success" icon="Edit" size="small" plain round
-                      @click="handleEditTask(scope.row, battle)">
-                      修改
+                    <el-button type="success" size="small" plain round @click="handleEditTask(scope.row, battle)">
+                      查看任务
                     </el-button>
-                    <el-button type="danger" icon="Delete" size="small" plain round
-                      @click="handleDeleteTask(scope.row)">
-                      删除
+                    <el-button type="danger" size="small" plain round @click="handleDeleteTask(scope.row)">
+                      删除任务
                     </el-button>
                   </div>
                 </template>
@@ -88,14 +90,14 @@
       </div>
     </div>
 
-    <!-- 新建 / 编辑战场弹窗 -->
+    <!-- 新建 / 编辑场景弹窗 -->
     <el-dialog :title="battleDialogTitle" v-model="battleDialogVisible" width="680px">
       <el-form :model="battleForm" ref="battleFormRef" :rules="createBattleRules" label-width="110px">
-        <el-form-item label="战场名称" prop="name">
-          <el-input v-model="battleForm.name" placeholder="请输入战场名称" />
+        <el-form-item label="场景名称" prop="name">
+          <el-input v-model="battleForm.name" placeholder="请输入 场景名称" />
         </el-form-item>
-        <el-form-item label="战场概述" prop="description">
-          <el-input v-model="battleForm.description" type="textarea" placeholder="请输入战场概述" />
+        <el-form-item label="场景概述" prop="description">
+          <el-input v-model="battleForm.description" type="textarea" placeholder="请输入场景概述" />
         </el-form-item>
         <el-form-item label="" v-if="battleForm.createAreaMode === '多边形'">
           <el-button type="primary" @click="addPolygonArea" size="small"> 新增区域 </el-button>
@@ -123,91 +125,7 @@
       </template>
     </el-dialog>
 
-    <!-- 新建 / 编辑任务弹窗 -->
-    <el-dialog :title="taskDialogTitle" v-model="taskDialogVisible" width="1220px" class="task-manage-dialog">
-      <div class="section-dialog-title">作战任务属性</div>
-      <el-form :model="taskForm" ref="taskFormRef" :rules="createTaskRules" label-width="110px">
-        <el-form-item label="任务名称" prop="name">
-          <el-input v-model="taskForm.name" placeholder="请输入任务名称" />
-        </el-form-item>
-        <el-form-item label="任务概述" prop="description">
-          <el-input v-model="taskForm.description" type="textarea" placeholder="请输入任务概述" />
-        </el-form-item>
-
-        <el-form-item label="时间限制" prop="beginDate">
-          <el-date-picker v-model="taskDatePickValue" type="datetimerange" start-placeholder="开始时间"
-            end-placeholder="结束时间" value-format="YYYY-MM-DD HH:mm" format="YYYY-MM-DD HH:mm" />
-        </el-form-item>
-
-        <el-form-item label="红方" prop="meCountry">
-          <el-select v-model="taskForm.meCountryShow" multiple placeholder="请选择红方国家"
-            @change="taskForm.meCountry = taskForm.meCountryShow.join(',')">
-            <el-option v-for="item in taskCountrys" :key="item" :label="item" :value="item" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="蓝方" prop="enemyCountry">
-          <el-select v-model="taskForm.enemyCountryShow" multiple placeholder="请选择蓝方国家"
-            @change="taskForm.enemyCountry = taskForm.enemyCountryShow.join(',')">
-            <el-option v-for="item in taskCountrys" :key="item" :label="item" :value="item" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="设置关注">
-          <el-switch v-model="taskForm.focusStatus" :active-value="1" :inactive-value="0" />
-        </el-form-item>
-      </el-form>
-
-      <div class="section-dialog-title">作战阶段流程配置</div>
-      <div class="dialog-table-box">
-        <div class="table-nav">
-          <el-button type="primary" size="small" round @click="handleAddBattleSegment">新增作战阶段</el-button>
-        </div>
-        <el-table :data="tableData" style="width: 100%" border size="small">
-          <el-table-column type="index" label="序号" width="60" align="center" />
-          <el-table-column prop="name" label="阶段名称" width="160">
-            <template #default="scope">
-              <el-input v-model="scope.row.name" placeholder="阶段名称" style="width: 100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="startTime" label="开始时间" width="200">
-            <template #default="scope">
-              <el-date-picker v-model="scope.row.startTime" @change="validateStartTime(scope.row)" type="datetime"
-                placeholder="开始时间" format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DD HH:mm" style="width: 100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="endTime" label="结束时间" width="200">
-            <template #default="scope">
-              <el-date-picker v-model="scope.row.endTime" @change="validateEndTime(scope.row)" type="datetime"
-                placeholder="结束时间" format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DD HH:mm" style="width: 100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="sateType" label="卫星类型" min-width="220">
-            <template #default="scope">
-              <el-select v-model="scope.row.sateTypeShow" placeholder="选择类型" multiple style="width: 100%">
-                <el-option v-for="item in taskSateTypes" :key="item" :label="item" :value="item" />
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column prop="target" label="目标" min-width="180">
-            <template #default="scope">
-              <el-select v-model="scope.row.target" placeholder="选择目标" style="width: 100%">
-                <el-option v-for="item in targetOptions" :key="item" :label="item" :value="item" />
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="100" align="center">
-            <template #default="scope">
-              <el-button icon="Delete" type="danger" plain size="small" @click="handleRemoveSegment(scope.row)">
-                删除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-      <template #footer>
-        <el-button @click="resetTaskForm(taskFormRef)">取 消</el-button>
-        <el-button type="primary" @click="submitTaskForm(taskFormRef)">确 定</el-button>
-      </template>
-    </el-dialog>
+    <TaskEditDialog v-model="taskEditVisible" :is-edit="taskEditIsEdit" :task="editingTask" @saved="handleTaskSaved" />
 
     <!-- 战场区域地图绘制选择弹窗 -->
     <el-dialog title="战场区域选择" v-model="showPolygonMap" width="1100px">
@@ -226,29 +144,25 @@
 /**
  * 导入 Vue 核心 API 及 Element Plus 类型定义
  */
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import PolygonMap from '@/components/cesium/BattleArea.vue'
+import TaskEditDialog from '@/components/BattleSituation/TaskEditDialog.vue'
 
 /**
- * 导入后台仪表盘与战场/任务管理相关 API 函数与类型
+ * 导入后台仪表盘与场景/任务管理相关 API 函数与类型
  */
 import {
-  createTask,
   deleteBattle,
   deleteTask,
-  getBattleCountrys,
   getBattleList,
   getTaskList,
-  getTaskStageTargetOptions,
   saveBattle,
   updateBattle,
-  updateTask,
 } from '@/api/dashboard'
 import type { BattleForm, TaskForm } from '@/types/dashboard'
 import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
-import type { TaskSteps } from '@/types/cesium/satellite'
 
 /** Store 状态对象 */
 const store = useLayoutStore()
@@ -256,28 +170,24 @@ const store = useLayoutStore()
 /** 多边形绘制组件引用 */
 const polygonRef = ref<InstanceType<typeof PolygonMap> | null>(null)
 
-/** 战场与任务表单引用的 DOM 对象 */
+/** 场景表单引用的 DOM 对象 */
 const battleFormRef = ref<FormInstance>()
-const taskFormRef = ref<FormInstance>()
 
-/** 战场列表及卡片展开控制响应式变量 */
+/** 场景列表及卡片展开控制响应式变量 */
 const battleList = ref<BattleForm[]>([])
 const activeNames = ref<number[]>([])
 
-/** 国家/地区和阶段配置下拉数据源 */
-const taskCountrys = ref<string[]>([])
-/** 作战阶段可选卫星类型（与评估报告、杀伤链一致） */
-const taskSateTypes = ref<string[]>(['导弹预警', '侦察', '通信', '导航', '太空目标监视与攻防'])
-const targetOptions = ref<string[]>([])
-
 /** 弹窗状态及标题 */
-const battleDialogTitle = ref('新建战场')
+const battleDialogTitle = ref('新建场景')
 const battleDialogVisible = ref(false)
-const taskDialogTitle = ref('新建任务')
-const taskDialogVisible = ref(false)
 const showPolygonMap = ref(false)
 
-/** 战场表单绑定的数据结构 */
+/** 任务编辑弹窗（复用态势页 TaskEditDialog） */
+const taskEditVisible = ref(false)
+const taskEditIsEdit = ref(false)
+const editingTask = ref<TaskForm | null>(null)
+
+/** 场景表单绑定的数据结构 */
 const battleForm = reactive<BattleForm>({
   name: '',
   description: '',
@@ -289,52 +199,13 @@ const battleForm = reactive<BattleForm>({
   tasks: [],
 })
 
-/** 任务表单绑定的数据结构 */
-const taskForm = reactive<TaskForm>({
-  battleId: -1,
-  name: '',
-  description: '',
-  beginDate: '',
-  endDate: '',
-  targetType: '',
-  targetTypeShow: [],
-  meCountry: '',
-  meCountryShow: [],
-  enemyCountry: '',
-  enemyCountryShow: [],
-  steps: '',
-  focusStatus: 0,
-})
-
 /** 日期范围选择器的底层中转变量 */
 const battleDatePickValue = ref<[string, string]>(['2025-12-01 09:00', '2025-12-02 18:00'])
-const taskDatePickValue = ref<[string, string]>(['2025-12-01 09:00', '2025-12-02 18:00'])
 
-/** 作战阶段表单行接口定义 */
-type BattleSegmentRow = TaskSteps & {
-  autoGenerated?: boolean
-}
-
-/** 默认自动生成的阶段名称 */
-const autoBattleSegmentNames = ['集结', '突防', '进攻', '撤退']
-
-/** 作战阶段列表数据源及递增编号 */
-const tableData = ref<BattleSegmentRow[]>([])
-const minIdx = ref(0)
-
-/** 战场表单表单校验规则 */
+/** 场景表单校验规则 */
 const createBattleRules = reactive<FormRules<BattleForm>>({
   name: [{ required: true, message: '请输入战场名称', trigger: 'blur' }],
   description: [{ required: true, message: '请输入战场概述', trigger: 'blur' }],
-})
-
-/** 任务表单校验规则 */
-const createTaskRules = reactive<FormRules<TaskForm>>({
-  name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
-  description: [{ required: true, message: '请输入任务概述', trigger: 'blur' }],
-  meCountry: [{ required: true, message: '请选择红方国家', trigger: 'change' }],
-  enemyCountry: [{ required: true, message: '请选择蓝方国家', trigger: 'change' }],
-  beginDate: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
 })
 
 const {
@@ -390,211 +261,6 @@ watch(
 )
 
 /**
- * 监听 taskDatePickValue 变化并更新 taskForm 的起止日期
- */
-watch(taskDatePickValue, (newVal) => {
-  if (newVal) {
-    taskForm.beginDate = String(newVal[0])
-    taskForm.endDate = String(newVal[1])
-  }
-  if (taskForm.beginDate && taskForm.endDate) {
-    syncBattleSegmentsWithTaskTime()
-  } else {
-    clearAutoGeneratedBattleSegments()
-  }
-})
-
-/**
- * 验证阶段开始时间
- * @param row 行数据对象
- */
-const validateStartTime = (row: BattleSegmentRow) => {
-  if (row.endTime && new Date(row.startTime).getTime() >= new Date(row.endTime).getTime()) {
-    ElMessage.warning('开始时间必须早于结束时间')
-    row.startTime = ''
-  }
-  if (taskForm.beginDate && new Date(row.startTime).getTime() < new Date(taskForm.beginDate).getTime()) {
-    ElMessage.warning('开始时间必须在任务时间范围内')
-    row.startTime = ''
-  }
-}
-
-/**
- * 验证阶段结束时间
- * @param row 行数据对象
- */
-const validateEndTime = (row: BattleSegmentRow) => {
-  if (row.startTime && new Date(row.endTime).getTime() <= new Date(row.startTime).getTime()) {
-    ElMessage.warning('结束时间必须晚于开始时间')
-    row.endTime = ''
-  }
-  if (taskForm.endDate && new Date(row.endTime).getTime() > new Date(taskForm.endDate).getTime()) {
-    ElMessage.warning('结束时间必须在任务时间范围内')
-    row.endTime = ''
-  }
-}
-
-/**
- * 格式化日期对象为标准字符串
- * @param date 日期实例
- */
-const formatDateTime = (date: Date) => {
-  const pad = (num: number) => String(num).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(
-    date.getMinutes()
-  )}`
-}
-
-/**
- * 解析日期字符串
- * @param value 时间文本
- */
-const parseDateTime = (value: string) => {
-  if (!value) return null
-  const date = new Date(value.replace(/-/g, '/'))
-  return Number.isNaN(date.getTime()) ? null : date
-}
-
-/**
- * 按阶段划分时间段
- * @param beginTime 开始时间
- * @param endTime 结束时间
- * @param count 数量
- */
-const splitTaskTimeRange = (beginTime: string, endTime: string, count: number) => {
-  const beginDate = parseDateTime(beginTime)
-  const endDate = parseDateTime(endTime)
-  if (!beginDate || !endDate || count <= 0) return [] as Array<[string, string]>
-
-  const totalDuration = endDate.getTime() - beginDate.getTime()
-  const stepDuration = totalDuration / count
-
-  return Array.from({ length: count }, (_, index) => {
-    const start = new Date(beginDate.getTime() + stepDuration * index)
-    const end = index === count - 1 ? endDate : new Date(beginDate.getTime() + stepDuration * (index + 1))
-    return [formatDateTime(start), formatDateTime(end)] as [string, string]
-  })
-}
-
-/**
- * 平衡重新划定阶段的时间分配
- * @param segments 阶段集合
- */
-const rebalanceBattleSegments = (segments: BattleSegmentRow[]) => {
-  if (!taskForm.beginDate || !taskForm.endDate || !segments.length) return segments
-  const ranges = splitTaskTimeRange(taskForm.beginDate, taskForm.endDate, segments.length)
-  if (!ranges.length) return segments
-
-  return segments.map((segment, index) => ({
-    ...segment,
-    startTime: ranges[index]?.[0] ?? taskForm.beginDate,
-    endTime: ranges[index]?.[1] ?? taskForm.endDate,
-    autoGenerated: true,
-  }))
-}
-
-/** 清理自动生成的阶段 */
-const clearAutoGeneratedBattleSegments = () => {
-  tableData.value = tableData.value.filter((segment) => !segment.autoGenerated)
-}
-
-/** 判断是否有仅自动生成的阶段项 */
-const hasOnlyRebalanceableRows = () =>
-  tableData.value.length > 0 &&
-  tableData.value.every(
-    (segment) =>
-      segment.autoGenerated ||
-      (!segment.name &&
-        !segment.startTime &&
-        !segment.endTime &&
-        !segment.sateType &&
-        !segment.target &&
-        segment.sateTypeShow.length === 0)
-  )
-
-/**
- * 同步任务阶段时间
- */
-const syncBattleSegmentsWithTaskTime = () => {
-  if (!taskForm.beginDate || !taskForm.endDate) {
-    clearAutoGeneratedBattleSegments()
-    return
-  }
-
-  const hasOnlyEmptyManualRows =
-    tableData.value.length > 0 &&
-    tableData.value.every(
-      (segment) =>
-        !segment.autoGenerated &&
-        !segment.name &&
-        !segment.startTime &&
-        !segment.endTime &&
-        !segment.sateType &&
-        !segment.target &&
-        segment.sateTypeShow.length === 0
-    )
-
-  if (hasOnlyEmptyManualRows || !tableData.value.length) {
-    tableData.value = rebalanceBattleSegments(
-      autoBattleSegmentNames.map((name, index) => ({
-        id: index + 1,
-        name,
-        startTime: '',
-        endTime: '',
-        sateTypeShow: [],
-        sateType: '',
-        target: '',
-        autoGenerated: true,
-      }))
-    )
-    minIdx.value = autoBattleSegmentNames.length
-    return
-  }
-
-  if (hasOnlyRebalanceableRows()) {
-    tableData.value = rebalanceBattleSegments(
-      tableData.value.map((segment) => ({
-        ...segment,
-        autoGenerated: true,
-      }))
-    )
-  }
-}
-
-/** 新增作战阶段 */
-const handleAddBattleSegment = () => {
-  minIdx.value++
-  tableData.value.push({
-    id: minIdx.value,
-    name: '',
-    startTime: '',
-    endTime: '',
-    sateTypeShow: [],
-    sateType: '',
-    target: '',
-    autoGenerated: false,
-  })
-
-  if (taskForm.beginDate && taskForm.endDate && hasOnlyRebalanceableRows()) {
-    syncBattleSegmentsWithTaskTime()
-  }
-}
-
-/** 删除作战阶段 */
-const handleRemoveSegment = (row: BattleSegmentRow) => {
-  const idx = tableData.value.findIndex((s) => s.id === row.id)
-  if (idx < 0) return
-  const removedRow = tableData.value[idx]
-  tableData.value.splice(idx, 1)
-
-  if (removedRow?.autoGenerated && taskForm.beginDate && taskForm.endDate && tableData.value.length) {
-    if (tableData.value.length === 1 || tableData.value.every((segment) => segment.autoGenerated)) {
-      tableData.value = rebalanceBattleSegments(tableData.value)
-    }
-  }
-}
-
-/**
  * 多边形区域绘制操作方法
  */
 const chooseArea = (idx: number) => {
@@ -634,7 +300,7 @@ const loadBattleList = async () => {
   }
 }
 
-/** 打开新建战场弹窗 */
+/** 打开新建场景弹窗 */
 const handleCreateBattle = () => {
   battleForm.id = undefined
   battleForm.name = ''
@@ -645,7 +311,7 @@ const handleCreateBattle = () => {
   battleForm.dataRefreshRate = ''
   battleDatePickValue.value = ['', '']
   battleForm.tasks = []
-  battleDialogTitle.value = '新建战场'
+  battleDialogTitle.value = '新建场景'
   battleDialogVisible.value = true
   store.battleCircleMap.clear()
   store.battlePolygonMap.clear()
@@ -715,73 +381,62 @@ const submitBattleForm = async (formEl: FormInstance | undefined) => {
   })
 }
 
-/** 打开新建任务弹窗 */
-const handleCreateTask = async (battle: BattleForm) => {
-  store.setActivedBattle(battle)
-  if (battle.id) {
-    taskForm.battleId = battle.id
-    taskForm.id = undefined
-    taskForm.name = ''
-    taskForm.description = ''
-    taskForm.targetTypeShow = []
-    taskForm.meCountry = ''
-    taskForm.meCountryShow = []
-    taskForm.enemyCountry = ''
-    taskForm.enemyCountryShow = []
-    taskForm.beginDate = ''
-    taskForm.endDate = ''
-    taskDatePickValue.value = ['', '']
-    taskForm.targetType = ''
-    taskDialogTitle.value = '新建任务'
-    taskDialogVisible.value = true
-    minIdx.value = 0
-    tableData.value = []
+/**
+ * 刷新指定场景下的任务列表。
+ *
+ * @param battleId 场景 ID
+ */
+const refreshBattleTasks = async (battleId: number) => {
+  const res = await getTaskList(battleId)
+  if (res.code !== 200) return
+  await resumeTaskProgressPollingForTasks(res.data)
+  const battle = battleList.value.find((item) => item.id === battleId)
+  if (battle) {
+    battle.tasks = res.data
   }
 }
 
-/** 编辑任务 */
-const handleEditTask = async (task: TaskForm, battle: BattleForm) => {
-  Object.assign(taskForm, task)
-  if (task.beginDate && task.endDate) {
-    taskDatePickValue.value = [task.beginDate, task.endDate]
-  }
-  taskForm.meCountryShow = taskForm.meCountry?.split(',') || []
-  taskForm.enemyCountryShow = taskForm.enemyCountry?.split(',') || []
-  taskForm.targetTypeShow = taskForm.targetType?.split(',') || []
-
-  let jsonTable: TaskSteps[] = []
-  if (taskForm.steps) {
-    try {
-      jsonTable = JSON.parse(taskForm.steps) as TaskSteps[]
-    } catch {
-      jsonTable = []
-    }
-  }
-
-  if (jsonTable && jsonTable.length) {
-    const isDefaultFourSteps =
-      jsonTable.length === autoBattleSegmentNames.length &&
-      jsonTable.every((step, index) => step.name === autoBattleSegmentNames[index])
-
-    jsonTable.forEach((step) => {
-      step.sateTypeShow = step.sateType ? step.sateType.split(',') : []
-        ; (step as BattleSegmentRow).autoGenerated = jsonTable.length === 1 || isDefaultFourSteps
-    })
-
-    if (jsonTable.length === 1 && task.beginDate && task.endDate) {
-      jsonTable[0].startTime = task.beginDate
-      jsonTable[0].endTime = task.endDate
-    }
-  }
-
-  minIdx.value = jsonTable.reduce((max, step) => Math.max(max, Number(step.id) || 0), 0)
-  tableData.value = jsonTable
-  if (task.beginDate && task.endDate) {
-    syncBattleSegmentsWithTaskTime()
-  }
+/** 打开新建任务弹窗（复用 TaskEditDialog） */
+const handleCreateTask = (battle: BattleForm) => {
+  if (!battle.id) return
   store.setActivedBattle(battle)
-  taskDialogTitle.value = '修改任务'
-  taskDialogVisible.value = true
+  taskEditIsEdit.value = false
+  editingTask.value = null
+  taskEditVisible.value = true
+}
+
+/** 查看任务详情（编辑接口未开放，仅查看） */
+const handleEditTask = (task: TaskForm, battle: BattleForm) => {
+  store.setActivedBattle(battle)
+  taskEditIsEdit.value = true
+  editingTask.value = task
+  taskEditVisible.value = true
+}
+
+/**
+ * 任务保存成功后刷新场景任务列表，并为新建任务启动进度轮询。
+ *
+ * @param updated 保存后的任务数据
+ */
+const handleTaskSaved = async (updated: TaskForm) => {
+  const battleId = updated.battleId || store.battle?.id
+  const previousTaskIds = new Set(
+    battleList.value.flatMap((battle) => (battle.tasks || []).map((task) => task.id).filter(Boolean) as number[])
+  )
+  const isCreate = Boolean(updated.id && !previousTaskIds.has(updated.id))
+
+  await loadBattleList()
+
+  if (!battleId) return
+
+  if (!activeNames.value.includes(battleId)) {
+    activeNames.value.push(battleId)
+  }
+  await refreshBattleTasks(battleId)
+
+  if (isCreate && updated.id) {
+    await startTaskProgressPolling(updated.id)
+  }
 }
 
 /** 删除任务 */
@@ -802,98 +457,9 @@ const handleDeleteTask = (task: TaskForm) => {
   })
 }
 
-/** 重置任务表单 */
-const resetTaskForm = (formEl: FormInstance | undefined) => {
-  if (!formEl) return
-  formEl.resetFields()
-  taskDialogVisible.value = false
-}
-
-/** 构造提交任务的负载对象 */
-const buildTaskPayload = () => {
-  const steps = tableData.value.map((step) => ({
-    ...step,
-    sateType: step.sateTypeShow.join(','),
-  }))
-
-  return {
-    ...taskForm,
-    meCountry: taskForm.meCountryShow.join(','),
-    enemyCountry: taskForm.enemyCountryShow.join(','),
-    targetType: taskForm.targetTypeShow.join(','),
-    steps: JSON.stringify(steps),
-  } as TaskForm
-}
-
-/** 提交任务表单 */
-const submitTaskForm = async (formEl: FormInstance | undefined) => {
-  if (!formEl) return
-  await formEl.validate(async (valid) => {
-    if (valid) {
-      if (tableData.value && tableData.value.length) {
-        for (const step of tableData.value) {
-          if (!step.name.trim()) {
-            ElMessage.warning('作战阶段的名称不能为空')
-            return
-          }
-          if (!step.startTime) {
-            ElMessage.warning('作战阶段的开始时间不能为空')
-            return
-          }
-          if (!step.endTime) {
-            ElMessage.warning('作战阶段的结束时间不能为空')
-            return
-          }
-          if (step.sateTypeShow.length === 0) {
-            ElMessage.warning('作战阶段的卫星类型不能为空')
-            return
-          }
-        }
-      } else {
-        ElMessage.warning('请至少添加一个作战阶段')
-        return
-      }
-
-      const taskPayload = buildTaskPayload()
-      let res
-      if (taskForm.id) {
-        res = await updateTask(taskPayload)
-      } else {
-        res = await createTask(taskPayload)
-      }
-      if (res.code === 200) {
-        if (!taskForm.id && res.data) {
-          const newTaskId = Number(res.data)
-          await startTaskProgressPolling(newTaskId)
-        }
-        resetTaskForm(taskFormRef.value)
-        await loadBattleList()
-        ElMessage.success(taskForm.id ? '修改任务成功' : '新增任务成功')
-        taskDialogVisible.value = false
-      } else {
-        ElMessage.error(res.msg || '操作失败')
-      }
-    } else {
-      ElMessage.warning('请填写完整的任务信息')
-    }
-  })
-}
-
 /** 页面挂载时数据初始化 */
 onMounted(async () => {
   await loadBattleList()
-  try {
-    const countryRes = await getBattleCountrys()
-    if (countryRes.code === 200) {
-      taskCountrys.value = countryRes.data || []
-    }
-    const targetRes = await getTaskStageTargetOptions()
-    if (targetRes.code === 200) {
-      targetOptions.value = targetRes.data || []
-    }
-  } catch (err) {
-    console.error('初始化下拉选择失败', err)
-  }
 })
 </script>
 
@@ -993,15 +559,6 @@ onMounted(async () => {
   }
 }
 
-.section-dialog-title {
-  font-size: 14px;
-  font-weight: bold;
-  margin: 12px 0 16px;
-  padding-left: 8px;
-  border-left: 3px solid #00e1ff;
-  color: #7dd3fc;
-}
-
 .polygon-area-item {
   margin: 10px 0;
   padding: 12px;
@@ -1038,58 +595,6 @@ onMounted(async () => {
         flex: 1;
         min-width: 0;
       }
-    }
-  }
-}
-
-.dialog-table-box {
-  margin-top: 12px;
-
-  .table-nav {
-    margin-bottom: 8px;
-  }
-
-  :deep(.atlas-app-table) {
-    th.el-table__cell {
-      padding: 8px 6px;
-
-      .cell {
-        white-space: nowrap;
-        overflow: visible;
-        text-overflow: clip;
-      }
-    }
-
-    td.el-table__cell {
-      padding: 6px 6px;
-
-      .cell {
-        padding-left: 4px;
-        padding-right: 4px;
-        overflow: visible;
-      }
-    }
-
-    .el-input {
-      width: 100%;
-    }
-
-    .el-button {
-      white-space: nowrap;
-      margin-left: 0;
-      padding: 4px 10px;
-    }
-
-    .el-select {
-      width: 100%;
-    }
-
-    .el-date-editor {
-      width: 100% !important;
-    }
-
-    .el-tag {
-      white-space: nowrap;
     }
   }
 }

@@ -9,8 +9,8 @@
 
     <div v-if="!activeMatrix" class="empty-sat-box">
       <span class="empty-icon">📡</span>
-      <p class="empty-text">暂无矩阵数据</p>
-      <p class="empty-sub">请在左侧选择任务以加载态势分析</p>
+      <p class="empty-text">暂无分析结果</p>
+      <p class="empty-sub">请查看当前任务计算进度</p>
     </div>
 
     <template v-else>
@@ -297,10 +297,16 @@ const goGanttAnalysis = () => {
   box-sizing: border-box;
   background: rgba(8, 15, 26, 0.88);
   border: 1px solid rgba(0, 225, 255, 0.18);
-  border-radius: 10px;
+  border-radius: 0;
   backdrop-filter: blur(8px);
   color: #e2efff;
   overflow: hidden;
+
+  &--right {
+    border-right: none;
+    border-top: none;
+    border-bottom: none;
+  }
 }
 
 .panel-header {

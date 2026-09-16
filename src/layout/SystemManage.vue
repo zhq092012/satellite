@@ -2,15 +2,18 @@
   <div class="system-manage-page">
     <el-card shadow="never" class="system-manage-card">
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+        <el-tab-pane label="场景管理" name="battles" />
+        <el-tab-pane label="卫星管理" name="satellites" />
+        <el-tab-pane label="武器管理" name="weapons" />
+        <el-tab-pane label="地面站管理" name="ground-stations" />
+        <el-tab-pane label="数据中心管理" name="data-centers" />
         <el-tab-pane label="用户管理" name="users" />
         <el-tab-pane label="角色管理" name="roles" />
         <el-tab-pane label="菜单管理" name="menus" />
-        <el-tab-pane label="卫星管理" name="satellites" />
-        <el-tab-pane label="武器管理" name="weapons" />
         <el-tab-pane label="基站管理" name="basestations" />
         <el-tab-pane label="导弹管理" name="missiles" />
         <el-tab-pane label="导弹基地管理" name="missileBases" />
-        <el-tab-pane label="战场管理" name="battles" />
+
       </el-tabs>
 
       <router-view />
@@ -31,6 +34,8 @@ const tabNameMap: Record<string, string> = {
   MenuManage: 'menus',
   SatelliteManage: 'satellites',
   WeaponManage: 'weapons',
+  GroundStationManage: 'ground-stations',
+  DataCenterManage: 'data-centers',
   BaseStationManage: 'basestations',
   MissileManage: 'missiles',
   MissileBaseManage: 'missileBases',
@@ -53,6 +58,10 @@ const handleTabChange = (tabName: string) => {
     router.push({ name: 'SatelliteManage' })
   } else if (tabName === 'weapons') {
     router.push({ name: 'WeaponManage' })
+  } else if (tabName === 'ground-stations') {
+    router.push({ name: 'GroundStationManage' })
+  } else if (tabName === 'data-centers') {
+    router.push({ name: 'DataCenterManage' })
   } else if (tabName === 'basestations') {
     router.push({ name: 'BaseStationManage' })
   } else if (tabName === 'missiles') {

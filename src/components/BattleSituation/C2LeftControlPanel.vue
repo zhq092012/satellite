@@ -26,11 +26,10 @@
 
         <div class="task-list-header">
           <!-- 从左到右：当前场景、任务数量、当前任务 -->
-          <span
-            class="task-header-text"
-            :title="`当前场景：${store.battle?.name || '未选择'}（包含${taskList.length}个任务），当前任务：${store.activedTask?.name || '未选择'}`"
-          >
-            当前场景：{{ store.battle?.name || '未选择' }}（包含{{ taskList.length }}个任务），当前任务：{{ store.activedTask?.name || '未选择' }}
+          <span class="task-header-text"
+            :title="`当前场景：${store.battle?.name || '未选择'}（包含${taskList.length}个任务），当前任务：${store.activedTask?.name || '未选择'}`">
+            当前场景：{{ store.battle?.name || '未选择' }}（包含{{ taskList.length }}个任务），当前任务：{{ store.activedTask?.name || '未选择'
+            }}
           </span>
         </div>
 
@@ -48,8 +47,8 @@
             <div class="task-card-fields">
               <div class="field-row">
                 <span class="field-label">作战目标</span>
-                <span class="field-val field-val--target" :title="displayTaskValue(task.targetType)">
-                  {{ displayTaskValue(task.targetType) }}
+                <span class="field-val field-val--target" :title="displayTaskValue(task.targetTypeNew)">
+                  {{ displayTaskValue(task.targetTypeNew) }}
                 </span>
               </div>
               <div class="field-row">
@@ -65,8 +64,8 @@
                 <div class="field-val field-val--progress">
                   <template v-if="getTaskProgress(task)">
                     <el-progress :percentage="getTaskProgressPercent(getTaskProgress(task))"
-                      :status="isTaskProgressComplete(getTaskProgress(task)) ? 'success' : undefined"
-                      :stroke-width="6" class="task-progress-bar" />
+                      :status="isTaskProgressComplete(getTaskProgress(task)) ? 'success' : undefined" :stroke-width="6"
+                      class="task-progress-bar" />
                     <span v-if="getTaskProgress(task)?.mes" class="progress-mes">{{ getTaskProgress(task)?.mes }}</span>
                   </template>
                   <span v-else class="is-muted">未开始</span>
@@ -357,7 +356,7 @@ onUnmounted(() => {
   box-sizing: border-box;
   background: rgba(8, 15, 26, 0.88);
   border: 1px solid rgba(0, 225, 255, 0.18);
-  border-radius: 10px;
+  border-radius: 0;
   backdrop-filter: blur(8px);
   color: #e2efff;
   font-family:
@@ -366,6 +365,12 @@ onUnmounted(() => {
     sans-serif;
   overflow: hidden;
   gap: 10px;
+
+  &--left {
+    border-left: none;
+    border-top: none;
+    border-bottom: none;
+  }
 }
 
 .panel-header {

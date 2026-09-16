@@ -1,12 +1,8 @@
 <template>
-  <div class="battle-situation-container" :class="{ 'has-expanded-timeline': !!taskTimeRange && !isTimelineCollapsed }">
-    <!-- 1. 地图占位层（已移除 Cesium 业务逻辑） -->
-    <div class="map-placeholder-layer">
-      <div class="map-placeholder-content">
-        <span class="map-placeholder-icon">🌐</span>
-        <p class="map-placeholder-title">态势地图区域</p>
-        <p class="map-placeholder-desc">地图业务已下线，保留左右面板与时间轴展示</p>
-      </div>
+  <div class="battle-situation-container">
+    <!-- 1. 地球底图 + 当前场景区域标记 -->
+    <div class="map-globe-layer">
+      <BattleSituationGlobe />
     </div>
 
     <!-- 2. 悬浮左侧控制面板 -->
@@ -40,7 +36,11 @@
     </div>
 
     <!-- 4. 任务时间轴（纯展示，无播放） -->
-    <div class="floating-timeline-wrapper" :class="{ 'is-collapsed': isTimelineCollapsed }" v-if="taskTimeRange">
+    <div class="floating-timeline-wrapper" :class="{
+      'is-collapsed': isTimelineCollapsed,
+      'timeline--left-collapsed': isLeftCollapsed,
+      'timeline--right-collapsed': isRightCollapsed,
+    }" v-if="taskTimeRange">
       <button type="button" class="timeline-toggle-btn" :title="isTimelineCollapsed ? '展开时间轴' : '收起时间轴'"
         @click="isTimelineCollapsed = !isTimelineCollapsed">
         <el-icon class="toggle-icon">
@@ -64,6 +64,7 @@ import { ArrowDown, ArrowUp, DArrowLeft, DArrowRight } from '@element-plus/icons
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
 import BattleGlobeTimeline from '@/components/BattleSituation/BattleGlobeTimeline.vue'
+import BattleSituationGlobe from '@/components/BattleSituation/BattleSituationGlobe.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
@@ -193,53 +194,28 @@ onActivated(() => {
 
 <style lang="scss" scoped>
 .battle-situation-container {
+  --c2-left-panel-width: 440px;
+  --c2-right-panel-width: 450px;
+  --c2-timeline-side-gap: 24px;
+
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
   background-color: #0b1528;
 
-  .map-placeholder-layer {
+  .map-globe-layer {
     position: absolute;
     inset: 0;
     z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background:
-      radial-gradient(ellipse at 50% 40%, rgba(0, 225, 255, 0.08) 0%, transparent 55%),
-      linear-gradient(180deg, #0a1628 0%, #060d18 100%);
-    border: 1px solid rgba(0, 225, 255, 0.08);
-  }
-
-  .map-placeholder-content {
-    text-align: center;
-    color: #64748b;
-    pointer-events: none;
-  }
-
-  .map-placeholder-icon {
-    font-size: 48px;
-    opacity: 0.35;
-  }
-
-  .map-placeholder-title {
-    margin: 8px 0 4px;
-    font-size: 16px;
-    font-weight: 600;
-    color: #7dd3fc;
-  }
-
-  .map-placeholder-desc {
-    margin: 0;
-    font-size: 12px;
-    color: #475569;
+    overflow: hidden;
+    background: #020617;
   }
 
   .floating-panel {
     position: absolute;
-    top: 14px;
-    bottom: 14px;
+    top: 0;
+    bottom: 0;
     z-index: 10;
     transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: auto;
@@ -247,7 +223,7 @@ onActivated(() => {
     .panel-inner {
       height: 100%;
       overflow: hidden;
-      border-radius: 8px;
+      border-radius: 0;
       backdrop-filter: blur(16px);
       background: rgba(8, 20, 36, 0.88);
       border: 1px solid rgba(0, 225, 255, 0.28);
@@ -286,8 +262,14 @@ onActivated(() => {
     }
 
     &--left {
-      left: 14px;
-      width: 440px;
+      left: 0;
+      width: var(--c2-left-panel-width);
+
+      .panel-inner {
+        border-left: none;
+        border-top: none;
+        border-bottom: none;
+      }
 
       .toggle-btn--left {
         right: -21px;
@@ -296,13 +278,19 @@ onActivated(() => {
       }
 
       &.is-collapsed {
-        transform: translateX(calc(-100% - 14px));
+        transform: translateX(-100%);
       }
     }
 
     &--right {
-      right: 14px;
-      width: 450px;
+      right: 0;
+      width: var(--c2-right-panel-width);
+
+      .panel-inner {
+        border-right: none;
+        border-top: none;
+        border-bottom: none;
+      }
 
       .toggle-btn--right {
         left: -21px;
@@ -311,25 +299,41 @@ onActivated(() => {
       }
 
       &.is-collapsed {
-        transform: translateX(calc(100% + 14px));
+        transform: translateX(100%);
       }
-    }
-  }
-
-  &.has-expanded-timeline {
-    .floating-panel {
-      bottom: 98px;
     }
   }
 
   .floating-timeline-wrapper {
     position: absolute;
-    left: 14px;
-    right: 14px;
+    left: calc(var(--c2-left-panel-width) + var(--c2-timeline-side-gap));
+    right: calc(var(--c2-right-panel-width) + var(--c2-timeline-side-gap));
     bottom: 12px;
     z-index: 15;
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width: calc(
+      100% - var(--c2-left-panel-width) - var(--c2-right-panel-width) - 2 * var(--c2-timeline-side-gap)
+    );
+    transition:
+      transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+      left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+      right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: auto;
+
+    &.timeline--left-collapsed {
+      left: var(--c2-timeline-side-gap);
+      max-width: calc(100% - var(--c2-right-panel-width) - 2 * var(--c2-timeline-side-gap));
+    }
+
+    &.timeline--right-collapsed {
+      right: var(--c2-timeline-side-gap);
+      max-width: calc(100% - var(--c2-left-panel-width) - 2 * var(--c2-timeline-side-gap));
+    }
+
+    &.timeline--left-collapsed.timeline--right-collapsed {
+      left: var(--c2-timeline-side-gap);
+      right: var(--c2-timeline-side-gap);
+      max-width: calc(100% - 2 * var(--c2-timeline-side-gap));
+    }
 
     .timeline-toggle-btn {
       position: absolute;

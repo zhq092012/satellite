@@ -2,20 +2,15 @@
   <div class="strike-plan-generator dark-theme" v-loading="store.zhchPlanLoading">
     <div class="plan-header">
       <div class="header-left">
-        <span class="header-icon">⚔️</span>
-        <span class="header-title glow-text">综合打击方案生成</span>
+
       </div>
 
       <div class="header-center">
         <span class="type-label">方案名称：</span>
         <div class="type-selector">
-          <button
-            v-for="item in usageTypeOptions"
-            :key="item.value"
-            class="type-btn"
+          <button v-for="item in usageTypeOptions" :key="item.value" class="type-btn"
             :class="{ active: store.selectedZhchUsageTypes.includes(item.value) }"
-            @click="handleToggleUsageType(item.value)"
-          >
+            @click="handleToggleUsageType(item.value)">
             {{ item.label }}
           </button>
         </div>
@@ -42,24 +37,16 @@
         <div class="empty-text">勾选用途类型后点击「生成方案」获取综合打击方案</div>
       </div>
 
-      <div
-        v-else
-        class="plan-columns"
-        :class="{
-          'plan-columns--single': selectedUsageTypes.length === 1,
-          'plan-columns--compare': selectedUsageTypes.length > 1,
-        }"
-        :style="{ gridTemplateColumns: `repeat(${selectedUsageTypes.length}, minmax(0, 1fr))` }"
-      >
+      <div v-else class="plan-columns" :class="{
+        'plan-columns--single': selectedUsageTypes.length === 1,
+        'plan-columns--compare': selectedUsageTypes.length > 1,
+      }" :style="{ gridTemplateColumns: `repeat(${selectedUsageTypes.length}, minmax(0, 1fr))` }">
         <div v-for="usageType in selectedUsageTypes" :key="usageType" class="plan-column">
           <div class="column-type-title">{{ getZhchUsageTypeLabel(usageType) }}</div>
           <div v-if="getPlanByType(usageType)" class="column-content">
-            <ZhchPlanDetailPanel
-              :plan="getPlanByType(usageType)!"
-              :show-series-link-timeline="selectedUsageTypes.length === 1"
-              :compact-kpi="selectedUsageTypes.length >= 3"
-              :align-blocks="selectedUsageTypes.length > 1"
-            />
+            <ZhchPlanDetailPanel :plan="getPlanByType(usageType)!"
+              :show-series-link-timeline="selectedUsageTypes.length === 1" :compact-kpi="selectedUsageTypes.length >= 3"
+              :align-blocks="selectedUsageTypes.length > 1" />
           </div>
           <div v-else class="empty-container small">
             <div class="empty-text">暂无 {{ getZhchUsageTypeLabel(usageType) }} 方案数据</div>

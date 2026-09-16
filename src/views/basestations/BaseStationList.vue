@@ -96,7 +96,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { getBattleCountrys } from '@/api/dashboard'
 import {
@@ -105,6 +106,35 @@ import {
   saveOrUpdateBaseStation,
   type BaseStationInfo,
 } from '@/api/system/satellite-system-api'
+/** 基站列表页作用域：全部 / 地面站 / 数据中心 */
+type StationScope = 'all' | 'ground' | 'center'
+
+const route = useRoute()
+
+/**
+ * 判断基站类型是否属于数据中心。
+ *
+ * @param type 基站类型文案
+ * @returns 是否为数据中心
+ */
+const isDataCenterType = (type?: string): boolean => {
+  const value = type || ''
+  return value.includes('中心') || value.includes('数据') || value.includes('云')
+}
+
+/** 当前路由对应的基站筛选范围 */
+const stationScope = computed<StationScope>(() => {
+  const scope = route.meta.stationScope
+  return scope === 'ground' || scope === 'center' || scope === 'all' ? scope : 'all'
+})
+
+/** 页面标题前缀（随路由变化） */
+const pageTitle = computed(() => {
+  if (stationScope.value === 'ground') return '地面站'
+  if (stationScope.value === 'center') return '数据中心'
+  return '基站'
+})
+
 const loading = ref(false)
 const saving = ref(false)
 const stations = ref<BaseStationInfo[]>([])
@@ -150,7 +180,23 @@ const rules = reactive<FormRules<BaseStationInfo>>({
 
 const countryCount = computed(() => new Set(stations.value.map((item) => item.country).filter(Boolean)).size)
 
-const dialogTitle = computed(() => (form._id ? '编辑基站' : '新增基站'))
+const dialogTitle = computed(() => (form._id ? `编辑${pageTitle.value}` : `新增${pageTitle.value}`))
+
+/**
+ * 按当前页面作用域过滤基站列表。
+ *
+ * @param list 原始列表
+ * @returns 过滤后的列表
+ */
+const filterStationsByScope = (list: BaseStationInfo[]): BaseStationInfo[] => {
+  if (stationScope.value === 'ground') {
+    return list.filter((item) => !isDataCenterType(item.type))
+  }
+  if (stationScope.value === 'center') {
+    return list.filter((item) => isDataCenterType(item.type))
+  }
+  return list
+}
 
 async function loadCountries() {
   try {
@@ -173,8 +219,11 @@ async function loadStations() {
       name: queryForm.name,
       type: queryForm.type,
     })
-    stations.value = res.code === 200 ? (res.data?.content ?? []) : []
-    totalElements.value = res.code === 200 ? (res.data?.totalElements ?? 0) : 0
+    const rawList = res.code === 200 ? (res.data?.content ?? []) : []
+    stations.value = filterStationsByScope(rawList)
+    totalElements.value = stationScope.value === 'all'
+      ? (res.code === 200 ? (res.data?.totalElements ?? 0) : 0)
+      : stations.value.length
   } finally {
     loading.value = false
   }
@@ -243,6 +292,14 @@ async function handleDelete(row: BaseStationInfo) {
 onMounted(async () => {
   await Promise.all([loadStations(), loadCountries()])
 })
+
+watch(
+  () => route.name,
+  () => {
+    page.pageNum = 1
+    void loadStations()
+  }
+)
 </script>
 
 <style scoped lang="scss">

@@ -62,7 +62,7 @@ interface State {
   zhchPlanTaskId: number | null
   /** 综合打击方案加载状态 */
   zhchPlanLoading: boolean
-  /** 当前勾选的用途类型（多选，打击方案生成页对比用） */
+  /** 当前勾选的用途类型（多选，打击方案管理页对比用） */
   selectedZhchUsageTypes: string[]
   /** 当前激活的综合打击方案用途类型（整体态势矩阵数据源） */
   activeZhchUsageType: string

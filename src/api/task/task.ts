@@ -338,24 +338,24 @@ export interface AttackWindow {
 
 /** 威胁卫星 */
 export interface ThreatSatellite {
-    norad: number;
-    name: string;
-    satType: string;
-    threatScore: number;
+    norad: number;//卫星NORAD号
+    name: string;//卫星名称
+    satType: string;//卫星类型
+    threatScore: number;//威胁得分
 }
 
 /** 时间影响 */
 export interface TimeEffect {
-    norad: number;
-    name: string;
-    satType: string;
+    norad: number;//卫星NORAD号
+    name: string;//卫星名称
+    satType: string;//卫星类型
 
-    beginTime: string;
-    endTime: string;
+    beginTime: string;//开始时间
+    endTime: string;//结束时间
 
-    duration: number;
+    duration: number;//链路时延（分钟）
 
-    receiveName: string;
+    receiveName: string;//接收站名称
 }
 
 

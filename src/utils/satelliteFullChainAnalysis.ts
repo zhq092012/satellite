@@ -888,7 +888,7 @@ export const resolveChainForTimelineMarker = (
       finishTimestamp: null,
       nodes: [],
       blocked: true,
-      blockedReason: '暂无矩阵数据',
+      blockedReason: '暂无分析数据',
     }
   }
 
@@ -925,7 +925,7 @@ export const analyzeSatelliteFullChain = (
     finishTimestamp: null,
     nodes: [],
     blocked: true,
-    blockedReason: '暂无矩阵数据',
+    blockedReason: '暂无分析数据',
   }
   if (!matrix || !norad) return empty
 

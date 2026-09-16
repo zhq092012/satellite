@@ -16,34 +16,21 @@
         <div class="header-right actions-bar">
           <!-- 当前场景（即战场）显示 / 下拉切换 -->
           <div class="task-status-bar">
-            <el-dropdown
-              trigger="click"
-              :disabled="sceneSwitching"
-              @command="handleSwitchScene"
-              @visible-change="handleSceneDropdownVisible"
-              popper-class="scene-selector-popper"
-            >
+            <el-dropdown trigger="click" :disabled="sceneSwitching" @command="handleSwitchScene"
+              @visible-change="handleSceneDropdownVisible" popper-class="scene-selector-popper">
               <div class="scene-trigger" :class="{ 'is-empty': !layoutStore.battle }">
                 <template v-if="layoutStore.battle">
-                  <span class="scene-label">当前场景：</span>
                   <span class="scene-name" :title="layoutStore.battle.name">{{ layoutStore.battle.name }}</span>
                 </template>
-                <template v-else>
-                  <span class="scene-empty">尚未选择场景（点击选择）</span>
-                </template>
+
                 <el-icon class="scene-arrow">
                   <ArrowDown />
                 </el-icon>
               </div>
               <template #dropdown>
                 <el-dropdown-menu class="scene-dropdown-menu">
-                  <el-dropdown-item
-                    v-for="battle in battleList"
-                    :key="battle.id"
-                    :command="battle.id"
-                    :disabled="sceneSwitching"
-                    :class="{ 'is-active': layoutStore.battle?.id === battle.id }"
-                  >
+                  <el-dropdown-item v-for="battle in battleList" :key="battle.id" :command="battle.id"
+                    :disabled="sceneSwitching" :class="{ 'is-active': layoutStore.battle?.id === battle.id }">
                     {{ battle.name }}
                   </el-dropdown-item>
                   <el-dropdown-item v-if="battleList.length === 0" disabled>
@@ -217,8 +204,18 @@ const filterMenusByPermission = (menus: DashboardMenuNode[]): DashboardMenuNode[
     .filter((menu): menu is DashboardMenuNode => menu !== null)
 }
 
+/** 顶栏资源管理菜单路径（需保留在顶栏展示，不走系统管理下拉）。 */
+const TOP_RESOURCE_MENU_PATHS = new Set([
+  '/system/battles',
+  '/system/satellites',
+  '/system/ground-stations',
+  '/system/data-centers',
+  '/system/weapons',
+])
+
 /**
- * 顶栏首页分析菜单：整体态势分析及其后的四个分析页。
+ * 顶栏菜单：整体态势分析 + 场景/资源管理 + 方案管理。
+ * 原态势拓扑/甘特图/打击窗口路由与组件保留，仅从顶栏移除。
  */
 const homeMenu = computed<DashboardMenuNode[]>(() => [
   {
@@ -231,36 +228,62 @@ const homeMenu = computed<DashboardMenuNode[]>(() => [
     children: [],
   },
   {
-    path: '/home/topo',
+    path: '/system/battles',
     meta: {
-      title: '态势拓扑分析',
+      title: '场景管理',
       icon: 'icon-situation',
       showInMenu: true,
+      roles: ['admin'],
     },
     children: [],
   },
   {
-    path: '/home/gantt',
+    path: '/system/satellites',
     meta: {
-      title: '甘特图分析',
+      title: '卫星管理',
       icon: 'icon-situation',
       showInMenu: true,
+      roles: ['admin'],
     },
     children: [],
   },
   {
-    path: '/home/windows',
+    path: '/system/ground-stations',
     meta: {
-      title: '打击窗口分析',
-      icon: 'icon-situation',
+      title: '地面站管理',
+      icon: 'icon-basestation',
       showInMenu: true,
+      roles: ['admin'],
+      permission: 'system:basestations:list',
+    },
+    children: [],
+  },
+  {
+    path: '/system/data-centers',
+    meta: {
+      title: '数据中心管理',
+      icon: 'icon-basestation',
+      showInMenu: true,
+      roles: ['admin'],
+      permission: 'system:basestations:list',
+    },
+    children: [],
+  },
+  {
+    path: '/system/weapons',
+    meta: {
+      title: '武器管理',
+      icon: 'icon-sword',
+      showInMenu: true,
+      roles: ['admin'],
+      permission: 'system:weapon:list',
     },
     children: [],
   },
   {
     path: '/home/strike-plan',
     meta: {
-      title: '打击方案生成',
+      title: '方案管理',
       icon: 'icon-situation',
       showInMenu: true,
     },
@@ -287,12 +310,12 @@ const getRouterViewKey = (viewRoute: { path?: string; name?: string | symbol | n
 const visibleMenus = computed<RouteRecordRaw[]>(() => {
   const backendMenus = filterMenusByPermission(buildMenuRoutes(authStore.menuTree))
   const mergedMenus = mergeMenus(homeMenu.value, backendMenus)
-  /** 五个分析页保持为顶栏平级项，避免后端 /home 子菜单把它变成下拉 */
-  const analysisPaths = new Set(homeMenu.value.map((item) => item.path))
+  /** 顶栏首页/资源管理项保持平级，避免后端子菜单把它变成下拉 */
+  const topMenuPaths = new Set(homeMenu.value.map((item) => item.path))
 
   return mergedMenus
     .map((menu) => {
-      if (analysisPaths.has(menu.path)) {
+      if (topMenuPaths.has(menu.path)) {
         return { ...menu, children: [] }
       }
       return menu
@@ -300,6 +323,9 @@ const visibleMenus = computed<RouteRecordRaw[]>(() => {
     .filter((menu) => {
       const path = menu.path || ''
       const title = (menu.meta as { title?: string } | undefined)?.title || ''
+      if (TOP_RESOURCE_MENU_PATHS.has(path)) {
+        return filterMenusByPermission([menu as DashboardMenuNode]).length > 0
+      }
       return (
         !path.startsWith('/system') &&
         !path.startsWith('/algorithm') &&

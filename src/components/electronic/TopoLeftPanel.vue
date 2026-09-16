@@ -22,7 +22,7 @@
     </div>
 
     <div v-if="!matrixData" class="empty-tip top-empty">
-      暂无矩阵数据，请先选择任务与卫星系列
+      暂无分析数据，请先选择任务与卫星系列
     </div>
 
     <div v-else-if="!linkItems.length && selectedNorad" class="empty-tip top-empty">
@@ -296,18 +296,18 @@ const linkItems = computed<LinkListItem[]>(() => {
   const weaponsByTargetName = new Map<string, Set<string>>()
 
   if (isStarlinkSeries.value) {
-    ;(matrix.initMatrixList || []).forEach((sat) => {
+    ; (matrix.initMatrixList || []).forEach((sat) => {
       beforeCoverageByNorad.set(sat.norad, toCoverageValue(sat.coverage))
     })
-    ;(matrix.satelliteMatrixList || []).forEach((sat) => {
-      afterCoverageByNorad.set(sat.norad, toCoverageValue(sat.coverage))
-    })
-    ;(matrix.attackPlanList || []).forEach((plan) => {
-      if (plan.weaponName) {
-        if (plan.targetId) addWeaponToTargetMap(weaponsByTargetId, String(plan.targetId), plan.weaponName)
-        if (plan.target) addWeaponToTargetMap(weaponsByTargetName, plan.target, plan.weaponName)
-      }
-    })
+      ; (matrix.satelliteMatrixList || []).forEach((sat) => {
+        afterCoverageByNorad.set(sat.norad, toCoverageValue(sat.coverage))
+      })
+      ; (matrix.attackPlanList || []).forEach((plan) => {
+        if (plan.weaponName) {
+          if (plan.targetId) addWeaponToTargetMap(weaponsByTargetId, String(plan.targetId), plan.weaponName)
+          if (plan.target) addWeaponToTargetMap(weaponsByTargetName, plan.target, plan.weaponName)
+        }
+      })
   }
 
   return ranked.map((r) => {
@@ -339,13 +339,13 @@ const linkItems = computed<LinkListItem[]>(() => {
     const stationNode = link.nodes.find((n) => n.layer === 'STATION')
     const starlinkWeaponNames = isStarlinkSeries.value
       ? joinWeaponSets(
-          Number.isFinite(satNorad) ? weaponsByTargetId.get(String(satNorad)) : undefined,
-          satNode?.name ? weaponsByTargetName.get(satNode.name) : undefined,
-          receiveNode ? weaponsByTargetId.get(receiveNode.id) : undefined,
-          receiveNode?.name ? weaponsByTargetName.get(receiveNode.name) : undefined,
-          stationNode ? weaponsByTargetId.get(stationNode.id) : undefined,
-          stationNode?.name ? weaponsByTargetName.get(stationNode.name) : undefined
-        )
+        Number.isFinite(satNorad) ? weaponsByTargetId.get(String(satNorad)) : undefined,
+        satNode?.name ? weaponsByTargetName.get(satNode.name) : undefined,
+        receiveNode ? weaponsByTargetId.get(receiveNode.id) : undefined,
+        receiveNode?.name ? weaponsByTargetName.get(receiveNode.name) : undefined,
+        stationNode ? weaponsByTargetId.get(stationNode.id) : undefined,
+        stationNode?.name ? weaponsByTargetName.get(stationNode.name) : undefined
+      )
       : ''
 
     return {

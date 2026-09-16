@@ -43,7 +43,7 @@ const routes: Array<RouteRecordRaw> = [
         meta: {
           title: '态势拓扑分析',
           icon: 'icon-situation',
-          showInMenu: true,
+          showInMenu: false,
         },
       },
       {
@@ -53,7 +53,7 @@ const routes: Array<RouteRecordRaw> = [
         meta: {
           title: '甘特图分析',
           icon: 'icon-situation',
-          showInMenu: true,
+          showInMenu: false,
         },
       },
       {
@@ -63,7 +63,7 @@ const routes: Array<RouteRecordRaw> = [
         meta: {
           title: '打击窗口分析',
           icon: 'icon-situation',
-          showInMenu: true,
+          showInMenu: false,
         },
       },
       {
@@ -71,9 +71,9 @@ const routes: Array<RouteRecordRaw> = [
         name: 'HomeStrikePlan',
         component: () => import('@/layout/Home.vue'),
         meta: {
-          title: '打击方案生成',
+          title: '打击方案管理',
           icon: 'icon-situation',
-          showInMenu: true,
+          showInMenu: false,
         },
       },
       {
@@ -176,6 +176,35 @@ const routes: Array<RouteRecordRaw> = [
               requiresAuth: true,
               roles: ['admin'],
               permission: 'system:basestations:list',
+              stationScope: 'all',
+            },
+          },
+          {
+            path: 'ground-stations',
+            name: 'GroundStationManage',
+            component: () => import('@/views/basestations/BaseStationList.vue'),
+            meta: {
+              title: '地面站管理',
+              icon: 'icon-basestation',
+              showInMenu: false,
+              requiresAuth: true,
+              roles: ['admin'],
+              permission: 'system:basestations:list',
+              stationScope: 'ground',
+            },
+          },
+          {
+            path: 'data-centers',
+            name: 'DataCenterManage',
+            component: () => import('@/views/basestations/BaseStationList.vue'),
+            meta: {
+              title: '数据中心管理',
+              icon: 'icon-basestation',
+              showInMenu: false,
+              requiresAuth: true,
+              roles: ['admin'],
+              permission: 'system:basestations:list',
+              stationScope: 'center',
             },
           },
           {
@@ -209,7 +238,7 @@ const routes: Array<RouteRecordRaw> = [
             name: 'BattleManage',
             component: () => import('@/views/admin/BattleManage.vue'),
             meta: {
-              title: '战场管理',
+              title: '场景管理',
               icon: 'icon-situation',
               showInMenu: true,
               requiresAuth: true,

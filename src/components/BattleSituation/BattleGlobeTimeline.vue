@@ -162,7 +162,7 @@ const handleTrackClick = (event: MouseEvent) => {
 .battle-globe-timeline {
   position: relative;
   width: 100%;
-  padding: 5px 14px 4px 14px;
+  padding: 5px 24px 4px 24px;
   background: transparent;
   box-sizing: border-box;
 }
@@ -190,26 +190,35 @@ const handleTrackClick = (event: MouseEvent) => {
   }
 }
 
+/** 中间轨道距顶部的偏移 */
+$track-top: 28px;
+/** 中间轨道高度 */
+$track-height: 8px;
+/** 日期时间与轨道之间的间距 */
+$label-track-gap: 8px;
+
 .ruler-panel {
   position: relative;
-  height: 52px;
+  height: 58px;
   cursor: pointer;
   user-select: none;
 }
 
 .ruler-scale {
   position: absolute;
-  inset: 0 0 18px;
+  left: 0;
+  right: 0;
+  top: $track-top;
+  height: $track-height;
   pointer-events: none;
+  z-index: 2;
 }
 
 .ruler-tick {
   position: absolute;
   top: 0;
+  height: 100%;
   transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 
   &.align-start {
     transform: translateX(0);
@@ -220,21 +229,40 @@ const handleTrackClick = (event: MouseEvent) => {
   }
 
   .tick-line {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
     width: 1px;
-    height: 8px;
-    background: rgba(125, 211, 252, 0.45);
+    height: 100%;
+    background: rgba(125, 211, 252, 0.55);
   }
 
   &.major .tick-line {
-    height: 12px;
-    background: rgba(64, 242, 255, 0.75);
+    width: 2px;
+    background: rgba(64, 242, 255, 0.9);
   }
 
   .tick-label {
-    margin-top: 2px;
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + #{$label-track-gap});
+    transform: translateX(-50%);
     font-size: 9px;
     color: #64748b;
     white-space: nowrap;
+    line-height: 1.2;
+  }
+
+  &.align-start .tick-label {
+    left: 0;
+    transform: translateX(0);
+  }
+
+  &.align-end .tick-label {
+    left: auto;
+    right: 0;
+    transform: translateX(0);
   }
 }
 
@@ -242,8 +270,8 @@ const handleTrackClick = (event: MouseEvent) => {
   position: absolute;
   left: 0;
   right: 0;
-  top: 22px;
-  height: 8px;
+  top: $track-top;
+  height: $track-height;
 
   .track-base {
     width: 100%;
@@ -256,7 +284,7 @@ const handleTrackClick = (event: MouseEvent) => {
 
 .orbit-playhead {
   position: absolute;
-  top: 14px;
+  top: calc(#{$track-top} - 4px);
   transform: translateX(-50%);
   z-index: 3;
   pointer-events: none;
@@ -264,7 +292,7 @@ const handleTrackClick = (event: MouseEvent) => {
   .orbit-playhead-line {
     display: block;
     width: 2px;
-    height: 24px;
+    height: calc(#{$track-height} + 8px);
     margin: 0 auto;
     background: #fbbf24;
     box-shadow: 0 0 6px rgba(251, 191, 36, 0.65);

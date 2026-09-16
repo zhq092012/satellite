@@ -743,7 +743,7 @@ export const getSatelliteThreatInfoByType = (data: { type: string; taskId: numbe
 }
 
 /**
- * 刷新打击方案生成缓存
+ * 刷新打击方案管理缓存
  * @param data.taskId - 作战任务 ID
  * @returns 包含综合打击方案数据的 Axios 响应 Promise
  */

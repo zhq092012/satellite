@@ -269,6 +269,12 @@ export interface TaskAssembleRow {
   extra1: string
   /** 额外字段：轨道、纬度、射程/间隔等 */
   extra2: string
+  /** 额外字段：武器经度等 */
+  extra3?: string
+  /** 额外字段：武器纬度等 */
+  extra4?: string
+  /** 额外字段：武器打击间隔等 */
+  extra5?: string
 }
 
 /** 表格列配置。 */
@@ -420,11 +426,14 @@ const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
     typeOptions: [],
     seriesOptions: [],
     columns: [
-      { prop: 'name', label: '名称', minWidth: 110 },
+      { prop: 'name', label: '名称', minWidth: 100 },
       { prop: 'type', label: '类型', width: 72 },
       { prop: 'country', label: '所属', width: 72 },
-      { prop: 'extra1', label: '适用目标', minWidth: 90 },
-      { prop: 'extra2', label: '射程/高度', width: 88 },
+      { prop: 'extra1', label: '适用目标', minWidth: 88 },
+      { prop: 'extra2', label: '射程/高度', width: 80 },
+      { prop: 'extra3', label: '经度', width: 72 },
+      { prop: 'extra4', label: '纬度', width: 72 },
+      { prop: 'extra5', label: '打击间隔', width: 80 },
     ],
   },
 }
@@ -624,6 +633,30 @@ const satelliteToRow = (satellite: SatellitePreviewItem): TaskAssembleRow => ({
 })
 
 /**
+ * 格式化武器坐标展示。
+ *
+ * @param value 经度或纬度
+ * @returns 坐标文本；无效时为 `--`
+ */
+const formatWeaponCoord = (value?: number | null): string => {
+  if (value == null || !Number.isFinite(value)) return '--'
+  return String(value)
+}
+
+/**
+ * 格式化武器打击间隔展示。
+ *
+ * @param value 打击间隔（分钟）
+ * @returns 间隔文本；无效时为 `--`
+ */
+const formatWeaponInterval = (value?: string | number | null): string => {
+  if (value == null || value === '') return '--'
+  const numeric = Number(value)
+  if (Number.isFinite(numeric)) return `${numeric}min`
+  return String(value)
+}
+
+/**
  * 将武器信息映射为装配表格行。
  * @param weapon 武器原始数据
  */
@@ -633,7 +666,6 @@ const weaponToRow = (weapon: Weapon): TaskAssembleRow => {
     weaponRawMap[weapon.id] = weapon
   }
   const rangeText = weapon.range != null ? `${weapon.range}km` : '--'
-  const intervalText = weapon.interval ? `${weapon.interval}min` : ''
   return {
     id,
     name: weapon.name,
@@ -641,9 +673,21 @@ const weaponToRow = (weapon: Weapon): TaskAssembleRow => {
     type: weapon.type,
     country: weapon.country,
     extra1: weapon.satellite_type || '--',
-    extra2: intervalText ? `${rangeText} / ${intervalText}` : rangeText,
+    extra2: rangeText,
+    extra3: formatWeaponCoord(weapon.longitude),
+    extra4: formatWeaponCoord(weapon.latitude),
+    extra5: formatWeaponInterval(weapon.interval),
   }
 }
+
+/**
+ * 生成资源行搜索关键字串。
+ *
+ * @param row 装配行
+ * @returns 用于关键字过滤的拼接文本
+ */
+const buildRowSearchText = (row: TaskAssembleRow): string =>
+  `${row.name} ${row.series} ${row.type} ${row.country} ${row.extra1} ${row.extra2} ${row.extra3 ?? ''} ${row.extra4 ?? ''} ${row.extra5 ?? ''}`.toLowerCase()
 
 /**
  * 尚未装配、且匹配关键字与类型筛选的候选行（非卫星种类使用客户端过滤）。
@@ -655,8 +699,7 @@ const filteredCandidates = computed(() => {
     return pool.filter((row) => {
       if (typeFilter.value && row.type !== typeFilter.value) return false
       if (!key) return true
-      const haystack = `${row.name} ${row.series} ${row.type} ${row.country} ${row.extra1} ${row.extra2}`.toLowerCase()
-      return haystack.includes(key)
+      return buildRowSearchText(row).includes(key)
     })
   }
   const assembledIds = new Set(assembledRows.value.map((row) => row.id))
@@ -665,8 +708,7 @@ const filteredCandidates = computed(() => {
     if (seriesFilter.value && row.series !== seriesFilter.value) return false
     if (typeFilter.value && row.type !== typeFilter.value) return false
     if (!key) return true
-    const haystack = `${row.name} ${row.series} ${row.type} ${row.country} ${row.extra1} ${row.extra2}`.toLowerCase()
-    return haystack.includes(key)
+    return buildRowSearchText(row).includes(key)
   })
 })
 
