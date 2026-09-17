@@ -3,7 +3,8 @@
     <!-- 1. 地球底图 + 当前场景区域标记 -->
     <div class="map-globe-layer">
       <BattleSituationGlobe ref="globeRef" :satellites="globeSatellites" :weapons="globeWeapons"
-        :current-time-ms="currentTimeMs" :selected-norad="selectedNorad" :selected-weapon-id="selectedWeaponId"
+        :ground-targets="globeGroundTargets" :current-time-ms="currentTimeMs" :selected-norad="selectedNorad"
+        :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
         :task-start-ms="taskStartMs" :task-end-ms="taskEndMs" />
 
       <div v-if="selectedNorad" class="globe-selected-bar">
@@ -16,6 +17,12 @@
         <span class="globe-selected-label">选中武器：</span>
         <span class="globe-selected-name globe-selected-name--weapon">{{ selectedWeaponName }}</span>
         <button type="button" class="globe-clear-btn" @click="handleClearSelectedWeapon">清除</button>
+      </div>
+
+      <div v-if="selectedGroundTargetKey" class="globe-selected-bar globe-selected-bar--ground">
+        <span class="globe-selected-label">{{ selectedGroundTargetBarLabel }}：</span>
+        <span class="globe-selected-name globe-selected-name--ground">{{ selectedGroundTargetName }}</span>
+        <button type="button" class="globe-clear-btn" @click="handleClearSelectedGroundTarget">清除</button>
       </div>
     </div>
 
@@ -39,8 +46,9 @@
       <div class="panel-inner">
         <C2RightAnalysisPanel :analysis-data="taskAnalysisData" :algorithm-complete="algorithmComplete"
           :analysis-loading="taskAnalysisLoading" :selected-norad="selectedNorad"
-          :selected-weapon-id="selectedWeaponId" @select-satellite="handleSelectSatellite"
-          @select-weapon="handleSelectWeapon" />
+          :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
+          @select-satellite="handleSelectSatellite" @select-weapon="handleSelectWeapon"
+          @select-ground-target="handleSelectGroundTarget" />
       </div>
       <button type="button" class="toggle-btn toggle-btn--right" :title="isRightCollapsed ? '展开右侧面板' : '收起右侧面板'"
         @click="isRightCollapsed = !isRightCollapsed">
@@ -85,6 +93,11 @@ import {
   buildBattleGlobeWeapons,
   buildBattleGlobeWeaponsFromMatrix,
 } from '@/utils/buildBattleGlobeWeapons'
+import {
+  buildBattleGlobeGroundTargets,
+  buildBattleGlobeGroundTargetsFromMatrix,
+  parseGroundTargetKey,
+} from '@/utils/buildBattleGlobeGroundTargets'
 import { computed, nextTick, onActivated, onBeforeUnmount, ref, watch } from 'vue'
 import { ArrowDown, ArrowUp, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
@@ -112,6 +125,9 @@ const selectedNorad = ref<number | null>(null)
 
 /** 当前选中的武器 ID */
 const selectedWeaponId = ref<string | null>(null)
+
+/** 当前选中的地面目标键（receive: / station:） */
+const selectedGroundTargetKey = ref<string | null>(null)
 
 /** 时间轴当前时刻（毫秒） */
 const currentTimeMs = ref(0)
@@ -170,6 +186,13 @@ const globeWeapons = computed(() => {
   return buildBattleGlobeWeaponsFromMatrix(matrixData.value)
 })
 
+/** 地球渲染接收站/数据中心列表 */
+const globeGroundTargets = computed(() => {
+  const fromAnalysis = buildBattleGlobeGroundTargets(taskAnalysisData.value)
+  if (fromAnalysis.length) return fromAnalysis
+  return buildBattleGlobeGroundTargetsFromMatrix(matrixData.value)
+})
+
 /** 地球组件引用 */
 const globeRef = ref<{ restoreOverviewView: () => void } | null>(null)
 
@@ -188,6 +211,34 @@ const selectedWeaponName = computed(() => {
   const fromGlobe = globeWeapons.value.find((weapon) => weapon.id === selectedWeaponId.value)
   return fromGlobe?.name || selectedWeaponId.value
 })
+
+/** 当前选中地面目标名称 */
+const selectedGroundTargetName = computed(() => {
+  if (!selectedGroundTargetKey.value) return ''
+  const parsed = parseGroundTargetKey(selectedGroundTargetKey.value)
+  if (!parsed) return selectedGroundTargetKey.value
+  const fromGlobe = globeGroundTargets.value.find(
+    (target) => target.kind === parsed.kind && target.id === parsed.id
+  )
+  return fromGlobe?.name || parsed.id
+})
+
+/** 地图顶部选中条标签（接收站/数据中心） */
+const selectedGroundTargetBarLabel = computed(() => {
+  const parsed = parseGroundTargetKey(selectedGroundTargetKey.value)
+  if (parsed?.kind === 'station') return '选中数据中心'
+  return '选中接收站'
+})
+
+/**
+ * 当前是否存在任意地图选中目标。
+ *
+ * @returns 是否已有选中项
+ */
+const hasGlobeSelection = (): boolean =>
+  selectedNorad.value != null ||
+  selectedWeaponId.value != null ||
+  selectedGroundTargetKey.value != null
 
 /**
  * 解析任务时间为毫秒。
@@ -303,7 +354,7 @@ const handleSelectionPlayback = (hadSelection: boolean, hasNewSelection: boolean
  */
 const handleSelectSatellite = async (norad: number | null) => {
   const previousNorad = selectedNorad.value
-  const hadSelection = previousNorad != null || selectedWeaponId.value != null
+  const hadSelection = hasGlobeSelection()
 
   if (norad != null && previousNorad === norad) {
     selectedNorad.value = null
@@ -317,6 +368,7 @@ const handleSelectSatellite = async (norad: number | null) => {
   if (norad != null) {
     handleSelectionPlayback(hadSelection, true)
     selectedWeaponId.value = null
+    selectedGroundTargetKey.value = null
   }
 
   selectedNorad.value = norad
@@ -331,13 +383,32 @@ const handleSelectSatellite = async (norad: number | null) => {
 const handleSelectWeapon = (weaponId: string | null) => {
   if (!weaponId) return
 
-  const hadSelection = selectedNorad.value != null || selectedWeaponId.value != null
+  const hadSelection = hasGlobeSelection()
   if (selectedWeaponId.value === weaponId) return
 
   handleSelectionPlayback(hadSelection, true)
   selectedNorad.value = null
   store.setSelectedAnalysisNorad(null)
+  selectedGroundTargetKey.value = null
   selectedWeaponId.value = weaponId
+}
+
+/**
+ * 选中接收站/数据中心并定位地球。
+ *
+ * @param targetKey 目标键 receive: / station:
+ */
+const handleSelectGroundTarget = (targetKey: string | null) => {
+  if (!targetKey) return
+
+  const hadSelection = hasGlobeSelection()
+  if (selectedGroundTargetKey.value === targetKey) return
+
+  handleSelectionPlayback(hadSelection, true)
+  selectedNorad.value = null
+  store.setSelectedAnalysisNorad(null)
+  selectedWeaponId.value = null
+  selectedGroundTargetKey.value = targetKey
 }
 
 /**
@@ -359,6 +430,19 @@ const handleClearSelectedSatellite = () => {
  */
 const handleClearSelectedWeapon = () => {
   selectedWeaponId.value = null
+  globeRef.value?.restoreOverviewView()
+
+  if (wasPlayingBeforeSelection) {
+    wasPlayingBeforeSelection = false
+    startTimelinePlayback()
+  }
+}
+
+/**
+ * 清除选中地面目标并恢复战场初始俯视视角。
+ */
+const handleClearSelectedGroundTarget = () => {
+  selectedGroundTargetKey.value = null
   globeRef.value?.restoreOverviewView()
 
   if (wasPlayingBeforeSelection) {
@@ -395,6 +479,7 @@ const loadMatrixForCurrentScope = async () => {
     store.clearMatrixData()
     selectedNorad.value = null
     selectedWeaponId.value = null
+    selectedGroundTargetKey.value = null
     store.setSelectedAnalysisNorad(null)
     return
   }
@@ -405,6 +490,7 @@ const loadMatrixForCurrentScope = async () => {
     if (loadToken !== matrixLoadToken) return
     selectedNorad.value = null
     selectedWeaponId.value = null
+    selectedGroundTargetKey.value = null
     store.setSelectedAnalysisNorad(null)
     if (!data) {
       console.warn('当前系列矩阵加载失败')
@@ -421,6 +507,7 @@ watch(
     stopTimelinePlayback()
     wasPlayingBeforeSelection = false
     selectedWeaponId.value = null
+    selectedGroundTargetKey.value = null
     currentTimeMs.value = range ? parseTaskTimeMs(range.start) : 0
   },
   { immediate: true }
@@ -538,8 +625,16 @@ onActivated(() => {
     border-color: rgba(248, 113, 113, 0.45);
   }
 
+  .globe-selected-bar--ground {
+    border-color: rgba(34, 211, 238, 0.45);
+  }
+
   .globe-selected-name--weapon {
     color: #f87171;
+  }
+
+  .globe-selected-name--ground {
+    color: #22d3ee;
   }
 
   .globe-clear-btn {

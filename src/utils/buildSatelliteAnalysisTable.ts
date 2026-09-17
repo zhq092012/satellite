@@ -2,10 +2,16 @@ import type { SatelliteAnalysisData } from '@/api/task/task'
 
 /** 卫星指标表格行（展示用） */
 export interface SatelliteMetricTableRow {
+  /** 行唯一键（系列 + 系统类型 + NORAD） */
+  rowKey: string
   /** 卫星 NORAD 编号 */
   norad: number
   /** 卫星名称 */
   name: string
+  /** 所属卫星系列（来自 levelSeriesEntities.series） */
+  series: string
+  /** 卫星系统类型（来自 levelSeriesEntities.sysType，如侦察/通信） */
+  sysType: string
   /** 打击前覆盖率展示 */
   coverageBeforeText: string
   /** 打击后覆盖率展示 */
@@ -34,10 +40,16 @@ export interface SatelliteMetricTableRow {
 
 /** 卫星指标合并过程中的内部行结构 */
 interface SatelliteMetricAccumulator {
+  /** 行唯一键 */
+  rowKey: string
   /** 卫星 NORAD 编号 */
   norad: number
   /** 卫星名称 */
   name: string
+  /** 所属系列 */
+  series: string
+  /** 系统类型 */
+  sysType: string
   /** 打击前覆盖率 */
   coverageBefore: number | null
   /** 打击后覆盖率 */
@@ -53,6 +65,40 @@ interface SatelliteMetricAccumulator {
 }
 
 const EMPTY_TEXT = '--'
+
+/**
+ * 构建卫星指标行唯一键（区分不同 levelSeriesEntities 下的同一 NORAD）。
+ *
+ * @param series 系列名称
+ * @param sysType 系统类型
+ * @param norad 卫星 NORAD
+ * @returns 行键
+ */
+export const buildSatelliteMetricRowKey = (
+  series: string,
+  sysType: string,
+  norad: number
+): string => `${series}::${sysType}::${norad}`
+
+/**
+ * 格式化系列与系统类型（tooltip 等多行文本）。
+ *
+ * @param series 系列名称
+ * @param sysType 系统类型
+ * @returns 如 `系列：starshield\n类型：侦察`
+ */
+export const formatSatelliteSeriesTypeMeta = (series: string, sysType: string): string => {
+  const lines: string[] = []
+  const seriesText = series?.trim()
+  const sysTypeText = sysType?.trim()
+  if (seriesText && seriesText !== EMPTY_TEXT) {
+    lines.push(`系列：${seriesText}`)
+  }
+  if (sysTypeText && sysTypeText !== EMPTY_TEXT) {
+    lines.push(`类型：${sysTypeText}`)
+  }
+  return lines.length ? lines.join('\n') : EMPTY_TEXT
+}
 
 /**
  * 将接口返回的 NORAD 规范为数字。
@@ -201,8 +247,11 @@ const toDisplayRow = (row: SatelliteMetricAccumulator): SatelliteMetricTableRow 
   const trueDelayAfter = resolveTrueDelayAfter(row.delayBefore, row.delayIncrease)
 
   return {
+  rowKey: row.rowKey,
   norad: row.norad,
   name: row.name,
+  series: row.series,
+  sysType: row.sysType,
   coverageBeforeText: formatSatelliteCoverage(row.coverageBefore),
   coverageAfterText: formatSatelliteCoverage(row.coverageAfter),
   coverageReduceText: formatSatelliteCoverageReduce(row.coverageBefore, row.coverageAfter),
@@ -317,35 +366,50 @@ export const rankSatellitesByCompositeBeforeMetrics = (
     const scoreA = calcCompositeBeforeScore(a, norms)
     const scoreB = calcCompositeBeforeScore(b, norms)
     if (scoreA !== scoreB) return scoreB - scoreA
+    const seriesCompare = a.series.localeCompare(b.series, 'zh-CN')
+    if (seriesCompare !== 0) return seriesCompare
+    const typeCompare = a.sysType.localeCompare(b.sysType, 'zh-CN')
+    if (typeCompare !== 0) return typeCompare
     return a.name.localeCompare(b.name, 'zh-CN')
   })
 }
 
 /**
  * 从任务分析结果中合并各系列卫星指标，构建表格行列表。
- * 以 NORAD 为键汇总 initMatrixList / satelliteMatrixList / timeEffects / threatSats。
+ * 按 levelSeriesEntities 的 series + sysType + NORAD 区分行，再汇总各数据源指标。
  *
  * @param data 任务算法分析结果
- * @returns 按卫星名称排序的表格行
+ * @returns 按系列、类型、名称排序的表格行
  */
 export const buildSatelliteAnalysisTableRows = (
   data: SatelliteAnalysisData | null | undefined
 ): SatelliteMetricTableRow[] => {
   if (!data) return []
 
-  const map = new Map<number, SatelliteMetricAccumulator>()
+  const map = new Map<string, SatelliteMetricAccumulator>()
 
   /**
-   * 合并单颗卫星的指标片段。
+   * 合并单颗卫星在某一系列实体下的指标片段。
    *
+   * @param series 系列名称
+   * @param sysType 系统类型
    * @param norad 卫星 NORAD
    * @param patch 待合并字段
    */
-  const upsert = (norad: number, patch: Partial<SatelliteMetricAccumulator> & { name?: string }) => {
+  const upsert = (
+    series: string,
+    sysType: string,
+    norad: number,
+    patch: Partial<SatelliteMetricAccumulator> & { name?: string }
+  ) => {
+    const rowKey = buildSatelliteMetricRowKey(series, sysType, norad)
     const exist =
-      map.get(norad) ||
+      map.get(rowKey) ||
       ({
+        rowKey,
         norad,
+        series,
+        sysType,
         name: patch.name || `Sat-${norad}`,
         coverageBefore: null,
         coverageAfter: null,
@@ -355,7 +419,7 @@ export const buildSatelliteAnalysisTableRows = (
         threatAfter: null,
       } satisfies SatelliteMetricAccumulator)
 
-    map.set(norad, {
+    map.set(rowKey, {
       ...exist,
       name: patch.name || exist.name,
       coverageBefore: patch.coverageBefore ?? exist.coverageBefore,
@@ -370,10 +434,13 @@ export const buildSatelliteAnalysisTableRows = (
   const entities = Array.isArray(data.levelSeriesEntities) ? data.levelSeriesEntities : []
 
   entities.forEach((entity) => {
+    const series = entity?.series?.trim() || EMPTY_TEXT
+    const sysType = entity?.sysType?.trim() || EMPTY_TEXT
+
     ;(entity?.initMatrixList || []).forEach((sat) => {
       const norad = normalizeNorad(sat?.norad)
       if (norad == null) return
-      upsert(norad, {
+      upsert(series, sysType, norad, {
         name: sat?.name,
         coverageBefore: isValidNumber(sat?.coverage) ? sat.coverage : null,
       })
@@ -382,7 +449,7 @@ export const buildSatelliteAnalysisTableRows = (
     ;(entity?.satelliteMatrixList || []).forEach((sat) => {
       const norad = normalizeNorad(sat?.norad)
       if (norad == null) return
-      upsert(norad, {
+      upsert(series, sysType, norad, {
         name: sat?.name,
         coverageAfter: isValidNumber(sat?.coverage) ? sat.coverage : null,
       })
@@ -391,7 +458,7 @@ export const buildSatelliteAnalysisTableRows = (
     ;(entity?.timeEffects || []).forEach((item) => {
       const norad = normalizeNorad(item?.norad)
       if (norad == null) return
-      upsert(norad, {
+      upsert(series, sysType, norad, {
         name: item?.name,
         delayBefore: isValidNumber(item?.duration) ? item.duration : null,
         delayIncrease: isValidNumber(item?.afterDuration) ? item.afterDuration : null,
@@ -401,7 +468,7 @@ export const buildSatelliteAnalysisTableRows = (
     ;(entity?.threatSats || []).forEach((item) => {
       const norad = normalizeNorad(item?.norad)
       if (norad == null) return
-      upsert(norad, {
+      upsert(series, sysType, norad, {
         name: item?.name,
         threatBefore: isValidNumber(item?.threatScore) ? item.threatScore : null,
         threatAfter: isValidNumber(item?.afterThreatScore) ? item.afterThreatScore : null,
@@ -411,5 +478,11 @@ export const buildSatelliteAnalysisTableRows = (
 
   return Array.from(map.values())
     .map(toDisplayRow)
-    .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+    .sort((a, b) => {
+      const seriesCompare = a.series.localeCompare(b.series, 'zh-CN')
+      if (seriesCompare !== 0) return seriesCompare
+      const typeCompare = a.sysType.localeCompare(b.sysType, 'zh-CN')
+      if (typeCompare !== 0) return typeCompare
+      return a.name.localeCompare(b.name, 'zh-CN')
+    })
 }

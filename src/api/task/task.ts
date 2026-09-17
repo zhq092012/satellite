@@ -246,7 +246,7 @@ export interface StationObject {
     stationId: string;//数据中心ID
     stationName: string;//数据中心名称
     stationLatLon: string;//数据中心经纬度
-    stationStatus: number;//数据中心状态
+    stationStatus: number;//数据中心状态 0:正常 1:异常 ，1代表被打击0代表未打击
 }
 
 /** 接收站->数据中心关系 */

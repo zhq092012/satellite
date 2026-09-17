@@ -636,12 +636,13 @@ export interface SatelliteThreatInfo {
   formula: string
 }
 /**
- * 根据卫星Norad编号、卫星类型、任务ID获取卫星威胁度等相关信息
- * @param data 请求参数对象 (norad, sysType, taskId)
+ * 根据卫星 Norad 编号、卫星系统类型、任务 ID 获取卫星威胁度等相关信息。
+ *
+ * @param data 请求参数（norad、sysType 如侦察/通信、taskId）
  * @returns 包含卫星威胁度等相关信息的 Axios 响应 Promise
  */
-export const getSatelliteThreatInfo = (data: { norad: number; series: string; taskId: number }) => {
-  const url = `/api/algorithm/satelliteCapModel?sysType=${data.series}&taskId=${data.taskId}&norads=${data.norad}`
+export const getSatelliteThreatInfo = (data: { norad: number; sysType: string; taskId: number }) => {
+  const url = `/api/algorithm/satelliteCapModel?sysType=${encodeURIComponent(data.sysType)}&taskId=${data.taskId}&norads=${data.norad}`
   return requestAPI.get<AxiosResponseType<SatelliteThreatInfo[]>>(url)
 }
 

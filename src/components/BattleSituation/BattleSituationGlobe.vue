@@ -12,6 +12,8 @@ import { useBattleGlobeSatellites } from '@/composables/useBattleGlobeSatellites
 import { useBattleGlobeWeapons } from '@/composables/useBattleGlobeWeapons'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
+import type { BattleGlobeGroundTarget } from '@/utils/buildBattleGlobeGroundTargets'
+import { useBattleGlobeGroundTargets } from '@/composables/useBattleGlobeGroundTargets'
 import { computed, onActivated, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
 /** 地图瓦片服务地址 */
@@ -27,8 +29,12 @@ const props = withDefaults(
     selectedNorad?: number | null
     /** 武器列表 */
     weapons?: BattleGlobeWeapon[]
+    /** 接收站/数据中心列表 */
+    groundTargets?: BattleGlobeGroundTarget[]
     /** 当前选中武器 ID */
     selectedWeaponId?: string | null
+    /** 当前选中地面目标键 */
+    selectedGroundTargetKey?: string | null
     /** 任务开始时间（毫秒） */
     taskStartMs?: number
     /** 任务结束时间（毫秒） */
@@ -39,7 +45,9 @@ const props = withDefaults(
     currentTimeMs: 0,
     selectedNorad: null,
     weapons: () => [],
+    groundTargets: () => [],
     selectedWeaponId: null,
+    selectedGroundTargetKey: null,
     taskStartMs: 0,
     taskEndMs: 0,
   }
@@ -73,6 +81,13 @@ useBattleGlobeWeapons(
   viewerRef,
   computed(() => props.weapons),
   computed(() => props.selectedWeaponId)
+)
+
+/** 接收站/数据中心渲染逻辑 */
+useBattleGlobeGroundTargets(
+  viewerRef,
+  computed(() => props.groundTargets),
+  computed(() => props.selectedGroundTargetKey)
 )
 
 /**

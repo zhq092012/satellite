@@ -88,16 +88,31 @@
           </span>
         </div>
 
-        <el-table :data="displayedSatelliteTableRows" size="small" row-key="norad" class="sat-metric-table"
+        <el-table :data="displayedSatelliteTableRows" size="small" row-key="rowKey" class="sat-metric-table"
           empty-text="暂无卫星数据">
-          <el-table-column label="卫星" width="98" class-name="sat-name-column">
+          <el-table-column label="卫星" width="112" class-name="sat-name-column">
             <template #default="{ row }">
-              <el-tooltip :content="row.name" placement="left" :show-after="200">
-                <button type="button" class="sat-name-wrap"
-                  :class="{ 'sat-name-wrap--selected': selectedNorad === row.norad }"
-                  @click="emit('select-satellite', row.norad)">
-                  {{ row.name }}
-                </button>
+              <el-tooltip
+                :content="`${row.name}\n${formatSatelliteSeriesTypeMeta(row.series, row.sysType)}`"
+                placement="left"
+                :show-after="200">
+                <div class="sat-name-cell">
+                  <button type="button" class="sat-name-wrap"
+                    :class="{ 'sat-name-wrap--selected': selectedNorad === row.norad }"
+                    @click="emit('select-satellite', row.norad)">
+                    {{ row.name }}
+                  </button>
+                  <div class="sat-name-meta">
+                    <div v-if="row.series && row.series !== '--'" class="sat-name-meta__line">
+                      <span class="sat-name-meta__label">系列：</span>
+                      <span class="sat-name-meta__series">{{ row.series }}</span>
+                    </div>
+                    <div v-if="row.sysType && row.sysType !== '--'" class="sat-name-meta__line">
+                      <span class="sat-name-meta__label">类型：</span>
+                      <span class="sat-name-meta__type">{{ row.sysType }}</span>
+                    </div>
+                  </div>
+                </div>
               </el-tooltip>
             </template>
           </el-table-column>
@@ -140,9 +155,12 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="威胁度" width="96" sortable :sort-method="sortByThreatBefore">
+          <el-table-column label="威胁度" width="96" sortable :sort-method="sortByThreatBefore"
+            class-name="sat-threat-column">
             <template #default="{ row }">
-              <div class="metric-cell">
+              <div class="metric-cell metric-cell--clickable-threat" role="button" tabindex="0"
+                @click.stop="handleThreatMetricClick(row)"
+                @keydown.enter.stop="handleThreatMetricClick(row)">
                 <div class="metric-line">
                   <span class="metric-line-label">打击前</span>
                   <span class="metric-line-value">{{ row.threatBeforeText }}</span>
@@ -299,8 +317,72 @@
           </button>
         </div>
       </section>
+
+      <!-- 6. 接收站 -->
+      <section class="analysis-section analysis-section--table">
+        <div class="section-head">
+          <span class="section-title">接收站</span>
+          <span class="section-count">共 {{ receiveStationTableRows.length }} 个</span>
+        </div>
+
+        <el-table :data="receiveStationTableRows" size="small" row-key="key"
+          class="sat-metric-table ground-station-table" empty-text="暂无接收站数据">
+          <el-table-column label="名称" min-width="0" show-overflow-tooltip>
+            <template #default="{ row }">
+              <button type="button" class="ground-target-name"
+                :class="{
+                  'ground-target-name--struck': row.struck,
+                  'ground-target-name--selected': selectedGroundTargetKey === row.key,
+                }"
+                @click="emit('select-ground-target', row.key)">
+                {{ row.name }}
+              </button>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="64">
+            <template #default="{ row }">
+              <span :class="{ 'ground-target-status--struck': row.struck }">{{ row.statusText }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="经纬度" min-width="0" show-overflow-tooltip prop="latLonText" />
+          <el-table-column label="用途" min-width="0" show-overflow-tooltip prop="usage" />
+        </el-table>
+      </section>
+
+      <!-- 7. 数据中心 -->
+      <section class="analysis-section analysis-section--table">
+        <div class="section-head">
+          <span class="section-title">数据中心</span>
+          <span class="section-count">共 {{ dataCenterTableRows.length }} 个</span>
+        </div>
+
+        <el-table :data="dataCenterTableRows" size="small" row-key="key"
+          class="sat-metric-table ground-station-table" empty-text="暂无数据中心数据">
+          <el-table-column label="名称" min-width="0" show-overflow-tooltip>
+            <template #default="{ row }">
+              <button type="button" class="ground-target-name"
+                :class="{
+                  'ground-target-name--struck': row.struck,
+                  'ground-target-name--selected': selectedGroundTargetKey === row.key,
+                }"
+                @click="emit('select-ground-target', row.key)">
+                {{ row.name }}
+              </button>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="64">
+            <template #default="{ row }">
+              <span :class="{ 'ground-target-status--struck': row.struck }">{{ row.statusText }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="经纬度" min-width="0" show-overflow-tooltip prop="latLonText" />
+        </el-table>
+      </section>
     </div>
   </aside>
+
+  <SatelliteThreatInfoDialog v-model="threatInfoDialogVisible" :loading="threatInfoLoading"
+    :threat-info="threatInfoData" :subtitle="threatInfoSubtitle" :empty-hint="threatInfoEmptyHint" />
 </template>
 
 <script setup lang="ts">
@@ -309,12 +391,20 @@
  * 根据任务算法进度展示 getTaskMatrix 返回的分析摘要。
  */
 import { computed, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import { getSatelliteThreatInfo, type SatelliteThreatInfo } from '@/api/electronic'
 import type { SatelliteAnalysisData } from '@/api/task/task'
+import SatelliteThreatInfoDialog from '@/components/BattleSituation/SatelliteThreatInfoDialog.vue'
+import { useLayoutStore } from '@/store/modules/layout'
 import {
   ATTACK_PLAN_TOP_COUNT,
   buildAttackPlanTableRows,
   type AttackPlanTableRow,
 } from '@/utils/buildAttackPlanTable'
+import {
+  buildDataCenterTableRows,
+  buildReceiveStationTableRows,
+} from '@/utils/buildGroundStationTable'
 import {
   buildLinkChainTableRows,
   LINK_CHAIN_TOP_COUNT,
@@ -323,6 +413,7 @@ import {
 import {
   buildSatelliteAnalysisTableRows,
   compareNullableMetric,
+  formatSatelliteSeriesTypeMeta,
   rankSatellitesByCompositeBeforeMetrics,
   SATELLITE_TABLE_TOP_COUNT,
   type SatelliteMetricTableRow,
@@ -338,6 +429,85 @@ import {
 /** 打击计划时间拆分为日期/时分秒两行展示 */
 const getPlanTimeParts = splitDateTimeDisplay
 
+/** 全局布局 Store（当前任务 ID） */
+const store = useLayoutStore()
+
+/** 威胁度算法参数弹窗可见性 */
+const threatInfoDialogVisible = ref(false)
+
+/** 威胁度算法参数加载状态 */
+const threatInfoLoading = ref(false)
+
+/** 威胁度算法参数数据 */
+const threatInfoData = ref<SatelliteThreatInfo | null>(null)
+
+/** 威胁度弹窗副标题 */
+const threatInfoSubtitle = ref('')
+
+/** 威胁度弹窗无数据提示 */
+const threatInfoEmptyHint = ref('')
+
+/**
+ * 从接口列表中解析与 NORAD 匹配的威胁度参数。
+ *
+ * @param list 接口返回列表
+ * @param norad 目标 NORAD
+ * @returns 匹配项或首项
+ */
+const resolveThreatInfoFromResponse = (
+  list: SatelliteThreatInfo[] | null | undefined,
+  norad: number
+): SatelliteThreatInfo | null => {
+  if (!list?.length) return null
+  return list.find((item) => item.satelliteBaseModelResp?.norad === norad) ?? list[0] ?? null
+}
+
+/**
+ * 点击威胁度单元格，拉取并展示威胁度算法参数。
+ *
+ * @param row 卫星指标行
+ */
+const handleThreatMetricClick = async (row: SatelliteMetricTableRow) => {
+  const taskId = store.activedTask?.id
+  if (!taskId) {
+    ElMessage.warning('请先选择任务')
+    return
+  }
+  if (!row.sysType || row.sysType === '--') {
+    ElMessage.warning('缺少卫星类型，无法查询威胁度算法参数')
+    return
+  }
+
+  threatInfoDialogVisible.value = true
+  threatInfoLoading.value = true
+  threatInfoData.value = null
+  threatInfoEmptyHint.value = ''
+  threatInfoSubtitle.value = `${row.name}${row.series && row.series !== '--' ? ` · 系列：${row.series}` : ''} · 类型：${row.sysType}`
+
+  try {
+    const res = await getSatelliteThreatInfo({
+      norad: row.norad,
+      sysType: row.sysType,
+      taskId,
+    })
+    if (res?.code !== 200) {
+      threatInfoEmptyHint.value = res?.msg || '未查询到威胁度算法参数'
+      return
+    }
+    const info = resolveThreatInfoFromResponse(res.data, row.norad)
+    threatInfoData.value = info
+    if (!info) {
+      threatInfoEmptyHint.value = '未查询到威胁度算法参数'
+    }
+  } catch (error) {
+    console.error('获取卫星威胁度算法参数失败:', error)
+    threatInfoEmptyHint.value = '加载失败，请稍后重试'
+    ElMessage.error('获取卫星威胁度算法参数失败')
+  } finally {
+    threatInfoLoading.value = false
+  }
+}
+
 const props = defineProps<{
   /** 任务算法分析结果 */
   analysisData: SatelliteAnalysisData | null
@@ -349,12 +519,15 @@ const props = defineProps<{
   selectedNorad?: number | null
   /** 当前选中的武器 ID */
   selectedWeaponId?: string | null
+  /** 当前选中的地面目标键 */
+  selectedGroundTargetKey?: string | null
 }>()
 
-/** 选中右侧卫星/武器时通知父组件定位地球 */
+/** 选中右侧卫星/武器/地面站时通知父组件定位地球 */
 const emit = defineEmits<{
   (e: 'select-satellite', norad: number): void
   (e: 'select-weapon', weaponId: string): void
+  (e: 'select-ground-target', targetKey: string): void
 }>()
 
 /**
@@ -478,6 +651,12 @@ const showAllAttackPlans = ref(false)
 
 /** 打击计划表格全量行（按开始时间升序） */
 const attackPlanTableRows = computed(() => buildAttackPlanTableRows(props.analysisData))
+
+/** 接收站表格行 */
+const receiveStationTableRows = computed(() => buildReceiveStationTableRows(props.analysisData))
+
+/** 数据中心表格行 */
+const dataCenterTableRows = computed(() => buildDataCenterTableRows(props.analysisData))
 
 /** 当前表格展示的打击计划行 */
 const displayedAttackPlanTableRows = computed(() => {
@@ -678,7 +857,7 @@ const displayedLinkChainTableRows = computed(() => {
   border: none;
   background: transparent;
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.35;
   color: #e2efff;
   word-break: break-all;
   white-space: normal;
@@ -694,6 +873,46 @@ const displayedLinkChainTableRows = computed(() => {
     color: #fbbf24;
     text-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
   }
+}
+
+.sat-name-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.sat-name-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  font-size: 10px;
+  line-height: 1.35;
+  word-break: break-all;
+  white-space: normal;
+}
+
+.sat-name-meta__line {
+  display: block;
+  width: 100%;
+}
+
+.sat-name-meta__label {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.sat-name-meta__series {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.sat-name-meta__type {
+  color: #22d3ee;
+  font-weight: 600;
 }
 
 .table-more-actions {
@@ -725,6 +944,24 @@ const displayedLinkChainTableRows = computed(() => {
   flex-direction: column;
   gap: 5px;
   min-width: 0;
+}
+
+.metric-cell--clickable-threat {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+
+  &:hover {
+    background: rgba(0, 225, 255, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(0, 225, 255, 0.22);
+  }
+
+  &:focus-visible {
+    outline: 1px solid rgba(0, 225, 255, 0.45);
+    outline-offset: 1px;
+  }
 }
 
 .metric-line {
@@ -865,6 +1102,47 @@ const displayedLinkChainTableRows = computed(() => {
 .plan-weapon-text--selected {
   color: #f87171;
   text-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
+}
+
+.ground-station-table {
+  width: 100%;
+}
+
+.ground-target-name {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #7dd3fc;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+
+  &:hover {
+    color: #bae6fd;
+    text-shadow: 0 0 8px rgba(125, 211, 252, 0.45);
+  }
+}
+
+.ground-target-name--struck {
+  color: #f87171;
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.35);
+}
+
+.ground-target-name--selected {
+  color: #22d3ee;
+  text-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+}
+
+.ground-target-status--struck {
+  color: #f87171;
+  font-weight: 700;
 }
 
 .plan-time-text {
