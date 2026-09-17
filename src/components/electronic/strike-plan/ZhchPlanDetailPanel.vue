@@ -17,7 +17,7 @@
     <div class="kpi-grid" :class="{ 'kpi-grid--compact': compactKpi }">
       <div class="kpi-card kpi-card--cyan">
         <span class="kpi-value">{{ plan.satNum }}<em>颗</em></span>
-        <span class="kpi-label">侦察卫星</span>
+        <span class="kpi-label">卫星数量</span>
       </div>
       <div class="kpi-card kpi-card--yellow">
         <span class="kpi-value">{{ plan.stationNum }}<em>座</em></span>
@@ -45,6 +45,37 @@
     <div class="text-block">
       <div class="block-head">方案概要</div>
       <p class="block-text large" v-html="highlightText(plan.summary)"></p>
+
+      <div v-if="topCoverageRecommends.length || topDelayRecommends.length" class="recommend-section">
+        <div v-if="topCoverageRecommends.length" class="recommend-block">
+          <div class="recommend-title">覆盖率降幅 TOP5</div>
+          <ul class="recommend-list">
+            <li v-for="item in topCoverageRecommends" :key="`cov-${item.norad}`" class="recommend-item">
+              <span class="recommend-name">{{ item.name }}</span>
+              <span class="recommend-meta">
+                {{ formatCoverage(item.coverage) }}
+                <span class="recommend-arrow">→</span>
+                {{ formatCoverage(item.afterCoverage) }}
+                <span class="recommend-delta recommend-delta--down">↓{{ formatCoverageDelta(item.reducedCoverage) }}</span>
+              </span>
+            </li>
+          </ul>
+        </div>
+        <div v-if="topDelayRecommends.length" class="recommend-block">
+          <div class="recommend-title">链路时延增幅 TOP5</div>
+          <ul class="recommend-list">
+            <li v-for="item in topDelayRecommends" :key="`delay-${item.norad}`" class="recommend-item">
+              <span class="recommend-name">{{ item.name }}</span>
+              <span class="recommend-meta">
+                {{ formatDelay(item.delay) }}
+                <span class="recommend-arrow">→</span>
+                {{ formatDelay(item.afterDelay) }}
+                <span class="recommend-delta recommend-delta--up">↑{{ formatDelayDelta(item.increasedDelay) }}</span>
+              </span>
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <div class="compare-section" :class="{ 'compare-section--align': alignBlocks }">
@@ -83,8 +114,8 @@
       <div class="station-row">
         <span class="row-label">可用地面站：</span>
         <div class="station-tags">
-          <span v-for="name in plan.stationList" :key="name" class="station-tag">{{ name }}</span>
-          <span v-if="!plan.stationList?.length" class="empty-hint">暂无地面站数据</span>
+          <span v-for="name in stationNames" :key="name" class="station-tag">{{ name }}</span>
+          <span v-if="!stationNames.length" class="empty-hint">暂无地面站数据</span>
         </div>
       </div>
     </div>
@@ -96,7 +127,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ZhchPlanResp } from '@/api/electronic'
+import type {
+  ZhchPlanCoverageRecommend,
+  ZhchPlanDelayRecommend,
+  ZhchPlanResp,
+} from '@/api/electronic'
 import { highlightResultText, formatInterferenceDelay } from '@/utils/zhchPlanDisplay'
 import SeriesLinkTimeline from './SeriesLinkTimeline.vue'
 
@@ -122,6 +157,68 @@ const formatCoverage = (coverage: number | null | undefined): string => {
   if (coverage == null || !Number.isFinite(coverage)) return '--'
   return `${Number(coverage.toFixed(2))}%`
 }
+
+/** 格式化覆盖率变化量（展示绝对值，方向由样式符号表达）。 */
+const formatCoverageDelta = (value: number | null | undefined): string => {
+  if (value == null || !Number.isFinite(value)) return '--'
+  return `${Math.abs(Number(value.toFixed(2)))}%`
+}
+
+/** 格式化链路时延（分钟）。 */
+const formatDelay = (minutes: number | null | undefined): string => {
+  if (minutes == null || !Number.isFinite(minutes)) return '--'
+  return `${Number(minutes.toFixed(2))} 分钟`
+}
+
+/** 格式化时延变化量（分钟）。 */
+const formatDelayDelta = (minutes: number | null | undefined): string => {
+  if (minutes == null || !Number.isFinite(minutes)) return '--'
+  return `${Math.abs(Number(minutes.toFixed(2)))} 分钟`
+}
+
+const RECOMMEND_TOP_N = 5
+
+/**
+ * 取覆盖率推荐前列：优先按 reducedCoverage 降序，不足时保留接口原序。
+ * @param list 接口返回的 coverageRecommends
+ */
+const pickTopCoverageRecommends = (
+  list: ZhchPlanCoverageRecommend[] | undefined
+): ZhchPlanCoverageRecommend[] => {
+  const source = list ?? []
+  if (!source.length) return []
+  const sorted = [...source].sort((a, b) => (b.reducedCoverage ?? 0) - (a.reducedCoverage ?? 0))
+  return sorted.slice(0, RECOMMEND_TOP_N)
+}
+
+/**
+ * 取链路时延推荐前列：优先按 increasedDelay 降序。
+ * @param list 接口返回的 delayRecommends
+ */
+const pickTopDelayRecommends = (list: ZhchPlanDelayRecommend[] | undefined): ZhchPlanDelayRecommend[] => {
+  const source = list ?? []
+  if (!source.length) return []
+  const sorted = [...source].sort((a, b) => (b.increasedDelay ?? 0) - (a.increasedDelay ?? 0))
+  return sorted.slice(0, RECOMMEND_TOP_N)
+}
+
+/** 方案概要下展示的覆盖率 TOP5 */
+const topCoverageRecommends = computed(() => pickTopCoverageRecommends(props.plan.coverageRecommends))
+
+/** 方案概要下展示的链路时延 TOP5 */
+const topDelayRecommends = computed(() => pickTopDelayRecommends(props.plan.delayRecommends))
+
+/** 将 stationList 统一为名称数组（兼容字符串与数组两种返回）。 */
+const stationNames = computed((): string[] => {
+  const raw = props.plan.stationList
+  if (Array.isArray(raw)) {
+    return raw.map((s) => String(s).trim()).filter(Boolean)
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    return raw.split(/[,，、;；\s]+/).map((s) => s.trim()).filter(Boolean)
+  }
+  return []
+})
 
 /** 打击干扰造成的延迟时长（格式：xx时xx分xx秒） */
 const interferenceDelay = computed(() =>
@@ -325,6 +422,91 @@ const coverageReduction = computed(() => {
     &--after {
       color: #fbbf24;
       background: rgba(251, 191, 36, 0.1);
+    }
+  }
+
+  .recommend-section {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 14px 16px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(79, 147, 221, 0.35);
+
+    > .recommend-block:only-child {
+      flex: 1 1 100%;
+    }
+  }
+
+  .recommend-block {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .recommend-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #bae6fd;
+    margin-bottom: 8px;
+  }
+
+  .recommend-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .recommend-item {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.45;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: rgba(8, 15, 26, 0.55);
+    border: 1px solid rgba(79, 147, 221, 0.2);
+  }
+
+  .recommend-name {
+    font-weight: 700;
+    color: #e2e8f0;
+    flex: 0 1 42%;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .recommend-meta {
+    color: #94a3b8;
+    font-weight: 600;
+    flex: 1 1 58%;
+    min-width: 0;
+    text-align: right;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .recommend-arrow {
+    margin: 0 4px;
+    color: #64748b;
+  }
+
+  .recommend-delta {
+    margin-left: 8px;
+    font-weight: 800;
+
+    &--down {
+      color: #f87171;
+    }
+
+    &--up {
+      color: #fb923c;
     }
   }
 

@@ -324,8 +324,10 @@ export interface ThreatSatelliteItem {
   name: string
   /** 卫星类型；部分卫星可能为 null */
   satType: string | null
-  /** 威胁度评分 */
+  /** 打击前威胁度评分 */
   threatScore: number
+  /** 打击后威胁度评分（综合打击方案 V3 返回） */
+  afterThreatScore?: number
 }
 
 /**
@@ -354,9 +356,13 @@ export interface TimeEffectsItem {
    */
   endTime: string
   /**
-   * 链路时长
+   * 打击前链路时长（分钟）
    */
   duration: number
+  /**
+   * 打击后链路时长（分钟，综合打击方案 V3 返回）
+   */
+  afterDuration?: number
   /**
    * 接收站名称；中继卫星或无地面站链路的卫星可能为 null
    */
@@ -659,6 +665,8 @@ export interface ZhchPlanLevelSeriesEntity {
   intensityLevel: string
   /** 任务 Id */
   taskId: number
+  /** 卫星系统类型（如：侦察、通信） */
+  sysType?: string
   /** 打击前初始过境时间窗口列表 */
   initMatrixList: InitMatrix[]
   /** 星间中继拓扑；该系列无中继时为 null */
@@ -692,6 +700,42 @@ export type ZhchPlanStationWindow = StationWindow
 export type ZhchPlanSatelliteMatrix = SatelliteMatrix
 
 /**
+ * 综合打击方案中的覆盖率变化推荐项（按降幅排序后取前列展示）。
+ */
+export interface ZhchPlanCoverageRecommend {
+  /** 卫星 NORAD 编号 */
+  norad: number
+  /** 卫星名称 */
+  name: string
+  /** 卫星类型 */
+  satType: string
+  /** 打击前覆盖率（百分比） */
+  coverage: number
+  /** 打击后覆盖率（百分比） */
+  afterCoverage: number
+  /** 覆盖率减少量（百分比，正值表示下降） */
+  reducedCoverage: number
+}
+
+/**
+ * 综合打击方案中的链路时延变化推荐项（按增幅排序后取前列展示）。
+ */
+export interface ZhchPlanDelayRecommend {
+  /** 卫星 NORAD 编号 */
+  norad: number
+  /** 卫星名称 */
+  name: string
+  /** 卫星类型 */
+  satType: string
+  /** 打击前链路时延（分钟） */
+  delay: number
+  /** 打击后链路时延（分钟） */
+  afterDelay: number
+  /** 时延增加量（分钟，正值表示变慢） */
+  increasedDelay: number
+}
+
+/**
  * 综合打击方案响应（zhchPlanV3）——基于军用/民用类型的卫星情报链路阻断方案。
  *
  * 顶层为全局统计与概述；各卫星系列的详细打击矩阵在 `levelSeriesEntities` 中，
@@ -720,14 +764,18 @@ export interface ZhchPlanResp {
   satNum: number
   /** 涉及的可用地面站（接收站）数量 */
   stationNum: number
-  /** 可用地面站名称列表 */
-  stationList: string[]
+  /** 可用地面站名称列表；部分接口版本为逗号分隔字符串 */
+  stationList: string[] | string
   /** 打击前态势描述 */
   beforeResult: string
   /** 打击后态势描述 */
   afterResult: string
   /** 按卫星系列划分的打击矩阵列表 */
   levelSeriesEntities: ZhchPlanLevelSeriesEntity[]
+  /** 覆盖率变化推荐列表（接口侧已排序，前端展示前 5 条） */
+  coverageRecommends?: ZhchPlanCoverageRecommend[]
+  /** 链路时延变化推荐列表（接口侧已排序，前端展示前 5 条） */
+  delayRecommends?: ZhchPlanDelayRecommend[]
 }
 
 /**

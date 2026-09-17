@@ -14,6 +14,14 @@
             {{ item.label }}
           </button>
         </div>
+        <span class="type-label type-label--sys">卫星类型：</span>
+        <div class="type-selector">
+          <button v-for="item in sysTypeOptions" :key="item.value" class="type-btn"
+            :class="{ active: store.selectedZhchSysType === item.value }"
+            @click="handleToggleSysType(item.value)">
+            {{ item.label }}
+          </button>
+        </div>
       </div>
 
       <div class="header-right">
@@ -62,7 +70,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ZhchPlanResp } from '@/api/electronic'
 import { refreshZhchPlanCache } from '@/api/electronic'
-import { useLayoutStore, ZHCH_USAGE_TYPE_OPTIONS, getZhchUsageTypeLabel } from '@/store/modules/layout'
+import { useLayoutStore, ZHCH_USAGE_TYPE_OPTIONS, ZHCH_SYS_TYPE_OPTIONS, getZhchUsageTypeLabel } from '@/store/modules/layout'
 import ZhchPlanDetailPanel from './strike-plan/ZhchPlanDetailPanel.vue'
 
 defineOptions({ name: 'StrikePlanGenerator' })
@@ -77,6 +85,12 @@ interface UsageTypeOption {
 
 const usageTypeOptions: UsageTypeOption[] = ZHCH_USAGE_TYPE_OPTIONS.map((value) => ({
   label: getZhchUsageTypeLabel(value),
+  value,
+}))
+
+/** 卫星系统类型选项（侦察 / 通信，单选或不选） */
+const sysTypeOptions: UsageTypeOption[] = ZHCH_SYS_TYPE_OPTIONS.map((value) => ({
+  label: value,
   value,
 }))
 
@@ -117,6 +131,15 @@ const handleToggleUsageType = (type: string) => {
   if (before === 1 && store.selectedZhchUsageTypes.length === 1) {
     ElMessage.warning('至少选择一种用途类型')
   }
+}
+
+/**
+ * 切换卫星系统类型（侦察 / 通信）；再次点击已选项则取消，接口传 null。
+ *
+ * @param type 侦察或通信
+ */
+const handleToggleSysType = (type: string) => {
+  store.toggleZhchSysType(type)
 }
 
 /** 生成方案 */
@@ -214,6 +237,10 @@ watch(
     .type-label {
       font-size: 16px;
       color: #94a3b8;
+
+      &--sys {
+        margin-left: 8px;
+      }
     }
 
     .type-selector {

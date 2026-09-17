@@ -74,6 +74,10 @@ interface State {
   selectedZhchUsageTypes: string[]
   /** 当前激活的综合打击方案用途类型（整体态势矩阵数据源） */
   activeZhchUsageType: string
+  /** 生成打击方案时选中的卫星系统类型（侦察 / 通信）；不选为 null */
+  selectedZhchSysType: string | null
+  /** 最近一次拉取方案时使用的卫星系统类型（用于缓存失效） */
+  zhchPlanFetchSysType: string | null
   /** 整体态势地图上是否显示我方武器图层 */
   showOurWeapons: boolean
   /** 右侧面板选中的我方武器（用于地图定位） */
@@ -125,6 +129,18 @@ export function getZhchUsageTypeLabel(type: string): string {
   return ZHCH_USAGE_TYPE_LABELS[type as (typeof ZHCH_USAGE_TYPE_OPTIONS)[number]] ?? type
 }
 
+/** 生成打击方案可选卫星系统类型（侦察 / 通信，单选或不选） */
+export const ZHCH_SYS_TYPE_OPTIONS = ['侦察', '通信'] as const
+
+/**
+ * 切换综合打击方案卫星系统类型（单选；再次点击同一项则取消选择）。
+ *
+ * @param type 侦察或通信
+ */
+export function isZhchSysTypeOption(type: string): type is (typeof ZHCH_SYS_TYPE_OPTIONS)[number] {
+  return (ZHCH_SYS_TYPE_OPTIONS as readonly string[]).includes(type)
+}
+
 /** 同一 scope 的矩阵拉取 in-flight 去重，避免多组件并发请求互相覆盖 */
 let matrixScopeInflight: Promise<MatrixResult | null> | null = null
 let matrixScopeInflightKey = ''
@@ -170,6 +186,8 @@ export const useLayoutStore = defineStore('layout-store', {
       zhchPlanLoading: false,
       selectedZhchUsageTypes: ['军用'],
       activeZhchUsageType: '军用',
+      selectedZhchSysType: null,
+      zhchPlanFetchSysType: null,
       showOurWeapons: true,
       selectedOurWeapon: null,
       focusedStrikeLink: null,
@@ -653,11 +671,21 @@ export const useLayoutStore = defineStore('layout-store', {
       }
     },
     /**
+     * 切换生成打击方案的卫星系统类型（侦察 / 通信，单选或不选）。
+     *
+     * @param type 侦察或通信
+     */
+    toggleZhchSysType(type: string) {
+      if (!isZhchSysTypeOption(type)) return
+      this.selectedZhchSysType = this.selectedZhchSysType === type ? null : type
+    },
+    /**
      * 清空综合打击方案缓存
      */
     clearZhchPlans() {
       this.zhchPlanMap = {}
       this.zhchPlanTaskId = null
+      this.zhchPlanFetchSysType = null
       this.clearMatrixData()
     },
     /**
@@ -683,6 +711,13 @@ export const useLayoutStore = defineStore('layout-store', {
         this.clearZhchPlans()
       }
 
+      const sysType = this.selectedZhchSysType
+      if (this.zhchPlanFetchSysType !== (sysType ?? null)) {
+        this.zhchPlanMap = {}
+        this.zhchPlanFetchSysType = sysType ?? null
+        force = true
+      }
+
       this.zhchPlanLoading = true
       try {
         const results = await Promise.all(
@@ -690,7 +725,11 @@ export const useLayoutStore = defineStore('layout-store', {
             if (!force && this.zhchPlanMap[type]) {
               return { type, data: this.zhchPlanMap[type] }
             }
-            const res = await getSatelliteThreatInfoByType({ type, taskId, sysType: null })
+            const res = await getSatelliteThreatInfoByType({
+              type,
+              taskId,
+              sysType: sysType ?? null,
+            })
             return { type, data: res.code === 200 ? res.data : null }
           })
         )
