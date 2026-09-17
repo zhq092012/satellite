@@ -120,29 +120,65 @@ export function parseFeedbackTimeAndLink(raw?: string | null): { time: string; l
 }
 
 /**
- * 计算打击造成的回传延迟（打击后 - 打击前）。
- * 不超过 1 小时显示「xx分钟」，超过 1 小时显示「xx小时xx分钟」。
+ * 判断打击后首次回传是否缺失（null、空串或「无」）。
  *
- * @param beforeTime 打击前首次回传时间
- * @param afterTime 打击后首次回传时间
+ * @param afterTime 打击后首次回传原始字段
+ * @returns 无有效打击后回传时为 true
+ */
+function isAfterFeedbackMissing(afterTime?: string | null): boolean {
+  if (afterTime == null) return true
+  const trimmed = afterTime.trim()
+  return trimmed === '' || trimmed === '无'
+}
+
+/**
+ * 将毫秒差格式化为延迟展示文案（不超过 1 小时为「xx分钟」，否则「xx小时xx分钟」）。
+ *
+ * @param diffMs 非负时间差（毫秒）
  * @returns 格式化后的延迟文本
  */
-export function formatStrikeDelayDuration(beforeTime?: string | null, afterTime?: string | null): string {
-  if (!beforeTime || !afterTime || beforeTime.trim() === '无' || afterTime.trim() === '无') {
-    return '--'
-  }
-  const beforeMs = parseFeedbackTimestamp(beforeTime)
-  const afterMs = parseFeedbackTimestamp(afterTime)
-  if (beforeMs === null || afterMs === null) return '--'
-
-  const diffMs = Math.max(0, afterMs - beforeMs)
-  const totalMinutes = Math.round(diffMs / 60000)
+function formatDelayDurationFromMs(diffMs: number): string {
+  const totalMinutes = Math.round(Math.max(0, diffMs) / 60000)
   if (totalMinutes <= 60) {
     return `${totalMinutes}分钟`
   }
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
   return minutes > 0 ? `${hours}小时${minutes}分钟` : `${hours}小时`
+}
+
+/**
+ * 计算打击造成的回传延迟（打击后 - 打击前）。
+ * 打击后无回传时，使用任务结束时间 - 打击前首次回传时间。
+ * 不超过 1 小时显示「xx分钟」，超过 1 小时显示「xx小时xx分钟」。
+ *
+ * @param beforeTime 打击前首次回传时间
+ * @param afterTime 打击后首次回传时间
+ * @param taskEndTime 任务结束时间；打击后缺失时用于计算延迟
+ * @returns 格式化后的延迟文本
+ */
+export function formatStrikeDelayDuration(
+  beforeTime?: string | null,
+  afterTime?: string | null,
+  taskEndTime?: string | null
+): string {
+  if (!beforeTime || beforeTime.trim() === '无') {
+    return '--'
+  }
+  const beforeMs = parseFeedbackTimestamp(beforeTime)
+  if (beforeMs === null) return '--'
+
+  let endMs: number | null
+  if (isAfterFeedbackMissing(afterTime)) {
+    if (!taskEndTime || taskEndTime.trim() === '') return '--'
+    endMs = parseFeedbackTimestamp(taskEndTime)
+  } else {
+    endMs = parseFeedbackTimestamp(afterTime)
+  }
+
+  if (endMs === null) return '--'
+
+  return formatDelayDurationFromMs(endMs - beforeMs)
 }
 
 /**

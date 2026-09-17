@@ -36,18 +36,24 @@
           </div>
 
           <div class="feedback-cell">
-            <span class="feedback-link">{{ beforeFeedback.link }}</span>
+            <el-tooltip
+              :disabled="!hasFeedbackLinkTooltip(beforeFeedback.link)"
+              :content="beforeFeedback.link"
+              placement="top"
+              :show-after="200"
+            >
+              <span class="feedback-time">{{ formatFeedbackTimeOnly(beforeFeedback.time) }}</span>
+            </el-tooltip>
           </div>
           <div class="feedback-cell">
-            <span class="feedback-link">{{ afterFeedback.link }}</span>
-          </div>
-          <div class="feedback-cell feedback-cell--empty" />
-
-          <div class="feedback-cell">
-            <span class="feedback-time">{{ beforeFeedback.time }}</span>
-          </div>
-          <div class="feedback-cell">
-            <span class="feedback-time">{{ afterFeedback.time }}</span>
+            <el-tooltip
+              :disabled="!hasFeedbackLinkTooltip(afterFeedback.link)"
+              :content="afterFeedback.link"
+              placement="top"
+              :show-after="200"
+            >
+              <span class="feedback-time">{{ formatFeedbackTimeOnly(afterFeedback.time) }}</span>
+            </el-tooltip>
           </div>
           <div class="feedback-cell">
             <span class="analysis-kpi-value analysis-kpi-value--delay">{{ strikeDelayText }}</span>
@@ -659,6 +665,29 @@ const resolveBeforeAvgCoverage = (data: SatelliteAnalysisData | null): number | 
   return coverages.reduce((sum, value) => sum + value, 0) / coverages.length
 }
 
+/**
+ * 首次回传 KPI 单元格仅展示时分秒；无效或「无」时原样返回。
+ *
+ * @param timeText 解析后的回传时间文本
+ * @returns 用于展示的时分秒或占位符
+ */
+function formatFeedbackTimeOnly(timeText: string): string {
+  if (timeText === '无' || timeText === '--') return timeText
+  const { time, date } = splitDateTimeDisplay(timeText)
+  return time || date || timeText
+}
+
+/**
+ * 是否存在可在 tooltip 中展示的回传链路。
+ *
+ * @param link 解析后的链路文本
+ * @returns 有有效链路时为 true
+ */
+function hasFeedbackLinkTooltip(link: string): boolean {
+  const trimmed = link?.trim()
+  return Boolean(trimmed && trimmed !== '--' && trimmed !== '无')
+}
+
 /** 打击前首次回传时间与链路 */
 const beforeFeedback = computed(() =>
   parseFeedbackTimeAndLink(props.analysisData?.beforeFirstFeedbackTime)
@@ -673,7 +702,8 @@ const afterFeedback = computed(() =>
 const strikeDelayText = computed(() =>
   formatStrikeDelayDuration(
     props.analysisData?.beforeFirstFeedbackTime,
-    props.analysisData?.afterFirstFeedbackTime
+    props.analysisData?.afterFirstFeedbackTime,
+    taskEndDate.value
   )
 )
 
@@ -1354,7 +1384,7 @@ const displayedLinkChainTableRows = computed(() => {
 .feedback-kpi-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto;
   gap: 8px 8px;
   padding: 10px 8px;
   border-radius: 6px;
@@ -1368,19 +1398,6 @@ const displayedLinkChainTableRows = computed(() => {
   align-items: flex-start;
   justify-content: flex-start;
   text-align: left;
-
-  &--empty {
-    min-height: 0;
-  }
-}
-
-.feedback-link {
-  font-size: 13px;
-  font-weight: 600;
-  color: #7dd3fc;
-  word-break: break-word;
-  line-height: 1.45;
-  text-shadow: 0 0 6px rgba(125, 211, 252, 0.35);
 }
 
 .feedback-time {

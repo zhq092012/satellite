@@ -59,7 +59,7 @@
       </button>
     </div>
 
-    <!-- 4. 任务时间轴（纯展示，无播放） -->
+    <!-- 4. 任务时间轴 -->
     <div class="floating-timeline-wrapper" :class="{
       'is-collapsed': isTimelineCollapsed,
       'timeline--left-collapsed': isLeftCollapsed,
@@ -137,6 +137,12 @@ const isTimelinePlaying = ref(false)
 
 /** 时间轴播放倍速 */
 const playbackSpeed = ref(1)
+
+/** 任务加载完成后自动播放使用的倍速 */
+const AUTO_TIMELINE_PLAYBACK_SPEED = 10
+
+/** 已对某任务触发过「加载完成自动播放」，避免重复启动 */
+let autoTimelinePlaybackTaskId: number | null = null
 
 /** 播放循环句柄 */
 let playbackRafId: number | null = null
@@ -329,6 +335,35 @@ const handlePlaybackSpeedChange = (speed: number) => {
 }
 
 /**
+ * 任务算法与态势数据就绪后，以 10 倍速自动播放 Cesium 时间轴（每任务仅一次，重算或换任务后重置）。
+ */
+const tryStartAutoTimelinePlayback = () => {
+  const taskId = store.activedTask?.id
+  if (!taskId || !algorithmComplete.value) return
+  if (autoTimelinePlaybackTaskId === taskId) return
+  if (taskAnalysisLoading.value) return
+  if (hasGlobeSelection()) return
+
+  const hasGlobeData =
+    Boolean(taskAnalysisData.value) ||
+    globeSatellites.value.length > 0 ||
+    globeWeapons.value.length > 0 ||
+    globeGroundTargets.value.length > 0 ||
+    Boolean(matrixData.value)
+  if (!hasGlobeData) return
+
+  const start = taskStartMs.value
+  const end = taskEndMs.value
+  if (!start || !end || end <= start) return
+
+  autoTimelinePlaybackTaskId = taskId
+  playbackSpeed.value = AUTO_TIMELINE_PLAYBACK_SPEED
+  stopTimelinePlayback()
+  currentTimeMs.value = start
+  nextTick(() => startTimelinePlayback())
+}
+
+/**
  * 处理选中目标时的播放暂停逻辑。
  *
  * @param hadSelection 选中前是否已有卫星/武器选中
@@ -455,6 +490,8 @@ const handleClearSelectedGroundTarget = () => {
  * 左侧面板保存并重算后：清空矩阵缓存并等待进度完成后由既有 watch 拉取分析。
  */
 const handleTaskRecalculated = () => {
+  autoTimelinePlaybackTaskId = null
+  stopTimelinePlayback()
   void loadMatrixForCurrentScope()
 }
 
@@ -536,6 +573,9 @@ watch(
 watch(
   () => store.activedTask?.id,
   (taskId, prevTaskId) => {
+    if (taskId !== prevTaskId) {
+      autoTimelinePlaybackTaskId = null
+    }
     if (!taskId) {
       store.clearTaskAnalysisData()
       return
@@ -545,6 +585,24 @@ watch(
     void loadTaskAnalysis()
   },
   { immediate: true }
+)
+
+/** 任务加载完成后 10x 自动播放时间轴 */
+watch(
+  () =>
+    [
+      store.activedTask?.id,
+      algorithmComplete.value,
+      taskAnalysisLoading.value,
+      taskAnalysisData.value,
+      matrixData.value,
+      globeSatellites.value.length,
+      globeWeapons.value.length,
+      globeGroundTargets.value.length,
+    ] as const,
+  () => {
+    tryStartAutoTimelinePlayback()
+  }
 )
 
 /** 算法进度完成后自动拉取分析结果 */

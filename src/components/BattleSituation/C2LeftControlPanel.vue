@@ -42,7 +42,15 @@
 
             class="task-progress-item"
 
-            :class="{ active: store.activedTask?.id === task.id, disabled: taskSwitching }"
+            :class="{
+
+              active: store.activedTask?.id === task.id,
+
+              disabled: taskSwitching,
+
+              'task-progress-item--done': isTaskCalculationComplete(task),
+
+            }"
 
             @click="selectTask(task)">
 
@@ -50,13 +58,19 @@
 
             <div class="task-progress-bar-wrap">
 
-              <template v-if="getTaskProgress(task)">
+              <div v-if="isTaskCalculationComplete(task)" class="task-progress-done">
+
+                <span class="task-progress-done-dot" aria-hidden="true" />
+
+                <span class="task-progress-done-text">计算完成</span>
+
+              </div>
+
+              <template v-else-if="getTaskProgress(task)">
 
                 <el-progress
 
                   :percentage="getTaskProgressPercent(getTaskProgress(task))"
-
-                  :status="isTaskProgressComplete(getTaskProgress(task)) ? 'success' : undefined"
 
                   :stroke-width="5"
 
@@ -444,6 +458,24 @@ const {
   resumeTaskProgressPollingForTasks,
 
 } = useTaskProgressPolling()
+
+
+
+/**
+
+ * 判断任务后台算法是否已全部计算完成。
+
+ *
+
+ * @param task 任务项
+
+ * @returns 三项进度均为「完成」时为 true
+
+ */
+
+const isTaskCalculationComplete = (task: TaskForm): boolean =>
+
+  isTaskProgressComplete(getTaskProgress(task))
 
 
 
@@ -1699,6 +1731,12 @@ onUnmounted(() => {
 
 .task-progress-item {
 
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
   padding: 8px 10px;
 
   border-radius: 6px;
@@ -1745,15 +1783,15 @@ onUnmounted(() => {
 
 .task-progress-name {
 
-  display: block;
+  flex: 1;
+
+  min-width: 0;
 
   font-size: 14px;
 
   font-weight: 700;
 
   color: #e2efff;
-
-  margin-bottom: 4px;
 
   overflow: hidden;
 
@@ -1772,6 +1810,74 @@ onUnmounted(() => {
   flex-direction: column;
 
   gap: 2px;
+
+  flex: 1;
+
+  min-width: 72px;
+
+  max-width: 168px;
+
+}
+
+
+
+.task-progress-item--done .task-progress-bar-wrap {
+
+  flex: 0 0 auto;
+
+  min-width: 0;
+
+  max-width: none;
+
+}
+
+
+
+.task-progress-done {
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: flex-end;
+
+  gap: 6px;
+
+  flex-shrink: 0;
+
+  white-space: nowrap;
+
+}
+
+
+
+.task-progress-done-dot {
+
+  flex-shrink: 0;
+
+  width: 8px;
+
+  height: 8px;
+
+  border-radius: 50%;
+
+  background: #22c55e;
+
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.55);
+
+}
+
+
+
+.task-progress-done-text {
+
+  font-size: 11px;
+
+  font-weight: 600;
+
+  color: #86efac;
+
+  line-height: 1.2;
 
 }
 
