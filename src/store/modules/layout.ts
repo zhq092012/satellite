@@ -472,7 +472,7 @@ export const useLayoutStore = defineStore('layout-store', {
       }
     },
     /**
-     * 按当前任务与选中系列动态生成矩阵（calSeriesChainV2），不再预查 zhchPlanV2。
+     * 按当前任务与选中系列动态生成矩阵（calSeriesChainV2），不再预查 zhchPlanV3。
      * @param force 是否强制重新请求
      */
     async fetchMatrixForCurrentScope(force = false): Promise<MatrixResult | null> {
@@ -690,7 +690,7 @@ export const useLayoutStore = defineStore('layout-store', {
             if (!force && this.zhchPlanMap[type]) {
               return { type, data: this.zhchPlanMap[type] }
             }
-            const res = await getSatelliteThreatInfoByType({ type, taskId })
+            const res = await getSatelliteThreatInfoByType({ type, taskId, sysType: null })
             return { type, data: res.code === 200 ? res.data : null }
           })
         )

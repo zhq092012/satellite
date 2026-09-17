@@ -1,5 +1,5 @@
 import * as Cesium from 'cesium'
-import { onBeforeUnmount, watch, type ComputedRef, type Ref } from 'vue'
+import { onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import {
   buildGroundTargetKey,
   type BattleGlobeGroundTarget,
@@ -46,11 +46,13 @@ interface GroundTargetVisual {
  * @param viewerRef Cesium Viewer 引用
  * @param targetsRef 地面目标列表
  * @param selectedTargetKeyRef 当前选中键（receive: / station:）
+ * @param deductionStruckReceiveKeysRef 推演中已被打击的接收站 ID/名称集合
  */
 export const useBattleGlobeGroundTargets = (
   viewerRef: Ref<Cesium.Viewer | null>,
   targetsRef: Ref<BattleGlobeGroundTarget[]> | ComputedRef<BattleGlobeGroundTarget[]>,
-  selectedTargetKeyRef: Ref<string | null> | ComputedRef<string | null>
+  selectedTargetKeyRef: Ref<string | null> | ComputedRef<string | null>,
+  deductionStruckReceiveKeysRef: Ref<Set<string>> | ComputedRef<Set<string>> = ref(new Set())
 ) => {
   const visualMap = new Map<string, GroundTargetVisual>()
   let pointCollection: Cesium.PointPrimitiveCollection | null = null
@@ -291,11 +293,19 @@ export const useBattleGlobeGroundTargets = (
       const facing = isPositionFacingCamera(visual.position, cameraPosition)
       const inFrustum = isPositionInCameraFrustum(viewer, visual.position)
       const distance = Cesium.Cartesian3.distance(cameraPosition, visual.position)
-      const baseColor = visual.struck
+      const targetKind = visual.key.startsWith('receive:') ? 'receive' : 'station'
+      const targetId = visual.key.split(':')[1] || ''
+      const deductionStruck = deductionStruckReceiveKeysRef.value
+      const struckInDeduction =
+        targetKind === 'receive' &&
+        (deductionStruck.has(targetId) || deductionStruck.has(visual.name))
+      const baseColor = struckInDeduction
         ? STRUCK_POINT_COLOR
-        : visual.key.startsWith('receive:')
-          ? RECEIVE_POINT_COLOR
-          : STATION_POINT_COLOR
+        : visual.struck
+          ? STRUCK_POINT_COLOR
+          : targetKind === 'receive'
+            ? RECEIVE_POINT_COLOR
+            : STATION_POINT_COLOR
       const lodStyle = resolveLodStyle(distance, selected, baseColor)
       const showLabel = shouldShowTargetLabel(distance, selected)
 
@@ -386,6 +396,8 @@ export const useBattleGlobeGroundTargets = (
     if (targetKey) flyToGroundTarget(targetKey)
     updateGroundTargetVisuals()
   })
+
+  watch(deductionStruckReceiveKeysRef, () => updateGroundTargetVisuals(), { deep: true })
 
   onBeforeUnmount(() => {
     removePostUpdateListener()

@@ -14,6 +14,9 @@ import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
 import type { BattleGlobeGroundTarget } from '@/utils/buildBattleGlobeGroundTargets'
 import { useBattleGlobeGroundTargets } from '@/composables/useBattleGlobeGroundTargets'
+import { useBattleGlobeDeductionEffects } from '@/composables/useBattleGlobeDeductionEffects'
+import type { SatelliteDeductionVisualPlan } from '@/utils/buildSatelliteDeductionTimeline'
+import { resolveDeductionVisualState } from '@/utils/buildSatelliteDeductionTimeline'
 import { computed, onActivated, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
 /** 地图瓦片服务地址 */
@@ -39,6 +42,12 @@ const props = withDefaults(
     taskStartMs?: number
     /** 任务结束时间（毫秒） */
     taskEndMs?: number
+    /** 选中卫星时是否自动飞行跟踪 */
+    followSelectedSatellite?: boolean
+    /** 是否正在推演播放 */
+    isDeductionPlaying?: boolean
+    /** 推演视觉计划 */
+    deductionVisualPlan?: SatelliteDeductionVisualPlan | null
   }>(),
   {
     satellites: () => [],
@@ -50,6 +59,9 @@ const props = withDefaults(
     selectedGroundTargetKey: null,
     taskStartMs: 0,
     taskEndMs: 0,
+    followSelectedSatellite: true,
+    isDeductionPlaying: false,
+    deductionVisualPlan: null,
   }
 )
 
@@ -73,7 +85,8 @@ useBattleGlobeSatellites(
   viewerRef,
   computed(() => props.satellites),
   computed(() => props.currentTimeMs),
-  computed(() => props.selectedNorad)
+  computed(() => props.selectedNorad),
+  computed(() => props.followSelectedSatellite)
 )
 
 /** 武器渲染逻辑 */
@@ -83,11 +96,32 @@ useBattleGlobeWeapons(
   computed(() => props.selectedWeaponId)
 )
 
+/** 推演中已被打击的接收站键集合 */
+const deductionStruckReceiveKeys = computed(() => {
+  if (!props.isDeductionPlaying || !props.deductionVisualPlan) return new Set<string>()
+  return resolveDeductionVisualState(
+    props.deductionVisualPlan,
+    props.currentTimeMs || 0,
+    true
+  ).struckReceiveKeys
+})
+
 /** 接收站/数据中心渲染逻辑 */
 useBattleGlobeGroundTargets(
   viewerRef,
   computed(() => props.groundTargets),
-  computed(() => props.selectedGroundTargetKey)
+  computed(() => props.selectedGroundTargetKey),
+  deductionStruckReceiveKeys
+)
+
+/** 推演 Cesium 特效 */
+useBattleGlobeDeductionEffects(
+  viewerRef,
+  computed(() => props.satellites),
+  computed(() => props.currentTimeMs),
+  computed(() => props.selectedNorad),
+  computed(() => props.isDeductionPlaying),
+  computed(() => props.deductionVisualPlan ?? null)
 )
 
 /**

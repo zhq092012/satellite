@@ -651,7 +651,7 @@ export const getSatelliteThreatInfo = (data: { norad: number; sysType: string; t
 /**
  * 综合打击方案中按卫星系列划分的矩阵实体。
  *
- * 结构与 {@link MatrixResult} 一致，用于 `zhchPlanV2` 返回的 `levelSeriesEntities` 元素。
+ * 结构与 {@link MatrixResult} 一致，用于 `zhchPlanV3` 返回的 `levelSeriesEntities` 元素。
  * 无星间中继时 `relayRelation` 为 null。
  */
 export interface ZhchPlanLevelSeriesEntity {
@@ -692,7 +692,7 @@ export type ZhchPlanStationWindow = StationWindow
 export type ZhchPlanSatelliteMatrix = SatelliteMatrix
 
 /**
- * 综合打击方案响应（zhchPlanV2）——基于军用/民用类型的卫星情报链路阻断方案。
+ * 综合打击方案响应（zhchPlanV3）——基于军用/民用类型的卫星情报链路阻断方案。
  *
  * 顶层为全局统计与概述；各卫星系列的详细打击矩阵在 `levelSeriesEntities` 中，
  * 每项结构与 {@link MatrixResult} 一致。
@@ -736,10 +736,11 @@ export interface ZhchPlanResp {
  * @param data.type - 卫星用途类型筛选条件（如"军用"、"民用"）
  * @param data.taskId - 作战任务 ID
  * @param data.intensityLevel -烈度
+ * @param data.sysType - 卫星系统类型（如侦察/通信）
  * @returns 包含综合打击方案数据的 Axios 响应 Promise
  */
-export const getSatelliteThreatInfoByType = (data: { type: string; taskId: number; intensityLevel?: number }) => {
-  const url = `/api/algorithm/zhchPlanV2`
+export const getSatelliteThreatInfoByType = (data: { type: string; taskId: number; intensityLevel?: number, sysType: string | null }) => {
+  const url = `/api/algorithm/zhchPlanV3`
   return requestAPI.post<AxiosResponseType<ZhchPlanResp>>(url, data)
 }
 

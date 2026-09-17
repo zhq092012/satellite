@@ -5,11 +5,20 @@
       <BattleSituationGlobe ref="globeRef" :satellites="globeSatellites" :weapons="globeWeapons"
         :ground-targets="globeGroundTargets" :current-time-ms="currentTimeMs" :selected-norad="selectedNorad"
         :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
-        :task-start-ms="taskStartMs" :task-end-ms="taskEndMs" />
+        :task-start-ms="taskStartMs" :task-end-ms="taskEndMs" :follow-selected-satellite="!isDeductionPlaying"
+        :is-deduction-playing="isDeductionPlaying" :deduction-visual-plan="deductionVisualPlan" />
 
       <div v-if="selectedNorad" class="globe-selected-bar">
         <span class="globe-selected-label">选中卫星：</span>
         <span class="globe-selected-name">{{ selectedSatelliteName }}</span>
+        <button type="button" class="globe-deduction-btn" :disabled="!selectedNorad || isDeductionPlaying"
+          @click="handleStartSatelliteDeduction">
+          播放推演
+        </button>
+        <button type="button" class="globe-deduction-btn globe-deduction-btn--pause" :disabled="!isDeductionPlaying"
+          @click="handleStopSatelliteDeduction">
+          暂停推演
+        </button>
         <button type="button" class="globe-clear-btn" @click="handleClearSelectedSatellite">清除</button>
       </div>
 
@@ -74,6 +83,11 @@
         <span class="btn-text">{{ isTimelineCollapsed ? '展开时间轴' : '收起时间轴' }}</span>
       </button>
 
+      <BattleGlobeDeductionToast
+        v-if="selectedNorad && deductionToastHighlightLines.length"
+        :lines="deductionToastHighlightLines"
+      />
+
       <div class="timeline-inner">
         <BattleGlobeTimeline :task-start="taskTimeRange.start" :task-end="taskTimeRange.end"
           :current-time-ms="currentTimeMs" :is-playing="isTimelinePlaying" :playback-speed="playbackSpeed"
@@ -104,10 +118,12 @@ import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
 import BattleGlobeTimeline from '@/components/BattleSituation/BattleGlobeTimeline.vue'
 import BattleSituationGlobe from '@/components/BattleSituation/BattleSituationGlobe.vue'
+import BattleGlobeDeductionToast from '@/components/BattleSituation/BattleGlobeDeductionToast.vue'
 import { taskProgressMap } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
+import { useSatelliteDeductionPlayback } from '@/composables/useSatelliteDeductionPlayback'
 
 /** 全局布局 Store */
 const store = useLayoutStore()
@@ -131,6 +147,16 @@ const selectedGroundTargetKey = ref<string | null>(null)
 
 /** 时间轴当前时刻（毫秒） */
 const currentTimeMs = ref(0)
+
+/** 选中卫星推演播放 */
+const {
+  isDeductionPlaying,
+  toastHighlightLines: deductionToastHighlightLines,
+  deductionVisualPlan,
+  startDeduction,
+  stopDeduction,
+  resetDeductionUi,
+} = useSatelliteDeductionPlayback(currentTimeMs)
 
 /** 时间轴是否正在播放 */
 const isTimelinePlaying = ref(false)
@@ -210,6 +236,22 @@ const selectedSatelliteName = computed(() => {
   const fromMatrix = matrixData.value?.initMatrixList?.find((sat) => sat.norad === selectedNorad.value)
   return fromMatrix?.name || `Sat-${selectedNorad.value}`
 })
+
+/**
+ * 开始选中卫星 Cesium 推演（暂停底部时间轴播放）。
+ */
+const handleStartSatelliteDeduction = () => {
+  const norad = selectedNorad.value
+  if (!norad) return
+  stopTimelinePlayback()
+  globeRef.value?.restoreOverviewView()
+  startDeduction(norad, taskAnalysisData.value, matrixData.value)
+}
+
+/** 暂停选中卫星推演 */
+const handleStopSatelliteDeduction = () => {
+  stopDeduction()
+}
 
 /** 当前选中武器名称 */
 const selectedWeaponName = computed(() => {
@@ -450,6 +492,7 @@ const handleSelectGroundTarget = (targetKey: string | null) => {
  * 清除选中卫星并恢复战场初始俯视视角。
  */
 const handleClearSelectedSatellite = () => {
+  resetDeductionUi()
   selectedNorad.value = null
   store.setSelectedAnalysisNorad(null)
   globeRef.value?.restoreOverviewView()
@@ -492,6 +535,7 @@ const handleClearSelectedGroundTarget = () => {
 const handleTaskRecalculated = () => {
   autoTimelinePlaybackTaskId = null
   stopTimelinePlayback()
+  resetDeductionUi()
   void loadMatrixForCurrentScope()
 }
 
@@ -549,6 +593,7 @@ watch(
   taskTimeRange,
   (range) => {
     stopTimelinePlayback()
+    resetDeductionUi()
     wasPlayingBeforeSelection = false
     selectedWeaponId.value = null
     selectedGroundTargetKey.value = null
@@ -557,8 +602,15 @@ watch(
   { immediate: true }
 )
 
+watch(selectedNorad, (norad, prevNorad) => {
+  if (norad !== prevNorad) {
+    resetDeductionUi()
+  }
+})
+
 onBeforeUnmount(() => {
   stopTimelinePlayback()
+  resetDeductionUi()
 })
 
 /** 系列/任务变化时重新加载矩阵 */
@@ -660,8 +712,10 @@ onActivated(() => {
     z-index: 12;
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    max-width: min(520px, calc(100% - 32px));
+    gap: 8px;
+    max-width: min(720px, calc(100% - 32px));
+    flex-wrap: wrap;
+    justify-content: center;
     padding: 8px 14px;
     border-radius: 8px;
     background: rgba(8, 20, 36, 0.88);
@@ -700,6 +754,39 @@ onActivated(() => {
 
   .globe-selected-name--ground {
     color: #22d3ee;
+  }
+
+  .globe-deduction-btn {
+    flex-shrink: 0;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(52, 211, 153, 0.45);
+    background: rgba(52, 211, 153, 0.12);
+    color: #6ee7b7;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover:not(:disabled) {
+      background: rgba(52, 211, 153, 0.24);
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    &--pause {
+      border-color: rgba(251, 191, 36, 0.45);
+      background: rgba(251, 191, 36, 0.12);
+      color: #fcd34d;
+
+      &:hover:not(:disabled) {
+        background: rgba(251, 191, 36, 0.24);
+      }
+    }
   }
 
   .globe-clear-btn {
@@ -823,6 +910,9 @@ onActivated(() => {
     max-width: calc(
       100% - var(--c2-left-panel-width) - var(--c2-right-panel-width) - 2 * var(--c2-timeline-side-gap)
     );
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     transition:
       transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
       left 0.35s cubic-bezier(0.4, 0, 0.2, 1),

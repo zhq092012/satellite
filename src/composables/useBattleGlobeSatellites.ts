@@ -1,6 +1,6 @@
 import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
-import { onBeforeUnmount, watch, type ComputedRef, type Ref } from 'vue'
+import { onBeforeUnmount, watch, type ComputedRef, type Ref, ref } from 'vue'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 
 /** 近距离 LOD 阈值（米） */
@@ -37,12 +37,14 @@ interface SatellitePointVisual {
  * @param satellitesRef 卫星列表
  * @param currentTimeMsRef 当前推演时刻（毫秒）
  * @param selectedNoradRef 当前选中 NORAD
+ * @param followSelectedRef 选中卫星时是否自动飞行定位
  */
 export const useBattleGlobeSatellites = (
   viewerRef: Ref<Cesium.Viewer | null>,
   satellitesRef: Ref<BattleGlobeSatellite[]> | ComputedRef<BattleGlobeSatellite[]>,
   currentTimeMsRef: Ref<number> | ComputedRef<number>,
-  selectedNoradRef: Ref<number | null> | ComputedRef<number | null>
+  selectedNoradRef: Ref<number | null> | ComputedRef<number | null>,
+  followSelectedRef: Ref<boolean> | ComputedRef<boolean> = ref(true)
 ) => {
   const satrecCache = new Map<number, satellitejs.SatRec>()
   const visualMap = new Map<number, SatellitePointVisual>()
@@ -416,7 +418,7 @@ export const useBattleGlobeSatellites = (
   })
 
   watch(selectedNoradRef, (norad) => {
-    if (norad) flyToSatellite(norad)
+    if (norad && followSelectedRef.value) flyToSatellite(norad)
     updateSatelliteVisuals()
   })
 
