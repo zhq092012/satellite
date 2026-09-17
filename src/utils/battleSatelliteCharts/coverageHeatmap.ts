@@ -137,15 +137,34 @@ export const buildSingleSatelliteCoverageHeatModel = (
   const transitionTimes = windowPool
     .map((window) => parseTimeToMs(window.peakWindow))
     .filter((timestamp) => timestamp > 0)
-  const transitionTime = transitionTimes.length ? Math.min(...transitionTimes) : taskStart
+  /** 无打击窗口时不切换，全程按打击前覆盖率展示 */
+  const hasStrikeTransition = transitionTimes.length > 0
+  const transitionTime = hasStrikeTransition ? Math.min(...transitionTimes) : Number.POSITIVE_INFINITY
+
+  /**
+   * 打击前/后覆盖率切换的时间片下标（[0, splitIndex) 为打击前）。
+   * 切换时刻落在某时间片起点时，该时间片仍视为打击前。
+   */
+  const resolveStrikeSplitIndex = (): number => {
+    if (!hasStrikeTransition || !Number.isFinite(transitionTime)) {
+      return timeLabels.length
+    }
+    if (transitionTime <= taskStart) {
+      return Math.min(1, timeLabels.length)
+    }
+    return Math.min(
+      timeLabels.length,
+      Math.max(1, Math.ceil((transitionTime - taskStart) / intervalMs))
+    )
+  }
+  const strikeSplitIndex = resolveStrikeSplitIndex()
 
   const cells: SingleSatCoverageHeatCell[] = []
   timeLabels.forEach((timeLabel, timeIndex) => {
-    const sliceTime = taskStart + timeIndex * intervalMs
-    const coverage =
-      sliceTime < transitionTime
-        ? beforeCoverage ?? afterCoverage!
-        : afterCoverage ?? beforeCoverage!
+    const useBeforeCoverage = timeIndex < strikeSplitIndex
+    const coverage = useBeforeCoverage
+      ? beforeCoverage ?? afterCoverage!
+      : afterCoverage ?? beforeCoverage!
     if (coverage == null || !Number.isFinite(coverage)) return
     cells.push({
       timeLabel,
@@ -159,13 +178,10 @@ export const buildSingleSatelliteCoverageHeatModel = (
     beforeCoverage != null &&
     afterCoverage != null &&
     Math.abs(beforeCoverage - afterCoverage) > 0.01 &&
-    timeLabels.length
+    hasStrikeTransition &&
+    strikeSplitIndex < timeLabels.length
   ) {
-    const splitIndex = Math.min(
-      timeLabels.length - 1,
-      Math.max(0, Math.round((transitionTime - taskStart) / intervalMs))
-    )
-    strikeSplitLabel = timeLabels[splitIndex] ?? null
+    strikeSplitLabel = timeLabels[strikeSplitIndex] ?? null
   }
 
   return {

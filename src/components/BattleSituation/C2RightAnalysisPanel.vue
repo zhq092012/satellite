@@ -93,7 +93,7 @@
           <el-table-column label="卫星" width="112" class-name="sat-name-column">
             <template #default="{ row }">
               <el-tooltip
-                :content="`${row.name}\n${formatSatelliteSeriesTypeMeta(row.series, row.sysType)}`"
+                :content="`${row.name}\n${formatSatelliteSeriesTypeMeta(row.series, row.sysType, row.usage)}`"
                 placement="left"
                 :show-after="200">
                 <div class="sat-name-cell">
@@ -110,6 +110,10 @@
                     <div v-if="row.sysType && row.sysType !== '--'" class="sat-name-meta__line">
                       <span class="sat-name-meta__label">类型：</span>
                       <span class="sat-name-meta__type">{{ row.sysType }}</span>
+                    </div>
+                    <div v-if="row.usage && row.usage !== '--'" class="sat-name-meta__line">
+                      <span class="sat-name-meta__label">用途：</span>
+                      <span class="sat-name-meta__usage">{{ row.usage }}</span>
                     </div>
                   </div>
                 </div>
@@ -1012,6 +1016,11 @@ const displayedLinkChainTableRows = computed(() => {
 
 .sat-name-meta__type {
   color: #22d3ee;
+  font-weight: 600;
+}
+
+.sat-name-meta__usage {
+  color: #a5b4fc;
   font-weight: 600;
 }
 

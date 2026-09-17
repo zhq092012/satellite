@@ -12,6 +12,8 @@ export interface SatelliteMetricTableRow {
   series: string
   /** 卫星系统类型（来自 levelSeriesEntities.sysType，如侦察/通信） */
   sysType: string
+  /** 卫星用途（来自 initMatrixList.usage，如军用/商用） */
+  usage: string
   /** 打击前覆盖率展示 */
   coverageBeforeText: string
   /** 打击后覆盖率展示 */
@@ -50,6 +52,8 @@ interface SatelliteMetricAccumulator {
   series: string
   /** 系统类型 */
   sysType: string
+  /** 用途（initMatrixList.usage） */
+  usage: string
   /** 打击前覆盖率 */
   coverageBefore: number | null
   /** 打击后覆盖率 */
@@ -85,17 +89,26 @@ export const buildSatelliteMetricRowKey = (
  *
  * @param series 系列名称
  * @param sysType 系统类型
- * @returns 如 `系列：starshield\n类型：侦察`
+ * @param usage 用途（可选）
+ * @returns 如 `系列：starshield\n类型：侦察\n用途：军用`
  */
-export const formatSatelliteSeriesTypeMeta = (series: string, sysType: string): string => {
+export const formatSatelliteSeriesTypeMeta = (
+  series: string,
+  sysType: string,
+  usage?: string
+): string => {
   const lines: string[] = []
   const seriesText = series?.trim()
   const sysTypeText = sysType?.trim()
+  const usageText = usage?.trim()
   if (seriesText && seriesText !== EMPTY_TEXT) {
     lines.push(`系列：${seriesText}`)
   }
   if (sysTypeText && sysTypeText !== EMPTY_TEXT) {
     lines.push(`类型：${sysTypeText}`)
+  }
+  if (usageText && usageText !== EMPTY_TEXT) {
+    lines.push(`用途：${usageText}`)
   }
   return lines.length ? lines.join('\n') : EMPTY_TEXT
 }
@@ -252,6 +265,7 @@ const toDisplayRow = (row: SatelliteMetricAccumulator): SatelliteMetricTableRow 
   name: row.name,
   series: row.series,
   sysType: row.sysType,
+  usage: row.usage,
   coverageBeforeText: formatSatelliteCoverage(row.coverageBefore),
   coverageAfterText: formatSatelliteCoverage(row.coverageAfter),
   coverageReduceText: formatSatelliteCoverageReduce(row.coverageBefore, row.coverageAfter),
@@ -411,6 +425,7 @@ export const buildSatelliteAnalysisTableRows = (
         series,
         sysType,
         name: patch.name || `Sat-${norad}`,
+        usage: EMPTY_TEXT,
         coverageBefore: null,
         coverageAfter: null,
         delayBefore: null,
@@ -422,6 +437,7 @@ export const buildSatelliteAnalysisTableRows = (
     map.set(rowKey, {
       ...exist,
       name: patch.name || exist.name,
+      usage: patch.usage?.trim() ? patch.usage.trim() : exist.usage,
       coverageBefore: patch.coverageBefore ?? exist.coverageBefore,
       coverageAfter: patch.coverageAfter ?? exist.coverageAfter,
       delayBefore: patch.delayBefore ?? exist.delayBefore,
@@ -442,6 +458,7 @@ export const buildSatelliteAnalysisTableRows = (
       if (norad == null) return
       upsert(series, sysType, norad, {
         name: sat?.name,
+        usage: sat?.usage?.trim() || undefined,
         coverageBefore: isValidNumber(sat?.coverage) ? sat.coverage : null,
       })
     })
