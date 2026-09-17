@@ -22,6 +22,9 @@ export const taskProgressMap = reactive<Record<number, TaskProgressInfo>>({})
 /** 各任务 ID 对应的轮询定时器。 */
 const taskProgressTimerMap = new Map<number, ReturnType<typeof setInterval>>()
 
+/** 查询任务是否计算完成的轮询间隔（毫秒），默认每 5 分钟一次。 */
+const TASK_PROGRESS_POLL_INTERVAL_MS = 5 * 60 * 1000
+
 /**
  * 判断任务进度是否三项均已完成。
  *
@@ -93,7 +96,7 @@ export const updateTaskProgress = async (taskId: number): Promise<void> => {
 }
 
 /**
- * 启动指定任务的进度轮询（默认每 3 秒查询一次）。
+ * 启动指定任务的进度轮询（默认每 5 分钟查询一次）。
  *
  * @param taskId 任务 ID
  */
@@ -109,7 +112,7 @@ export const startTaskProgressPolling = async (taskId: number): Promise<void> =>
 
   const timer = setInterval(() => {
     void updateTaskProgress(taskId)
-  }, 3000)
+  }, TASK_PROGRESS_POLL_INTERVAL_MS)
   taskProgressTimerMap.set(taskId, timer)
 }
 
