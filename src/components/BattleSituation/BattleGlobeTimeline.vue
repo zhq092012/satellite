@@ -10,14 +10,8 @@
           </button>
           <div class="speed-group">
             <span class="speed-label">速度</span>
-            <button
-              v-for="option in speedOptions"
-              :key="option"
-              type="button"
-              class="speed-btn"
-              :class="{ 'is-active': playbackSpeed === option }"
-              @click="emit('speed-change', option)"
-            >
+            <button v-for="option in speedOptions" :key="option" type="button" class="speed-btn"
+              :class="{ 'is-active': playbackSpeed === option }" @click="emit('speed-change', option)">
               {{ option }}x
             </button>
           </div>
@@ -55,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, withDefaults } from 'vue'
+import { computed, ref } from 'vue'
 import { formatTimelineTime, msToRatio } from '@/utils/satelliteTimelineMarkers'
 
 /**

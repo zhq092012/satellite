@@ -119,7 +119,9 @@
 
           <el-table-column label="覆盖率" width="96" sortable :sort-method="sortByCoverageBefore">
             <template #default="{ row }">
-              <div class="metric-cell">
+              <div class="metric-cell metric-cell--clickable-metric" role="button" tabindex="0"
+                @click.stop="handleCoverageMetricClick(row)"
+                @keydown.enter.stop="handleCoverageMetricClick(row)">
                 <div class="metric-line">
                   <span class="metric-line-label">打击前</span>
                   <span class="metric-line-value">{{ row.coverageBeforeText }}</span>
@@ -138,7 +140,9 @@
 
           <el-table-column label="链路时延" width="96" sortable :sort-method="sortByDelayBefore">
             <template #default="{ row }">
-              <div class="metric-cell">
+              <div class="metric-cell metric-cell--clickable-metric" role="button" tabindex="0"
+                @click.stop="handleDelayMetricClick(row)"
+                @keydown.enter.stop="handleDelayMetricClick(row)">
                 <div class="metric-line">
                   <span class="metric-line-label">打击前</span>
                   <span class="metric-line-value">{{ row.delayBeforeText }}</span>
@@ -383,6 +387,12 @@
 
   <SatelliteThreatInfoDialog v-model="threatInfoDialogVisible" :loading="threatInfoLoading"
     :threat-info="threatInfoData" :subtitle="threatInfoSubtitle" :empty-hint="threatInfoEmptyHint" />
+
+  <BattleSatelliteCoverageDialog v-model="coverageDialogVisible" :matrix="chartMatrix" :norad="chartNorad"
+    :task-begin="taskBeginDate" :task-end="taskEndDate" :subtitle="chartDialogSubtitle" />
+
+  <BattleSatelliteLinkDelayDialog v-model="linkDelayDialogVisible" :matrix="chartMatrix" :norad="chartNorad"
+    :task-end="taskEndDate" :subtitle="chartDialogSubtitle" />
 </template>
 
 <script setup lang="ts">
@@ -392,9 +402,12 @@
  */
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getSatelliteThreatInfo, type SatelliteThreatInfo } from '@/api/electronic'
-import type { SatelliteAnalysisData } from '@/api/task/task'
+import { getSatelliteThreatInfo, type MatrixResult, type SatelliteThreatInfo } from '@/api/electronic'
+import type { LevelSeriesEntity, SatelliteAnalysisData } from '@/api/task/task'
+import BattleSatelliteCoverageDialog from '@/components/BattleSituation/BattleSatelliteCoverageDialog.vue'
+import BattleSatelliteLinkDelayDialog from '@/components/BattleSituation/BattleSatelliteLinkDelayDialog.vue'
 import SatelliteThreatInfoDialog from '@/components/BattleSituation/SatelliteThreatInfoDialog.vue'
+import { levelSeriesEntityToMatrix } from '@/utils/seriesLinkTimeline'
 import { useLayoutStore } from '@/store/modules/layout'
 import {
   ATTACK_PLAN_TOP_COUNT,
@@ -446,6 +459,93 @@ const threatInfoSubtitle = ref('')
 
 /** 威胁度弹窗无数据提示 */
 const threatInfoEmptyHint = ref('')
+
+/** 覆盖率 / 链路时延图表弹窗可见性 */
+const coverageDialogVisible = ref(false)
+const linkDelayDialogVisible = ref(false)
+
+/** 图表弹窗使用的系列矩阵与 NORAD */
+const chartMatrix = ref<MatrixResult | null>(null)
+const chartNorad = ref<number | null>(null)
+const chartDialogSubtitle = ref('')
+
+/** 当前任务时间范围（图表用） */
+const taskBeginDate = computed(() => store.activedTask?.beginDate ?? '')
+const taskEndDate = computed(() => store.activedTask?.endDate ?? '')
+
+/**
+ * 按系列与系统类型查找 levelSeriesEntities 中的矩阵实体。
+ *
+ * @param row 卫星表格行
+ * @returns 系列实体或 null
+ */
+const findLevelSeriesEntityForRow = (row: SatelliteMetricTableRow): LevelSeriesEntity | null => {
+  const entities = props.analysisData?.levelSeriesEntities
+  if (!entities?.length) return null
+  if (row.series && row.series !== '--') {
+    const matched = entities.find((entity) => entity.series === row.series && entity.sysType === row.sysType)
+    if (matched) return matched
+  }
+  return entities.find((entity) => entity.sysType === row.sysType) ?? null
+}
+
+/**
+ * 打开图表弹窗前的公共校验与矩阵解析。
+ *
+ * @param row 卫星行
+ * @returns 是否可继续
+ */
+const prepareChartDialogContext = (row: SatelliteMetricTableRow): boolean => {
+  if (!store.activedTask?.id) {
+    ElMessage.warning('请先选择任务')
+    return false
+  }
+  if (!props.algorithmComplete || !props.analysisData) {
+    ElMessage.warning('请等待任务算法分析完成')
+    return false
+  }
+  const entity = findLevelSeriesEntityForRow(row)
+  if (!entity) {
+    ElMessage.warning('未找到该卫星对应的系列分析数据')
+    return false
+  }
+  chartMatrix.value = levelSeriesEntityToMatrix(entity)
+  chartNorad.value = row.norad
+  chartDialogSubtitle.value = `${row.name}${row.series && row.series !== '--' ? ` · 系列：${row.series}` : ''}${row.sysType && row.sysType !== '--' ? ` · 类型：${row.sysType}` : ''}`
+  return true
+}
+
+/**
+ * 点击覆盖率单元格，打击前覆盖率有效且大于 0 时打开热力图。
+ *
+ * @param row 卫星指标行
+ */
+const handleCoverageMetricClick = (row: SatelliteMetricTableRow) => {
+  const before = row.coverageBefore
+  if (before == null || !Number.isFinite(before) || before <= 0) {
+    ElMessage.info('当前卫星没有覆盖率信息')
+    return
+  }
+  if (!prepareChartDialogContext(row)) return
+  linkDelayDialogVisible.value = false
+  coverageDialogVisible.value = true
+}
+
+/**
+ * 点击链路时延单元格，打击前时延有效且大于 0 分钟时打开 G6 拓扑。
+ *
+ * @param row 卫星指标行
+ */
+const handleDelayMetricClick = (row: SatelliteMetricTableRow) => {
+  const before = row.delayBefore
+  if (before == null || !Number.isFinite(before) || before <= 0) {
+    ElMessage.info('当前卫星没有链路时延信息')
+    return
+  }
+  if (!prepareChartDialogContext(row)) return
+  coverageDialogVisible.value = false
+  linkDelayDialogVisible.value = true
+}
 
 /**
  * 从接口列表中解析与 NORAD 匹配的威胁度参数。
@@ -946,7 +1046,8 @@ const displayedLinkChainTableRows = computed(() => {
   min-width: 0;
 }
 
-.metric-cell--clickable-threat {
+.metric-cell--clickable-threat,
+.metric-cell--clickable-metric {
   cursor: pointer;
   border-radius: 4px;
   padding: 2px 4px;

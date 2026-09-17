@@ -1,4 +1,5 @@
 import type { MatrixResult, ZhchPlanLevelSeriesEntity, ZhchPlanResp } from '@/api/electronic'
+import type { LevelSeriesEntity } from '@/api/task/task'
 import {
   collectSeriesTransmissionLinks,
   type SatelliteTransmissionLink,
@@ -103,12 +104,17 @@ interface RawTimelineBlock {
 }
 
 /**
+ * task / electronic 两套接口中的系列实体，运行时结构与 {@link MatrixResult} 一致。
+ */
+export type LevelSeriesEntityForMatrix = ZhchPlanLevelSeriesEntity | LevelSeriesEntity
+
+/**
  * 将系列实体转为矩阵结构，供链路分析复用。
  *
- * @param entity 综合打击方案中的系列实体
+ * @param entity 任务矩阵或综合打击方案中的系列实体
  * @returns 与 MatrixResult 兼容的矩阵对象
  */
-export const levelSeriesEntityToMatrix = (entity: ZhchPlanLevelSeriesEntity): MatrixResult => {
+export const levelSeriesEntityToMatrix = (entity: LevelSeriesEntityForMatrix): MatrixResult => {
   return entity as unknown as MatrixResult
 }
 
