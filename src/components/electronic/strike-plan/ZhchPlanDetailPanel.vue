@@ -41,15 +41,25 @@
       </div>
     </div>
 
-    <!-- 2. 方案概要 + 打击前后对比（顶部） -->
-    <div class="text-block">
-      <div class="block-head">方案概要</div>
-      <p class="block-text large" v-html="highlightText(plan.summary)"></p>
+    <!-- 2. 方案概要 + TOP5（对比模式下拆成两行 subgrid，保证三列等高） -->
+    <div class="summary-group" :class="{ 'summary-group--align': alignBlocks }">
+      <div class="text-block text-block--summary">
+        <div class="block-head">方案概要</div>
+        <p class="block-text large" v-html="highlightText(plan.summary)"></p>
+      </div>
 
-      <div v-if="topCoverageRecommends.length || topDelayRecommends.length" class="recommend-section">
-        <div v-if="topCoverageRecommends.length" class="recommend-block">
+      <div
+        v-if="showRecommendSection"
+        class="recommend-section"
+        :class="{ 'recommend-section--align': alignBlocks }"
+      >
+        <div v-if="alignBlocks || topCoverageRecommends.length" class="recommend-block">
           <div class="recommend-title">覆盖率降幅 TOP5</div>
-          <ul class="recommend-list">
+          <ul
+            v-if="topCoverageRecommends.length"
+            class="recommend-list"
+            :class="{ 'recommend-list--fixed': alignBlocks }"
+          >
             <li v-for="item in topCoverageRecommends" :key="`cov-${item.norad}`" class="recommend-item">
               <span class="recommend-name">{{ item.name }}</span>
               <span class="recommend-meta">
@@ -60,10 +70,15 @@
               </span>
             </li>
           </ul>
+          <p v-else-if="alignBlocks" class="recommend-empty">暂无覆盖率降幅数据</p>
         </div>
-        <div v-if="topDelayRecommends.length" class="recommend-block">
+        <div v-if="alignBlocks || topDelayRecommends.length" class="recommend-block">
           <div class="recommend-title">链路时延增幅 TOP5</div>
-          <ul class="recommend-list">
+          <ul
+            v-if="topDelayRecommends.length"
+            class="recommend-list"
+            :class="{ 'recommend-list--fixed': alignBlocks }"
+          >
             <li v-for="item in topDelayRecommends" :key="`delay-${item.norad}`" class="recommend-item">
               <span class="recommend-name">{{ item.name }}</span>
               <span class="recommend-meta">
@@ -74,6 +89,7 @@
               </span>
             </li>
           </ul>
+          <p v-else-if="alignBlocks" class="recommend-empty">暂无链路时延增幅数据</p>
         </div>
       </div>
     </div>
@@ -208,6 +224,14 @@ const topCoverageRecommends = computed(() => pickTopCoverageRecommends(props.pla
 /** 方案概要下展示的链路时延 TOP5 */
 const topDelayRecommends = computed(() => pickTopDelayRecommends(props.plan.delayRecommends))
 
+/** 是否展示 TOP5 区域：单方案有数据才展示；多方案对比时固定占位以保持列对齐 */
+const showRecommendSection = computed(
+  () =>
+    !!props.alignBlocks ||
+    topCoverageRecommends.value.length > 0 ||
+    topDelayRecommends.value.length > 0
+)
+
 /** 将 stationList 统一为名称数组（兼容字符串与数组两种返回）。 */
 const stationNames = computed((): string[] => {
   const raw = props.plan.stationList
@@ -247,7 +271,7 @@ const coverageReduction = computed(() => {
   &--align {
     display: grid;
     grid-template-rows: subgrid;
-    grid-row: span 7;
+    grid-row: span 8;
     min-height: 0;
     // 与外层 plan-columns--compare 的 --plan-compare-row-gap 保持一致；
     // subgrid 会用自身 gap 覆盖父级 row-gap，写成 0 会导致块与块贴死。
@@ -380,6 +404,34 @@ const coverageReduction = computed(() => {
   }
 }
 
+.summary-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(79, 147, 221, 0.25);
+  background: rgba(14, 28, 48, 0.6);
+  overflow: hidden;
+
+  &--align {
+    display: contents;
+    border: none;
+    background: none;
+  }
+
+  .text-block--summary {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .recommend-section:not(.recommend-section--align) {
+    margin-top: 0;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(79, 147, 221, 0.35);
+  }
+}
+
 .compare-section {
   display: flex;
   flex-direction: column;
@@ -405,6 +457,13 @@ const coverageReduction = computed(() => {
     gap: 10px;
   }
 
+  .zhch-plan-detail--align &.text-block--summary {
+    .block-text.large {
+      flex: 1;
+      min-height: 7.6em;
+    }
+  }
+
   .block-head {
     font-size: 17px;
     font-weight: 800;
@@ -425,18 +484,39 @@ const coverageReduction = computed(() => {
     }
   }
 
-  .recommend-section {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 14px 16px;
-    margin-top: 14px;
-    padding-top: 12px;
-    border-top: 1px dashed rgba(79, 147, 221, 0.35);
+  .block-text {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.9;
+    color: #e2e8f0;
 
-    > .recommend-block:only-child {
-      flex: 1 1 100%;
+    &.large {
+      font-size: 17px;
+      text-align: left;
     }
+
+    :deep(.hl-num) {
+      color: #4ade80;
+      font-weight: 800;
+      font-size: 1.1em;
+    }
+
+    :deep(.hl-time) {
+      color: #fbbf24;
+      font-weight: 800;
+    }
+  }
+}
+
+.recommend-section {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 14px 16px;
+  padding: 0 16px 14px;
+
+  > .recommend-block:only-child {
+    flex: 1 1 100%;
   }
 
   .recommend-block {
@@ -509,28 +589,76 @@ const coverageReduction = computed(() => {
       color: #fb923c;
     }
   }
+}
 
-  .block-text {
+.recommend-section--align {
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 14px 16px;
+  margin-top: 0;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(79, 147, 221, 0.25);
+  background: rgba(14, 28, 48, 0.6);
+
+  .recommend-block {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .recommend-list--fixed {
+    flex: 1;
+    min-height: calc(5 * 36px + 4 * 6px);
+  }
+
+  .recommend-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 8px 10px;
+  }
+
+  .recommend-name {
+    flex: none;
+    width: 100%;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: normal;
+  }
+
+  .recommend-meta {
+    width: 100%;
+    flex: none;
+    text-align: left;
+    white-space: normal;
+    word-break: keep-all;
+    line-height: 1.45;
+    font-size: 12px;
+  }
+
+  .recommend-delta {
+    display: block;
+    margin-left: 0;
+    margin-top: 2px;
+  }
+
+  .recommend-empty {
+    flex: 1;
+    min-height: calc(5 * 36px + 4 * 6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     margin: 0;
-    font-size: 16px;
-    line-height: 1.9;
-    color: #e2e8f0;
-
-    &.large {
-      font-size: 17px;
-      text-align: left;
-    }
-
-    :deep(.hl-num) {
-      color: #4ade80;
-      font-weight: 800;
-      font-size: 1.1em;
-    }
-
-    :deep(.hl-time) {
-      color: #fbbf24;
-      font-weight: 800;
-    }
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748b;
   }
 }
 

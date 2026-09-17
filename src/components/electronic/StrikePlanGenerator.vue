@@ -307,7 +307,7 @@ watch(
   }
 
   /**
-   * 多方案并排：同一行块（概要 / 打击前 / 打击后 / 地面站）共用三列中的最大高度。
+   * 多方案并排：同一行块（概要 / TOP5 / 打击前 / 打击后 / 地面站）共用三列中的最大高度。
    * 嵌套 subgrid 必须使用相同 row-gap，否则内层 gap:0 会把父级间距吃掉。
    */
   &--compare {
@@ -319,7 +319,7 @@ watch(
     .plan-column {
       display: grid;
       grid-template-rows: subgrid;
-      grid-row: span 8;
+      grid-row: span 9;
       row-gap: var(--plan-compare-row-gap);
       overflow: hidden;
     }
@@ -327,7 +327,7 @@ watch(
     .column-content {
       display: grid;
       grid-template-rows: subgrid;
-      grid-row: span 7;
+      grid-row: span 8;
       row-gap: var(--plan-compare-row-gap);
       min-width: 0;
     }
