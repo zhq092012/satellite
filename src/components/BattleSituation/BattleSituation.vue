@@ -30,7 +30,7 @@
     <div class="floating-panel floating-panel--left" :class="{ 'is-collapsed': isLeftCollapsed }">
       <div class="panel-inner">
         <C2LeftControlPanel :matrix-data="matrixData" :selected-norad="selectedNorad"
-          @select-satellite="handleSelectSatellite" />
+          @select-satellite="handleSelectSatellite" @task-recalculated="handleTaskRecalculated" />
       </div>
       <button type="button" class="toggle-btn toggle-btn--left" :title="isLeftCollapsed ? '展开左侧面板' : '收起左侧面板'"
         @click="isLeftCollapsed = !isLeftCollapsed">
@@ -449,6 +449,13 @@ const handleClearSelectedGroundTarget = () => {
     wasPlayingBeforeSelection = false
     startTimelinePlayback()
   }
+}
+
+/**
+ * 左侧面板保存并重算后：清空矩阵缓存并等待进度完成后由既有 watch 拉取分析。
+ */
+const handleTaskRecalculated = () => {
+  void loadMatrixForCurrentScope()
 }
 
 /** 矩阵加载序号，用于丢弃过期响应 */
