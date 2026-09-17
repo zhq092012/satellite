@@ -1,5 +1,6 @@
 import type { MatrixResult } from '@/api/electronic'
 import type { ReceiveObject, RelationList, SatelliteAnalysisData, StationObject } from '@/api/task/task'
+import type { DeductionStationPassWindow } from '@/utils/buildSatelliteDeductionTimeline'
 
 /** 地面目标类型：接收站 / 数据中心 */
 export type BattleGlobeGroundTargetKind = 'receive' | 'station'
@@ -174,3 +175,71 @@ export const buildBattleGlobeGroundTargetsFromMatrix = (
   if (!matrix?.initRelationList) return []
   return buildBattleGlobeGroundTargetsFromRelationList(matrix.initRelationList as RelationList)
 }
+
+/** 过站坐标与已有目标匹配阈值（度） */
+const DEDUCTION_PASS_COORD_MATCH_DEG = 0.08
+
+/**
+ * 将推演过站窗口补进地面目标列表（关系列表缺坐标或未收录的接收站）。
+ *
+ * @param base 已有地面目标
+ * @param passes 推演过站窗口
+ * @returns 合并后的目标列表
+ */
+export const mergeDeductionPassGroundTargets = (
+  base: BattleGlobeGroundTarget[],
+  passes: DeductionStationPassWindow[]
+): BattleGlobeGroundTarget[] => {
+  if (!passes.length) return base
+
+  const targetMap = new Map<string, BattleGlobeGroundTarget>()
+  base.forEach((item) => {
+    targetMap.set(buildGroundTargetKey(item.kind, item.id), item)
+  })
+
+  const isNearExisting = (latitude: number, longitude: number): boolean =>
+    base.some(
+      (item) =>
+        Math.abs(item.latitude - latitude) <= DEDUCTION_PASS_COORD_MATCH_DEG &&
+        Math.abs(item.longitude - longitude) <= DEDUCTION_PASS_COORD_MATCH_DEG
+    )
+
+  passes.forEach((pass) => {
+    if (isNearExisting(pass.latitude, pass.longitude)) return
+    const id =
+      pass.receiveId?.trim() ||
+      pass.receiveName?.trim() ||
+      `deduction-${pass.latitude.toFixed(4)}-${pass.longitude.toFixed(4)}`
+    const key = buildGroundTargetKey('receive', id)
+    if (targetMap.has(key)) return
+    targetMap.set(key, {
+      kind: 'receive',
+      id,
+      name: pass.receiveName?.trim() || pass.receiveId?.trim() || id,
+      latitude: pass.latitude,
+      longitude: pass.longitude,
+      status: 0,
+    })
+  })
+
+  return Array.from(targetMap.values())
+}
+
+/**
+ * 判断地面目标坐标是否落在推演过站高亮窗口附近。
+ *
+ * @param latitude 目标纬度
+ * @param longitude 目标经度
+ * @param passes 高亮过站列表
+ * @returns 是否匹配
+ */
+export const isGroundTargetNearDeductionPass = (
+  latitude: number,
+  longitude: number,
+  passes: DeductionStationPassWindow[]
+): boolean =>
+  passes.some(
+    (pass) =>
+      Math.abs(pass.latitude - latitude) <= DEDUCTION_PASS_COORD_MATCH_DEG &&
+      Math.abs(pass.longitude - longitude) <= DEDUCTION_PASS_COORD_MATCH_DEG
+  )

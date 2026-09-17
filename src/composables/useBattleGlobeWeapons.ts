@@ -10,11 +10,6 @@ const LOD_MID_DISTANCE = 8_000_000
 const LOD_FAR_DISTANCE = 50_000_000
 /** 视锥体剔除包围球半径（米） */
 const FRUSTUM_BOUNDING_RADIUS = 30_000
-/**
- * 贴地标签三点深度检测距离（米）。
- * 相机距地面较近时，保证 CLAMP_TO_GROUND 标签任一角可见则整体可见。
- */
-const WEAPON_LABEL_THREE_POINT_DEPTH_TEST_DISTANCE = 5000
 /** 武器点默认颜色 */
 const WEAPON_POINT_COLOR = Cesium.Color.fromCssColorString('#ff3333')
 /** 选中武器相机距离（米） */
@@ -190,10 +185,7 @@ export const useBattleGlobeWeapons = (
     }
     if (!labelCollection || labelCollection.isDestroyed()) {
       labelCollection = viewer.scene.primitives.add(
-        new Cesium.LabelCollection({
-          scene: viewer.scene,
-          threePointDepthTestDistance: WEAPON_LABEL_THREE_POINT_DEPTH_TEST_DISTANCE,
-        })
+        new Cesium.LabelCollection({ scene: viewer.scene })
       )
     }
   }

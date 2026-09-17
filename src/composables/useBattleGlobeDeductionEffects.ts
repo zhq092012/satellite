@@ -240,7 +240,7 @@ export const useBattleGlobeDeductionEffects = (
   }
 
   /**
-   * 同步卫星打击八角星爆炸。
+   * 同步卫星打击八角星爆炸（随当前推演时刻的轨道位置移动，打击后至推演结束持续显示）。
    *
    * @param viewer Viewer
    * @param norad NORAD
@@ -257,9 +257,10 @@ export const useBattleGlobeDeductionEffects = (
       octStarDataUrl = createOctagonStarExplosionDataUrl(80)
     }
 
-    const ms = currentTimeMsRef.value > 0 ? currentTimeMsRef.value : Date.now()
+    const currentMs = currentTimeMsRef.value > 0 ? currentTimeMsRef.value : Date.now()
     const position =
-      propagatePosition(norad, new Date(ms), true) ?? Cesium.Cartesian3.clone(Cesium.Cartesian3.ZERO)
+      propagatePosition(norad, new Date(currentMs), true) ??
+      Cesium.Cartesian3.clone(Cesium.Cartesian3.ZERO)
     const scale = 0.85 + Math.sin(performance.now() / 180) * 0.15
 
     if (existing) {
@@ -306,6 +307,53 @@ export const useBattleGlobeDeductionEffects = (
     viewer.scene.requestRender()
   }
 
+  /**
+   * 每帧刷新爆炸位置与脉动（与卫星 TLE 传播时刻一致）。
+   */
+  const updateExplosionOnPostUpdate = () => {
+    const viewer = viewerRef.value
+    if (!viewer || viewer.isDestroyed() || !isDeductionPlayingRef.value) return
+
+    const plan = visualPlanRef.value
+    const norad = selectedNoradRef.value
+    const currentMs = currentTimeMsRef.value
+    if (!plan || !norad || plan.norad !== norad) return
+
+    const state = resolveDeductionVisualState(plan, currentMs, true)
+    syncExplosion(viewer, norad, state.showExplosion)
+  }
+
+  let effectsPostUpdateRemover: (() => void) | null = null
+
+  /**
+   * 注册 postUpdate，使爆炸随推演时钟与卫星同步移动。
+   */
+  const ensureEffectsPostUpdateListener = () => {
+    const viewer = viewerRef.value
+    if (!viewer || viewer.isDestroyed() || effectsPostUpdateRemover) return
+    effectsPostUpdateRemover = viewer.scene.postUpdate.addEventListener(() => {
+      updateExplosionOnPostUpdate()
+    })
+  }
+
+  /**
+   * 移除 postUpdate 监听。
+   */
+  const removeEffectsPostUpdateListener = () => {
+    effectsPostUpdateRemover?.()
+    effectsPostUpdateRemover = null
+  }
+
+  watch(
+    () => viewerRef.value,
+    (viewer) => {
+      removeEffectsPostUpdateListener()
+      if (!viewer || viewer.isDestroyed()) return
+      ensureEffectsPostUpdateListener()
+    },
+    { immediate: true }
+  )
+
   watch(
     [isDeductionPlayingRef, visualPlanRef, selectedNoradRef, currentTimeMsRef],
     () => syncDeductionEffects(),
@@ -323,6 +371,7 @@ export const useBattleGlobeDeductionEffects = (
   )
 
   onBeforeUnmount(() => {
+    removeEffectsPostUpdateListener()
     const viewer = viewerRef.value
     if (viewer && !viewer.isDestroyed()) {
       clearDeductionEntities(viewer)

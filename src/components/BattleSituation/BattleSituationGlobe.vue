@@ -13,6 +13,7 @@ import { useBattleGlobeWeapons } from '@/composables/useBattleGlobeWeapons'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
 import type { BattleGlobeGroundTarget } from '@/utils/buildBattleGlobeGroundTargets'
+import { mergeDeductionPassGroundTargets } from '@/utils/buildBattleGlobeGroundTargets'
 import { useBattleGlobeGroundTargets } from '@/composables/useBattleGlobeGroundTargets'
 import { useBattleGlobeDeductionEffects } from '@/composables/useBattleGlobeDeductionEffects'
 import type { SatelliteDeductionVisualPlan } from '@/utils/buildSatelliteDeductionTimeline'
@@ -80,13 +81,40 @@ let resizeObserver: ResizeObserver | null = null
 /** 初始化互斥锁 */
 let viewerInitializing = false
 
+/** 推演地面站/卫星视觉状态 */
+const deductionGlobeVisualState = computed(() => {
+  if (!props.isDeductionPlaying || !props.deductionVisualPlan) {
+    return {
+      struckReceiveKeys: new Set<string>(),
+      activePassReceiveKeys: new Set<string>(),
+      passHighlightReceiveKeys: new Set<string>(),
+      passHighlightPasses: [] as import('@/utils/buildSatelliteDeductionTimeline').DeductionStationPassWindow[],
+      explosionNorad: null as number | null,
+    }
+  }
+  const state = resolveDeductionVisualState(
+    props.deductionVisualPlan,
+    props.currentTimeMs || 0,
+    true
+  )
+  return {
+    struckReceiveKeys: state.struckReceiveKeys,
+    activePassReceiveKeys: state.activePassReceiveKeys,
+    passHighlightReceiveKeys: state.passHighlightReceiveKeys,
+    passHighlightPasses: state.passHighlightPasses,
+    explosionNorad:
+      state.showExplosion && props.selectedNorad != null ? props.selectedNorad : null,
+  }
+})
+
 /** 卫星渲染逻辑 */
 useBattleGlobeSatellites(
   viewerRef,
   computed(() => props.satellites),
   computed(() => props.currentTimeMs),
   computed(() => props.selectedNorad),
-  computed(() => props.followSelectedSatellite)
+  computed(() => props.followSelectedSatellite),
+  computed(() => deductionGlobeVisualState.value.explosionNorad)
 )
 
 /** 武器渲染逻辑 */
@@ -96,22 +124,34 @@ useBattleGlobeWeapons(
   computed(() => props.selectedWeaponId)
 )
 
-/** 推演中已被打击的接收站键集合 */
-const deductionStruckReceiveKeys = computed(() => {
-  if (!props.isDeductionPlaying || !props.deductionVisualPlan) return new Set<string>()
-  return resolveDeductionVisualState(
-    props.deductionVisualPlan,
-    props.currentTimeMs || 0,
-    true
-  ).struckReceiveKeys
+/** 推演地面站视觉状态（打击变红、过站高亮） */
+const deductionStruckReceiveKeys = computed(
+  () => deductionGlobeVisualState.value.struckReceiveKeys
+)
+const deductionPassHighlightReceiveKeys = computed(
+  () => deductionGlobeVisualState.value.passHighlightReceiveKeys
+)
+const deductionPassHighlightPasses = computed(
+  () => deductionGlobeVisualState.value.passHighlightPasses
+)
+
+/** 推演时补全过站接收站坐标，保证地球上有可高亮点位 */
+const globeGroundTargetsForRender = computed((): BattleGlobeGroundTarget[] => {
+  const base = props.groundTargets
+  if (!props.isDeductionPlaying || !props.deductionVisualPlan?.stationPasses.length) {
+    return base
+  }
+  return mergeDeductionPassGroundTargets(base, props.deductionVisualPlan.stationPasses)
 })
 
 /** 接收站/数据中心渲染逻辑 */
 useBattleGlobeGroundTargets(
   viewerRef,
-  computed(() => props.groundTargets),
+  globeGroundTargetsForRender,
   computed(() => props.selectedGroundTargetKey),
-  deductionStruckReceiveKeys
+  deductionStruckReceiveKeys,
+  deductionPassHighlightReceiveKeys,
+  deductionPassHighlightPasses
 )
 
 /** 推演 Cesium 特效 */

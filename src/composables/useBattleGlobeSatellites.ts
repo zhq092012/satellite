@@ -38,13 +38,15 @@ interface SatellitePointVisual {
  * @param currentTimeMsRef 当前推演时刻（毫秒）
  * @param selectedNoradRef 当前选中 NORAD
  * @param followSelectedRef 选中卫星时是否自动飞行定位
+ * @param hidePointNoradRef 推演打击后隐藏点与标签的 NORAD（由爆炸特效代替）
  */
 export const useBattleGlobeSatellites = (
   viewerRef: Ref<Cesium.Viewer | null>,
   satellitesRef: Ref<BattleGlobeSatellite[]> | ComputedRef<BattleGlobeSatellite[]>,
   currentTimeMsRef: Ref<number> | ComputedRef<number>,
   selectedNoradRef: Ref<number | null> | ComputedRef<number | null>,
-  followSelectedRef: Ref<boolean> | ComputedRef<boolean> = ref(true)
+  followSelectedRef: Ref<boolean> | ComputedRef<boolean> = ref(true),
+  hidePointNoradRef: Ref<number | null> | ComputedRef<number | null> = ref(null)
 ) => {
   const satrecCache = new Map<number, satellitejs.SatRec>()
   const visualMap = new Map<number, SatellitePointVisual>()
@@ -317,11 +319,18 @@ export const useBattleGlobeSatellites = (
       visual.label.position = visual.position
 
       const selected = selectedNorad === visual.norad
+      const hideForExplosion = hidePointNoradRef.value === visual.norad
       const facing = isPositionFacingCamera(visual.position, cameraPosition)
       const inFrustum = isPositionInCameraFrustum(viewer, visual.position)
       const distance = Cesium.Cartesian3.distance(cameraPosition, visual.position)
       const lodStyle = resolveLodStyle(distance, selected)
       const showLabel = shouldShowSatelliteLabel(distance, selected)
+
+      if (hideForExplosion) {
+        visual.point.show = false
+        visual.label.show = false
+        return
+      }
 
       if (!selected && !facing) {
         visual.point.show = false
@@ -419,6 +428,10 @@ export const useBattleGlobeSatellites = (
 
   watch(selectedNoradRef, (norad) => {
     if (norad && followSelectedRef.value) flyToSatellite(norad)
+    updateSatelliteVisuals()
+  })
+
+  watch(hidePointNoradRef, () => {
     updateSatelliteVisuals()
   })
 

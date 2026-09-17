@@ -2,8 +2,13 @@ import * as Cesium from 'cesium'
 import { onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import {
   buildGroundTargetKey,
+  isGroundTargetNearDeductionPass,
   type BattleGlobeGroundTarget,
 } from '@/utils/buildBattleGlobeGroundTargets'
+import {
+  matchesDeductionReceiveHighlight,
+  type DeductionStationPassWindow,
+} from '@/utils/buildSatelliteDeductionTimeline'
 
 /** 近距离 LOD 阈值（米） */
 const LOD_NEAR_DISTANCE = 2_000_000
@@ -13,14 +18,14 @@ const LOD_MID_DISTANCE = 8_000_000
 const LOD_FAR_DISTANCE = 50_000_000
 /** 视锥体剔除包围球半径（米） */
 const FRUSTUM_BOUNDING_RADIUS = 30_000
-/** 贴地标签三点深度检测距离（米） */
-const GROUND_LABEL_THREE_POINT_DEPTH_TEST_DISTANCE = 5000
 /** 接收站点颜色 */
 const RECEIVE_POINT_COLOR = Cesium.Color.fromCssColorString('#22d3ee')
 /** 数据中心的点颜色 */
 const STATION_POINT_COLOR = Cesium.Color.fromCssColorString('#fb923c')
 /** 被打击状态点颜色 */
 const STRUCK_POINT_COLOR = Cesium.Color.fromCssColorString('#f87171')
+/** 推演过站高亮颜色（与过站虚线一致） */
+const DEDUCTION_PASS_HIGHLIGHT_COLOR = Cesium.Color.fromCssColorString('#facc15')
 /** 选中目标相机距离（米） */
 const SELECTED_CAMERA_RANGE = 600_000
 
@@ -36,6 +41,10 @@ interface GroundTargetVisual {
   label: Cesium.Label
   /** 世界坐标 */
   position: Cesium.Cartesian3
+  /** 纬度（度） */
+  latitude: number
+  /** 经度（度） */
+  longitude: number
   /** 是否被打击 */
   struck: boolean
 }
@@ -47,12 +56,20 @@ interface GroundTargetVisual {
  * @param targetsRef 地面目标列表
  * @param selectedTargetKeyRef 当前选中键（receive: / station:）
  * @param deductionStruckReceiveKeysRef 推演中已被打击的接收站 ID/名称集合
+ * @param deductionPassHighlightReceiveKeysRef 推演当前过站窗口内接收站 ID/名称集合
+ * @param deductionPassHighlightPassesRef 推演高亮过站窗口（含坐标）
  */
 export const useBattleGlobeGroundTargets = (
   viewerRef: Ref<Cesium.Viewer | null>,
   targetsRef: Ref<BattleGlobeGroundTarget[]> | ComputedRef<BattleGlobeGroundTarget[]>,
   selectedTargetKeyRef: Ref<string | null> | ComputedRef<string | null>,
-  deductionStruckReceiveKeysRef: Ref<Set<string>> | ComputedRef<Set<string>> = ref(new Set())
+  deductionStruckReceiveKeysRef: Ref<Set<string>> | ComputedRef<Set<string>> = ref(new Set()),
+  deductionPassHighlightReceiveKeysRef: Ref<Set<string>> | ComputedRef<Set<string>> = ref(
+    new Set()
+  ),
+  deductionPassHighlightPassesRef: Ref<DeductionStationPassWindow[]> | ComputedRef<
+    DeductionStationPassWindow[]
+  > = ref([])
 ) => {
   const visualMap = new Map<string, GroundTargetVisual>()
   let pointCollection: Cesium.PointPrimitiveCollection | null = null
@@ -152,9 +169,17 @@ export const useBattleGlobeGroundTargets = (
    * @param baseColor 默认颜色
    * @returns 点样式
    */
-  const resolveLodStyle = (distance: number, selected: boolean, baseColor: Cesium.Color) => {
+  const resolveLodStyle = (
+    distance: number,
+    selected: boolean,
+    passHighlight: boolean,
+    baseColor: Cesium.Color
+  ) => {
     if (selected) {
       return { pixelSize: 12, color: Cesium.Color.YELLOW }
+    }
+    if (passHighlight) {
+      return { pixelSize: 12, color: DEDUCTION_PASS_HIGHLIGHT_COLOR }
     }
     if (distance <= LOD_NEAR_DISTANCE) {
       return { pixelSize: 8, color: baseColor }
@@ -175,8 +200,11 @@ export const useBattleGlobeGroundTargets = (
    * @param selected 是否选中
    * @returns 是否显示标签
    */
-  const shouldShowTargetLabel = (distance: number, selected: boolean): boolean =>
-    selected || distance <= LOD_NEAR_DISTANCE
+  const shouldShowTargetLabel = (
+    distance: number,
+    selected: boolean,
+    passHighlight: boolean
+  ): boolean => selected || passHighlight || distance <= LOD_NEAR_DISTANCE
 
   /**
    * 清理地面站 Point 集合。
@@ -209,10 +237,7 @@ export const useBattleGlobeGroundTargets = (
     }
     if (!labelCollection || labelCollection.isDestroyed()) {
       labelCollection = viewer.scene.primitives.add(
-        new Cesium.LabelCollection({
-          scene: viewer.scene,
-          threePointDepthTestDistance: GROUND_LABEL_THREE_POINT_DEPTH_TEST_DISTANCE,
-        })
+        new Cesium.LabelCollection({ scene: viewer.scene })
       )
     }
   }
@@ -270,6 +295,8 @@ export const useBattleGlobeGroundTargets = (
         point,
         label,
         position,
+        latitude: target.latitude,
+        longitude: target.longitude,
         struck: target.status === 1,
       })
     }
@@ -296,9 +323,17 @@ export const useBattleGlobeGroundTargets = (
       const targetKind = visual.key.startsWith('receive:') ? 'receive' : 'station'
       const targetId = visual.key.split(':')[1] || ''
       const deductionStruck = deductionStruckReceiveKeysRef.value
+      const passHighlightKeys = deductionPassHighlightReceiveKeysRef.value
+      const passHighlightPasses = deductionPassHighlightPassesRef.value
       const struckInDeduction =
         targetKind === 'receive' &&
-        (deductionStruck.has(targetId) || deductionStruck.has(visual.name))
+        (deductionStruck.has(targetId) ||
+          deductionStruck.has(visual.name) ||
+          matchesDeductionReceiveHighlight(targetId, visual.name, deductionStruck))
+      const passHighlightInDeduction =
+        !struckInDeduction &&
+        (matchesDeductionReceiveHighlight(targetId, visual.name, passHighlightKeys) ||
+          isGroundTargetNearDeductionPass(visual.latitude, visual.longitude, passHighlightPasses))
       const baseColor = struckInDeduction
         ? STRUCK_POINT_COLOR
         : visual.struck
@@ -306,16 +341,16 @@ export const useBattleGlobeGroundTargets = (
           : targetKind === 'receive'
             ? RECEIVE_POINT_COLOR
             : STATION_POINT_COLOR
-      const lodStyle = resolveLodStyle(distance, selected, baseColor)
-      const showLabel = shouldShowTargetLabel(distance, selected)
+      const lodStyle = resolveLodStyle(distance, selected, passHighlightInDeduction, baseColor)
+      const showLabel = shouldShowTargetLabel(distance, selected, passHighlightInDeduction)
 
-      if (!selected && !facing) {
+      if (!selected && !passHighlightInDeduction && !facing) {
         visual.point.show = false
         visual.label.show = false
         return
       }
 
-      if (!selected && !inFrustum) {
+      if (!selected && !passHighlightInDeduction && !inFrustum) {
         visual.point.show = false
         visual.label.show = false
         return
@@ -326,7 +361,11 @@ export const useBattleGlobeGroundTargets = (
       visual.point.color = lodStyle.color
 
       visual.label.show = showLabel
-      visual.label.fillColor = selected ? Cesium.Color.YELLOW : baseColor
+      visual.label.fillColor = selected
+        ? Cesium.Color.YELLOW
+        : passHighlightInDeduction
+          ? DEDUCTION_PASS_HIGHLIGHT_COLOR
+          : baseColor
     })
 
     viewer.scene.requestRender()
@@ -398,6 +437,8 @@ export const useBattleGlobeGroundTargets = (
   })
 
   watch(deductionStruckReceiveKeysRef, () => updateGroundTargetVisuals(), { deep: true })
+  watch(deductionPassHighlightReceiveKeysRef, () => updateGroundTargetVisuals(), { deep: true })
+  watch(deductionPassHighlightPassesRef, () => updateGroundTargetVisuals(), { deep: true })
 
   onBeforeUnmount(() => {
     removePostUpdateListener()

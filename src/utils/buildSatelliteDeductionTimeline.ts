@@ -3,6 +3,7 @@ import type {
   InitMatrix,
   InitWindow,
   LevelSeriesEntity,
+  RelationList,
   SatelliteAnalysisData,
   SatelliteMatrix,
   TimeEffect,
@@ -17,6 +18,7 @@ import {
   resolveTrueDelayAfter,
 } from '@/utils/buildSatelliteAnalysisTable'
 import { parseFeedbackTimestamp, splitDateTimeDisplay } from '@/utils/zhchPlanDisplay'
+import { parseReceiveLatLonString } from '@/utils/buildBattleGlobeGroundTargets'
 import * as satellitejs from 'satellite.js'
 
 /** 推演事件类型（用于同刻排序） */
@@ -219,6 +221,38 @@ const parseMatrixTimeMs = (value?: string | null): number | null => {
  */
 const normalizeSatelliteNameKey = (name: string): string => {
   return name.replace(/\s+/g, '').replace(/-+/g, '-').toLowerCase()
+}
+
+/**
+ * 判断地面目标 ID/名称是否命中推演过站高亮键（含模糊名称匹配）。
+ *
+ * @param targetId 目标 ID
+ * @param targetName 展示名称
+ * @param highlightKeys 过站 receiveId / receiveName 集合
+ * @returns 是否应高亮
+ */
+export const matchesDeductionReceiveHighlight = (
+  targetId: string,
+  targetName: string,
+  highlightKeys: Set<string>
+): boolean => {
+  if (!highlightKeys.size) return false
+  const id = targetId.trim()
+  const name = targetName.trim()
+  if (id && highlightKeys.has(id)) return true
+  if (name && highlightKeys.has(name)) return true
+  const targetKey = normalizeSatelliteNameKey(name)
+  for (const key of highlightKeys) {
+    const trimmed = key.trim()
+    if (!trimmed) continue
+    if (trimmed === id || trimmed === name) return true
+    const keyNorm = normalizeSatelliteNameKey(trimmed)
+    if (!keyNorm || !targetKey) continue
+    if (keyNorm === targetKey || keyNorm.includes(targetKey) || targetKey.includes(keyNorm)) {
+      return true
+    }
+  }
+  return false
 }
 
 /**
@@ -517,8 +551,43 @@ interface VisualPlanContext {
   initSat: InitMatrix
   postSat: SatelliteMatrix | undefined
   windows: InitWindow[]
+  /** 打击前关系列表，用于补全过站经纬度 */
+  initRelationList: RelationList | null | undefined
   satelliteStrikeMs: number | null
   raw: RawDeductionEvent[]
+}
+
+/**
+ * 解析过站窗口对应接收站经纬度（窗口字段缺失时从关系列表补全）。
+ *
+ * @param win 过站窗口
+ * @param relation 接收站关系列表
+ * @returns 经纬度或 null
+ */
+const resolveReceiveCoordsForWindow = (
+  win: InitWindow,
+  relation: RelationList | null | undefined
+): { latitude: number; longitude: number } | null => {
+  const lat = win.receiveLat
+  const lon = win.receiveLon
+  if (lat != null && lon != null && Number.isFinite(lat) && Number.isFinite(lon)) {
+    return { latitude: lat, longitude: lon }
+  }
+  const winId = win.receiveId?.trim()
+  const winName = win.receiveName?.trim()
+  for (const receive of relation?.receiveObjList || []) {
+    const receiveId = receive.receiveId?.trim()
+    const receiveName = receive.receiveName?.trim()
+    const idMatch = Boolean(winId && receiveId && winId === receiveId)
+    const nameMatch =
+      Boolean(winName && receiveName) &&
+      (winName === receiveName ||
+        normalizeSatelliteNameKey(winName!) === normalizeSatelliteNameKey(receiveName!))
+    if (!idMatch && !nameMatch) continue
+    const coords = parseReceiveLatLonString(receive.receiveLatLon)
+    if (coords) return coords
+  }
+  return null
 }
 
 /**
@@ -560,14 +629,13 @@ const buildVisualPlanFromContext = (ctx: VisualPlanContext): SatelliteDeductionV
       const startMs = parseMatrixTimeMs(win.peakWindow)
       if (startMs == null) return null
       const endMs = parseMatrixTimeMs(win.endWindow) ?? startMs
-      const lat = win.receiveLat
-      const lon = win.receiveLon
-      if (lat == null || lon == null || !Number.isFinite(lat) || !Number.isFinite(lon)) return null
+      const coords = resolveReceiveCoordsForWindow(win, ctx.initRelationList)
+      if (!coords) return null
       return {
         receiveId: win.receiveId?.trim() || '',
         receiveName: win.receiveName?.trim() || '',
-        latitude: lat,
-        longitude: lon,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
         startMs,
         endMs: Math.max(endMs, startMs),
       }
@@ -823,6 +891,7 @@ const buildSatelliteDeductionTimelineInternal = (
     initSat,
     postSat,
     windows,
+    initRelationList: entity.initRelationList,
     satelliteStrikeMs,
     raw,
   })
@@ -873,12 +942,21 @@ export const resolveDeductionVisualState = (
 ): {
   showOrbitPath: boolean
   activePass: DeductionStationPassWindow | null
+  /** 当前过站窗口内接收站 ID/名称（过站连线等） */
+  activePassReceiveKeys: Set<string>
+  /** 推演已开始过站的接收站 ID/名称（用于地球高亮与标签） */
+  passHighlightReceiveKeys: Set<string>
+  /** 当前时刻应高亮的过站窗口（含坐标，用于地图匹配） */
+  passHighlightPasses: DeductionStationPassWindow[]
   showExplosion: boolean
   struckReceiveKeys: Set<string>
 } => {
   const empty = {
     showOrbitPath: false,
     activePass: null as DeductionStationPassWindow | null,
+    activePassReceiveKeys: new Set<string>(),
+    passHighlightReceiveKeys: new Set<string>(),
+    passHighlightPasses: [] as DeductionStationPassWindow[],
     showExplosion: false,
     struckReceiveKeys: new Set<string>(),
   }
@@ -888,9 +966,7 @@ export const resolveDeductionVisualState = (
     plan.stationPasses.find((pass) => currentMs >= pass.startMs && currentMs <= pass.endMs) ?? null
 
   const showExplosion =
-    plan.satelliteStrikeMs != null &&
-    currentMs >= plan.satelliteStrikeMs &&
-    currentMs <= plan.satelliteStrikeMs + 6000
+    plan.satelliteStrikeMs != null && currentMs >= plan.satelliteStrikeMs
 
   const struckReceiveKeys = new Set<string>()
   plan.receiveStrikes.forEach((strike) => {
@@ -900,9 +976,34 @@ export const resolveDeductionVisualState = (
     }
   })
 
+  const activePassReceiveKeys = new Set<string>()
+  if (activePass) {
+    if (activePass.receiveId) activePassReceiveKeys.add(activePass.receiveId)
+    if (activePass.receiveName) activePassReceiveKeys.add(activePass.receiveName)
+  }
+
+  const passHighlightReceiveKeys = new Set<string>()
+  const passHighlightPasses: DeductionStationPassWindow[] = []
+  plan.stationPasses.forEach((pass) => {
+    if (currentMs < pass.startMs) return
+    passHighlightPasses.push(pass)
+    if (pass.receiveId) passHighlightReceiveKeys.add(pass.receiveId)
+    if (pass.receiveName) passHighlightReceiveKeys.add(pass.receiveName)
+  })
+  if (activePass) {
+    if (activePass.receiveId) passHighlightReceiveKeys.add(activePass.receiveId)
+    if (activePass.receiveName) passHighlightReceiveKeys.add(activePass.receiveName)
+    if (!passHighlightPasses.includes(activePass)) {
+      passHighlightPasses.push(activePass)
+    }
+  }
+
   return {
     showOrbitPath: true,
     activePass,
+    activePassReceiveKeys,
+    passHighlightReceiveKeys,
+    passHighlightPasses,
     showExplosion,
     struckReceiveKeys,
   }
