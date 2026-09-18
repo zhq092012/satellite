@@ -41,56 +41,11 @@
       </div>
     </div>
 
-    <!-- 2. 方案概要 + TOP5（对比模式下拆成两行 subgrid，保证三列等高） -->
+    <!-- 2. 方案概要（对比模式下参与 subgrid 等高） -->
     <div class="summary-group" :class="{ 'summary-group--align': alignBlocks }">
       <div class="text-block text-block--summary">
         <div class="block-head">方案概要</div>
         <p class="block-text large" v-html="highlightText(plan.summary)"></p>
-      </div>
-
-      <div
-        v-if="showRecommendSection"
-        class="recommend-section"
-        :class="{ 'recommend-section--align': alignBlocks }"
-      >
-        <div v-if="alignBlocks || topCoverageRecommends.length" class="recommend-block">
-          <div class="recommend-title">覆盖率降幅 TOP5</div>
-          <ul
-            v-if="topCoverageRecommends.length"
-            class="recommend-list"
-            :class="{ 'recommend-list--fixed': alignBlocks }"
-          >
-            <li v-for="item in topCoverageRecommends" :key="`cov-${item.norad}`" class="recommend-item">
-              <span class="recommend-name">{{ item.name }}</span>
-              <span class="recommend-meta">
-                {{ formatCoverage(item.coverage) }}
-                <span class="recommend-arrow">→</span>
-                {{ formatCoverage(item.afterCoverage) }}
-                <span class="recommend-delta recommend-delta--down">↓{{ formatCoverageDelta(item.reducedCoverage) }}</span>
-              </span>
-            </li>
-          </ul>
-          <p v-else-if="alignBlocks" class="recommend-empty">暂无覆盖率降幅数据</p>
-        </div>
-        <div v-if="alignBlocks || topDelayRecommends.length" class="recommend-block">
-          <div class="recommend-title">链路时延增幅 TOP5</div>
-          <ul
-            v-if="topDelayRecommends.length"
-            class="recommend-list"
-            :class="{ 'recommend-list--fixed': alignBlocks }"
-          >
-            <li v-for="item in topDelayRecommends" :key="`delay-${item.norad}`" class="recommend-item">
-              <span class="recommend-name">{{ item.name }}</span>
-              <span class="recommend-meta">
-                {{ formatDelay(item.delay) }}
-                <span class="recommend-arrow">→</span>
-                {{ formatDelay(item.afterDelay) }}
-                <span class="recommend-delta recommend-delta--up">↑{{ formatDelayDelta(item.increasedDelay) }}</span>
-              </span>
-            </li>
-          </ul>
-          <p v-else-if="alignBlocks" class="recommend-empty">暂无链路时延增幅数据</p>
-        </div>
       </div>
     </div>
 
@@ -136,7 +91,55 @@
       </div>
     </div>
 
-    <!-- 4. 系列链路通断时序（仅单方案展示，多方案对比时隐藏） -->
+    <!-- 4. 卫星指标 TOP5（独立面板，位于地面站打击分析下方） -->
+    <div
+      v-if="showRecommendSection"
+      class="recommend-top-panel"
+      :class="{ 'recommend-top-panel--align': alignBlocks }"
+    >
+      <div class="recommend-section" :class="{ 'recommend-section--align': alignBlocks, 'recommend-section--panel': true }">
+        <div v-if="alignBlocks || topCoverageRecommends.length" class="recommend-block">
+          <div class="recommend-title">覆盖率降幅 TOP5</div>
+          <ul
+            v-if="topCoverageRecommends.length"
+            class="recommend-list"
+            :class="{ 'recommend-list--fixed': alignBlocks }"
+          >
+            <li v-for="item in topCoverageRecommends" :key="`cov-${item.norad}`" class="recommend-item">
+              <span class="recommend-name">{{ item.name }}</span>
+              <span class="recommend-meta">
+                {{ formatCoverage(item.coverage) }}
+                <span class="recommend-arrow">→</span>
+                {{ formatCoverage(item.afterCoverage) }}
+                <span class="recommend-delta recommend-delta--down">↓{{ formatCoverageDelta(item.reducedCoverage) }}</span>
+              </span>
+            </li>
+          </ul>
+          <p v-else-if="alignBlocks" class="recommend-empty">暂无覆盖率降幅数据</p>
+        </div>
+        <div v-if="alignBlocks || topDelayRecommends.length" class="recommend-block">
+          <div class="recommend-title">链路时延增幅 TOP5</div>
+          <ul
+            v-if="topDelayRecommends.length"
+            class="recommend-list"
+            :class="{ 'recommend-list--fixed': alignBlocks }"
+          >
+            <li v-for="item in topDelayRecommends" :key="`delay-${item.norad}`" class="recommend-item">
+              <span class="recommend-name">{{ item.name }}</span>
+              <span class="recommend-meta">
+                {{ formatDelay(item.delay) }}
+                <span class="recommend-arrow">→</span>
+                {{ formatDelay(item.afterDelay) }}
+                <span class="recommend-delta recommend-delta--up">↑{{ formatDelayDelta(item.increasedDelay) }}</span>
+              </span>
+            </li>
+          </ul>
+          <p v-else-if="alignBlocks" class="recommend-empty">暂无链路时延增幅数据</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. 系列链路通断时序（仅单方案展示，多方案对比时隐藏） -->
     <SeriesLinkTimeline v-if="showSeriesLinkTimeline" :plan="plan" />
   </div>
 </template>
@@ -218,10 +221,10 @@ const pickTopDelayRecommends = (list: ZhchPlanDelayRecommend[] | undefined): Zhc
   return sorted.slice(0, RECOMMEND_TOP_N)
 }
 
-/** 方案概要下展示的覆盖率 TOP5 */
+/** 地面站打击分析下展示的覆盖率 TOP5 */
 const topCoverageRecommends = computed(() => pickTopCoverageRecommends(props.plan.coverageRecommends))
 
-/** 方案概要下展示的链路时延 TOP5 */
+/** 地面站打击分析下展示的链路时延 TOP5 */
 const topDelayRecommends = computed(() => pickTopDelayRecommends(props.plan.delayRecommends))
 
 /** 是否展示 TOP5 区域：单方案有数据才展示；多方案对比时固定占位以保持列对齐 */
@@ -423,12 +426,6 @@ const coverageReduction = computed(() => {
     border: none;
     border-radius: 0;
     background: transparent;
-  }
-
-  .recommend-section:not(.recommend-section--align) {
-    margin-top: 0;
-    padding-top: 12px;
-    border-top: 1px dashed rgba(79, 147, 221, 0.35);
   }
 }
 
@@ -705,7 +702,6 @@ const coverageReduction = computed(() => {
   .zhch-plan-detail--align & {
     height: 100%;
     box-sizing: border-box;
-    gap: 10px;
   }
 
   .card-title {
@@ -713,6 +709,35 @@ const coverageReduction = computed(() => {
     font-weight: 800;
     color: #fbbf24;
     margin-bottom: 12px;
+  }
+}
+
+.recommend-top-panel {
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(79, 147, 221, 0.25);
+  background: rgba(14, 28, 48, 0.6);
+
+  &--align {
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .recommend-section--panel {
+    padding: 0;
+  }
+
+  .recommend-section--panel.recommend-section--align {
+    flex: 1;
+    min-height: 0;
+    margin-top: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
   }
 }
 
