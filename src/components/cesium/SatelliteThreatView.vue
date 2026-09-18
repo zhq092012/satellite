@@ -718,6 +718,7 @@ import type { ThreatTaskWeightsResponse, ThreatWeight } from '@/types/threat'
 import { formatDate, getDaysAgo } from '@/utils/tools/funcs.ts'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import type { SatelliteThreat, SceneConfig } from '@/types/dashboard/index.js'
+import type { TaskSteps } from '@/types/cesium/satellite'
 defineOptions({
   name: 'ThreatAnalysis',
 })

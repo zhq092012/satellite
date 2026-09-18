@@ -60,12 +60,14 @@ const toBattleGlobeSatellite = (
   sat: BattleGlobeSatelliteSource,
   series: string
 ): BattleGlobeSatellite | null => {
-  if (!hasValidTle(sat.line1, sat.line2)) return null
+  const line1 = sat.line1?.trim() ?? ''
+  const line2 = sat.line2?.trim() ?? ''
+  if (!hasValidTle(line1, line2)) return null
   return {
     norad: sat.norad,
     name: sat.name || `Sat-${sat.norad}`,
-    line1: sat.line1.trim(),
-    line2: sat.line2.trim(),
+    line1,
+    line2,
     series,
   }
 }

@@ -19,14 +19,13 @@ import type { SatelliteData, Weapon } from '@/types/dashboard'
 import { markBattleArea } from '@/utils/tools/functionTool'
 import laserStationIcon from '@/assets/icons/LaserStation.png'
 import groundStationIcon from '@/assets/icons/GroundStation.png'
-import opticalTrackingStationIcon from '@/assets/icons/OpticalTrackingStation.png'
 import launchPadIcon from '@/assets/icons/LaunchPad.png'
 import satelliteIcon from '@/assets/icons/Satellite.png'
 import radarStationIcon from '@/assets/icons/RadarStation.png'
 import launchSiteIcon from '@/assets/icons/LaunchSite.png'
 import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
 // import { listenCameraLocaion, listenClickPositionCartesian } from '@/utils/tools/cameraTools'
 
 // 全局布局状态管理 store
@@ -463,10 +462,10 @@ const pickSatellitesForGlobe = (
   if (!isLarge) return sats
 
   const threatMap = new Map<number, number>()
-  ;(props.matrixData?.threatSats || []).forEach((item) => {
-    const raw = Number(item.threatScore)
-    if (Number.isFinite(raw)) threatMap.set(item.norad, raw <= 1 ? raw * 100 : raw)
-  })
+    ; (props.matrixData?.threatSats || []).forEach((item) => {
+      const raw = Number(item.threatScore)
+      if (Number.isFinite(raw)) threatMap.set(item.norad, raw <= 1 ? raw * 100 : raw)
+    })
   const ranked = [...sats].sort((a, b) => {
     const threatDiff = (threatMap.get(b.norad) ?? -Infinity) - (threatMap.get(a.norad) ?? -Infinity)
     if (threatDiff !== 0) return threatDiff
@@ -1905,10 +1904,10 @@ const flyToBattleView = () => {
       destination,
       orientation: orientation
         ? {
-            heading: orientation.heading,
-            pitch: orientation.pitch,
-            roll: orientation.roll,
-          }
+          heading: orientation.heading,
+          pitch: orientation.pitch,
+          roll: orientation.roll,
+        }
         : { heading: 0, pitch: -Cesium.Math.toRadians(90), roll: 0 },
       duration: 1.5,
     })

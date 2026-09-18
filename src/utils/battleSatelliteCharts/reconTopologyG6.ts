@@ -1,4 +1,4 @@
-import G6, { type GraphData } from '@antv/g6'
+import G6, { type GraphData, type NodeConfig } from '@antv/g6'
 import type { MatrixResult } from '@/api/electronic'
 import {
   collectRelaySatelliteTransmissionLinks,
@@ -189,7 +189,7 @@ const buildTopoNode = (
     subLabel?: string
   },
   stageHeight: number
-) => {
+): NodeConfig => {
   const struck = !!opts.struck
   const showLabel = opts.showLabel !== false
   const hasSubLabel = showLabel && !!opts.subLabel
@@ -220,16 +220,15 @@ const buildTopoNode = (
     style,
     labelCfg: showLabel
       ? {
-          position: 'bottom',
-          offset: hasSubLabel ? 14 : 8,
-          style: {
-            fill: '#e2efff',
-            fontSize: hasSubLabel ? 9 : 10,
-            fontWeight: 500,
-            lineHeight: 14,
-            textAlign: 'center',
-          },
-        }
+        position: 'bottom',
+        offset: hasSubLabel ? 14 : 8,
+        style: {
+          fill: '#e2efff',
+          fontSize: hasSubLabel ? 9 : 10,
+          fontWeight: 500,
+          textAlign: 'center' as const,
+        },
+      }
       : { style: { opacity: 0 } },
   }
 }
