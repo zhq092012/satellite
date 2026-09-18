@@ -16,6 +16,7 @@ import type { BattleGlobeGroundTarget } from '@/utils/buildBattleGlobeGroundTarg
 import { mergeDeductionPassGroundTargets } from '@/utils/buildBattleGlobeGroundTargets'
 import { useBattleGlobeGroundTargets } from '@/composables/useBattleGlobeGroundTargets'
 import { useBattleGlobeDeductionEffects } from '@/composables/useBattleGlobeDeductionEffects'
+import { useBattleGlobeTimelineSelectedOrbit } from '@/composables/useBattleGlobeTimelineSelectedOrbit'
 import type { SatelliteDeductionVisualPlan } from '@/utils/buildSatelliteDeductionTimeline'
 import { resolveDeductionVisualState } from '@/utils/buildSatelliteDeductionTimeline'
 import { computed, onActivated, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
@@ -47,6 +48,8 @@ const props = withDefaults(
     followSelectedSatellite?: boolean
     /** 是否正在推演播放 */
     isDeductionPlaying?: boolean
+    /** 底部时间轴是否正在播放 */
+    isTimelinePlaying?: boolean
     /** 推演视觉计划 */
     deductionVisualPlan?: SatelliteDeductionVisualPlan | null
   }>(),
@@ -62,6 +65,7 @@ const props = withDefaults(
     taskEndMs: 0,
     followSelectedSatellite: true,
     isDeductionPlaying: false,
+    isTimelinePlaying: false,
     deductionVisualPlan: null,
   }
 )
@@ -114,7 +118,19 @@ useBattleGlobeSatellites(
   computed(() => props.currentTimeMs),
   computed(() => props.selectedNorad),
   computed(() => props.followSelectedSatellite),
-  computed(() => deductionGlobeVisualState.value.explosionNorad)
+  computed(() => deductionGlobeVisualState.value.explosionNorad),
+  computed(() => props.isTimelinePlaying)
+)
+
+/** 选中卫星 Entity.path 轨迹（单星推演时由推演模块绘制） */
+useBattleGlobeTimelineSelectedOrbit(
+  viewerRef,
+  computed(() => props.satellites),
+  computed(() => props.currentTimeMs),
+  computed(() => props.selectedNorad),
+  computed(() => props.isDeductionPlaying),
+  computed(() => props.taskStartMs),
+  computed(() => props.taskEndMs)
 )
 
 /** 武器渲染逻辑 */

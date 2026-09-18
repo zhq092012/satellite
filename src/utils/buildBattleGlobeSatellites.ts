@@ -1,3 +1,4 @@
+import * as satellitejs from 'satellite.js'
 import type { SatelliteAnalysisData } from '@/api/task/task'
 
 /** 地球渲染所需的最小卫星字段（兼容 task / electronic 两套 InitMatrix） */
@@ -41,6 +42,26 @@ export interface BattleGlobeSatellite {
  * @param line2 TLE 第二行
  * @returns 是否可用于 SGP4 传播
  */
+/**
+ * 从 TLE 估算卫星轨道周期（秒），用于态势地球绘制一轨轨迹。
+ *
+ * @param sat 含 line1/line2 的卫星数据
+ * @returns 轨道周期（秒）；解析失败时默认 90 分钟
+ */
+export const resolveBattleGlobeOrbitPeriodSec = (
+  sat: Pick<BattleGlobeSatellite, 'line1' | 'line2'>
+): number => {
+  try {
+    const satrec = satellitejs.twoline2satrec(sat.line1, sat.line2)
+    if (satrec?.no && satrec.no > 0) {
+      return Math.max(300, ((2 * Math.PI) / satrec.no) * 60)
+    }
+  } catch {
+    /* fallback below */
+  }
+  return 90 * 60
+}
+
 export const hasValidTle = (line1?: string | null, line2?: string | null): boolean => {
   if (!line1 || !line2) return false
   const trimmed1 = line1.trim()

@@ -4,6 +4,10 @@ import { onBeforeUnmount, watch, type ComputedRef, type Ref } from 'vue'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import { createOctagonStarExplosionDataUrl } from '@/utils/battleGlobeOctStar'
 import {
+  BATTLE_GLOBE_ORBIT_PATH_WIDTH,
+  createBattleGlobeOrbitGlowMaterial,
+} from '@/utils/battleGlobeOrbitPathStyle'
+import {
   resolveDeductionVisualState,
   type SatelliteDeductionVisualPlan,
 } from '@/utils/buildSatelliteDeductionTimeline'
@@ -174,11 +178,8 @@ export const useBattleGlobeDeductionEffects = (
         id: entityId,
         polyline: {
           positions: new Cesium.ConstantProperty(positions),
-          width: 2,
-          material: new Cesium.PolylineGlowMaterialProperty({
-            glowPower: 0.25,
-            color: Cesium.Color.fromCssColorString('#fde047'),
-          }),
+          width: BATTLE_GLOBE_ORBIT_PATH_WIDTH,
+          material: createBattleGlobeOrbitGlowMaterial(),
           arcType: Cesium.ArcType.NONE,
         },
       })

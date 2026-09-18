@@ -39,6 +39,7 @@ interface SatellitePointVisual {
  * @param selectedNoradRef 当前选中 NORAD
  * @param followSelectedRef 选中卫星时是否自动飞行定位
  * @param hidePointNoradRef 推演打击后隐藏点与标签的 NORAD（由爆炸特效代替）
+ * @param timelinePlaybackActiveRef 时间轴播放中（选中星持续高亮并始终显示名称）
  */
 export const useBattleGlobeSatellites = (
   viewerRef: Ref<Cesium.Viewer | null>,
@@ -46,7 +47,8 @@ export const useBattleGlobeSatellites = (
   currentTimeMsRef: Ref<number> | ComputedRef<number>,
   selectedNoradRef: Ref<number | null> | ComputedRef<number | null>,
   followSelectedRef: Ref<boolean> | ComputedRef<boolean> = ref(true),
-  hidePointNoradRef: Ref<number | null> | ComputedRef<number | null> = ref(null)
+  hidePointNoradRef: Ref<number | null> | ComputedRef<number | null> = ref(null),
+  timelinePlaybackActiveRef: Ref<boolean> | ComputedRef<boolean> = ref(false)
 ) => {
   const satrecCache = new Map<number, satellitejs.SatRec>()
   const visualMap = new Map<number, SatellitePointVisual>()
@@ -170,7 +172,10 @@ export const useBattleGlobeSatellites = (
    * @param selected 是否选中
    * @returns 点样式
    */
-  const resolveLodStyle = (distance: number, selected: boolean) => {
+  const resolveLodStyle = (distance: number, selected: boolean, playbackSelected: boolean) => {
+    if (playbackSelected) {
+      return { pixelSize: 14, color: Cesium.Color.YELLOW }
+    }
     if (selected) {
       return { pixelSize: 12, color: Cesium.Color.YELLOW }
     }
@@ -228,8 +233,11 @@ export const useBattleGlobeSatellites = (
    * @param selected 是否选中
    * @returns 是否显示名称标签
    */
-  const shouldShowSatelliteLabel = (distance: number, selected: boolean): boolean =>
-    selected || distance <= LOD_NEAR_DISTANCE
+  const shouldShowSatelliteLabel = (
+    distance: number,
+    selected: boolean,
+    playbackSelected: boolean
+  ): boolean => playbackSelected || selected || distance <= LOD_NEAR_DISTANCE
 
   /**
    * 根据卫星列表重建 Point 图元。
@@ -319,12 +327,14 @@ export const useBattleGlobeSatellites = (
       visual.label.position = visual.position
 
       const selected = selectedNorad === visual.norad
+      /** 选中星：加强点大小与名称标签（播放时同样保持） */
+      const emphasizeSelected = selected
       const hideForExplosion = hidePointNoradRef.value === visual.norad
       const facing = isPositionFacingCamera(visual.position, cameraPosition)
       const inFrustum = isPositionInCameraFrustum(viewer, visual.position)
       const distance = Cesium.Cartesian3.distance(cameraPosition, visual.position)
-      const lodStyle = resolveLodStyle(distance, selected)
-      const showLabel = shouldShowSatelliteLabel(distance, selected)
+      const lodStyle = resolveLodStyle(distance, selected, emphasizeSelected)
+      const showLabel = shouldShowSatelliteLabel(distance, selected, emphasizeSelected)
 
       if (hideForExplosion) {
         visual.point.show = false
@@ -350,6 +360,14 @@ export const useBattleGlobeSatellites = (
 
       visual.label.show = showLabel
       visual.label.fillColor = selected ? Cesium.Color.YELLOW : SATELLITE_POINT_COLOR
+      if (emphasizeSelected) {
+        visual.label.showBackground = true
+        visual.label.backgroundColor = new Cesium.Color(0.45, 0.35, 0, 0.55)
+        visual.label.font = 'bold 13px "Microsoft YaHei", sans-serif'
+      } else {
+        visual.label.font = 'bold 12px "Microsoft YaHei", sans-serif'
+        visual.label.backgroundColor = new Cesium.Color(0, 0, 0, 0.35)
+      }
     })
 
     viewer.scene.requestRender()
@@ -432,6 +450,10 @@ export const useBattleGlobeSatellites = (
   })
 
   watch(hidePointNoradRef, () => {
+    updateSatelliteVisuals()
+  })
+
+  watch(timelinePlaybackActiveRef, () => {
     updateSatelliteVisuals()
   })
 

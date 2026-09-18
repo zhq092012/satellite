@@ -6,7 +6,8 @@
         :ground-targets="globeGroundTargets" :current-time-ms="currentTimeMs" :selected-norad="selectedNorad"
         :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
         :task-start-ms="taskStartMs" :task-end-ms="taskEndMs" :follow-selected-satellite="!isDeductionPlaying"
-        :is-deduction-playing="isDeductionPlaying" :deduction-visual-plan="deductionVisualPlan" />
+        :is-deduction-playing="isDeductionPlaying" :is-timeline-playing="isTimelinePlaying"
+        :deduction-visual-plan="deductionVisualPlan" />
 
       <div v-if="selectedNorad" class="globe-selected-bar">
         <span class="globe-selected-label">选中卫星：</span>
@@ -54,10 +55,9 @@
     <div class="floating-panel floating-panel--right" :class="{ 'is-collapsed': isRightCollapsed }">
       <div class="panel-inner">
         <C2RightAnalysisPanel :analysis-data="taskAnalysisData" :algorithm-complete="algorithmComplete"
-          :analysis-loading="taskAnalysisLoading" :selected-norad="selectedNorad"
-          :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
-          @select-satellite="handleSelectSatellite" @select-weapon="handleSelectWeapon"
-          @select-ground-target="handleSelectGroundTarget" />
+          :analysis-loading="taskAnalysisLoading" :selected-norad="selectedNorad" :selected-weapon-id="selectedWeaponId"
+          :selected-ground-target-key="selectedGroundTargetKey" @select-satellite="handleSelectSatellite"
+          @select-weapon="handleSelectWeapon" @select-ground-target="handleSelectGroundTarget" />
       </div>
       <button type="button" class="toggle-btn toggle-btn--right" :title="isRightCollapsed ? '展开右侧面板' : '收起右侧面板'"
         @click="isRightCollapsed = !isRightCollapsed">
@@ -83,10 +83,8 @@
         <span class="btn-text">{{ isTimelineCollapsed ? '展开时间轴' : '收起时间轴' }}</span>
       </button>
 
-      <BattleGlobeDeductionToast
-        v-if="selectedNorad && deductionToastHighlightLines.length"
-        :lines="deductionToastHighlightLines"
-      />
+      <BattleGlobeDeductionToast v-if="selectedNorad && deductionToastHighlightLines.length"
+        :lines="deductionToastHighlightLines" />
 
       <div class="timeline-inner">
         <BattleGlobeTimeline :task-start="taskTimeRange.start" :task-end="taskTimeRange.end"
@@ -162,7 +160,7 @@ const {
 const isTimelinePlaying = ref(false)
 
 /** 时间轴播放倍速 */
-const playbackSpeed = ref(1)
+const playbackSpeed = ref(10)
 
 /** 任务加载完成后自动播放使用的倍速 */
 const AUTO_TIMELINE_PLAYBACK_SPEED = 10
@@ -322,7 +320,7 @@ const stopTimelinePlayback = () => {
 }
 
 /**
- * 启动时间轴播放循环。
+ * 启动时间轴播放循环，并将地球相机恢复到战场初始俯视视角。
  */
 const startTimelinePlayback = () => {
   const start = taskStartMs.value
@@ -332,6 +330,8 @@ const startTimelinePlayback = () => {
   if (currentTimeMs.value >= end) {
     currentTimeMs.value = start
   }
+
+  globeRef.value?.restoreOverviewView()
 
   isTimelinePlaying.value = true
   lastPlaybackFrameMs = performance.now()
@@ -907,9 +907,7 @@ onActivated(() => {
     right: calc(var(--c2-right-panel-width) + var(--c2-timeline-side-gap));
     bottom: 12px;
     z-index: 15;
-    max-width: calc(
-      100% - var(--c2-left-panel-width) - var(--c2-right-panel-width) - 2 * var(--c2-timeline-side-gap)
-    );
+    max-width: calc(100% - var(--c2-left-panel-width) - var(--c2-right-panel-width) - 2 * var(--c2-timeline-side-gap));
     display: flex;
     flex-direction: column;
     align-items: stretch;
