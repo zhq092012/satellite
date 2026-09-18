@@ -15,6 +15,7 @@ import {
   formatSatelliteDelayIncrease,
   formatSatelliteDelayMinutes,
   formatSatelliteThreat,
+  formatSatelliteThreatReduce,
   resolveTrueDelayAfter,
 } from '@/utils/buildSatelliteAnalysisTable'
 import { parseFeedbackTimestamp, splitDateTimeDisplay } from '@/utils/zhchPlanDisplay'
@@ -166,6 +167,100 @@ const buildCoverageHighlightLine = (
       seg(`（${formatSatelliteCoverageReduce(beforeCov, afterCov)}）`, 'coverage'),
     ],
   }
+}
+
+/** 推演提示右侧指标区展示数据 */
+export interface DeductionToastMetricDisplay {
+  /** 威胁度变化量，如 `-0.184` */
+  threat?: string
+  /** 链路时延变化量，如 `+34分钟` */
+  delay?: string
+  /** 覆盖率变化量，如 `-1.25%` */
+  coverage?: string
+}
+
+/** 推演提示左右分栏布局 */
+export interface DeductionToastDisplayLayout {
+  /** 左侧叙事行（节点消息与时间） */
+  narrativeLines: DeductionToastLine[]
+  /** 右侧指标 */
+  metrics: DeductionToastMetricDisplay
+}
+
+/**
+ * 拼接提示行的完整文本。
+ *
+ * @param line 提示行
+ * @returns 拼接后的字符串
+ */
+const joinToastLineText = (line: DeductionToastLine): string =>
+  line.segments.map((part) => part.text).join('')
+
+/**
+ * 从括号片段中取出变化量文案（如 `+34分钟`、`-1.25%`）。
+ *
+ * @param text 整行文本
+ * @returns 括号内内容；无匹配时返回 null
+ */
+const extractParenDeltaText = (text: string): string | null => {
+  const match = text.match(/（([^）]+)）/)
+  return match?.[1]?.trim() || null
+}
+
+/**
+ * 从「打击前 → 打击后」数值对解析威胁度变化量。
+ *
+ * @param text 整行文本
+ * @returns 变化量文案；无法解析时返回 null
+ */
+const parseThreatDeltaFromLine = (text: string): string | null => {
+  const match = text.match(/威胁度\s*([\d.]+)\s*→\s*([\d.]+)/)
+  if (!match) return null
+  const before = Number(match[1])
+  const after = Number(match[2])
+  if (!Number.isFinite(before) || !Number.isFinite(after)) return null
+  const delta = formatSatelliteThreatReduce(before, after)
+  return delta === '--' ? null : delta
+}
+
+/**
+ * 将推演提示行拆为「左侧叙事 + 右侧指标」布局。
+ *
+ * @param lines 当前事件的全部高亮行
+ * @returns 分栏后的展示模型
+ */
+export const layoutDeductionToastLines = (lines: DeductionToastLine[]): DeductionToastDisplayLayout => {
+  const narrativeLines: DeductionToastLine[] = []
+  const metrics: DeductionToastMetricDisplay = {}
+
+  lines.forEach((line) => {
+    const text = joinToastLineText(line)
+    if (text.includes('威胁度')) {
+      const delta = parseThreatDeltaFromLine(text)
+      if (delta) metrics.threat = delta
+      return
+    }
+    if (text.includes('链路时延')) {
+      const parenDelta = extractParenDeltaText(text)
+      if (parenDelta) {
+        metrics.delay = parenDelta
+      } else {
+        const increaseSeg = line.segments.find(
+          (part) => part.kind === 'delay' && /^[+-]/.test(part.text.trim())
+        )
+        if (increaseSeg) metrics.delay = increaseSeg.text.trim()
+      }
+      return
+    }
+    if (text.includes('覆盖率')) {
+      const parenDelta = extractParenDeltaText(text)
+      if (parenDelta) metrics.coverage = parenDelta
+      return
+    }
+    narrativeLines.push(line)
+  })
+
+  return { narrativeLines, metrics }
 }
 
 /** 同刻事件稳定排序权重（越小越靠前） */
