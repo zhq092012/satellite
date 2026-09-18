@@ -185,7 +185,7 @@ export interface InitMatrix {
     satType: string;//卫星类型
     line1: string;//TLE第一行
     line2: string;//TLE第二行
-    orbitType: number;//轨道类型
+    orbitType: number;//轨道类型（0:未知 1:低轨 2:中轨 3:高轨 4:大椭圆）
     usage: string;//用途（军用、民用/商用）
     battleWindow: string;//卫星打击窗口
     height: number | null;//高度，可能为null，卫星的高度不应该为null,所以不要从这里取数据，应该从TLE推断卫星的高度
