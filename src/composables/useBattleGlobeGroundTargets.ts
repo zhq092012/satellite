@@ -71,14 +71,22 @@ export const useBattleGlobeGroundTargets = (
     DeductionStationPassWindow[]
   > = ref([])
 ) => {
+  // 可视化对象映射
   const visualMap = new Map<string, GroundTargetVisual>()
+  // 点图元集合
   let pointCollection: Cesium.PointPrimitiveCollection | null = null
+  // 标签集合
   let labelCollection: Cesium.LabelCollection | null = null
+  // postUpdate 监听器
   let postUpdateRemover: (() => void) | null = null
+  // 重建令牌
   let rebuildToken = 0
 
+  // 临时相机方向
   const scratchCameraDir = new Cesium.Cartesian3()
+  // 临时目标方向
   const scratchTargetDir = new Cesium.Cartesian3()
+  // 临时视锥体包围球
   const scratchFrustumSphere = new Cesium.BoundingSphere()
 
   /**
@@ -98,9 +106,11 @@ export const useBattleGlobeGroundTargets = (
    */
   const resolveTargetPosition = (target: BattleGlobeGroundTarget): Cesium.Cartesian3 | null => {
     const position = Cesium.Cartesian3.fromDegrees(target.longitude, target.latitude, 0)
+    // 判断坐标是否有效且距离大于1米
     if (!isFiniteCartesian(position) || Cesium.Cartesian3.magnitude(position) < 1) {
       return null
     }
+    // 返回世界坐标
     return position
   }
 
@@ -115,16 +125,23 @@ export const useBattleGlobeGroundTargets = (
     position: Cesium.Cartesian3,
     cameraPosition: Cesium.Cartesian3
   ): boolean => {
+    // 地心到相机
     Cesium.Cartesian3.subtract(cameraPosition, Cesium.Cartesian3.ZERO, scratchCameraDir)
+    // 地心到目标
     Cesium.Cartesian3.subtract(position, Cesium.Cartesian3.ZERO, scratchTargetDir)
+
     if (
+      // 如果向量异常小，直接认为可见，注意：magnitudeSquared 是向量长度的平方，这里假如相机或目标就在地心，就认为可见，但是一般情况下不会这样，
+      // 这是一种兜底处理，将这种极端情况判定为可见，而不是不可见
       Cesium.Cartesian3.magnitudeSquared(scratchCameraDir) < 1e-6 ||
       Cesium.Cartesian3.magnitudeSquared(scratchTargetDir) < 1e-6
     ) {
       return true
     }
+    // 将向量转成单位向量
     Cesium.Cartesian3.normalize(scratchCameraDir, scratchCameraDir)
     Cesium.Cartesian3.normalize(scratchTargetDir, scratchTargetDir)
+    // 如果点乘结果大于0，则认为可见
     return Cesium.Cartesian3.dot(scratchCameraDir, scratchTargetDir) > 0
   }
 
@@ -140,14 +157,16 @@ export const useBattleGlobeGroundTargets = (
     position: Cesium.Cartesian3
   ): boolean => {
     const camera = viewer.camera
+    // 计算视锥体包围球
     const cullingVolume = camera.frustum.computeCullingVolume(
-      camera.positionWC,
-      camera.directionWC,
-      camera.upWC
+      camera.positionWC,//相机位置
+      camera.directionWC,//相机方向
+      camera.upWC//相机上方向
     )
-    scratchFrustumSphere.center = position
-    scratchFrustumSphere.radius = FRUSTUM_BOUNDING_RADIUS
-    return cullingVolume.computeVisibility(scratchFrustumSphere) !== Cesium.Intersect.OUTSIDE
+    scratchFrustumSphere.center = position//包围球中心
+    scratchFrustumSphere.radius = FRUSTUM_BOUNDING_RADIUS//包围球半径
+    // 判断是否在视锥体内
+    return cullingVolume.computeVisibility(scratchFrustumSphere) !== Cesium.Intersect.OUTSIDE//如果返回的是OUTSIDE，则说明不在视锥体内
   }
 
   /**
@@ -256,14 +275,19 @@ export const useBattleGlobeGroundTargets = (
 
     const targets = targetsRef.value
     for (const target of targets) {
+      // 如果重建令牌不匹配，则返回
       if (token !== rebuildToken) return
 
+      // 将地面目标经纬度转为世界坐标。
       const initialPosition = resolveTargetPosition(target)
       if (!initialPosition) continue
-
+      // 构建地面目标唯一键
       const key = buildGroundTargetKey(target.kind, target.id)
+      // 解析地面目标默认点颜色
       const baseColor = resolveBasePointColor(target)
+      // 克隆世界坐标
       const position = Cesium.Cartesian3.clone(initialPosition)
+      // 添加点图元
       const point = pointCollection.add({
         position,
         pixelSize: 6,

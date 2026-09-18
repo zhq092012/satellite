@@ -343,10 +343,13 @@ const renderBattleLabel = () => {
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed() || !store.battle?.name) return
 
+  // 解析战场区域名称标签经纬度锚点
   const labelPosition = resolveBattleSpaceLabelPosition(store.battle, store.battleCenterCartensian)
   if (!labelPosition) return
 
+  // 将标签经纬度锚点转换为 Cartographic 对象
   const cartographic = Cesium.Cartographic.fromCartesian(labelPosition)
+  // 如果 Cartographic 对象的经度、纬度或高度不为有限数，则返回
   if (
     !Number.isFinite(cartographic.longitude) ||
     !Number.isFinite(cartographic.latitude) ||
@@ -355,9 +358,13 @@ const renderBattleLabel = () => {
     return
   }
 
+  // 清除战场区域名称标签
   clearBattleLabel()
+  // 复制标签经纬度锚点
   battleLabelAnchor = Cesium.Cartesian3.clone(labelPosition)
+  // 添加标签实体
   viewer.entities.add({
+    // 标签实体 ID
     id: 'battle-area-label',
     position: labelPosition,
     label: {
@@ -367,11 +374,15 @@ const renderBattleLabel = () => {
       outlineColor: Cesium.Color.fromCssColorString('#1a0000'),
       outlineWidth: 2,
       style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      // 水平居中对齐
       horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+      // 垂直底部对齐
       verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      // 贴地高度参考
       heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-      // 参与地球深度检测；Infinity 会导致标签穿透地球背面
-      disableDepthTestDistance: 0,
+      // 参与地球深度检测,小于 5000 米时不参与深度检测
+      disableDepthTestDistance: 5000,
+      // 像素偏移量，向下偏移 4 像素
       pixelOffset: new Cesium.Cartesian2(0, -4),
     },
   })
@@ -439,9 +450,11 @@ const initViewer = async () => {
         credit: 'credit',
       })
     )
-    // 地球写入深度缓冲：背面轨道卫星参与深度检测后不再穿透地球
-    viewer.scene.globe.depthTestAgainstTerrain = true
+    // 不参与地球深度检测
+    viewer.scene.globe.depthTestAgainstTerrain = false
+    // 不显示地球边缘
     viewer.scene.globe.showSkirts = false
+    // 禁用雾效
     viewer.scene.fog.enabled = false
 
     viewerRef.value = viewer

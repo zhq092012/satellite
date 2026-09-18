@@ -196,12 +196,21 @@ const parseLonLatPoint = (point: unknown): { lon: number; lat: number } | null =
   return null
 }
 
+/**
+ * 计算战场区域中心点。
+ *
+ * @param battle 战场表单
+ * @returns 经纬度中心；无法解析时返回 null
+ */
 export function resolveBattleGeoCenter(battle: BattleForm | null): { lon: number; lat: number } | null {
+  // 如果战场表单为空，则返回 null
   if (!battle) return null
 
+  // 如果战场区域模式为多边形且有区域坐标，则解析多边形坐标
   if (battle.createAreaMode === '多边形' && battle.area) {
     try {
       const polygons = JSON.parse(battle.area) as { lonlats?: unknown[] }[]
+      // 解析多边形坐标，并过滤掉解析失败的坐标
       const coords = polygons.flatMap((polygon) => polygon.lonlats || []).map(parseLonLatPoint).filter(Boolean) as {
         lon: number
         lat: number
@@ -209,6 +218,7 @@ export function resolveBattleGeoCenter(battle: BattleForm | null): { lon: number
       if (coords.length) {
         const lon = coords.reduce((sum, point) => sum + point.lon, 0) / coords.length
         const lat = coords.reduce((sum, point) => sum + point.lat, 0) / coords.length
+        // 如果经纬度都为有限数，则返回经纬度中心
         if (Number.isFinite(lon) && Number.isFinite(lat)) return { lon, lat }
       }
     } catch {
@@ -216,6 +226,7 @@ export function resolveBattleGeoCenter(battle: BattleForm | null): { lon: number
     }
   }
 
+  // 如果战场区域模式为圆形且有圆形坐标，则解析圆形坐标
   if (battle.circleJSON) {
     try {
       const circles = JSON.parse(battle.circleJSON) as { center?: unknown }[]
@@ -283,7 +294,9 @@ function collectBattleGeoCoords(battle: BattleForm | null): { lon: number; lat: 
  * @returns 标签经纬度锚点；无法解析时返回 null
  */
 export function resolveBattleLabelGeoAnchor(battle: BattleForm | null): { lon: number; lat: number } | null {
+  // 收集战场区域全部经纬度坐标点
   const coords = collectBattleGeoCoords(battle)
+  // 如果收集到的坐标点为空，则返回战场中心
   if (!coords.length) return resolveBattleGeoCenter(battle)
 
   let minLon = Infinity
@@ -291,16 +304,22 @@ export function resolveBattleLabelGeoAnchor(battle: BattleForm | null): { lon: n
   let minLat = Infinity
   let maxLat = -Infinity
   coords.forEach(({ lon, lat }) => {
+    // 计算经度最小值
     minLon = Math.min(minLon, lon)
+    // 计算经度最大值
     maxLon = Math.max(maxLon, lon)
+    // 计算纬度最小值
     minLat = Math.min(minLat, lat)
+    // 计算纬度最大值
     maxLat = Math.max(maxLat, lat)
   })
 
   const centerLon = (minLon + maxLon) / 2
+  // 计算纬度跨度
   const latSpan = maxLat - minLat
+  // 计算标签与区域边界的最小间距
   const margin = Math.max(latSpan * 0.25, BATTLE_LABEL_BOUNDS_MARGIN_DEG)
-
+  // 返回标签经纬度锚点，锚点在区域北侧外部，避免遮挡多边形
   return { lon: centerLon, lat: maxLat + margin }
 }
 
@@ -315,6 +334,7 @@ export function resolveBattleSpaceLabelPosition(
   battle: BattleForm | null,
   fallbackCenter?: Cesium.Cartesian3 | null
 ): Cesium.Cartesian3 | null {
+  // 计算战场名称标签锚点
   const anchor = resolveBattleLabelGeoAnchor(battle)
   if (anchor) {
     return Cesium.Cartesian3.fromDegrees(anchor.lon, anchor.lat, BATTLE_SPACE_LABEL_ALTITUDE_M)
