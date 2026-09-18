@@ -5,7 +5,6 @@
         <el-tab-pane label="卫星威胁分析" name="threat" />
         <el-tab-pane label="可打击度分析" name="attackability" />
         <el-tab-pane label="杀伤链方案" name="killchain" />
-        <el-tab-pane label="打击结果评估" name="evaluation" />
         <el-tab-pane label="打击方案仿真" name="simulation" />
       </el-tabs>
 

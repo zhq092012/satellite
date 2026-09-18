@@ -2,18 +2,12 @@
   <div class="system-manage-page">
     <el-card shadow="never" class="system-manage-card">
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
-        <el-tab-pane label="场景管理" name="battles" />
-        <el-tab-pane label="卫星管理" name="satellites" />
-        <el-tab-pane label="地面站管理" name="ground-stations" />
-        <el-tab-pane label="数据中心管理" name="data-centers" />
-        <el-tab-pane label="武器管理" name="weapons" />
         <el-tab-pane label="用户管理" name="users" />
         <el-tab-pane label="角色管理" name="roles" />
         <el-tab-pane label="菜单管理" name="menus" />
         <el-tab-pane label="基站管理" name="basestations" />
         <el-tab-pane label="导弹管理" name="missiles" />
         <el-tab-pane label="导弹基地管理" name="missileBases" />
-
       </el-tabs>
 
       <router-view />
@@ -28,18 +22,14 @@ import { useRoute, useRouter } from 'vue-router'
 const route = useRoute()
 const router = useRouter()
 
+/** 系统管理子路由名称与 Tab 标识的映射 */
 const tabNameMap: Record<string, string> = {
   UserManage: 'users',
   RoleManage: 'roles',
   MenuManage: 'menus',
-  SatelliteManage: 'satellites',
-  WeaponManage: 'weapons',
-  GroundStationManage: 'ground-stations',
-  DataCenterManage: 'data-centers',
   BaseStationManage: 'basestations',
   MissileManage: 'missiles',
   MissileBaseManage: 'missileBases',
-  BattleManage: 'battles',
 }
 
 const activeTab = computed({
@@ -47,6 +37,10 @@ const activeTab = computed({
   set: () => undefined,
 })
 
+/**
+ * Tab 切换时跳转到对应的系统管理子路由
+ * @param tabName Tab 标识
+ */
 const handleTabChange = (tabName: string) => {
   if (tabName === 'users') {
     router.push({ name: 'UserManage' })
@@ -54,22 +48,12 @@ const handleTabChange = (tabName: string) => {
     router.push({ name: 'RoleManage' })
   } else if (tabName === 'menus') {
     router.push({ name: 'MenuManage' })
-  } else if (tabName === 'satellites') {
-    router.push({ name: 'SatelliteManage' })
-  } else if (tabName === 'weapons') {
-    router.push({ name: 'WeaponManage' })
-  } else if (tabName === 'ground-stations') {
-    router.push({ name: 'GroundStationManage' })
-  } else if (tabName === 'data-centers') {
-    router.push({ name: 'DataCenterManage' })
   } else if (tabName === 'basestations') {
     router.push({ name: 'BaseStationManage' })
   } else if (tabName === 'missiles') {
     router.push({ name: 'MissileManage' })
   } else if (tabName === 'missileBases') {
     router.push({ name: 'MissileBaseManage' })
-  } else if (tabName === 'battles') {
-    router.push({ name: 'BattleManage' })
   }
 }
 </script>
