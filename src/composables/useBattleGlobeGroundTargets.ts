@@ -18,8 +18,8 @@ const LOD_MID_DISTANCE = 8_000_000
 const LOD_FAR_DISTANCE = 50_000_000
 /** 视锥体剔除包围球半径（米） */
 const FRUSTUM_BOUNDING_RADIUS = 30_000
-/** 接收站点颜色 */
-const RECEIVE_POINT_COLOR = Cesium.Color.fromCssColorString('#22d3ee')
+/** 接收站点颜色（黄色，与青色卫星点区分） */
+const RECEIVE_POINT_COLOR = Cesium.Color.fromCssColorString('#facc15')
 /** 数据中心的点颜色 */
 const STATION_POINT_COLOR = Cesium.Color.fromCssColorString('#fb923c')
 /** 被打击状态点颜色 */

@@ -738,11 +738,15 @@ const mapStationWindowsForDeduction = (
 ): InitWindow[] => {
   return (postSat?.stationWindows || [])
     .map((win) => {
-      const initMatch = initWindows.find(
-        (item) =>
-          (win.receiveId && item.receiveId === win.receiveId) ||
-          (win.receiveName && item.receiveName === win.receiveName)
-      )
+      const receiveId = win.receiveId?.trim()
+      const receiveName = win.receiveName?.trim()
+      const initMatch =
+        (receiveId
+          ? initWindows.find((item) => item.receiveId?.trim() === receiveId)
+          : undefined) ||
+        (receiveName
+          ? initWindows.find((item) => item.receiveName?.trim() === receiveName)
+          : undefined)
       return {
         receiveId: win.receiveId,
         receiveName: win.receiveName,
@@ -1286,11 +1290,11 @@ export const resolveDeductionVisualState = (
 ): {
   /** 是否显示轨道路径 */
   showOrbitPath: boolean
-  /** 当前过站窗口 */
+  /** 当前过站窗口（重叠时取开始最晚的一站，与 toast 一致） */
   activePass: DeductionStationPassWindow | null
   /** 当前过站窗口内接收站 ID/名称（过站连线等） */
   activePassReceiveKeys: Set<string>
-  /** 推演已开始过站的接收站 ID/名称（用于地球高亮与标签） */
+  /** 当前连线对应的接收站 ID/名称（地球高亮与标签） */
   passHighlightReceiveKeys: Set<string>
   /** 当前时刻应高亮的过站窗口（含坐标，用于地图匹配） */
   passHighlightPasses: DeductionStationPassWindow[]
@@ -1318,10 +1322,18 @@ export const resolveDeductionVisualState = (
   // 如果视觉计划为空，或推演未开始，则返回空对象
   if (!plan || !isPlaying) return empty
 
-  // 获取当前过站窗口
+  // 当前时刻可能落在多个过站窗口内（上一站尚未结束、下一站已开始）。
+  // 连线必须跟 toast 一致：取「已经开始且开始最晚」的窗口，而不是数组里的第一个。
+  const overlappingPasses = plan.stationPasses.filter(
+    (pass) => currentMs >= pass.startMs && currentMs <= pass.endMs
+  )
   const activePass =
-    // 获取当前过站窗口
-    plan.stationPasses.find((pass) => currentMs >= pass.startMs && currentMs <= pass.endMs) ?? null
+    overlappingPasses.reduce<DeductionStationPassWindow | null>((latest, pass) => {
+      if (!latest) return pass
+      if (pass.startMs > latest.startMs) return pass
+      if (pass.startMs === latest.startMs && pass.endMs < latest.endMs) return pass
+      return latest
+    }, null)
 
   // 是否显示爆炸效果
   const showExplosion =
@@ -1354,28 +1366,11 @@ export const resolveDeductionVisualState = (
   const passHighlightReceiveKeys = new Set<string>()
   // 当前时刻应高亮的过站窗口（含坐标，用于地图匹配）
   const passHighlightPasses: DeductionStationPassWindow[] = []
-  // 遍历过站窗口
-  plan.stationPasses.forEach((pass) => {
-    // 如果过站开始时间戳小于当前时刻，则返回
-    if (currentMs < pass.startMs) return
-    // 添加过站窗口
-    passHighlightPasses.push(pass)
-    // 添加接收站 ID/名称
-    if (pass.receiveId) passHighlightReceiveKeys.add(pass.receiveId)
-    // 添加接收站名称
-    if (pass.receiveName) passHighlightReceiveKeys.add(pass.receiveName)
-  })
-  // 如果当前过站窗口不为空，则添加接收站 ID/名称
+  // 标签和高亮只跟当前连线那一站，避免上一站（如三泽）还亮着、文案已经是下一站（横田）
   if (activePass) {
-    // 添加接收站 ID/名称
     if (activePass.receiveId) passHighlightReceiveKeys.add(activePass.receiveId)
-    // 添加接收站名称
     if (activePass.receiveName) passHighlightReceiveKeys.add(activePass.receiveName)
-    // 如果过站窗口不在高亮过站窗口列表中，则添加过站窗口
-    if (!passHighlightPasses.includes(activePass)) {
-      // 添加过站窗口
-      passHighlightPasses.push(activePass)
-    }
+    passHighlightPasses.push(activePass)
   }
 
   return {
