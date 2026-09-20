@@ -152,6 +152,18 @@ const routes: Array<RouteRecordRaw> = [
         },
       },
       {
+        path: 'system/satellite-network',
+        name: 'SatelliteNetworkManage',
+        component: () => import('@/views/satellites/SatelliteNetworkManage.vue'),
+        meta: {
+          title: '卫星网络管理',
+          icon: 'icon-situation',
+          showInMenu: false,
+          requiresAuth: true,
+          roles: ['admin'],
+        },
+      },
+      {
         path: 'system',
         name: 'SystemManage',
         component: () => import('@/layout/SystemManage.vue'),

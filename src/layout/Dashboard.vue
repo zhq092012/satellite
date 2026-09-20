@@ -211,6 +211,7 @@ const TOP_RESOURCE_MENU_PATHS = new Set([
   '/system/ground-stations',
   '/system/data-centers',
   '/system/weapons',
+  '/system/satellite-network',
 ])
 
 /**
@@ -277,6 +278,16 @@ const homeMenu = computed<DashboardMenuNode[]>(() => [
       showInMenu: true,
       roles: ['admin'],
       permission: 'system:weapon:list',
+    },
+    children: [],
+  },
+  {
+    path: '/system/satellite-network',
+    meta: {
+      title: '卫星网络管理',
+      icon: 'icon-situation',
+      showInMenu: true,
+      roles: ['admin'],
     },
     children: [],
   },
