@@ -33,6 +33,25 @@ cd /mnt/xajdlab/sentiment/ver-2.1.0/webui/config
 
 替换镜像版本号后vi webui.yaml
 
+# 任务重算 WebSocket 地址（打包后无需改前端）
+
+编辑挂载的 nginx 配置（与 default.conf 同目录），修改 `location /ws` 的 `proxy_pass`：
+
+```
+location /ws {
+    proxy_pass http://新IP:新端口;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 3600s;
+}
+```
+
+改完后重载/重启 web 容器即可。浏览器始终连接当前站点的 `ws://当前域名/ws`。
+
+cd /mnt/share/manifest/ver-2.1.0
+
 cd /mnt/share/manifest/ver-2.1.0
 
 按住A,进编辑,上下移动修后

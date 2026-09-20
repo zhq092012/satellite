@@ -68,6 +68,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
+        '/ws': {
+          target: 'ws://192.168.52.72:34126',
+          ws: true,
+          changeOrigin: true,
+        },
       },
     },
     worker: {

@@ -164,8 +164,8 @@ export const createTask = (task: TaskForm) => {
 }
 
 /**
- * 查询当前任务后台计算进度
- * @param taskId
+ * 查询当前任务后台计算进度（HTTP 快照，进度实时推送已改用 WebSocket）。
+ * @param taskId 任务 ID
  */
 export const queryTaskProgress = (taskId: number) => {
   const url = `/api/battle/algorithmStatus?taskId=${taskId}`

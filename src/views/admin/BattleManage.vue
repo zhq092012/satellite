@@ -414,7 +414,7 @@ const handleEditTask = (task: TaskForm, battle: BattleForm) => {
 }
 
 /**
- * 任务保存成功后刷新场景任务列表，并为新建任务启动进度轮询。
+ * 任务保存成功后刷新场景任务列表，并为新建任务订阅进度 WebSocket。
  *
  * @param updated 保存后的任务数据
  */
