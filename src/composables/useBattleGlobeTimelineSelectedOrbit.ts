@@ -223,8 +223,12 @@ export const useBattleGlobeTimelineSelectedOrbit = (
 
   watch(
     () => selectedNoradRef.value,
-    () => {
+    (norad) => {
       activePathNorad = null
+      const viewer = viewerRef.value
+      if ((!norad || isDeductionPlayingRef.value) && viewer && !viewer.isDestroyed()) {
+        clearSelectedPathEntities(viewer)
+      }
       syncSelectedSatelliteOrbit()
     }
   )

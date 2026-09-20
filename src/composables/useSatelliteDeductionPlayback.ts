@@ -15,7 +15,7 @@ import {
 export type SatelliteDeductionPhase = 'idle' | 'pausedAtEvent' | 'jumpingToNext'
 
 /** 事件点停留时长（毫秒） */
-export const DEDUCTION_EVENT_PAUSE_MS = 5000
+export const DEDUCTION_EVENT_PAUSE_MS = 2000
 
 /** 事件之间时钟插值时长（毫秒） */
 export const DEDUCTION_JUMP_DURATION_MS = 3000

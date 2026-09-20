@@ -1,6 +1,6 @@
 import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
-import { onBeforeUnmount, watch, type ComputedRef, type Ref } from 'vue'
+import { onBeforeUnmount, watch, type ComputedRef, type Ref, ref } from 'vue'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import { createOctagonStarExplosionDataUrl } from '@/utils/battleGlobeOctStar'
 import {
@@ -23,6 +23,10 @@ const DEDUCTION_SAT_ENTITY_ID = 'battle-deduction-sat-'
 const DEDUCTION_LINK_ENTITY_ID = 'battle-deduction-station-link'
 /** 爆炸 billboard 实体 ID */
 const DEDUCTION_EXPLOSION_ENTITY_ID = 'battle-deduction-explosion'
+/** 推演相机相对卫星的距离（米），保证能看到地球与过站连线，不贴地 */
+const DEDUCTION_CAMERA_RANGE = 12_000_000
+/** 推演跟随相机俯仰角：正俯视（与战场初始俯视一致） */
+const DEDUCTION_CAMERA_PITCH = Cesium.Math.toRadians(-90)
 
 /** 八角星图标 Data URL（懒加载） */
 let octStarDataUrl: string | null = null
@@ -37,6 +41,8 @@ let octStarDataUrl: string | null = null
  * @param selectedNoradRef 选中 NORAD
  * @param isDeductionPlayingRef 是否推演中
  * @param visualPlanRef 推演视觉计划
+ * @param followCameraRef 推演时是否跟随卫星
+ * @param restoreOverviewView 不跟随时恢复战场原始俯视视角
  */
 export const useBattleGlobeDeductionEffects = (
   viewerRef: Ref<Cesium.Viewer | null>,
@@ -44,12 +50,18 @@ export const useBattleGlobeDeductionEffects = (
   currentTimeMsRef: Ref<number> | ComputedRef<number>,
   selectedNoradRef: Ref<number | null> | ComputedRef<number | null>,
   isDeductionPlayingRef: Ref<boolean> | ComputedRef<boolean>,
-  visualPlanRef: Ref<SatelliteDeductionVisualPlan | null> | ComputedRef<SatelliteDeductionVisualPlan | null>
+  visualPlanRef: Ref<SatelliteDeductionVisualPlan | null> | ComputedRef<SatelliteDeductionVisualPlan | null>,
+  followCameraRef: Ref<boolean> | ComputedRef<boolean> = ref(true),
+  restoreOverviewView?: () => void
 ) => {
   // 卫星轨道参数缓存
   const satrecCache = new Map<number, satellitejs.SatRec>()
   // 临时位置
   const scratchPosition = new Cesium.Cartesian3()
+  /** 当前是否处于 lookAt 跟随，避免未跟随时每帧重置相机 */
+  let cameraFollowing = false
+  /** 本轮「不跟随」是否已恢复过原始视角，避免每帧重复 flyTo */
+  let noFollowOverviewApplied = false
 
   /**
    * 获取卫星 satrec。
@@ -153,6 +165,22 @@ export const useBattleGlobeDeductionEffects = (
   }
 
   /**
+   * 移除所有推演一轨折线（清除选中后 selectedNorad 可能已为 null，不能只按当前选中删）。
+   *
+   * @param viewer Viewer
+   */
+  const removeDeductionOrbitPathEntities = (viewer: Cesium.Viewer) => {
+    const prefix = DEDUCTION_SAT_ENTITY_ID
+    const suffix = DEDUCTION_ORBIT_PATH_SUFFIX
+    viewer.entities.values
+      .filter((entity) => {
+        const id = String(entity.id ?? '')
+        return id.startsWith(prefix) && id.endsWith(suffix)
+      })
+      .forEach((entity) => viewer.entities.remove(entity))
+  }
+
+  /**
    * 移除推演相关实体。
    *
    * @param viewer Viewer
@@ -164,18 +192,51 @@ export const useBattleGlobeDeductionEffects = (
       const entity = viewer.entities.getById(id)
       if (entity) viewer.entities.remove(entity)
     })
-    // 获取选中卫星 NORAD
-    const norad = selectedNoradRef.value
-    if (norad) {
-      // 获取轨道轨迹实体 ID
-      const orbitId = `${DEDUCTION_SAT_ENTITY_ID}${norad}${DEDUCTION_ORBIT_PATH_SUFFIX}`
-      // 获取轨道轨迹实体
-      const orbitEntity = viewer.entities.getById(orbitId)
-      // 如果轨道轨迹实体不为空，则移除轨道轨迹实体
-      if (orbitEntity) viewer.entities.remove(orbitEntity)
-    }
+    removeDeductionOrbitPathEntities(viewer)
+    releaseDeductionCamera(viewer)
+    noFollowOverviewApplied = false
     // 请求渲染
     viewer.scene.requestRender()
+  }
+
+  /**
+   * 推演期间相机跟随卫星：以卫星为锚点、正俯视、保持远距不贴地。
+   *
+   * @param viewer Viewer
+   * @param norad NORAD
+   */
+  const followDeductionCamera = (viewer: Cesium.Viewer, norad: number) => {
+    const ms = currentTimeMsRef.value > 0 ? currentTimeMsRef.value : Date.now()
+    const satPos = propagatePosition(norad, new Date(ms), true)
+    if (!satPos) return
+    viewer.camera.lookAt(
+      satPos,
+      new Cesium.HeadingPitchRange(0, DEDUCTION_CAMERA_PITCH, DEDUCTION_CAMERA_RANGE)
+    )
+    cameraFollowing = true
+  }
+
+  /**
+   * 解除 lookAt 锁定，避免推演结束后相机仍钉在卫星上。
+   *
+   * @param viewer Viewer
+   */
+  const releaseDeductionCamera = (viewer: Cesium.Viewer) => {
+    if (!cameraFollowing) return
+    viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY)
+    cameraFollowing = false
+  }
+
+  /**
+   * 不跟随时切回战场原始俯视视角（与清除选中卫星时一致）。
+   *
+   * @param viewer Viewer
+   */
+  const applyNoFollowOverview = (viewer: Cesium.Viewer) => {
+    releaseDeductionCamera(viewer)
+    if (noFollowOverviewApplied) return
+    restoreOverviewView?.()
+    noFollowOverviewApplied = true
   }
 
   /**
@@ -367,6 +428,12 @@ export const useBattleGlobeDeductionEffects = (
     syncStationLink(viewer, norad, state.activePass)
     // 同步卫星打击八角星爆炸
     syncExplosion(viewer, norad, state.showExplosion)
+    if (followCameraRef.value) {
+      noFollowOverviewApplied = false
+      followDeductionCamera(viewer, norad)
+    } else {
+      applyNoFollowOverview(viewer)
+    }
     // 请求渲染
     viewer.scene.requestRender()
   }
@@ -428,7 +495,7 @@ export const useBattleGlobeDeductionEffects = (
 
   watch(
     // 监听推演状态、推演视觉计划、选中卫星 NORAD、当前时刻毫秒变化
-    [isDeductionPlayingRef, visualPlanRef, selectedNoradRef, currentTimeMsRef],
+    [isDeductionPlayingRef, visualPlanRef, selectedNoradRef, currentTimeMsRef, followCameraRef],
     () => syncDeductionEffects(),// 同步推演相关特效
     { deep: true }
   )
@@ -440,6 +507,7 @@ export const useBattleGlobeDeductionEffects = (
       const viewer = viewerRef.value
       // 如果推演状态为 false 且 viewer 不为空且未销毁，则移除推演相关实体
       if (!playing && viewer && !viewer.isDestroyed()) {
+        noFollowOverviewApplied = false
         clearDeductionEntities(viewer)
       }
     }

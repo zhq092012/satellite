@@ -46,6 +46,8 @@ const props = withDefaults(
     taskEndMs?: number
     /** 选中卫星时是否自动飞行跟踪 */
     followSelectedSatellite?: boolean
+    /** 推演播放时是否让相机跟随卫星 */
+    followDeductionSatellite?: boolean
     /** 是否正在推演播放 */
     isDeductionPlaying?: boolean
     /** 底部时间轴是否正在播放 */
@@ -64,6 +66,7 @@ const props = withDefaults(
     taskStartMs: 0,
     taskEndMs: 0,
     followSelectedSatellite: true,
+    followDeductionSatellite: true,
     isDeductionPlaying: false,
     isTimelinePlaying: false,
     deductionVisualPlan: null,
@@ -160,6 +163,58 @@ const globeGroundTargetsForRender = computed((): BattleGlobeGroundTarget[] => {
   return mergeDeductionPassGroundTargets(base, props.deductionVisualPlan.stationPasses)
 })
 
+/**
+ * 飞到默认地球视角（无场景区域或区域无效时使用）。
+ */
+const flyToDefaultEarthView = () => {
+  const viewer = viewerRef.value
+  if (!viewer || viewer.isDestroyed()) return
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(120, 24, 18000000),
+    duration: 1.2,
+  })
+}
+
+/**
+ * 恢复战场初始俯视视角（清除卫星选中、推演不跟随时使用）。
+ */
+const restoreOverviewView = () => {
+  const viewer = viewerRef.value
+  if (!viewer || viewer.isDestroyed()) return
+
+  viewer.camera.cancelFlight()
+  const destination = store.battleCenterCartensian
+  const orientation = store.battleCenterOritentation
+
+  if (destination) {
+    viewer.camera.flyTo({
+      destination,
+      orientation: orientation
+        ? {
+          heading: orientation.heading,
+          pitch: orientation.pitch,
+          roll: orientation.roll,
+        }
+        : {
+          heading: 0,
+          pitch: -Cesium.Math.toRadians(90),
+          roll: 0,
+        },
+      duration: 1.2,
+    })
+    viewer.scene.requestRender()
+    return
+  }
+
+  if (store.battle) {
+    markBattleArea(viewer, store.battle, 24000000, { clampToGround: true })
+    viewer.scene.requestRender()
+    return
+  }
+
+  flyToDefaultEarthView()
+}
+
 /** 接收站/数据中心渲染逻辑 */
 useBattleGlobeGroundTargets(
   viewerRef,
@@ -177,7 +232,9 @@ useBattleGlobeDeductionEffects(
   computed(() => props.currentTimeMs),
   computed(() => props.selectedNorad),
   computed(() => props.isDeductionPlaying),
-  computed(() => props.deductionVisualPlan ?? null)
+  computed(() => props.deductionVisualPlan ?? null),
+  computed(() => props.followDeductionSatellite),
+  restoreOverviewView
 )
 
 /**
@@ -226,58 +283,6 @@ const syncViewerClock = () => {
   viewer.clock.clockRange = Cesium.ClockRange.CLAMPED
   viewer.clock.shouldAnimate = false
   viewer.clock.multiplier = 1
-}
-
-/**
- * 飞到默认地球视角（无场景区域或区域无效时使用）。
- */
-const flyToDefaultEarthView = () => {
-  const viewer = viewerRef.value
-  if (!viewer || viewer.isDestroyed()) return
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(120, 24, 18000000),
-    duration: 1.2,
-  })
-}
-
-/**
- * 恢复战场初始俯视视角（清除卫星选中后使用）。
- */
-const restoreOverviewView = () => {
-  const viewer = viewerRef.value
-  if (!viewer || viewer.isDestroyed()) return
-
-  viewer.camera.cancelFlight()
-  const destination = store.battleCenterCartensian
-  const orientation = store.battleCenterOritentation
-
-  if (destination) {
-    viewer.camera.flyTo({
-      destination,
-      orientation: orientation
-        ? {
-          heading: orientation.heading,
-          pitch: orientation.pitch,
-          roll: orientation.roll,
-        }
-        : {
-          heading: 0,
-          pitch: -Cesium.Math.toRadians(90),
-          roll: 0,
-        },
-      duration: 1.2,
-    })
-    viewer.scene.requestRender()
-    return
-  }
-
-  if (store.battle) {
-    markBattleArea(viewer, store.battle, 24000000, { clampToGround: true })
-    viewer.scene.requestRender()
-    return
-  }
-
-  flyToDefaultEarthView()
 }
 
 defineExpose({

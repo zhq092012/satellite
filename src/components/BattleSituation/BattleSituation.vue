@@ -5,7 +5,8 @@
       <BattleSituationGlobe ref="globeRef" :satellites="globeSatellites" :weapons="globeWeapons"
         :ground-targets="globeGroundTargets" :current-time-ms="currentTimeMs" :selected-norad="selectedNorad"
         :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
-        :task-start-ms="taskStartMs" :task-end-ms="taskEndMs" :follow-selected-satellite="!isDeductionPlaying"
+        :task-start-ms="taskStartMs" :task-end-ms="taskEndMs"         :follow-selected-satellite="!isDeductionPlaying"
+        :follow-deduction-satellite="followDeductionSatellite"
         :is-deduction-playing="isDeductionPlaying" :is-timeline-playing="isTimelinePlaying"
         :deduction-visual-plan="deductionVisualPlan" />
 
@@ -20,6 +21,10 @@
           @click="handleStopSatelliteDeduction">
           暂停推演
         </button>
+        <label class="globe-follow-check">
+          <input v-model="followDeductionSatellite" type="checkbox" />
+          跟随卫星
+        </label>
         <button type="button" class="globe-clear-btn" @click="handleClearSelectedSatellite">清除</button>
       </div>
 
@@ -156,6 +161,9 @@ const {
   resetDeductionUi,
 } = useSatelliteDeductionPlayback(currentTimeMs)
 
+/** 推演时是否让相机跟随卫星 */
+const followDeductionSatellite = ref(true)
+
 /** 时间轴是否正在播放 */
 const isTimelinePlaying = ref(false)
 
@@ -242,7 +250,6 @@ const handleStartSatelliteDeduction = () => {
   const norad = selectedNorad.value
   if (!norad) return
   stopTimelinePlayback()
-  globeRef.value?.restoreOverviewView()
   startDeduction(norad, taskAnalysisData.value, matrixData.value)
 }
 
@@ -492,9 +499,9 @@ const handleSelectGroundTarget = (targetKey: string | null) => {
  * 清除选中卫星并恢复战场初始俯视视角。
  */
 const handleClearSelectedSatellite = () => {
-  resetDeductionUi()
   selectedNorad.value = null
   store.setSelectedAnalysisNorad(null)
+  resetDeductionUi()
   globeRef.value?.restoreOverviewView()
 
   if (wasPlayingBeforeSelection) {
@@ -713,7 +720,7 @@ onActivated(() => {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    max-width: min(720px, calc(100% - 32px));
+    max-width: min(860px, calc(100% - 32px));
     flex-wrap: wrap;
     justify-content: center;
     padding: 8px 14px;
@@ -754,6 +761,30 @@ onActivated(() => {
 
   .globe-selected-name--ground {
     color: #22d3ee;
+  }
+
+  .globe-follow-check {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 225, 255, 0.28);
+    background: rgba(0, 225, 255, 0.08);
+    color: #7dd3fc;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+
+    input {
+      margin: 0;
+      accent-color: #22d3ee;
+      cursor: pointer;
+    }
   }
 
   .globe-deduction-btn {

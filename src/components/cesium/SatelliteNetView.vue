@@ -463,10 +463,7 @@ async function initGraph() {
         size: 0.1,
         style: {
           lineWidth: 0.1,
-          endArrow: {
-            path: G6.Arrow.triangle(1.2, 2, 0.2),
-            d: 0,
-          },
+          endArrow: false,
           stroke: '#ccc',
         },
         type: 'line',
@@ -833,13 +830,33 @@ const filterAndRenderGraph = () => {
     const key = `${pairKey}-${edge.relation}`
     if (edgeKeySet.has(key)) return
     edgeKeySet.add(key)
+    const isProximity = relationType.value === '抵近'
     uniqueEdges.push({
       id: `Satellite-Relation-${idx}`,
       source: sourceId,
       target: targetId,
-      label: relationType.value === '抵近'
+      // 仅抵近关系在连线上展示文案；轨道共面 / 轨道相似 / 相位稳定不显示边标签
+      label: isProximity
         ? `最近距离:${edge.min_distance_km}km  时间:${dayjs(edge.timestamp).format('YYYY-MM-DD HH:mm:ss')}`
-        : `${edge.relation} `,
+        : '',
+      labelCfg: isProximity
+        ? undefined
+        : {
+            style: {
+              opacity: 0,
+              fontSize: 0,
+            },
+          },
+      style: isProximity
+        ? {
+            endArrow: {
+              path: G6.Arrow.triangle(1.2, 2, 0.2),
+              d: 0,
+            },
+          }
+        : {
+            endArrow: false,
+          },
       time: edge.timestamp,
     })
   })
