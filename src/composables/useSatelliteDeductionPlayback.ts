@@ -215,7 +215,7 @@ export function useSatelliteDeductionPlayback(currentTimeMs: Ref<number>) {
       return false
     }
 
-    const bundle = buildSatelliteDeductionBundle(entity, norad)
+    const bundle = buildSatelliteDeductionBundle(entity, norad, matrixFallback)
     if (!bundle?.events.length) {
       ElMessage.warning('无可推演事件')
       return false

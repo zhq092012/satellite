@@ -18,7 +18,6 @@ import {
   formatSatelliteThreatReduce,
   resolveTrueDelayAfter,
 } from '@/utils/buildSatelliteAnalysisTable'
-import { parseFeedbackTimestamp, splitDateTimeDisplay } from '@/utils/zhchPlanDisplay'
 import { parseReceiveLatLonString } from '@/utils/buildBattleGlobeGroundTargets'
 import * as satellitejs from 'satellite.js'
 
@@ -315,55 +314,60 @@ const KIND_ORDER: Record<SatelliteDeductionEventKind, number> = {
 }
 
 /**
- * 将时间文本格式化为「xx时xx分」展示。
+ * 从接口时间字符串拆出本地墙上时钟，不经过 Date 时区换算。
+ * 支持 `2026-09-16 15:24:52`、`2026-09-16T15:24:52`。
  *
- * @param timeText 原始时间字符串
- * @returns 中文时分文案；无效时返回 `--`
+ * @param timeText 原始时间文本
+ * @returns 年月日时分秒；无法识别时返回 null
  */
-export const formatDeductionHmLabel = (timeText?: string | null): string => {
-  // 如果时间字符串为空，则返回 '--'
-  if (!timeText?.trim()) return '--'
-  // 获取时间字符串
-  const { time } = splitDateTimeDisplay(timeText.trim())
-  // 获取时间
-  const segment = time || timeText.trim()
-  // 判断时间字符串是否匹配
-  const match = segment.match(/^(\d{1,2}):(\d{2})/)
-  // 如果时间字符串匹配，则返回时间
-  if (match) {
-    return `${Number(match[1])}时${match[2]}分`
+const parseWallClockParts = (
+  timeText?: string | null
+): { year: number; month: number; day: number; hour: number; minute: number; second: number } | null => {
+  if (!timeText?.trim()) return null
+  const match = timeText
+    .trim()
+    .match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})[T\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?/)
+  if (!match) return null
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+    hour: Number(match[4]),
+    minute: Number(match[5]),
+    second: Number(match[6] ?? 0),
   }
-  // 从反馈时间戳中解析时间戳
-  const ms = parseFeedbackTimestamp(timeText)
-  // 如果时间戳为空，则返回 '--'
-  if (ms == null) return '--'
-  // 创建日期对象
-  const date = new Date(ms)
-  // 返回时间
-  return `${date.getHours()}时${String(date.getMinutes()).padStart(2, '0')}分`
 }
 
 /**
- * 解析矩阵时间字段为毫秒时间戳。
+ * 将时间文本格式化为「yyyy年MM月dd日 HH时mm分ss秒」。
+ * 只取源字符串里的年月日时分秒，不用播放时钟、不用 Date.getHours。
+ *
+ * @param timeText 原始时间字符串
+ * @returns 中文日期时间文案；无效时返回 `--`
+ */
+export const formatDeductionHmLabel = (timeText?: string | null): string => {
+  const parts = parseWallClockParts(timeText)
+  if (!parts) return '--'
+  const month = String(parts.month).padStart(2, '0')
+  const day = String(parts.day).padStart(2, '0')
+  const hour = String(parts.hour).padStart(2, '0')
+  const minute = String(parts.minute).padStart(2, '0')
+  const second = String(parts.second).padStart(2, '0')
+  return `${parts.year}年${month}月${day}日 ${hour}时${minute}分${second}秒`
+}
+
+/**
+ * 将矩阵时间字段解析为本地毫秒时间戳（按墙上时钟，不做 UTC 换算）。
  *
  * @param value 时间字符串
  * @returns 毫秒时间戳；无效时返回 null
  */
 const parseMatrixTimeMs = (value?: string | null): number | null => {
-  // 如果时间字符串为空，则返回 null
   if (!value?.trim() || value.trim() === '无' || value.trim() === '--') return null
-  // 获取时间字符串
-  const trimmed = value.trim()
-  // 从反馈时间戳中解析时间戳
-  const fromFeedback = parseFeedbackTimestamp(trimmed)
-  // 如果从反馈时间戳中解析出时间戳，则返回时间戳
-  if (fromFeedback != null) return fromFeedback
-  // 将时间字符串转换为日期对象
-  const normalized = new Date(trimmed.replace(/-/g, '/'))
-  // 如果日期对象的时间戳不为 NaN，则返回时间戳
-  if (!Number.isNaN(normalized.getTime())) return normalized.getTime()
-  // 如果日期对象的时间戳为 NaN，则返回 null
-  return null
+  const parts = parseWallClockParts(value)
+  if (!parts) return null
+  const ms = new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second).getTime()
+  return Number.isFinite(ms) ? ms : null
 }
 
 /**
@@ -491,7 +495,43 @@ const resolveReceiveDisplayName = (win: InitWindow): string => {
 }
 
 /**
- * 判断打击方案是否命中指定卫星。
+ * 取出打击方案的 beginTime 原文。只认字符串，不把 Date/播放时钟转回去。
+ *
+ * @param plan 打击方案
+ * @returns beginTime 原文；没有则空串
+ */
+const resolvePlanBeginTimeText = (plan: AttackPlan): string => {
+  const raw = plan.beginTime
+  return typeof raw === 'string' ? raw.trim() : ''
+}
+
+/**
+ * 推演打击方案列表：当前系列矩阵包含该星时，用矩阵的 `attackPlanList`（与你在接口里看到的 JSON 一致）；
+ * 否则回退任务分析实体上的列表。
+ *
+ * @param entity 系列实体（任务分析或矩阵）
+ * @param norad 当前卫星 NORAD
+ * @param satName 当前卫星名称
+ * @param matrixFallback 当前选中系列矩阵
+ * @returns 用于生成打击事件的方案列表
+ */
+const resolveDeductionAttackPlans = (
+  entity: LevelSeriesEntity,
+  norad: number,
+  _satName: string,
+  matrixFallback?: MatrixResult | null
+): AttackPlan[] => {
+  const satInMatrix =
+    Boolean(matrixFallback?.initMatrixList?.some((sat) => sat.norad === norad)) ||
+    Boolean(matrixFallback?.satelliteMatrixList?.some((sat) => sat.norad === norad))
+  if (satInMatrix && (matrixFallback?.attackPlanList?.length || 0) > 0) {
+    return matrixFallback!.attackPlanList as AttackPlan[]
+  }
+  return entity.attackPlanList || []
+}
+
+/**
+ * 判断打击方案是否命中指定卫星。有 targetId 时优先比 NORAD；名称只做全等，不做模糊包含。
  *
  * @param plan 打击方案
  * @param norad 卫星 NORAD
@@ -500,22 +540,13 @@ const resolveReceiveDisplayName = (win: InitWindow): string => {
  */
 const matchSatelliteAttackPlan = (plan: AttackPlan, norad: number, satName: string): boolean => {
   if (!isSatelliteTargetType(plan.targetType)) return false
-  // 获取目标 ID
   const targetId = plan.targetId?.trim()
-  // 判断 ID 是否匹配
-  const idMatch =
-    targetId === String(norad) || (targetId != null && Number(targetId) === norad)
-  // 获取目标名称
+  const idMatch = Boolean(targetId) && (targetId === String(norad) || Number(targetId) === norad)
+  if (idMatch) return true
   const targetName = plan.target?.trim() || ''
-  // 规范化卫星名称
   const nameKey = normalizeSatelliteNameKey(satName)
-  // 规范化目标名称
   const targetKey = normalizeSatelliteNameKey(targetName)
-  // 判断名称是否匹配
-  const nameMatch =
-    Boolean(nameKey && targetKey) &&
-    (nameKey === targetKey || nameKey.includes(targetKey) || targetKey.includes(nameKey))
-  return idMatch || nameMatch
+  return Boolean(nameKey && targetKey) && nameKey === targetKey
 }
 
 /**
@@ -528,19 +559,16 @@ const matchSatelliteAttackPlan = (plan: AttackPlan, norad: number, satName: stri
  */
 const matchReceiveAttackPlan = (
   plan: AttackPlan,
-  // 获取接收站 ID 集合
   receiveIds: Set<string>,
-  // 获取接收站名称集合
   receiveNames: Set<string>
 ): boolean => {
-  if (!isReceiveTargetType(plan.targetType)) return false
-  // 获取目标 ID
+  const targetType = (plan.targetType || '').trim()
+  if (targetType && isSatelliteTargetType(targetType) && !isReceiveTargetType(targetType)) {
+    return false
+  }
   const id = plan.targetId?.trim()
-  // 获取目标名称
   const name = plan.target?.trim()
-  // 判断目标 ID 是否匹配
   if (id && receiveIds.has(id)) return true
-  // 判断目标名称是否匹配
   if (name && receiveNames.has(name)) return true
   // 判断目标名称是否匹配
   if (name) {
@@ -697,67 +725,38 @@ export const resolveLevelSeriesEntityForNorad = (
 }
 
 /**
- * 将打击后过站窗口转为 initWindows 结构（用于无 initWindows 时兜底）。
+ * 将 satelliteMatrixList.stationWindows 转为推演过站窗口。
+ * 过站开始/结束取 peakWindow / endWindow；经纬度从 initWindows 按接收站补全。
  *
  * @param postSat 打击后卫星矩阵
- * @returns 与 InitWindow 兼容的窗口列表
+ * @param initWindows 打击前窗口（仅补坐标，不作为过站时间来源）
+ * @returns 过站窗口列表
  */
-const mapPostStationWindowsToInit = (postSat: SatelliteMatrix): InitWindow[] => {
-  // 将打击后卫星过站窗口转为 initWindows 结构
-  return (postSat.stationWindows || []).map((win) => ({
-    // 设置接收站 ID
-    receiveId: win.receiveId,
-    // 设置接收站名称
-    receiveName: win.receiveName,
-    // 设置接收站纬度
-    receiveLat: null,
-    // 设置接收站经度
-    receiveLon: null,
-    // 设置接收站用途
-    receiveUsage: win.receiveUsage ?? null,
-    // 设置过站开始窗口
-    peakWindow: win.peakWindow,
-    // 设置过站结束窗口
-    endWindow: win.endWindow,
-    // 设置过境战场窗口
-    battleWindow: '',
-    // 设置高度
-    height: null,
-  }))
-}
-
-/**
- * 合并 init / post 过站窗口并按 peakWindow 去重排序。
- *
- * @param initWindows 打击前窗口
- * @param postWindows 打击后窗口映射
- * @returns 合并后的窗口列表，按过站开始时间戳排序
- */
-const mergePassWindows = (initWindows: InitWindow[], postWindows: InitWindow[]): InitWindow[] => {
-  // 创建Map对象
-  const map = new Map<string, InitWindow>()
-  // 添加过站窗口到Map对象
-  const put = (win: InitWindow) => {
-    // 获取过站窗口键
-    const key = `${win.receiveId || ''}|${win.receiveName || ''}|${win.peakWindow || ''}`
-    // 如果过站窗口为空，则返回
-    if (!win.peakWindow?.trim()) return
-    // 如果Map对象不包含该过站窗口，则添加到Map对象
-    if (!map.has(key)) map.set(key, win)
-  }
-  // 添加打击前窗口到Map对象
-  initWindows.forEach(put)
-  // 添加打击后窗口到Map对象
-  postWindows.forEach(put)
-  // 返回合并后的窗口列表，按过站开始时间戳排序
-  return [...map.values()].sort((a, b) => {
-    // 获取过站开始时间戳
-    const aMs = parseMatrixTimeMs(a.peakWindow) ?? Number.MAX_SAFE_INTEGER
-    // 获取过站结束时间戳
-    const bMs = parseMatrixTimeMs(b.peakWindow) ?? Number.MAX_SAFE_INTEGER
-    // 返回过站开始时间戳差值
-    return aMs - bMs
-  })
+const mapStationWindowsForDeduction = (
+  postSat: SatelliteMatrix | undefined,
+  initWindows: InitWindow[]
+): InitWindow[] => {
+  return (postSat?.stationWindows || [])
+    .map((win) => {
+      const initMatch = initWindows.find(
+        (item) =>
+          (win.receiveId && item.receiveId === win.receiveId) ||
+          (win.receiveName && item.receiveName === win.receiveName)
+      )
+      return {
+        receiveId: win.receiveId,
+        receiveName: win.receiveName,
+        receiveLat: initMatch?.receiveLat ?? null,
+        receiveLon: initMatch?.receiveLon ?? null,
+        receiveUsage: win.receiveUsage ?? initMatch?.receiveUsage ?? null,
+        peakWindow: win.peakWindow,
+        endWindow: win.endWindow,
+        battleWindow: '',
+        height: initMatch?.height ?? null,
+      }
+    })
+    .filter((win) => Boolean(win.peakWindow?.trim()))
+    .sort((a, b) => (parseMatrixTimeMs(a.peakWindow) ?? 0) - (parseMatrixTimeMs(b.peakWindow) ?? 0))
 }
 
 /** 过站窗口（推演连线用） */
@@ -1012,11 +1011,8 @@ const buildSatelliteDeductionTimelineInternal = (
       usage: postSat.usage,
       // 设置战场窗口
       battleWindow: postSat.battleWindow,
-      // 设置卫星高度
       height: postSat.height,
-      // 设置初始过站窗口
-      initWindows: mapPostStationWindowsToInit(postSat),
-      // 设置覆盖率
+      initWindows: mapStationWindowsForDeduction(postSat, []),
       coverage: postSat.coverage,
     }
   }
@@ -1025,12 +1021,13 @@ const buildSatelliteDeductionTimelineInternal = (
   if (!initSat) return null
   // 获取卫星名称
   const satName = initSat.name?.trim() || postSat?.name?.trim() || `NORAD-${norad}`
-  // 获取打击后卫星过站窗口
-  const postMappedWindows = postSat ? mapPostStationWindowsToInit(postSat) : []
-  // 合并打击前和打击后卫星过站窗口
-  const windows = mergePassWindows(initSat.initWindows || [], postMappedWindows)
-  // 收集接收站 ID/名称集合
-  const { receiveIds, receiveNames } = collectReceiveKeysFromWindows(windows)
+  // 过站时间只取 satelliteMatrixList.stationWindows（peakWindow / endWindow）
+  const windows = mapStationWindowsForDeduction(postSat, initSat.initWindows || [])
+  // 打击方案匹配接收站时，同时参考打击前窗口，避免漏掉仅出现在 initWindows 的站
+  const { receiveIds, receiveNames } = collectReceiveKeysFromWindows([
+    ...windows,
+    ...(initSat.initWindows || []),
+  ])
   // 查找卫星时间效果
   const timeEffect = findTimeEffectForNorad(entity.timeEffects, norad)
   // 构建指标变化高亮行
@@ -1106,138 +1103,39 @@ const buildSatelliteDeductionTimelineInternal = (
   let satelliteStrikeMs: number | null = null
     // 遍历卫星打击方案
     ; (entity.attackPlanList || []).forEach((plan) => {
-      // 如果卫星打击方案匹配，则添加卫星打击事件
-      if (matchSatelliteAttackPlan(plan, norad, satName)) {
-        // 解析打击开始时间戳
-        const atMs = parseMatrixTimeMs(plan.beginTime)
-        // 如果打击开始时间戳为空，则返回
+      if (matchReceiveAttackPlan(plan, receiveIds, receiveNames)) {
+        const beginTimeText = resolvePlanBeginTimeText(plan)
+        const atMs = parseMatrixTimeMs(beginTimeText)
         if (atMs == null) return
-        // 如果卫星打击时间戳为空，则设置为打击任务开始时间戳
-        if (satelliteStrikeMs == null || atMs < satelliteStrikeMs) satelliteStrikeMs = atMs
-        // 获取武器名称
-        const weaponName = plan.weaponName || '--'
-        // 格式化打击开始时间
-        const timeHm = formatDeductionHmLabel(plan.beginTime)
-        // 添加卫星打击事件
-        raw.push({
-          // 设置事件类型
-          kind: 'satelliteStrike',
-          // 设置事件时间戳
-          atMs,
-          // 设置事件文本
-          line: `卫星${satName}被打击，武器${weaponName}；时间：${timeHm}`,
-          // 设置事件高亮行
-          highlightLine: {
-            segments: [
-              // 设置卫星名称
-              seg('卫星', 'default'),
-              seg(satName, 'satellite'),
-              seg(' ', 'default'),
-              // 设置被打击事件
-              seg('被打击，武器', 'event'),
-              // 设置武器名称
-              seg(weaponName, 'weapon'),
-              // 设置时间：
-              seg('；时间：', 'default'),
-              // 设置时间
-              seg(timeHm, 'time'),
-            ],
-          },
-        })
-        // 如果接收站打击方案匹配，则添加接收站打击事件
-      } else if (matchReceiveAttackPlan(plan, receiveIds, receiveNames)) {
-        // 解析打击开始时间戳
-        const atMs = parseMatrixTimeMs(plan.beginTime)
-        // 如果打击开始时间戳为空，则返回
-        if (atMs == null) return
-        // 获取接收站名称
         const stationLabel = plan.target?.trim() || plan.targetId?.trim() || '--'
-        // 格式化打击开始时间
-        const timeHm = formatDeductionHmLabel(plan.beginTime)
-        // 添加接收站打击事件
+        const timeHm = formatDeductionHmLabel(beginTimeText)
         raw.push({
-          // 设置事件类型
           kind: 'receiveStrike',
-          // 设置事件时间戳
           atMs,
-          // 设置事件文本
           line: `${stationLabel}接收站被打击，时间：${timeHm}`,
-          // 设置事件高亮行
           highlightLine: {
             segments: [
-              // 设置接收站名称
               seg(stationLabel, 'station'),
-              // 设置接收站事件
               seg('接收站', 'default'),
-              // 设置接收站被打击事件
               seg('被打击', 'event'),
               seg('，时间：', 'default'),
-              // 设置时间
               seg(timeHm, 'time'),
             ],
           },
         })
+        return
       }
-    })
-
-  // 遍历战场窗口
-  windows.forEach((win) => {
-    // 解析战场窗口时间戳
-    const atMs = parseMatrixTimeMs(win.battleWindow)
-    // 如果战场窗口时间戳为空，则返回
-    if (atMs == null) return
-    // 获取接收站名称
-    const stationName = resolveReceiveDisplayName(win)
-    // 格式化战场窗口时间
-    const timeHm = formatDeductionHmLabel(win.battleWindow)
-    // 添加接收站打击事件
-    raw.push({
-      // 设置事件类型
-      kind: 'receiveStrike',
-      // 设置事件时间戳
-      atMs,
-      // 设置事件文本
-      line: `${stationName}接收站被打击，时间：${timeHm}`,
-      // 设置事件高亮行
-      highlightLine: {
-        segments: [
-          // 设置接收站名称
-          seg(stationName, 'station'),
-          // 设置接收站被打击事件
-          seg('接收站被打击', 'event'),
-          // 设置时间：
-          seg('，时间：', 'default'),
-          // 设置时间
-          seg(timeHm, 'time'),
-        ],
-      }
-    })
-  })
-  // 判断是否存在卫星打击事件
-  const hasSatelliteStrikeEvent = raw.some((item) => item.kind === 'satelliteStrike')
-  // 如果不存在卫星打击事件，则添加卫星打击事件
-  if (!hasSatelliteStrikeEvent && postSat?.satelliteStatus === 1) {
-    // 解析战场窗口时间戳
-    const atMs = parseMatrixTimeMs(postSat.battleWindow)
-    // 如果战场窗口时间戳不为空，则添加卫星打击事件
-    if (atMs != null) {
-      if (satelliteStrikeMs == null || atMs < satelliteStrikeMs) satelliteStrikeMs = atMs
-      // 获取武器列表
-      const weapons = postSat.weapons?.length ? postSat.weapons : [{ name: '--' }]
-      // 遍历武器
-      weapons.forEach((weapon) => {
-        const weaponName = weapon.name || '--'
-        // 格式化战场窗口时间
-        const timeHm = formatDeductionHmLabel(postSat.battleWindow)
-        // 添加卫星打击事件
+      if (matchSatelliteAttackPlan(plan, norad, satName)) {
+        const beginTimeText = resolvePlanBeginTimeText(plan)
+        const atMs = parseMatrixTimeMs(beginTimeText)
+        if (atMs == null) return
+        if (satelliteStrikeMs == null || atMs < satelliteStrikeMs) satelliteStrikeMs = atMs
+        const weaponName = plan.weaponName || '--'
+        const timeHm = formatDeductionHmLabel(beginTimeText)
         raw.push({
-          // 设置事件类型
           kind: 'satelliteStrike',
-          // 设置事件时间戳
           atMs,
-          // 设置事件文本
-          line: `卫星${satName}被打击，武器${weaponName}；时间：${timeHm}`,
-          // 设置事件高亮行
+          line: `卫星：${satName}，被打击，武器：${weaponName}，时间：${timeHm}`,
           highlightLine: {
             segments: [
               seg('卫星', 'default'),
@@ -1250,9 +1148,8 @@ const buildSatelliteDeductionTimelineInternal = (
             ],
           },
         })
-      })
-    }
-  }
+      }
+    })
 
   // 如果指标变化高亮行不为空，则添加指标变化事件
   if (metricHighlightEntries.length) {
@@ -1340,14 +1237,22 @@ const buildSatelliteDeductionTimelineInternal = (
  *
  * @param entity 系列实体
  * @param norad 卫星 NORAD
+ * @param matrixFallback 当前选中系列矩阵；有该星时打击时间以矩阵 attackPlanList.beginTime 为准
  * @returns 事件与视觉计划；无 init 卫星时 null
  */
 export const buildSatelliteDeductionBundle = (
   entity: LevelSeriesEntity,
-  norad: number
+  norad: number,
+  matrixFallback?: MatrixResult | null
 ): SatelliteDeductionBundle | null => {
-  // 构建推演事件与视觉计划
-  const internal = buildSatelliteDeductionTimelineInternal(entity, norad)
+  const satName =
+    entity.initMatrixList?.find((sat) => sat.norad === norad)?.name?.trim() ||
+    entity.satelliteMatrixList?.find((sat) => sat.norad === norad)?.name?.trim() ||
+    ''
+  const attackPlanList = resolveDeductionAttackPlans(entity, norad, satName, matrixFallback)
+  const entityForTimeline =
+    attackPlanList === entity.attackPlanList ? entity : { ...entity, attackPlanList }
+  const internal = buildSatelliteDeductionTimelineInternal(entityForTimeline, norad)
   // 如果内部推演事件与视觉计划为空，则返回空
   if (!internal || !internal.events.length) return null
   // 返回推演事件与视觉计划
@@ -1379,7 +1284,9 @@ export const resolveDeductionVisualState = (
   currentMs: number,
   isPlaying: boolean
 ): {
+  /** 是否显示轨道路径 */
   showOrbitPath: boolean
+  /** 当前过站窗口 */
   activePass: DeductionStationPassWindow | null
   /** 当前过站窗口内接收站 ID/名称（过站连线等） */
   activePassReceiveKeys: Set<string>
