@@ -223,24 +223,28 @@ export const useBattleGlobeGroundTargets = (
     distance: number,
     selected: boolean,
     passHighlight: boolean
-  ): boolean => selected || passHighlight || distance <= LOD_NEAR_DISTANCE
+  ): boolean => selected || passHighlight || distance <= LOD_NEAR_DISTANCE // 判断是否选中、是否在推演当前过站窗口内、是否在近距离范围内
 
   /**
    * 清理地面站 Point 集合。
    */
   const clearGroundTargetPoints = () => {
     visualMap.clear()
+    // 如果 Viewer 不存在，将 Point / Label 图元集合设置为 null
     if (!viewerRef.value || viewerRef.value.isDestroyed()) {
       pointCollection = null
       labelCollection = null
       return
     }
+    // 如果 Point 图元集合存在，则移除
     if (pointCollection && !pointCollection.isDestroyed()) {
       viewerRef.value.scene.primitives.remove(pointCollection)
     }
+    // 如果 Label 图元集合存在，则移除
     if (labelCollection && !labelCollection.isDestroyed()) {
       viewerRef.value.scene.primitives.remove(labelCollection)
     }
+    // 将 Point / Label 图元集合设置为 null
     pointCollection = null
     labelCollection = null
   }
@@ -250,10 +254,13 @@ export const useBattleGlobeGroundTargets = (
    */
   const ensurePrimitiveCollections = () => {
     const viewer = viewerRef.value
+    // 如果 Viewer 不存在，则返回
     if (!viewer || viewer.isDestroyed()) return
+    // 如果 Point 图元集合不存在，则创建
     if (!pointCollection || pointCollection.isDestroyed()) {
       pointCollection = viewer.scene.primitives.add(new Cesium.PointPrimitiveCollection())
     }
+    // 如果 Label 图元集合不存在，则创建
     if (!labelCollection || labelCollection.isDestroyed()) {
       labelCollection = viewer.scene.primitives.add(
         new Cesium.LabelCollection({ scene: viewer.scene })
@@ -268,12 +275,18 @@ export const useBattleGlobeGroundTargets = (
     const viewer = viewerRef.value
     if (!viewer || viewer.isDestroyed()) return
 
+    // 重建令牌
     const token = ++rebuildToken
+    // 清理地面站 Point 集合
     clearGroundTargetPoints()
+    // 确保 Point / Label 图元集合已创建
     ensurePrimitiveCollections()
+    // 如果 Point / Label 图元集合不存在，则返回
     if (!pointCollection || !labelCollection) return
 
+    // 获取地面目标列表
     const targets = targetsRef.value
+    // 遍历地面目标列表
     for (const target of targets) {
       // 如果重建令牌不匹配，则返回
       if (token !== rebuildToken) return
@@ -336,54 +349,77 @@ export const useBattleGlobeGroundTargets = (
     const viewer = viewerRef.value
     if (!viewer || viewer.isDestroyed() || !pointCollection || visualMap.size === 0) return
 
+    // 获取相机位置
     const cameraPosition = viewer.camera.positionWC
+    // 获取选中目标键
     const selectedKey = selectedTargetKeyRef.value
 
+    // 遍历可视化对象
     visualMap.forEach((visual) => {
+      // 判断是否选中
       const selected = selectedKey === visual.key
+      // 判断是否可见
       const facing = isPositionFacingCamera(visual.position, cameraPosition)
+      // 判断是否在视锥体内
       const inFrustum = isPositionInCameraFrustum(viewer, visual.position)
+      // 计算距离
       const distance = Cesium.Cartesian3.distance(cameraPosition, visual.position)
+      // 判断目标类型
       const targetKind = visual.key.startsWith('receive:') ? 'receive' : 'station'
+      // 获取目标 ID
       const targetId = visual.key.split(':')[1] || ''
+      // 获取推演中已被打击的接收站 ID/名称集合
       const deductionStruck = deductionStruckReceiveKeysRef.value
+      // 获取推演当前过站窗口内接收站 ID/名称集合
       const passHighlightKeys = deductionPassHighlightReceiveKeysRef.value
+      // 获取推演高亮过站窗口（含坐标）
       const passHighlightPasses = deductionPassHighlightPassesRef.value
+      // 判断是否被打击
       const struckInDeduction =
         targetKind === 'receive' &&
         (deductionStruck.has(targetId) ||
           deductionStruck.has(visual.name) ||
           matchesDeductionReceiveHighlight(targetId, visual.name, deductionStruck))
+      // 判断是否在推演当前过站窗口内
       const passHighlightInDeduction =
         !struckInDeduction &&
         (matchesDeductionReceiveHighlight(targetId, visual.name, passHighlightKeys) ||
           isGroundTargetNearDeductionPass(visual.latitude, visual.longitude, passHighlightPasses))
+      // 获取默认颜色
       const baseColor = struckInDeduction
         ? STRUCK_POINT_COLOR
-        : visual.struck
+        : // 判断是否被打击
+        visual.struck
           ? STRUCK_POINT_COLOR
-          : targetKind === 'receive'
+          : // 接收站默认颜色
+          targetKind === 'receive'
             ? RECEIVE_POINT_COLOR
-            : STATION_POINT_COLOR
+            : // 数据中心默认颜色
+            STATION_POINT_COLOR
+      // 计算 LOD 样式
       const lodStyle = resolveLodStyle(distance, selected, passHighlightInDeduction, baseColor)
+      // 判断是否显示标签
       const showLabel = shouldShowTargetLabel(distance, selected, passHighlightInDeduction)
-
+      // 没有选中，也没有在推演当前过站窗口内，在背面剔除，则不显示点
       if (!selected && !passHighlightInDeduction && !facing) {
         visual.point.show = false
         visual.label.show = false
         return
       }
 
+      // 没有选中，也没有在推演当前过站窗口内，也没有在视锥体内，则不显示点
       if (!selected && !passHighlightInDeduction && !inFrustum) {
         visual.point.show = false
         visual.label.show = false
         return
       }
 
+      // 显示点
       visual.point.show = true
       visual.point.pixelSize = lodStyle.pixelSize
       visual.point.color = lodStyle.color
 
+      // 显示标签
       visual.label.show = showLabel
       visual.label.fillColor = selected
         ? Cesium.Color.YELLOW
@@ -404,9 +440,11 @@ export const useBattleGlobeGroundTargets = (
     const viewer = viewerRef.value
     if (!viewer || viewer.isDestroyed() || !targetKey) return
 
+    // 获取可视化对象
     const visual = visualMap.get(targetKey)
     if (!visual) return
 
+    // 相机飞到目标位置
     viewer.camera.flyToBoundingSphere(
       new Cesium.BoundingSphere(visual.position, 1000),
       {
@@ -435,18 +473,29 @@ export const useBattleGlobeGroundTargets = (
     postUpdateRemover = null
   }
 
+  /**
+   * 监听 Viewer 是否有变化。
+   */
   watch(
     () => viewerRef.value,
     (viewer) => {
+      // 移除 postUpdate 监听
       removePostUpdateListener()
+      // 清理地面站 Point 集合
       clearGroundTargetPoints()
+      // 如果 Viewer 不存在，则返回
       if (!viewer || viewer.isDestroyed()) return
+      // 确保 postUpdate 监听已注册
       ensurePostUpdateListener()
+      // 重建地面站 Point 集合
       void rebuildGroundTargetPoints()
     },
     { immediate: true }
   )
 
+  /**
+   * 监听地面目标列表是否有变化。
+   */
   watch(
     targetsRef,
     () => {
@@ -455,17 +504,36 @@ export const useBattleGlobeGroundTargets = (
     { deep: true }
   )
 
+  /**
+   * 监听选中目标键是否有变化。
+   */
   watch(selectedTargetKeyRef, (targetKey) => {
+    // 如果选中目标键不为空，则飞到目标
     if (targetKey) flyToGroundTarget(targetKey)
+    // 更新地面站可视化
     updateGroundTargetVisuals()
   })
 
+  /**
+   * 监听推演中已被打击的接收站 ID/名称集合是否有变化。
+   */
   watch(deductionStruckReceiveKeysRef, () => updateGroundTargetVisuals(), { deep: true })
+  /**
+   * 监听推演当前过站窗口内接收站 ID/名称集合是否有变化。
+   */
   watch(deductionPassHighlightReceiveKeysRef, () => updateGroundTargetVisuals(), { deep: true })
+  /**
+   * 监听推演高亮过站窗口（含坐标）是否有变化。
+   */
   watch(deductionPassHighlightPassesRef, () => updateGroundTargetVisuals(), { deep: true })
 
+  /**
+   * 卸载组件时清理资源。
+   */
   onBeforeUnmount(() => {
+    // 移除 postUpdate 监听
     removePostUpdateListener()
+    // 清理地面站 Point 集合
     clearGroundTargetPoints()
   })
 

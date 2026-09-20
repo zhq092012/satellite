@@ -1,4 +1,4 @@
-import G6, { type GraphData, type NodeConfig } from '@antv/g6'
+import { type GraphData, type NodeConfig } from '@antv/g6'
 import type { MatrixResult } from '@/api/electronic'
 import {
   collectRelaySatelliteTransmissionLinks,
@@ -46,26 +46,13 @@ const LINK_COLOR_STRUCK = '#94a3b8'
 /** 侦察拓扑 G6 边类型：直线连接各层节点 */
 export const RECON_TOPO_EDGE_TYPE = 'line'
 
-/**
- * 链路边终点箭头（与边描边同色）。
- *
- * @param stroke 边颜色
- * @returns G6 endArrow 配置
- */
-const buildReconEdgeEndArrow = (stroke: string) => ({
-  path: G6.Arrow.triangle(8, 10, 0),
-  fill: stroke,
-  d: 0,
-})
-
-/** G6 Graph 实例默认边：直线 + 箭头 */
+/** G6 Graph 实例默认边：直线（无箭头） */
 export const RECON_TOPO_GRAPH_DEFAULT_EDGE = {
   type: RECON_TOPO_EDGE_TYPE,
   style: {
     stroke: LINK_COLOR_NORMAL,
     lineWidth: 2.5,
     opacity: 1,
-    endArrow: buildReconEdgeEndArrow(LINK_COLOR_NORMAL),
   },
 }
 
@@ -283,7 +270,6 @@ const buildLinkEdgeStyle = (struck: boolean) => {
     lineWidth: struck ? 2 : 2.5,
     lineDash: struck ? [6, 4] : [],
     opacity: 1,
-    endArrow: buildReconEdgeEndArrow(stroke),
   }
 }
 
