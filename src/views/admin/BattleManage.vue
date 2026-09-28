@@ -287,7 +287,30 @@ const clearMap = () => {
   polygonRef.value?.clearAll()
 }
 
-/** 加载战场列表 */
+/**
+ * 刷新指定场景下的任务列表。
+ *
+ * @param battleId 场景 ID
+ */
+const refreshBattleTasks = async (battleId: number) => {
+  const res = await getTaskList(battleId)
+  if (res.code !== 200) return
+  await resumeTaskProgressPollingForTasks(res.data)
+  const battle = battleList.value.find((item) => item.id === battleId)
+  if (battle) {
+    battle.tasks = res.data
+  }
+}
+
+/**
+ * 重新拉取当前已展开场景的任务列表。
+ */
+const refreshExpandedTaskLists = async () => {
+  const battleIds = activeNames.value.filter((id) => battleList.value.some((battle) => battle.id === id))
+  await Promise.all(battleIds.map((battleId) => refreshBattleTasks(battleId)))
+}
+
+/** 加载战场列表，并补回已展开场景的任务 */
 const loadBattleList = async () => {
   const res = await getBattleList()
   if (res.code === 200) {
@@ -296,7 +319,9 @@ const loadBattleList = async () => {
       nextTick(() => {
         activeNames.value = [battleList.value[0].id ?? 0]
       })
+      return
     }
+    await refreshExpandedTaskLists()
   }
 }
 
@@ -381,21 +406,6 @@ const submitBattleForm = async (formEl: FormInstance | undefined) => {
   })
 }
 
-/**
- * 刷新指定场景下的任务列表。
- *
- * @param battleId 场景 ID
- */
-const refreshBattleTasks = async (battleId: number) => {
-  const res = await getTaskList(battleId)
-  if (res.code !== 200) return
-  await resumeTaskProgressPollingForTasks(res.data)
-  const battle = battleList.value.find((item) => item.id === battleId)
-  if (battle) {
-    battle.tasks = res.data
-  }
-}
-
 /** 打开新建任务弹窗（复用 TaskEditDialog） */
 const handleCreateTask = (battle: BattleForm) => {
   if (!battle.id) return
@@ -425,9 +435,10 @@ const handleTaskSaved = async (updated: TaskForm) => {
   )
   const isCreate = Boolean(updated.id && !previousTaskIds.has(updated.id))
 
-  await loadBattleList()
-
-  if (!battleId) return
+  if (!battleId) {
+    await loadBattleList()
+    return
+  }
 
   if (!activeNames.value.includes(battleId)) {
     activeNames.value.push(battleId)
@@ -450,7 +461,13 @@ const handleDeleteTask = (task: TaskForm) => {
     const res = await deleteTask(task.id!)
     if (res.code === 200) {
       ElMessage.success('删除任务成功')
-      await loadBattleList()
+      const battleId =
+        task.battleId || battleList.value.find((battle) => battle.tasks?.some((item) => item.id === task.id))?.id
+      if (battleId) {
+        await refreshBattleTasks(battleId)
+      } else {
+        await refreshExpandedTaskLists()
+      }
     } else {
       ElMessage.error(res.msg || '删除任务失败')
     }

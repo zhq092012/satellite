@@ -37,20 +37,20 @@
     <div id="cesiumContainer" :class="[{ animating: showView2D, 'not-animating': !showView2D }, selectedModeClass]"
       class="fullSize">
       <div class="left-top-bar" v-show="selectedMode !== '天对天'">
-        <div>
-          <span>{{ statistics?.weaponNum || 0 }}</span><span>武器总数</span>
+        <div class="stat-card">
+          <span class="stat-value">{{ statistics?.weaponNum || 0 }}</span>
+          <span class="stat-label">武器总数</span>
         </div>
-        <div style="display: flex; flex-direction: row">
-          <div v-for="[type, count] in Object.entries(statistics?.weaponTypeMap || {})" :key="type">
-            <span>{{ count }}</span>
-            <span> {{ type }} ({{ selectedWeaponTypeMap[type] || 0 }})</span>
+        <div class="stat-group">
+          <div v-for="[type, count] in Object.entries(statistics?.weaponTypeMap || {})" :key="type" class="stat-card">
+            <span class="stat-value">{{ count }}</span>
+            <span class="stat-label">{{ type }} ({{ selectedWeaponTypeMap[type] || 0 }})</span>
           </div>
         </div>
-
-        <div style="display: flex; flex-direction: row">
-          <div v-for="[country, count] in Object.entries(statistics?.weaponAreaMap || {})" :key="country">
-            <span>{{ count }}</span>
-            <span> {{ country }}</span>
+        <div class="stat-group">
+          <div v-for="[country, count] in Object.entries(statistics?.weaponAreaMap || {})" :key="country" class="stat-card">
+            <span class="stat-value">{{ count }}</span>
+            <span class="stat-label">{{ country }}</span>
           </div>
         </div>
       </div>
@@ -76,17 +76,17 @@
       </div>
 
       <div class="right-top-bar" v-show="selectedMode !== '天对天'">
-        <div>
-          <span>{{ statistics?.satelliteNum || 0 }}</span>
-          <span>卫星总数</span>
+        <div class="stat-card">
+          <span class="stat-value">{{ statistics?.satelliteNum || 0 }}</span>
+          <span class="stat-label">卫星总数</span>
         </div>
-        <div>
-          <span>{{ statistics?.satelliteTypeNum || 0 }}</span>
-          <span>卫星类型</span>
+        <div class="stat-card">
+          <span class="stat-value">{{ statistics?.satelliteTypeNum || 0 }}</span>
+          <span class="stat-label">卫星类型</span>
         </div>
-        <div>
-          <span>{{ statistics?.avgThreat || 0 }}</span>
-          <span>平均威胁度</span>
+        <div class="stat-card">
+          <span class="stat-value">{{ statistics?.avgThreat || 0 }}</span>
+          <span class="stat-label">平均威胁度</span>
         </div>
       </div>
       <div class="right-workbench">
@@ -1507,18 +1507,22 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
 </script>
 <style lang="scss" scoped>
 .container {
-  height: 100%;
+  /* 顶栏、页面边距、算法页签和卡片内边距之外的剩余高度，避免整页竖向滚动 */
+  height: calc(100vh - 142px);
+  max-height: calc(100vh - 142px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   font-size: 14px;
+  box-sizing: border-box;
 
   .nav {
+    flex-shrink: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
     background: #06223d;
-    padding: 10px;
+    padding: 6px 10px;
 
     .nav-left {
       gap: 10px;
@@ -1561,12 +1565,11 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
 
     display: grid;
     grid-template-columns: 300px 1fr 1fr 300px;
-    grid-template-rows: 60px 1fr;
+    grid-template-rows: 44px minmax(0, 1fr);
     gap: 5px;
-    // AI:
-    // - 锁定在固定的视口高度范围内，避免 Cesium Canvas 和 CSS Grid 循环触发 Resize 导致页面无限向下滚动
-    // - 内部侧边栏带有独立 overflow: auto 供列表滚动
-    height: calc(100vh - 152px);
+    flex: 1;
+    min-height: 0;
+    height: auto;
     overflow: hidden;
 
     &.not-animating {
@@ -1581,28 +1584,62 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
       }
     }
 
-    .left-top-bar {
-      grid-column: 1/3;
-      grid-row: 1;
+    .left-top-bar,
+    .right-top-bar {
+      min-height: 0;
+      overflow: hidden;
       display: flex;
-      align-items: center;
+      align-items: stretch;
       justify-content: center;
-      gap: 5px;
+      gap: 4px;
 
-      div {
-        height: 100%;
-        background: linear-gradient(to bottom, #f75e61, #f16f71);
+      .stat-group {
+        flex: 2;
+        min-width: 0;
+        display: flex;
+        align-items: stretch;
+        gap: 4px;
+        background: transparent;
+      }
+
+      .stat-card {
         flex: 1;
+        min-width: 0;
+        height: 100%;
+        box-sizing: border-box;
+        padding: 2px 6px;
+        border-radius: 4px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
+        line-height: 1.1;
+        overflow: hidden;
+      }
 
-        span:first-child {
-          font-size: 18px;
-          font-weight: bolder;
-          margin-bottom: 5px;
-        }
+      .stat-value {
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+
+      .stat-label {
+        margin-top: 1px;
+        font-size: 11px;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+    }
+
+    .left-top-bar {
+      grid-column: 1/3;
+      grid-row: 1;
+
+      .stat-card {
+        background: linear-gradient(to bottom, #f75e61, #f16f71);
       }
     }
 
@@ -1661,7 +1698,7 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
 
     /* 天对地模式时，左红右蓝互换 */
     &.mode-air-to-ground {
-      .left-top-bar div {
+      .left-top-bar .stat-card {
         background: linear-gradient(to bottom, #2ca6ff, #53aff1);
       }
 
@@ -1670,7 +1707,7 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
         background: rgba(44, 166, 255, 0.15);
       }
 
-      .right-top-bar div {
+      .right-top-bar .stat-card {
         background: linear-gradient(to bottom, #f75e61, #f16f71);
       }
 
@@ -1685,7 +1722,7 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
     }
 
     &.mode-air-to-air {
-      grid-template-rows: 0px 1fr;
+      grid-template-rows: 0 minmax(0, 1fr);
     }
 
     .left-panel {
@@ -1727,33 +1764,19 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
     .right-top-bar {
       grid-column: 3/5;
       grid-row: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
 
-      div {
-        height: 100%;
+      .stat-card {
         background: linear-gradient(to bottom, #2ca6ff, #53aff1);
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-
-        span:first-child {
-          font-size: 18px;
-          font-weight: bolder;
-          margin-bottom: 5px;
-        }
       }
     }
 
     .right-side-bar {
       height: 100%;
       padding: 8px;
-      overflow: auto;
+      overflow: hidden;
       box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
 
       .panel-title {
         font-size: 16px;
@@ -1765,7 +1788,8 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
       }
 
       .satellite-list {
-        max-height: calc(100vh - 165px - 110px - 35px);
+        flex: 1;
+        min-height: 0;
         overflow-y: auto;
         text-align: left;
 
