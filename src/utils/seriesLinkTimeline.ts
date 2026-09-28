@@ -399,7 +399,7 @@ export const buildPlanLinkTimelineModel = (
 export const buildTimelineTicks = (
   minMs: number,
   maxMs: number,
-  tickCount = 8
+  tickCount = 32
 ): Array<{ ms: number; leftPx: number; label: string }> => {
   const range = Math.max(maxMs - minMs, 1)
   const canvasWidth = resolveCanvasWidth(minMs, maxMs)
