@@ -322,6 +322,17 @@ const routes: Array<RouteRecordRaw> = [
               requiresAuth: true,
             },
           },
+          {
+            path: 'confrontation',
+            name: 'ConfrontationAnalysis',
+            component: () => import('@/components/cesium/ConfrontationAnalysis.vue'),
+            meta: {
+              title: '对抗分析',
+              icon: 'icon-situation',
+              showInMenu: true,
+              requiresAuth: true,
+            },
+          },
         ],
       },
     ],
