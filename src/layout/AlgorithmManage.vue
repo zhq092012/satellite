@@ -13,7 +13,10 @@
         <el-tab-pane label="打击窗口分析" name="weaponAttack" />
       </el-tabs>
 
-      <router-view />
+      <!-- 拓扑图和甘特图铺满页签下方剩余高度，避免整页出现滚动条 -->
+      <div :class="['algorithm-view', { 'algorithm-view--fill': fillsViewport }]">
+        <router-view />
+      </div>
     </el-card>
   </div>
 </template>
@@ -50,6 +53,12 @@ const activeTab = computed({
   get: () => tabNameMap[String(route.name ?? '')] ?? 'threat',
   set: () => undefined,
 })
+
+/** 需要按剩余视口高度铺满、且不让外层出现滚动条的页签 */
+const fillViewportTabs = new Set(['electronicWarfare', 'satelliteGantt'])
+
+/** 当前页签是否要铺满剩余视口 */
+const fillsViewport = computed(() => fillViewportTabs.has(activeTab.value))
 
 /**
  * 响应选项卡点击切换逻辑
@@ -103,6 +112,24 @@ const handleTabChange = (tabName: string) => {
 
   :deep(.atlas-app-tabs__header) {
     margin-bottom: 4px;
+  }
+}
+
+.algorithm-view--fill {
+  /* 与红蓝对抗分析相同：扣掉顶栏、页面边距、页签和卡片内边距后的剩余高度 */
+  height: calc(100vh - 142px);
+  max-height: calc(100vh - 142px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+
+  :deep(> *) {
+    flex: 1 1 auto;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 }
 </style>
