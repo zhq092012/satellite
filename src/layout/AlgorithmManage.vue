@@ -8,6 +8,9 @@
         <el-tab-pane label="打击方案仿真" name="simulation" />
         <el-tab-pane label="红蓝对抗分析" name="confrontation" />
         <el-tab-pane label="生成打击方案" name="stationReport" />
+        <el-tab-pane label="态势拓扑分析" name="electronicWarfare" />
+        <el-tab-pane label="甘特图分析" name="satelliteGantt" />
+        <el-tab-pane label="打击窗口分析" name="weaponAttack" />
       </el-tabs>
 
       <router-view />
@@ -37,6 +40,9 @@ const tabNameMap: Record<string, string> = {
   StrikeSimulation: 'simulation',
   ConfrontationAnalysis: 'confrontation',
   StationReport: 'stationReport',
+  ElectronicWarfare: 'electronicWarfare',
+  SatelliteGantt: 'satelliteGantt',
+  WeaponAttackList: 'weaponAttack',
 }
 
 /** 当前激活的选项卡名称，根据当前路由自动匹配 */
@@ -64,6 +70,12 @@ const handleTabChange = (tabName: string) => {
     router.push({ name: 'ConfrontationAnalysis' })
   } else if (tabName === 'stationReport') {
     router.push({ name: 'StationReport' })
+  } else if (tabName === 'electronicWarfare') {
+    router.push({ name: 'ElectronicWarfare' })
+  } else if (tabName === 'satelliteGantt') {
+    router.push({ name: 'SatelliteGantt' })
+  } else if (tabName === 'weaponAttack') {
+    router.push({ name: 'WeaponAttackList' })
   }
 }
 </script>
