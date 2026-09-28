@@ -333,6 +333,17 @@ const routes: Array<RouteRecordRaw> = [
               requiresAuth: true,
             },
           },
+          {
+            path: 'station-report',
+            name: 'StationReport',
+            component: () => import('@/components/cesium/StationReport.vue'),
+            meta: {
+              title: '打击方案',
+              icon: 'icon-situation',
+              showInMenu: true,
+              requiresAuth: true,
+            },
+          },
         ],
       },
     ],

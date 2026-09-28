@@ -7,6 +7,7 @@
         <el-tab-pane label="杀伤链方案" name="killchain" />
         <el-tab-pane label="打击方案仿真" name="simulation" />
         <el-tab-pane label="红蓝对抗分析" name="confrontation" />
+        <el-tab-pane label="生成打击方案" name="stationReport" />
       </el-tabs>
 
       <router-view />
@@ -35,6 +36,7 @@ const tabNameMap: Record<string, string> = {
   EvaluationResult: 'evaluation',
   StrikeSimulation: 'simulation',
   ConfrontationAnalysis: 'confrontation',
+  StationReport: 'stationReport',
 }
 
 /** 当前激活的选项卡名称，根据当前路由自动匹配 */
@@ -60,6 +62,8 @@ const handleTabChange = (tabName: string) => {
     router.push({ name: 'StrikeSimulation' })
   } else if (tabName === 'confrontation') {
     router.push({ name: 'ConfrontationAnalysis' })
+  } else if (tabName === 'stationReport') {
+    router.push({ name: 'StationReport' })
   }
 }
 </script>
