@@ -6,7 +6,7 @@
 
 <script setup lang="ts">
 import * as Cesium from 'cesium'
-import { markBattleArea, resolveBattleSpaceLabelPosition } from '@/utils/tools/functionTool'
+import { markBattleArea, markTaskCombatArea, resolveBattleSpaceLabelPosition } from '@/utils/tools/functionTool'
 import { useLayoutStore } from '@/store/modules/layout'
 import { useBattleGlobeSatellites } from '@/composables/useBattleGlobeSatellites'
 import { useBattleGlobeWeapons } from '@/composables/useBattleGlobeWeapons'
@@ -413,6 +413,7 @@ const renderBattleArea = () => {
       clearBattleLabel()
       flyToDefaultEarthView()
     }
+    markTaskCombatArea(viewer, store.taskCombatArea)
   } catch (error) {
     console.error('渲染战场区域失败:', error)
     flyToDefaultEarthView()
@@ -527,6 +528,17 @@ watch(
   () => {
     renderBattleLabel()
   }
+)
+
+watch(
+  () => store.taskCombatArea,
+  () => {
+    const viewer = viewerRef.value
+    if (!viewer || viewer.isDestroyed()) return
+    markTaskCombatArea(viewer, store.taskCombatArea)
+    viewer.scene.requestRender()
+  },
+  { deep: true }
 )
 
 watch(

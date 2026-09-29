@@ -48,6 +48,8 @@ interface State {
   matrixData: MatrixResult | null
   /** 当前任务算法分析结果（getTaskMatrix） */
   taskAnalysisData: SatelliteAnalysisData | null
+  /** 左侧面板编辑的任务作战区域（用于地图展示，与 activedTask.combatArea 同步） */
+  taskCombatArea: TaskCombatArea | null
   /** 任务算法分析结果加载状态 */
   taskAnalysisLoading: boolean
   /** 任务分析结果对应的任务 ID */
@@ -173,6 +175,7 @@ export const useLayoutStore = defineStore('layout-store', {
 
       matrixData: null,
       taskAnalysisData: null,
+      taskCombatArea: null,
       taskAnalysisLoading: false,
       taskAnalysisTaskId: null,
       matrixLoading: false,
@@ -262,6 +265,13 @@ export const useLayoutStore = defineStore('layout-store', {
     },
     setActivedTask(activedTask: TaskForm | null) {
       this.activedTask = activedTask
+    },
+    /**
+     * 更新当前任务作战区域预览（左侧面板编辑 → 地图渲染）。
+     * @param area 区域配置；null 表示清除
+     */
+    setTaskCombatArea(area: TaskCombatArea | null) {
+      this.taskCombatArea = area ? { ...area } : null
     },
     setActivedBattle(battle: BattleForm) {
       this.battle = battle

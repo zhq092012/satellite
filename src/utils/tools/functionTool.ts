@@ -354,6 +354,51 @@ export interface MarkBattleAreaOptions {
   clampToGround?: boolean
 }
 
+/** 任务作战区域 Cesium 实体 ID */
+const TASK_COMBAT_AREA_ENTITY_ID = 'task-combat-area-ellipse'
+
+/**
+ * 清除地图上的任务作战区域标记。
+ *
+ * @param viewer Cesium Viewer
+ */
+export function clearTaskCombatArea(viewer: Cesium.Viewer | null | undefined) {
+  if (!viewer || (viewer as { isDestroyed?: () => boolean }).isDestroyed?.()) return
+  const entity = viewer.entities.getById(TASK_COMBAT_AREA_ENTITY_ID)
+  if (entity) viewer.entities.remove(entity)
+}
+
+/**
+ * 在地球上绘制任务级圆形作战区域（需 enabled 为 true）。
+ *
+ * @param viewer Cesium Viewer
+ * @param area 任务作战区域；未启用或参数无效时不绘制
+ */
+export function markTaskCombatArea(viewer: Cesium.Viewer | null | undefined, area: TaskCombatArea | null | undefined) {
+  if (!viewer || (viewer as { isDestroyed?: () => boolean }).isDestroyed?.()) return
+  clearTaskCombatArea(viewer)
+  if (!area?.enabled) return
+  const { centerLon, centerLat, radiusKm } = area
+  if (!Number.isFinite(centerLon) || !Number.isFinite(centerLat) || !Number.isFinite(radiusKm) || radiusKm <= 0) {
+    return
+  }
+  const radiusM = radiusKm * 1000
+  viewer.entities.add({
+    id: TASK_COMBAT_AREA_ENTITY_ID,
+    position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat),
+    ellipse: {
+      semiMajorAxis: radiusM,
+      semiMinorAxis: radiusM,
+      material: Cesium.Color.fromCssColorString('#00e1ff').withAlpha(0.2),
+      outline: true,
+      outlineColor: Cesium.Color.fromCssColorString('#00e1ff'),
+      outlineWidth: 2,
+      heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 150000000),
+    },
+  })
+}
+
 /**
  * 在地球上标记战场区域并调整初始视角。
  *

@@ -8,6 +8,18 @@ interface TaskResourceItem {
   stationIds: string[]
 }
 
+/** 任务级圆形作战区域（中心点 + 半径） */
+interface TaskCombatArea {
+  /** 区域中心经度（度，WGS84） */
+  centerLon: number
+  /** 区域中心纬度（度，WGS84） */
+  centerLat: number
+  /** 区域半径（千米） */
+  radiusKm: number
+  /** 是否在地图上显示该区域 */
+  enabled: boolean
+}
+
 interface TaskForm {
   id?: number
   battleId: number
@@ -33,6 +45,8 @@ interface TaskForm {
   weaponIds?: string[]
   /** 装配资源 */
   resources?: TaskResourceItem[]
+  /** 任务作战区域（圆形）；后端未接入前可由前端假数据填充 */
+  combatArea?: TaskCombatArea | null
   /** 国家汇总 */
   country?: string
   createTime?: string

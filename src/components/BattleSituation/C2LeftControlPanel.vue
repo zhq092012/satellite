@@ -94,6 +94,30 @@
                   </el-tag>
                 </div>
               </div>
+              <div class="metric-row metric-row--combat-head">
+                <span class="metric-label">作战区域</span>
+                <label class="combat-area-enable">
+                  <el-checkbox v-model="editorDraft.combatArea.enabled">启用</el-checkbox>
+                </label>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">经度</span>
+                <el-input-number v-model="editorDraft.combatArea.centerLon" class="metric-input-number" size="small"
+                  :controls="false" :precision="4" :step="0.0001" :min="-180" :max="180" />
+                <span class="metric-unit metric-unit--empty" aria-hidden="true" />
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">纬度</span>
+                <el-input-number v-model="editorDraft.combatArea.centerLat" class="metric-input-number" size="small"
+                  :controls="false" :precision="4" :step="0.0001" :min="-90" :max="90" />
+                <span class="metric-unit metric-unit--empty" aria-hidden="true" />
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">半径</span>
+                <el-input-number v-model="editorDraft.combatArea.radiusKm" class="metric-input-number" size="small"
+                  :controls="false" :precision="0" :step="10" :min="1" :max="20000" />
+                <span class="metric-unit">km</span>
+              </div>
             </div>
           </div>
           <div class="tag-section">
@@ -459,9 +483,11 @@ const syncEditorForTask = async (task: TaskForm | null | undefined) => {
     durationHours.value = calcTaskDurationHours(editorDraft.value.beginDate, editorDraft.value.endDate)
     stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
     useWeaponsEnabled.value = editorDraft.value.selectedWeaponIds.length > 0
+    store.setTaskCombatArea({ ...editorDraft.value.combatArea })
   } else {
     stashedWeaponIds.value = []
     useWeaponsEnabled.value = false
+    store.setTaskCombatArea(null)
   }
   if (!task) return
   await Promise.all([
@@ -477,6 +503,17 @@ watch(
     void syncEditorForTask(store.activedTask)
   },
   { immediate: true }
+)
+
+/**
+ * 作战区域编辑同步到 Store，供地球视图绘制/隐藏。
+ */
+watch(
+  () => editorDraft.value?.combatArea,
+  (area) => {
+    store.setTaskCombatArea(area ? { ...area } : null)
+  },
+  { deep: true }
 )
 watch(
   () =>
@@ -986,6 +1023,29 @@ onUnmounted(() => {
 .metric-row--types {
   grid-template-columns: 72px minmax(0, 1fr);
   align-items: start;
+}
+
+.metric-row--combat-head {
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+}
+
+.combat-area-enable {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  cursor: pointer;
+  line-height: 1;
+  justify-self: start;
+}
+
+.combat-area-enable :deep(.atlas-app-checkbox) {
+  height: auto;
+  align-items: center;
+}
+
+.metric-unit--empty {
+  visibility: hidden;
 }
 
 .metric-row--readonly {

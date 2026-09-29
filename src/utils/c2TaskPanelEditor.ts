@@ -30,6 +30,43 @@ export interface C2TaskEditorDraft {
   coverage: number
   /** 卫星类型（侦察 / 通信） */
   targetTypeShow: string[]
+  /** 任务作战区域 */
+  combatArea: TaskCombatArea
+}
+
+/**
+ * 后端未返回任务区域时使用的默认假数据（台海附近示例圆，半径 3000km）。
+ * 接入接口后应改为仅读取 task.combatArea。
+ */
+export const TASK_COMBAT_AREA_MOCK: TaskCombatArea = {
+  centerLon: 121.5,
+  centerLat: 25.0,
+  radiusKm: 3000,
+  enabled: true,
+}
+
+/**
+ * 从任务或假数据解析作战区域草稿。
+ *
+ * @param task 任务
+ * @returns 作战区域配置
+ */
+export const resolveTaskCombatAreaFromTask = (task: TaskForm | null | undefined): TaskCombatArea => {
+  const fromTask = task?.combatArea
+  if (
+    fromTask &&
+    Number.isFinite(fromTask.centerLon) &&
+    Number.isFinite(fromTask.centerLat) &&
+    Number.isFinite(fromTask.radiusKm)
+  ) {
+    return {
+      centerLon: Number(fromTask.centerLon),
+      centerLat: Number(fromTask.centerLat),
+      radiusKm: Math.max(1, Number(fromTask.radiusKm)),
+      enabled: Boolean(fromTask.enabled),
+    }
+  }
+  return { ...TASK_COMBAT_AREA_MOCK }
 }
 
 /**
@@ -167,6 +204,7 @@ export const createDraftFromTask = (task: TaskForm | null | undefined): C2TaskEd
     delayMin: Number.isFinite(task.delayMin) ? Number(task.delayMin) : 60,
     coverage: Number.isFinite(task.coverage) ? Number(task.coverage) : 50,
     targetTypeShow: resolveTaskTargetTypesFromForm(task),
+    combatArea: resolveTaskCombatAreaFromTask(task),
   }
 }
 
@@ -203,6 +241,7 @@ export const mergeTaskFormWithDraft = (base: TaskForm, draft: C2TaskEditorDraft)
     targetType: targetTypeValue,
     targetTypeNew: targetTypeValue,
     targetTypeShow: [...draft.targetTypeShow],
+    combatArea: { ...draft.combatArea },
   }
 }
 
