@@ -6,92 +6,12 @@
       <p v-if="plan.intensityLevel" class="intensity-badge">打击烈度：{{ plan.intensityLevel }}</p>
     </div>
 
-    <p class="summary-line">
-      共 <span class="num-green">{{ plan.visibleWindowNum }}</span> 个过境窗口，其中
-      <span class="num-red">{{ plan.visibleWindowStrikeNum }}</span> 个被打击压制；
-      打击前覆盖率 <span class="num-green">{{ formatCoverage(plan.beforeAvgCoverage) }}</span>，
-      打击后覆盖率 <span class="num-orange">{{ formatCoverage(plan.afterAvgCoverage) }}</span>。
-    </p>
+    <ZhchPlanSummaryMetricsTable :plan="plan" :vertical="!!alignBlocks" />
 
-    <!-- 关键指标（带单位）；三方案并排时缩小数字避免挤叠 -->
-    <div class="kpi-grid" :class="{ 'kpi-grid--compact': compactKpi }">
-      <div class="kpi-card kpi-card--cyan">
-        <span class="kpi-value">{{ plan.satNum }}<em>颗</em></span>
-        <span class="kpi-label">卫星数量</span>
-      </div>
-      <div class="kpi-card kpi-card--yellow">
-        <span class="kpi-value">{{ plan.stationNum }}<em>座</em></span>
-        <span class="kpi-label">地面站</span>
-      </div>
-      <div class="kpi-card kpi-card--green">
-        <span class="kpi-value">{{ plan.visibleWindowNum }}<em>个</em></span>
-        <span class="kpi-label">过境窗口</span>
-      </div>
-      <div class="kpi-card kpi-card--red">
-        <span class="kpi-value">{{ plan.visibleWindowStrikeNum }}<em>个</em></span>
-        <span class="kpi-label">压制窗口</span>
-      </div>
-      <div class="kpi-card kpi-card--green">
-        <span class="kpi-value">{{ formatCoverage(plan.beforeAvgCoverage) }}</span>
-        <span class="kpi-label">打击前覆盖率</span>
-      </div>
-      <div class="kpi-card kpi-card--orange">
-        <span class="kpi-value">{{ formatCoverage(plan.afterAvgCoverage) }}</span>
-        <span class="kpi-label">打击后覆盖率</span>
-      </div>
-    </div>
+    <!-- 打击前 / 打击后指标对比表 -->
+    <ZhchPlanMetricsCompareTable :plan="plan" :vertical="!!alignBlocks" />
 
-    <!-- 2. 方案概要（对比模式下参与 subgrid 等高） -->
-    <div class="summary-group" :class="{ 'summary-group--align': alignBlocks }">
-      <div class="text-block text-block--summary">
-        <div class="block-head">方案概要</div>
-        <p class="block-text large" v-html="highlightText(plan.summary)"></p>
-      </div>
-    </div>
-
-    <div class="compare-section" :class="{ 'compare-section--align': alignBlocks }">
-      <div class="text-block">
-        <div class="block-head block-head--before">① 打击前计算结果</div>
-        <p class="block-text large" v-html="highlightText(plan.beforeResult)"></p>
-        <div class="feedback-row">
-          <span class="row-label">最早回传时间：</span>
-          <span class="feedback-time feedback-time--before">{{ plan.beforeFirstFeedbackTime || '--' }}</span>
-        </div>
-      </div>
-
-      <div class="text-block">
-        <div class="block-head block-head--after">② 打击后计算结果</div>
-        <p class="block-text large" v-html="highlightText(plan.afterResult)"></p>
-        <div class="feedback-row">
-          <span class="row-label">最早回传时间：</span>
-          <span class="feedback-time feedback-time--after">{{ plan.afterFirstFeedbackTime || '--' }}</span>
-        </div>
-        <div class="feedback-row">
-          <span class="row-label">干扰造成延迟：</span>
-          <span class="feedback-time feedback-time--delay">{{ interferenceDelay }}</span>
-        </div>
-        <div class="feedback-row">
-          <span class="row-label">覆盖率减少：</span>
-          <span class="feedback-time feedback-time--coverage">{{ coverageReduction }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3. 可用地面站（底部） -->
-    <div class="strike-analysis-card">
-      <div class="card-title">
-        地面站打击分析（共 <span class="num-orange">{{ plan.stationNum }}</span> 座）
-      </div>
-      <div class="station-row">
-        <span class="row-label">可用地面站：</span>
-        <div class="station-tags">
-          <span v-for="name in stationNames" :key="name" class="station-tag">{{ name }}</span>
-          <span v-if="!stationNames.length" class="empty-hint">暂无地面站数据</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 4. 卫星指标 TOP5（独立面板，位于地面站打击分析下方） -->
+    <!-- 卫星指标 TOP5 -->
     <div
       v-if="showRecommendSection"
       class="recommend-top-panel"
@@ -151,25 +71,18 @@ import type {
   ZhchPlanDelayRecommend,
   ZhchPlanResp,
 } from '@/api/electronic'
-import { highlightResultText, formatInterferenceDelay } from '@/utils/zhchPlanDisplay'
 import SeriesLinkTimeline from './SeriesLinkTimeline.vue'
+import ZhchPlanMetricsCompareTable from './ZhchPlanMetricsCompareTable.vue'
+import ZhchPlanSummaryMetricsTable from './ZhchPlanSummaryMetricsTable.vue'
 
 const props = defineProps<{
   /** 综合打击方案完整数据 */
   plan: ZhchPlanResp
   /** 是否展示系列链路通断时序（多方案对比时不展示） */
   showSeriesLinkTimeline?: boolean
-  /** 三方案并排时缩小 KPI 数字字号，单方案保持原尺寸 */
-  compactKpi?: boolean
   /** 多方案对比时与其它列按块对齐高度 */
   alignBlocks?: boolean
 }>()
-
-/**
- * 高亮描述文本中的数字与时间
- * @param text 原始文本
- */
-const highlightText = (text?: string | null) => highlightResultText(text)
 
 /** 将平均覆盖率格式化为百分比。 */
 const formatCoverage = (coverage: number | null | undefined): string => {
@@ -221,10 +134,10 @@ const pickTopDelayRecommends = (list: ZhchPlanDelayRecommend[] | undefined): Zhc
   return sorted.slice(0, RECOMMEND_TOP_N)
 }
 
-/** 地面站打击分析下展示的覆盖率 TOP5 */
+/** 覆盖率降幅 TOP5 */
 const topCoverageRecommends = computed(() => pickTopCoverageRecommends(props.plan.coverageRecommends))
 
-/** 地面站打击分析下展示的链路时延 TOP5 */
+/** 链路时延增幅 TOP5 */
 const topDelayRecommends = computed(() => pickTopDelayRecommends(props.plan.delayRecommends))
 
 /** 是否展示 TOP5 区域：单方案有数据才展示；多方案对比时固定占位以保持列对齐 */
@@ -235,30 +148,6 @@ const showRecommendSection = computed(
     topDelayRecommends.value.length > 0
 )
 
-/** 将 stationList 统一为名称数组（兼容字符串与数组两种返回）。 */
-const stationNames = computed((): string[] => {
-  const raw = props.plan.stationList
-  if (Array.isArray(raw)) {
-    return raw.map((s) => String(s).trim()).filter(Boolean)
-  }
-  if (typeof raw === 'string' && raw.trim()) {
-    return raw.split(/[,，、;；\s]+/).map((s) => s.trim()).filter(Boolean)
-  }
-  return []
-})
-
-/** 打击干扰造成的延迟时长（格式：xx时xx分xx秒） */
-const interferenceDelay = computed(() =>
-  formatInterferenceDelay(props.plan.beforeFirstFeedbackTime, props.plan.afterFirstFeedbackTime)
-)
-
-/** 覆盖率变化：打击后平均覆盖率减去打击前平均覆盖率 */
-const coverageReduction = computed(() => {
-  const before = props.plan.beforeAvgCoverage
-  const after = props.plan.afterAvgCoverage
-  if (!Number.isFinite(before) || !Number.isFinite(after)) return '--'
-  return `${(after - before).toFixed(2)}%`
-})
 </script>
 
 <style lang="scss" scoped>
@@ -274,15 +163,13 @@ const coverageReduction = computed(() => {
   &--align {
     display: grid;
     grid-template-rows: subgrid;
-    grid-row: span 8;
+    grid-row: span 5;
     min-height: 0;
     // 与外层 plan-columns--compare 的 --plan-compare-row-gap 保持一致；
     // subgrid 会用自身 gap 覆盖父级 row-gap，写成 0 会导致块与块贴死。
     gap: var(--plan-compare-row-gap, 10px);
 
-    .result-header,
-    .summary-line,
-    .kpi-grid {
+    .result-header {
       height: 100%;
       box-sizing: border-box;
     }
@@ -693,25 +580,6 @@ const coverageReduction = computed(() => {
   }
 }
 
-.strike-analysis-card {
-  padding: 16px 18px;
-  border-radius: 10px;
-  border: 1px solid rgba(251, 191, 36, 0.35);
-  background: linear-gradient(180deg, rgba(40, 30, 10, 0.5) 0%, rgba(14, 28, 48, 0.8) 100%);
-
-  .zhch-plan-detail--align & {
-    height: 100%;
-    box-sizing: border-box;
-  }
-
-  .card-title {
-    font-size: 18px;
-    font-weight: 800;
-    color: #fbbf24;
-    margin-bottom: 12px;
-  }
-}
-
 .recommend-top-panel {
   padding: 14px 16px;
   border-radius: 8px;
@@ -741,35 +609,6 @@ const coverageReduction = computed(() => {
   }
 }
 
-.station-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 16px;
-
-  .row-label {
-    flex-shrink: 0;
-    color: #94a3b8;
-    font-weight: 600;
-  }
-}
-
-.station-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.station-tag {
-  padding: 4px 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #7dd3fc;
-  border: 1px solid rgba(0, 225, 255, 0.4);
-  border-radius: 16px;
-  background: rgba(0, 225, 255, 0.08);
-}
-
 .num-green {
   color: #4ade80;
   font-weight: 800;
@@ -783,10 +622,5 @@ const coverageReduction = computed(() => {
 .num-orange {
   color: #fbbf24;
   font-weight: 800;
-}
-
-.empty-hint {
-  font-size: 15px;
-  color: #64748b;
 }
 </style>
