@@ -319,7 +319,7 @@ watch(
     .plan-column {
       display: grid;
       grid-template-rows: subgrid;
-      grid-row: span 6;
+      grid-row: span 8;
       row-gap: var(--plan-compare-row-gap);
       overflow: hidden;
     }
@@ -327,7 +327,7 @@ watch(
     .column-content {
       display: grid;
       grid-template-rows: subgrid;
-      grid-row: span 5;
+      grid-row: span 7;
       row-gap: var(--plan-compare-row-gap);
       min-width: 0;
     }

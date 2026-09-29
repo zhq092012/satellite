@@ -11,6 +11,9 @@
     <!-- 打击前 / 打击后指标对比表 -->
     <ZhchPlanMetricsCompareTable :plan="plan" :vertical="!!alignBlocks" />
 
+    <ZhchPlanCapabilityCompareTable :plan="plan" kind="recon" :vertical="!!alignBlocks" />
+    <ZhchPlanCapabilityCompareTable :plan="plan" kind="comm" :vertical="!!alignBlocks" />
+
     <!-- 卫星指标 TOP5 -->
     <div
       v-if="showRecommendSection"
@@ -74,6 +77,7 @@ import type {
 import SeriesLinkTimeline from './SeriesLinkTimeline.vue'
 import ZhchPlanMetricsCompareTable from './ZhchPlanMetricsCompareTable.vue'
 import ZhchPlanSummaryMetricsTable from './ZhchPlanSummaryMetricsTable.vue'
+import ZhchPlanCapabilityCompareTable from './ZhchPlanCapabilityCompareTable.vue'
 
 const props = defineProps<{
   /** 综合打击方案完整数据 */
@@ -163,7 +167,7 @@ const showRecommendSection = computed(
   &--align {
     display: grid;
     grid-template-rows: subgrid;
-    grid-row: span 5;
+    grid-row: span 7;
     min-height: 0;
     // 与外层 plan-columns--compare 的 --plan-compare-row-gap 保持一致；
     // subgrid 会用自身 gap 覆盖父级 row-gap，写成 0 会导致块与块贴死。

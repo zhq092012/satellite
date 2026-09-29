@@ -265,6 +265,7 @@ const rowVariantClass = (variant?: ZhchPlanMetricsTableRowView['rowVariant']): s
     padding: 10px 14px;
     border-bottom: 1px solid rgba(79, 147, 221, 0.2);
     background: rgba(0, 225, 255, 0.06);
+    text-align: left;
   }
 
   &__scroll {
