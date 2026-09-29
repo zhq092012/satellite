@@ -85,7 +85,91 @@
         </div>
       </section>
 
-      <!-- 3. 卫星指标表格 -->
+      <!-- 3. 卫星打击推荐列表（接口未就绪，当前为假数据） -->
+      <section class="analysis-section analysis-section--table">
+        <div class="section-head">
+          <span class="section-title">卫星打击推荐列表</span>
+          <span class="section-count">共 {{ strikeRecommendDisplayRows.length }} 颗 · 按综合威胁度降序</span>
+        </div>
+
+        <el-table :data="strikeRecommendDisplayRows" size="small" row-key="norad"
+          class="sat-metric-table strike-recommend-table" empty-text="暂无推荐数据">
+          <el-table-column label="序号" width="48" align="center" class-name="strike-recommend-index-col">
+            <template #default="{ $index }">
+              <span class="strike-recommend-index">{{ $index + 1 }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="卫星名称" min-width="100" show-overflow-tooltip class-name="strike-recommend-name-col">
+            <template #default="{ row }">
+              <button type="button" class="sat-name-wrap strike-recommend-name"
+                :class="{ 'sat-name-wrap--selected': selectedNorad === row.norad }"
+                @click="emit('select-satellite', row.norad)">
+                {{ row.name }}
+              </button>
+            </template>
+          </el-table-column>
+          <el-table-column label="综合威胁度" width="88" align="right" class-name="strike-recommend-metric-col">
+            <template #default="{ row }">
+              <span class="strike-recommend-score strike-recommend-score--composite">{{
+                formatStrikeRecommendThreat(row.compositeThreat) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="静态威胁度" width="88" align="right" class-name="strike-recommend-metric-col">
+            <template #default="{ row }">
+              <span class="strike-recommend-score">{{ formatStrikeRecommendThreat(row.staticThreat) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="动态威胁度" width="88" align="right" class-name="strike-recommend-metric-col">
+            <template #default="{ row }">
+              <span class="strike-recommend-score">{{ formatStrikeRecommendThreat(row.dynamicThreat) }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </section>
+
+      <!-- 3b. 接收站打击推荐列表（接口未就绪，当前为假数据） -->
+      <section class="analysis-section analysis-section--table">
+        <div class="section-head">
+          <span class="section-title">接收站打击推荐列表</span>
+          <span class="section-count">共 {{ receiveStrikeRecommendDisplayRows.length }} 个 · 按综合威胁度降序</span>
+        </div>
+
+        <el-table :data="receiveStrikeRecommendDisplayRows" size="small" row-key="targetKey"
+          class="sat-metric-table strike-recommend-table" empty-text="暂无推荐数据">
+          <el-table-column label="序号" width="48" align="center" class-name="strike-recommend-index-col">
+            <template #default="{ $index }">
+              <span class="strike-recommend-index">{{ $index + 1 }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="接收站名称" min-width="100" show-overflow-tooltip class-name="strike-recommend-name-col">
+            <template #default="{ row }">
+              <button type="button" class="sat-name-wrap strike-recommend-name ground-target-name"
+                :class="{ 'ground-target-name--selected': selectedGroundTargetKey === row.targetKey }"
+                @click="emit('select-ground-target', row.targetKey)">
+                {{ row.name }}
+              </button>
+            </template>
+          </el-table-column>
+          <el-table-column label="综合威胁度" width="88" align="right" class-name="strike-recommend-metric-col">
+            <template #default="{ row }">
+              <span class="strike-recommend-score strike-recommend-score--composite">{{
+                formatStrikeRecommendThreat(row.compositeThreat) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="静态威胁度" width="88" align="right" class-name="strike-recommend-metric-col">
+            <template #default="{ row }">
+              <span class="strike-recommend-score">{{ formatStrikeRecommendThreat(row.staticThreat) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="动态威胁度" width="88" align="right" class-name="strike-recommend-metric-col">
+            <template #default="{ row }">
+              <span class="strike-recommend-score">{{ formatStrikeRecommendThreat(row.dynamicThreat) }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </section>
+
+      <!-- 4. 卫星指标表格 -->
       <section class="analysis-section analysis-section--table">
         <div class="section-head">
           <span class="section-title">卫星指标</span>
@@ -437,10 +521,20 @@ import {
   buildSatelliteAnalysisTableRows,
   compareNullableMetric,
   formatSatelliteSeriesTypeMeta,
+  formatSatelliteThreat,
   rankSatellitesByCompositeBeforeMetrics,
   SATELLITE_TABLE_TOP_COUNT,
   type SatelliteMetricTableRow,
 } from '@/utils/buildSatelliteAnalysisTable'
+import {
+  MOCK_SATELLITE_STRIKE_RECOMMENDATIONS,
+  sortStrikeRecommendByCompositeThreat,
+  type SatelliteStrikeRecommendItem,
+} from '@/utils/mockSatelliteStrikeRecommendations'
+import {
+  MOCK_RECEIVE_STATION_STRIKE_RECOMMENDATIONS,
+  type ReceiveStationStrikeRecommendItem,
+} from '@/utils/mockReceiveStationStrikeRecommendations'
 import {
   formatCoveragePercent,
   formatCoverageReduction,
@@ -725,6 +819,24 @@ const coverageReductionText = computed(() =>
   )
 )
 
+/**
+ * 卫星打击推荐列表展示行（当前为假数据；接入后端后改为 API / analysisData 字段）。
+ * 排序规则：综合威胁度降序。
+ */
+const strikeRecommendDisplayRows = computed((): SatelliteStrikeRecommendItem[] =>
+  sortStrikeRecommendByCompositeThreat(MOCK_SATELLITE_STRIKE_RECOMMENDATIONS)
+)
+
+/**
+ * 接收站打击推荐列表展示行（当前为假数据；接入后端后改为 API / analysisData 字段）。
+ */
+const receiveStrikeRecommendDisplayRows = computed((): ReceiveStationStrikeRecommendItem[] =>
+  sortStrikeRecommendByCompositeThreat(MOCK_RECEIVE_STATION_STRIKE_RECOMMENDATIONS)
+)
+
+/** 推荐列表威胁度数值格式化（与卫星指标表一致） */
+const formatStrikeRecommendThreat = formatSatelliteThreat
+
 /** 是否展示全部卫星（默认仅展示综合排序前 10 条） */
 const showAllSatellites = ref(false)
 
@@ -982,6 +1094,39 @@ const displayedLinkChainTableRows = computed(() => {
     padding-right: 4px;
     vertical-align: middle;
   }
+}
+
+.strike-recommend-table {
+  :deep(td.strike-recommend-index-col) {
+    vertical-align: middle;
+  }
+
+  :deep(td.strike-recommend-name-col),
+  :deep(td.strike-recommend-metric-col) {
+    vertical-align: middle;
+  }
+}
+
+.strike-recommend-index {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.strike-recommend-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.strike-recommend-score {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+.strike-recommend-score--composite {
+  font-weight: 700;
+  color: #fbbf24;
 }
 
 .sat-name-wrap {
