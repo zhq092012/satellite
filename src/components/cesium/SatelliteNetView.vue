@@ -1168,8 +1168,8 @@ onBeforeUnmount(() => {
   min-height: 0;
 
   &--standalone {
-    height: calc(100vh - 88px);
-    min-height: 480px;
+    height: 100%;
+    min-height: 0;
     border-radius: 12px;
     border: 1px solid var(--surface-border-color, rgba(79, 147, 221, 0.25));
     background: var(--net-chrome-bg);
@@ -1598,7 +1598,8 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1280px) {
   .graph-container--standalone {
-    height: calc(100vh - 88px);
+    height: 100%;
+    min-height: 0;
   }
 
   .graph-container .scroll-bar-left {

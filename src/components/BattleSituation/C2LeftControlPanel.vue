@@ -19,7 +19,10 @@
             disabled: taskSwitching,
             'task-progress-item--done': isTaskCalculationComplete(task),
           }" @click="selectTask(task)">
-            <span class="task-progress-name" :title="task.name">{{ task.name }}</span>
+            <span class="task-progress-name" :title="task.name">
+              <span class="task-progress-name-tag">任务名称</span>
+              <span class="task-progress-name-text">：{{ task.name }}</span>
+            </span>
             <div class="task-progress-bar-wrap">
               <div v-if="isTaskCalculationComplete(task)" class="task-progress-done">
                 <span class="task-progress-done-dot" aria-hidden="true" />
@@ -58,6 +61,10 @@
               </label>
             </div>
             <div class="task-metric-rows">
+              <div class="metric-row metric-row--readonly">
+                <span class="metric-label">国家/组织</span>
+                <span class="metric-value" :title="enemyCountryDisplayText">{{ enemyCountryDisplayText }}</span>
+              </div>
               <div class="metric-row">
                 <span class="metric-label">任务时长</span>
                 <el-input-number v-model="durationHours" class="metric-input-number" size="small" :min="1" :max="8760"
@@ -103,15 +110,22 @@
           </div>
           <div class="tag-section">
             <div class="tag-section-head">任务武器</div>
-            <div v-if="weaponOptionsLoading" class="tag-hint">正在加载武器...</div>
-            <div v-else-if="!weaponTagOptions.length" class="tag-hint">暂无武器候选项</div>
-            <div v-else class="tag-cloud">
-              <el-tag v-for="item in weaponTagOptions" :key="item.id" class="task-config-tag"
-                :class="{ 'is-selected': isWeaponSelected(item.id) }" :closable="isWeaponSelected(item.id)"
-                disable-transitions @close="removeWeapon(item.id)" @click="toggleWeapon(item.id)">
-                {{ item.label }}
-              </el-tag>
+            <div class="weapon-use-item">
+              <span class="weapon-use-item-label">使用武器</span>
+              <el-switch v-model="useWeaponsEnabled" size="small" @change="handleUseWeaponsChange" />
             </div>
+            <template v-if="useWeaponsEnabled">
+              <div v-if="weaponOptionsLoading" class="tag-hint">正在加载武器...</div>
+              <div v-else-if="!weaponTagOptions.length" class="tag-hint">暂无武器候选项</div>
+              <div v-else class="tag-cloud">
+                <el-tag v-for="item in weaponTagOptions" :key="item.id" class="task-config-tag"
+                  :class="{ 'is-selected': isWeaponSelected(item.id) }" :closable="isWeaponSelected(item.id)"
+                  disable-transitions @close="removeWeapon(item.id)" @click="toggleWeapon(item.id)">
+                  {{ item.label }}
+                </el-tag>
+              </div>
+            </template>
+            <div v-else class="tag-hint">已关闭「使用武器」，武器选择已暂存；重新打开可恢复</div>
           </div>
           <div class="tag-section">
             <div class="tag-section-head">任务地面站</div>
@@ -221,6 +235,10 @@ const sceneEditIsEdit = ref(false)
 const editingScene = ref<BattleForm | null>(null)
 /** 当前选中任务的内联编辑草稿 */
 const editorDraft = ref<C2TaskEditorDraft | null>(null)
+/** 是否启用任务武器配置；关闭时草稿中不携带武器，选择暂存于此 */
+const useWeaponsEnabled = ref(false)
+/** 关闭「使用武器」时暂存的武器 ID，重新打开开关时恢复 */
+const stashedWeaponIds = ref<string[]>([])
 /** 任务时长（小时），与起止时间联动 */
 const durationHours = ref(8)
 const seriesTagOptions = ref<TaskPanelTagOption[]>([])
@@ -298,6 +316,14 @@ const resolveEnemyCountries = (task: TaskForm | null | undefined): string[] => {
     .map((item) => item.trim())
     .filter(Boolean)
 }
+
+/**
+ * 当前编辑任务蓝方（敌方）国家/组织展示文案。
+ */
+const enemyCountryDisplayText = computed(() => {
+  const countries = resolveEnemyCountries(store.activedTask)
+  return countries.length ? countries.join('、') : '--'
+})
 /**
  * 加载卫星系列候选项。
  *
@@ -431,6 +457,11 @@ const syncEditorForTask = async (task: TaskForm | null | undefined) => {
   editorDraft.value = createDraftFromTask(task)
   if (task && editorDraft.value) {
     durationHours.value = calcTaskDurationHours(editorDraft.value.beginDate, editorDraft.value.endDate)
+    stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
+    useWeaponsEnabled.value = editorDraft.value.selectedWeaponIds.length > 0
+  } else {
+    stashedWeaponIds.value = []
+    useWeaponsEnabled.value = false
   }
   if (!task) return
   await Promise.all([
@@ -517,13 +548,30 @@ const removeSeries = (series: string) => {
   if (!editorDraft.value) return
   editorDraft.value.selectedSeries = editorDraft.value.selectedSeries.filter((item) => item !== series)
 }
+
+/**
+ * 「使用武器」开关切换：关闭时暂存当前选择并清空草稿；打开时从暂存恢复。
+ * @param enabled 是否使用武器
+ */
+const handleUseWeaponsChange = (enabled: boolean) => {
+  if (!editorDraft.value) return
+  if (!enabled) {
+    stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
+    editorDraft.value.selectedWeaponIds = []
+    return
+  }
+  editorDraft.value.selectedWeaponIds = [...stashedWeaponIds.value]
+}
+
 const toggleWeapon = (id: string) => {
-  if (!editorDraft.value || editorDraft.value.selectedWeaponIds.includes(id)) return
+  if (!useWeaponsEnabled.value || !editorDraft.value || editorDraft.value.selectedWeaponIds.includes(id)) return
   editorDraft.value.selectedWeaponIds = [...editorDraft.value.selectedWeaponIds, id]
+  stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
 }
 const removeWeapon = (id: string) => {
-  if (!editorDraft.value) return
+  if (!useWeaponsEnabled.value || !editorDraft.value) return
   editorDraft.value.selectedWeaponIds = editorDraft.value.selectedWeaponIds.filter((item) => item !== id)
+  stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
 }
 const toggleReceive = (id: string) => {
   if (!editorDraft.value || editorDraft.value.selectedReceiveIds.includes(id)) return
@@ -821,12 +869,33 @@ onUnmounted(() => {
 .task-progress-name {
   flex: 1;
   min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 14px;
   font-weight: 700;
   color: #e2efff;
   overflow: hidden;
+}
+
+.task-progress-name-tag {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 225, 255, 0.35);
+  background: rgba(0, 225, 255, 0.12);
+  color: #7dd3fc;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.task-progress-name-text {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: #e2efff;
 }
 
 .task-progress-bar-wrap {
@@ -919,6 +988,19 @@ onUnmounted(() => {
   align-items: start;
 }
 
+.metric-row--readonly {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.metric-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2efff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .metric-label {
   font-size: 12px;
   color: #94a3b8;
@@ -963,6 +1045,23 @@ onUnmounted(() => {
   font-weight: 700;
   color: #7dd3fc;
   text-align: left;
+}
+
+.weapon-use-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.weapon-use-item-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  flex-shrink: 0;
 }
 
 .task-editor-times {

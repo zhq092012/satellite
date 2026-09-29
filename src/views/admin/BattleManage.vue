@@ -482,9 +482,16 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 .battle-manage-container {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
   padding: 8px 0;
 
   .toolbar-card {
+    flex-shrink: 0;
     margin-bottom: 16px;
     background: var(--surface-bg-color);
     border: 1px solid var(--surface-border-color);
@@ -511,6 +518,9 @@ onMounted(async () => {
   }
 
   .battle-list-box {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
     display: flex;
     flex-direction: column;
     gap: 16px;

@@ -44,7 +44,8 @@
     </section>
 
     <section class="panel-card table-card">
-      <el-table :data="satellites" v-loading="loading" stripe border height="calc(100vh - 430px)">
+      <div class="table-fill">
+      <el-table :data="satellites" v-loading="loading" stripe border height="100%">
         <el-table-column prop="norad" label="NORAD" width="110" />
         <el-table-column prop="name_en" label="英文名称" min-width="160" show-overflow-tooltip />
         <el-table-column prop="name_cn" label="中文名称" min-width="140" show-overflow-tooltip />
@@ -73,6 +74,7 @@
           </template>
         </el-table-column>
       </el-table>
+      </div>
 
       <div class="pager">
         <el-pagination
@@ -278,8 +280,14 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 .container {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 16px;
   border-radius: 8px;
+  box-sizing: border-box;
 }
 
 .panel-card {
@@ -295,6 +303,7 @@ onMounted(async () => {
 }
 
 .toolbar-card {
+  flex-shrink: 0;
   margin-bottom: 16px;
 }
 
@@ -312,9 +321,19 @@ onMounted(async () => {
 }
 
 .table-card {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow: hidden;
+}
+
+.table-fill {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .table-card :deep(.atlas-app-table) {
@@ -346,6 +365,7 @@ onMounted(async () => {
 }
 
 .pager {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
 }

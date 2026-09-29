@@ -28,7 +28,8 @@
     </section>
 
     <section class="panel-card table-card">
-      <el-table :data="displayWeapons" v-loading="loading" stripe border height="calc(100vh - 362px)">
+      <div class="table-fill">
+      <el-table :data="displayWeapons" v-loading="loading" stripe border height="100%">
         <el-table-column prop="name" label="武器名称" min-width="180" show-overflow-tooltip />
         <el-table-column prop="country" label="所属国家/地区" min-width="160" />
         <el-table-column prop="type" label="武器类型" min-width="150" show-overflow-tooltip />
@@ -44,6 +45,7 @@
           </template>
         </el-table-column>
       </el-table>
+      </div>
 
       <div class="pager">
         <el-pagination v-model:current-page="page.current" v-model:page-size="page.size" :total="filteredCount"
@@ -329,8 +331,11 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
   padding: 18px;
-  min-height: 100%;
   background:
     radial-gradient(circle at top left, rgba(79, 147, 221, 0.2), transparent 24%),
     radial-gradient(circle at right center, rgba(30, 79, 132, 0.18), transparent 26%), var(--app-bg-gradient);
@@ -412,6 +417,10 @@ onMounted(async () => {
   padding: 18px 20px;
 }
 
+.toolbar-card {
+  flex-shrink: 0;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -426,9 +435,19 @@ onMounted(async () => {
 }
 
 .table-card {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow: hidden;
+}
+
+.table-fill {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .table-card :deep(.atlas-app-table) {
@@ -460,6 +479,7 @@ onMounted(async () => {
 }
 
 .pager {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
 }

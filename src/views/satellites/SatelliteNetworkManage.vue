@@ -14,8 +14,9 @@ import SatelliteNetView from '@/components/cesium/SatelliteNetView.vue'
 <style lang="scss" scoped>
 .satellite-network-manage {
   width: 100%;
-  padding: 8px 12px 12px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   box-sizing: border-box;
-  min-height: calc(100vh - 76px);
 }
 </style>

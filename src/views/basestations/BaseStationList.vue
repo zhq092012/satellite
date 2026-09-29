@@ -21,7 +21,8 @@
     </section>
 
     <section class="panel-card table-card">
-      <el-table :data="stations" v-loading="loading" stripe border height="calc(100vh - 362px)">
+      <div class="table-fill">
+      <el-table :data="stations" v-loading="loading" stripe border height="100%">
         <el-table-column prop="name" label="基站名称" />
         <el-table-column prop="country" label="所属国家/地区" />
         <el-table-column prop="location" label="地理位置" />
@@ -36,6 +37,7 @@
           </template>
         </el-table-column>
       </el-table>
+      </div>
 
       <div class="pager">
         <el-pagination v-model:current-page="page.pageNum" v-model:page-size="page.pageSize" :total="totalElements"
@@ -304,8 +306,14 @@ watch(
 
 <style scoped lang="scss">
 .container {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 16px;
   border-radius: 8px;
+  box-sizing: border-box;
 }
 
 .hero-card {
@@ -380,6 +388,11 @@ watch(
   padding: 18px 20px;
 }
 
+.toolbar-card {
+  flex-shrink: 0;
+  margin-bottom: 16px;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -394,9 +407,19 @@ watch(
 }
 
 .table-card {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow: hidden;
+}
+
+.table-fill {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .table-card :deep(.atlas-app-table) {
@@ -428,6 +451,7 @@ watch(
 }
 
 .pager {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
 }

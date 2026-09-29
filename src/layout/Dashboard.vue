@@ -5,7 +5,7 @@
       <el-header class="header-wrapper">
         <div class="header-left">
           <div class="logo">
-            <span class="logo-title">卫星态势分析系统</span>
+            <span class="logo-title">作战目标选择系统</span>
           </div>
         </div>
 
@@ -56,11 +56,17 @@
                   </el-icon>
                   <span>系统管理</span>
                 </el-dropdown-item>
+                <el-dropdown-item v-if="isAdmin" command="data-manage" class="user-menu-item">
+                  <el-icon>
+                    <Folder />
+                  </el-icon>
+                  <span>数据管理</span>
+                </el-dropdown-item>
                 <el-dropdown-item command="algorithm" class="user-menu-item">
                   <el-icon>
                     <DataAnalysis />
                   </el-icon>
-                  <span>算法分析管理</span>
+                  <span>算法管理</span>
                 </el-dropdown-item>
                 <el-dropdown-item divided command="logout" class="user-menu-item user-logout-item">
                   <el-icon>
@@ -97,7 +103,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { type RouteRecordRaw, useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowDown, DataAnalysis, Setting, SwitchButton } from '@element-plus/icons-vue'
+import { ArrowDown, DataAnalysis, Folder, Setting, SwitchButton } from '@element-plus/icons-vue'
 import MenuTree from './MenuTree.vue'
 import { logout as logoutApi, type MenuItem } from '@/api/auth'
 import { useAuthStore } from '@/store/modules/auth'
@@ -204,19 +210,9 @@ const filterMenusByPermission = (menus: DashboardMenuNode[]): DashboardMenuNode[
     .filter((menu): menu is DashboardMenuNode => menu !== null)
 }
 
-/** 顶栏资源管理菜单路径（需保留在顶栏展示，不走系统管理下拉）。 */
-const TOP_RESOURCE_MENU_PATHS = new Set([
-  '/system/battles',
-  '/system/satellites',
-  '/system/ground-stations',
-  '/system/data-centers',
-  '/system/weapons',
-  '/system/satellite-network',
-])
-
 /**
- * 顶栏菜单：整体态势分析 + 场景/资源管理 + 方案管理。
- * 原态势拓扑/甘特图/打击窗口路由与组件保留，仅从顶栏移除。
+ * 顶栏只保留整体态势分析和方案管理。
+ * 场景、卫星、地面站、数据中心、武器、卫星网络已收进右侧「数据管理」页签。
  */
 const homeMenu = computed<DashboardMenuNode[]>(() => [
   {
@@ -225,69 +221,6 @@ const homeMenu = computed<DashboardMenuNode[]>(() => [
       title: '整体态势分析',
       icon: 'icon-situation',
       showInMenu: true,
-    },
-    children: [],
-  },
-  {
-    path: '/system/battles',
-    meta: {
-      title: '场景管理',
-      icon: 'icon-situation',
-      showInMenu: true,
-      roles: ['admin'],
-    },
-    children: [],
-  },
-  {
-    path: '/system/satellites',
-    meta: {
-      title: '卫星管理',
-      icon: 'icon-situation',
-      showInMenu: true,
-      roles: ['admin'],
-    },
-    children: [],
-  },
-  {
-    path: '/system/ground-stations',
-    meta: {
-      title: '地面站管理',
-      icon: 'icon-basestation',
-      showInMenu: true,
-      roles: ['admin'],
-      permission: 'system:basestations:list',
-    },
-    children: [],
-  },
-  {
-    path: '/system/data-centers',
-    meta: {
-      title: '数据中心管理',
-      icon: 'icon-basestation',
-      showInMenu: true,
-      roles: ['admin'],
-      permission: 'system:basestations:list',
-    },
-    children: [],
-  },
-  {
-    path: '/system/weapons',
-    meta: {
-      title: '武器管理',
-      icon: 'icon-sword',
-      showInMenu: true,
-      roles: ['admin'],
-      permission: 'system:weapon:list',
-    },
-    children: [],
-  },
-  {
-    path: '/system/satellite-network',
-    meta: {
-      title: '卫星网络管理',
-      icon: 'icon-situation',
-      showInMenu: true,
-      roles: ['admin'],
     },
     children: [],
   },
@@ -334,13 +267,12 @@ const visibleMenus = computed<RouteRecordRaw[]>(() => {
     .filter((menu) => {
       const path = menu.path || ''
       const title = (menu.meta as { title?: string } | undefined)?.title || ''
-      if (TOP_RESOURCE_MENU_PATHS.has(path)) {
-        return filterMenusByPermission([menu as DashboardMenuNode]).length > 0
-      }
       return (
         !path.startsWith('/system') &&
+        !path.startsWith('/data-manage') &&
         !path.startsWith('/algorithm') &&
         !title.includes('系统管理') &&
+        !title.includes('数据管理') &&
         !title.includes('算法分析管理')
       )
     }) as RouteRecordRaw[]
@@ -356,6 +288,8 @@ const displayUserName = computed(() => {
 const handleCommand = (command: string) => {
   if (command === 'system') {
     router.push('/system')
+  } else if (command === 'data-manage') {
+    router.push('/data-manage')
   } else if (command === 'algorithm') {
     if (!layoutStore.activedTask) {
       ElMessage.warning('尚未选择战场任务，请先在首页选择战场及任务！')
