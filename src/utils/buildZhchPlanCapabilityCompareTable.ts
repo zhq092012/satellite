@@ -6,7 +6,7 @@ import type {
   ZhchPlanMetricsCompareTableModel,
   ZhchPlanMetricColumnDef,
 } from '@/utils/buildZhchPlanMetricsCompareTable'
-import { formatCoveragePercent } from '@/utils/zhchPlanDisplay'
+import { formatCoveragePercent, parseFeedbackTimestamp } from '@/utils/zhchPlanDisplay'
 import {
   buildMockZhchPlanCapabilityMetrics,
   type CommCapabilityMetricValues,
@@ -17,7 +17,121 @@ import {
 type CapabilityNumericDeltaPolicy = 'neutral' | 'lower-favorable' | 'higher-favorable'
 
 /**
- * 格式化带单位的整数差值。
+ * 从带百分号的展示串解析数值。
+ *
+ * @param text 如 78.4%
+ * @returns 数值或 null
+ */
+const parsePercentDisplay = (text: string): number | null => {
+  const match = text.trim().match(/^([+-]?\d+(?:\.\d+)?)\s*%?$/)
+  if (!match) return null
+  const n = Number(match[1])
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * 从「x.x小时」解析小时数。
+ *
+ * @param text 展示串
+ * @returns 小时或 null
+ */
+const parseHoursDisplay = (text: string): number | null => {
+  const match = text.trim().match(/^([+-]?\d+(?:\.\d+)?)\s*小时$/)
+  if (!match) return null
+  const n = Number(match[1])
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * 从 Gbps 展示串解析数值。
+ *
+ * @param text 如 2.6Gbps
+ * @returns Gbps 或 null
+ */
+const parseGbpsDisplay = (text: string): number | null => {
+  const match = text.trim().match(/^([+-]?\d+(?:\.\d+)?)\s*Gbps$/i)
+  if (!match) return null
+  const n = Number(match[1])
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * 解析 0–1 小数展示。
+ *
+ * @param text 如 0.91
+ * @returns 数值或 null
+ */
+const parseUnitlessDecimalDisplay = (text: string): number | null => {
+  const trimmed = text.trim()
+  if (!/^-?\d+(?:\.\d+)?$/.test(trimmed)) return null
+  const n = Number(trimmed)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * 将毫秒差格式化为带正负号的时长文案（用于括号内差值）。
+ *
+ * @param diffMs after - before（毫秒）
+ * @returns 如 (+20分15秒) 或 (-5分0秒)
+ */
+const formatSignedDurationDelta = (diffMs: number): string => {
+  if (diffMs === 0) return '(+0秒)'
+  const sign = diffMs > 0 ? '+' : '-'
+  const absSec = Math.abs(Math.round(diffMs / 1000))
+  const h = Math.floor(absSec / 3600)
+  const m = Math.floor((absSec % 3600) / 60)
+  const s = absSec % 60
+  let body: string
+  if (h > 0) {
+    body = `${h}时${m}分${s}秒`
+  } else if (m > 0) {
+    body = `${m}分${s}秒`
+  } else {
+    body = `${s}秒`
+  }
+  return `(${sign}${body})`
+}
+
+/**
+ * 时刻推后/提前的差值 tone。
+ *
+ * @param beforeMs 打击前时刻
+ * @param afterMs 打击后时刻
+ * @returns tone
+ */
+const timeDeltaTone = (beforeMs: number, afterMs: number): ZhchPlanMetricDeltaTone => {
+  if (beforeMs === afterMs) return 'neutral'
+  return afterMs > beforeMs ? 'adverse' : 'favorable'
+}
+
+/**
+ * 构建打击后时刻单元格（括号内为时间差）。
+ *
+ * @param afterDisplay 打击后展示
+ * @param beforeTime 打击前时刻
+ * @param afterTime 打击后时刻
+ * @returns 单元格
+ */
+const buildAfterTimeCell = (
+  afterDisplay: string,
+  beforeTime: string,
+  afterTime: string
+): ZhchPlanMetricCell => {
+  const beforeMs = parseFeedbackTimestamp(beforeTime)
+  const afterMs = parseFeedbackTimestamp(afterTime)
+  if (beforeMs == null || afterMs == null) {
+    return { value: afterDisplay }
+  }
+  const diffMs = afterMs - beforeMs
+  return {
+    value: afterDisplay,
+    delta: formatSignedDurationDelta(diffMs),
+    deltaTone: timeDeltaTone(beforeMs, afterMs),
+  }
+}
+
+/**
+ * 格式化带单位的数值差值。
  *
  * @param before 打击前
  * @param after 打击后
@@ -30,9 +144,10 @@ const formatSignedUnitDelta = (
   unit: string
 ): string | null => {
   const diff = after - before
-  if (diff === 0) return `(+0${unit})`
+  if (diff === 0) return unit ? `(+0${unit})` : '(+0)'
   const sign = diff > 0 ? '+' : ''
-  return `(${sign}${Number.isInteger(diff) ? diff : diff.toFixed(1)}${unit})`
+  const magnitude = Number.isInteger(diff) ? String(diff) : diff.toFixed(2)
+  return `(${sign}${magnitude}${unit})`
 }
 
 /**
@@ -99,6 +214,28 @@ const buildAfterCell = (
 }
 
 /**
+ * 从展示串解析数值并构建打击后单元格（百分比/Gbps/小时/小数等）。
+ *
+ * @param afterDisplay 打击后展示
+ * @param beforeDisplay 打击前展示
+ * @param parse 解析函数
+ * @param unit 差值单位后缀（'' 表示无单位小数）
+ * @param policy 差值策略
+ * @returns 单元格
+ */
+const buildAfterCellFromDisplay = (
+  afterDisplay: string,
+  beforeDisplay: string,
+  parse: (text: string) => number | null,
+  unit: string,
+  policy: CapabilityNumericDeltaPolicy
+): ZhchPlanMetricCell => {
+  const beforeNum = parse(beforeDisplay)
+  const afterNum = parse(afterDisplay)
+  return buildAfterCell(afterDisplay, beforeNum ?? undefined, afterNum ?? undefined, unit, policy)
+}
+
+/**
  * 由侦察能力 mock 构建打击前/后对比表。
  *
  * @param before 打击前
@@ -131,8 +268,16 @@ const buildReconCapabilityTable = (
       '个',
       'lower-favorable'
     ),
-    earliestTransit: { value: after.earliestTransitTime },
-    earliestReturn: { value: after.earliestDataReturnTime },
+    earliestTransit: buildAfterTimeCell(
+      after.earliestTransitTime,
+      before.earliestTransitTime,
+      after.earliestTransitTime
+    ),
+    earliestReturn: buildAfterTimeCell(
+      after.earliestDataReturnTime,
+      before.earliestDataReturnTime,
+      after.earliestDataReturnTime
+    ),
     coverageTimePercent: buildAfterCell(
       formatCoveragePercent(after.coverageTimePercent),
       before.coverageTimePercent,
@@ -178,8 +323,20 @@ const buildCommCapabilityTable = (
   }
 
   const afterCells: Record<string, ZhchPlanMetricCell> = {
-    coverageRange: { value: after.coverageRange },
-    revisitTime: { value: after.revisitTime },
+    coverageRange: buildAfterCellFromDisplay(
+      after.coverageRange,
+      before.coverageRange,
+      parsePercentDisplay,
+      '%',
+      'lower-favorable'
+    ),
+    revisitTime: buildAfterCellFromDisplay(
+      after.revisitTime,
+      before.revisitTime,
+      parseHoursDisplay,
+      '小时',
+      'higher-favorable'
+    ),
     processingDelay: buildAfterCell(
       `${after.processingDelayMin}分钟`,
       before.processingDelayMin,
@@ -187,8 +344,20 @@ const buildCommCapabilityTable = (
       '分钟',
       'higher-favorable'
     ),
-    linkQuality: { value: after.linkQuality },
-    commCapacity: { value: after.commCapacity },
+    linkQuality: buildAfterCellFromDisplay(
+      after.linkQuality,
+      before.linkQuality,
+      parseUnitlessDecimalDisplay,
+      '',
+      'lower-favorable'
+    ),
+    commCapacity: buildAfterCellFromDisplay(
+      after.commCapacity,
+      before.commCapacity,
+      parseGbpsDisplay,
+      'Gbps',
+      'lower-favorable'
+    ),
   }
 
   const rows: ZhchPlanMetricCompareRow[] = [
