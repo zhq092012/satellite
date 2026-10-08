@@ -92,6 +92,36 @@ export const buildSatelliteMetricRowKey = (
  * @param usage 用途（可选）
  * @returns 如 `系列：starshield\n类型：侦察\n用途：军用`
  */
+/** 卫星展示用元数据（系列 / 系统类型 / 用途） */
+export interface SatelliteDisplayMeta {
+  /** 卫星名称 */
+  name: string
+  /** 所属系列 */
+  series: string
+  /** 系统类型（侦察 / 通信） */
+  sysType: string
+  /** 用途（军用 / 商用等） */
+  usage: string
+}
+
+/**
+ * 将系列、类型、用途格式化为单行文案（地球标签、顶部选中标等）。
+ *
+ * @param series 系列名称
+ * @param sysType 系统类型
+ * @param usage 用途
+ * @returns 如 `系列：STARLINK 类型：通信 用途：商用`
+ */
+export const formatSatelliteMetaInline = (
+  series: string,
+  sysType: string,
+  usage?: string
+): string => {
+  const lines = formatSatelliteSeriesTypeMeta(series, sysType, usage)
+  if (lines === EMPTY_TEXT) return ''
+  return lines.replace(/\n/g, '  ')
+}
+
 export const formatSatelliteSeriesTypeMeta = (
   series: string,
   sysType: string,
@@ -468,6 +498,7 @@ export const buildSatelliteAnalysisTableRows = (
       if (norad == null) return
       upsert(series, sysType, norad, {
         name: sat?.name,
+        usage: sat?.usage?.trim() || undefined,
         coverageAfter: isValidNumber(sat?.coverage) ? sat.coverage : null,
       })
     })
@@ -502,4 +533,49 @@ export const buildSatelliteAnalysisTableRows = (
       if (typeCompare !== 0) return typeCompare
       return a.name.localeCompare(b.name, 'zh-CN')
     })
+}
+
+/**
+ * 按 NORAD 从任务分析结果解析卫星系列、类型、用途（表格行优先，否则扫描 initMatrixList）。
+ *
+ * @param data 任务算法分析结果
+ * @param norad 卫星 NORAD
+ * @returns 展示元数据；未找到时返回 null
+ */
+export const resolveSatelliteDisplayMetaFromAnalysis = (
+  data: SatelliteAnalysisData | null | undefined,
+  norad: number
+): SatelliteDisplayMeta | null => {
+  if (!norad) return null
+
+  const rows = buildSatelliteAnalysisTableRows(data)
+  const matchedRow = rows.find((row) => row.norad === norad)
+  if (matchedRow) {
+    return {
+      name: matchedRow.name,
+      series: matchedRow.series,
+      sysType: matchedRow.sysType,
+      usage: matchedRow.usage,
+    }
+  }
+
+  if (!data) return null
+
+  const entities = Array.isArray(data.levelSeriesEntities) ? data.levelSeriesEntities : []
+  for (const entity of entities) {
+    const series = entity?.series?.trim() || EMPTY_TEXT
+    const sysType = entity?.sysType?.trim() || EMPTY_TEXT
+    for (const sat of entity?.initMatrixList || []) {
+      const satNorad = normalizeNorad(sat?.norad)
+      if (satNorad !== norad) continue
+      return {
+        name: sat?.name?.trim() || `Sat-${norad}`,
+        series,
+        sysType,
+        usage: sat?.usage?.trim() || EMPTY_TEXT,
+      }
+    }
+  }
+
+  return null
 }

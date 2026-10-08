@@ -172,7 +172,12 @@
       <!-- 4. 卫星指标表格 -->
       <section class="analysis-section analysis-section--table">
         <div class="section-head">
-          <span class="section-title">卫星指标</span>
+          <div class="section-head-main">
+            <span class="section-title">卫星指标</span>
+            <span v-if="selectedSatelliteMetaInline" class="selected-sat-inline-meta">
+              {{ selectedSatelliteMetaInline }}
+            </span>
+          </div>
           <span class="section-count">
             展示 {{ displayedSatelliteTableRows.length }} / 共 {{ rankedSatelliteTableRows.length }} 颗
           </span>
@@ -186,24 +191,27 @@
                 :content="`${row.name}\n${formatSatelliteSeriesTypeMeta(row.series, row.sysType, row.usage)}`"
                 placement="left"
                 :show-after="200">
-                <div class="sat-name-cell">
+                <div class="sat-name-cell" :class="{ 'sat-name-cell--selected': selectedNorad === row.norad }">
                   <button type="button" class="sat-name-wrap"
                     :class="{ 'sat-name-wrap--selected': selectedNorad === row.norad }"
                     @click="emit('select-satellite', row.norad)">
                     {{ row.name }}
                   </button>
-                  <div class="sat-name-meta">
-                    <div v-if="row.series && row.series !== '--'" class="sat-name-meta__line">
+                  <div
+                    v-if="selectedNorad === row.norad || hasSatelliteMeta(row)"
+                    class="sat-name-meta"
+                    :class="{ 'sat-name-meta--selected': selectedNorad === row.norad }">
+                    <div v-if="displaySatelliteSeries(row) !== '--'" class="sat-name-meta__line">
                       <span class="sat-name-meta__label">系列：</span>
-                      <span class="sat-name-meta__series">{{ row.series }}</span>
+                      <span class="sat-name-meta__series">{{ displaySatelliteSeries(row) }}</span>
                     </div>
-                    <div v-if="row.sysType && row.sysType !== '--'" class="sat-name-meta__line">
+                    <div v-if="displaySatelliteSysType(row) !== '--'" class="sat-name-meta__line">
                       <span class="sat-name-meta__label">类型：</span>
-                      <span class="sat-name-meta__type">{{ row.sysType }}</span>
+                      <span class="sat-name-meta__type">{{ displaySatelliteSysType(row) }}</span>
                     </div>
-                    <div v-if="row.usage && row.usage !== '--'" class="sat-name-meta__line">
+                    <div v-if="displaySatelliteUsage(row) !== '--'" class="sat-name-meta__line">
                       <span class="sat-name-meta__label">用途：</span>
-                      <span class="sat-name-meta__usage">{{ row.usage }}</span>
+                      <span class="sat-name-meta__usage">{{ displaySatelliteUsage(row) }}</span>
                     </div>
                   </div>
                 </div>
@@ -520,9 +528,11 @@ import {
 import {
   buildSatelliteAnalysisTableRows,
   compareNullableMetric,
+  formatSatelliteMetaInline,
   formatSatelliteSeriesTypeMeta,
   formatSatelliteThreat,
   rankSatellitesByCompositeBeforeMetrics,
+  resolveSatelliteDisplayMetaFromAnalysis,
   SATELLITE_TABLE_TOP_COUNT,
   type SatelliteMetricTableRow,
 } from '@/utils/buildSatelliteAnalysisTable'
@@ -854,6 +864,70 @@ const displayedSatelliteTableRows = computed(() => {
   return rankedSatelliteTableRows.value.slice(0, SATELLITE_TABLE_TOP_COUNT)
 })
 
+/** 当前选中卫星在列表中的元数据（类型 / 用途） */
+const selectedSatelliteMetaInline = computed(() => {
+  const norad = props.selectedNorad
+  if (!norad) return ''
+  const row = rankedSatelliteTableRows.value.find((item) => item.norad === norad)
+  if (row) {
+    return formatSatelliteMetaInline(row.series, row.sysType, row.usage)
+  }
+  const resolved = resolveSatelliteDisplayMetaFromAnalysis(props.analysisData, norad)
+  if (!resolved) return ''
+  return formatSatelliteMetaInline(resolved.series, resolved.sysType, resolved.usage)
+})
+
+/**
+ * 解析表格行对应 NORAD 的展示元数据（行内字段优先，选中行可回退到分析数据扫描）。
+ *
+ * @param row 卫星指标行
+ * @returns 元数据或 null
+ */
+const resolveRowSatelliteMeta = (row: SatelliteMetricTableRow) => {
+  let series = row.series
+  let sysType = row.sysType
+  let usage = row.usage
+  if (props.selectedNorad === row.norad) {
+    const resolved = resolveSatelliteDisplayMetaFromAnalysis(props.analysisData, row.norad)
+    if (resolved) {
+      if (series === '--') series = resolved.series
+      if (sysType === '--') sysType = resolved.sysType
+      if (usage === '--') usage = resolved.usage
+    }
+  }
+  return { series, sysType, usage }
+}
+
+/**
+ * @param row 卫星指标行
+ * @returns 系列展示文案
+ */
+const displaySatelliteSeries = (row: SatelliteMetricTableRow): string =>
+  resolveRowSatelliteMeta(row)?.series || row.series || '--'
+
+/**
+ * @param row 卫星指标行
+ * @returns 系统类型展示文案
+ */
+const displaySatelliteSysType = (row: SatelliteMetricTableRow): string =>
+  resolveRowSatelliteMeta(row)?.sysType || row.sysType || '--'
+
+/**
+ * @param row 卫星指标行
+ * @returns 用途展示文案
+ */
+const displaySatelliteUsage = (row: SatelliteMetricTableRow): string =>
+  resolveRowSatelliteMeta(row)?.usage || row.usage || '--'
+
+/**
+ * @param row 卫星指标行
+ * @returns 是否存在可展示的系列/类型/用途
+ */
+const hasSatelliteMeta = (row: SatelliteMetricTableRow): boolean =>
+  displaySatelliteSeries(row) !== '--' ||
+  displaySatelliteSysType(row) !== '--' ||
+  displaySatelliteUsage(row) !== '--'
+
 /** 任务分析数据变化时重置「查看更多」状态 */
 watch(
   () => props.analysisData,
@@ -1154,6 +1228,22 @@ const displayedLinkChainTableRows = computed(() => {
   }
 }
 
+.section-head-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.selected-sat-inline-meta {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #7dd3fc;
+  word-break: break-word;
+}
+
 .sat-name-cell {
   display: flex;
   flex-direction: column;
@@ -1161,6 +1251,18 @@ const displayedLinkChainTableRows = computed(() => {
   gap: 6px;
   width: 100%;
   min-width: 0;
+
+  &--selected {
+    padding: 4px 6px;
+    margin: -4px -6px;
+    border-radius: 6px;
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.28);
+  }
+}
+
+.sat-name-meta--selected {
+  padding-top: 2px;
 }
 
 .sat-name-meta {

@@ -96,7 +96,7 @@ const deductionGlobeVisualState = computed(() => {
       activePassReceiveKeys: new Set<string>(),
       passHighlightReceiveKeys: new Set<string>(),
       passHighlightPasses: [] as import('@/utils/buildSatelliteDeductionTimeline').DeductionStationPassWindow[],
-      explosionNorad: null as number | null,
+      struckSatelliteNorad: null as number | null,
     }
   }
   const state = resolveDeductionVisualState(
@@ -109,7 +109,7 @@ const deductionGlobeVisualState = computed(() => {
     activePassReceiveKeys: state.activePassReceiveKeys,
     passHighlightReceiveKeys: state.passHighlightReceiveKeys,
     passHighlightPasses: state.passHighlightPasses,
-    explosionNorad:
+    struckSatelliteNorad:
       state.showExplosion && props.selectedNorad != null ? props.selectedNorad : null,
   }
 })
@@ -121,7 +121,7 @@ useBattleGlobeSatellites(
   computed(() => props.currentTimeMs),
   computed(() => props.selectedNorad),
   computed(() => props.followSelectedSatellite),
-  computed(() => deductionGlobeVisualState.value.explosionNorad),
+  computed(() => deductionGlobeVisualState.value.struckSatelliteNorad),
   computed(() => props.isTimelinePlaying)
 )
 

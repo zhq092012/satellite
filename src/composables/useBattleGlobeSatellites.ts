@@ -2,6 +2,7 @@ import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
 import { onBeforeUnmount, watch, type ComputedRef, type Ref, ref } from 'vue'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
+import { formatSatelliteMetaInline } from '@/utils/buildSatelliteAnalysisTable'
 
 /** 近距离 LOD 阈值（米） */
 const LOD_NEAR_DISTANCE = 2_000_000
@@ -13,6 +14,8 @@ const LOD_FAR_DISTANCE = 50_000_000
 const FRUSTUM_BOUNDING_RADIUS = 50_000
 /** 卫星点统一颜色（各 LOD 层级一致） */
 const SATELLITE_POINT_COLOR = Cesium.Color.fromCssColorString('#40f2ff')
+/** 推演中卫星被打击后的点/标签颜色 */
+const STRUCK_SATELLITE_COLOR = Cesium.Color.fromCssColorString('#ef4444')
 /** 选中卫星相机距离（米） */
 const SELECTED_CAMERA_RANGE = 900_000
 
@@ -22,6 +25,12 @@ interface SatellitePointVisual {
   norad: number
   /** 卫星名称 */
   name: string
+  /** 所属系列 */
+  series: string
+  /** 系统类型（侦察 / 通信） */
+  sysType: string
+  /** 用途（军用 / 商用等） */
+  usage: string
   /** Point 图元 */
   point: Cesium.PointPrimitive
   /** 名称标签（最近 LOD 层显示） */
@@ -38,7 +47,7 @@ interface SatellitePointVisual {
  * @param currentTimeMsRef 当前推演时刻（毫秒）
  * @param selectedNoradRef 当前选中 NORAD
  * @param followSelectedRef 选中卫星时是否自动飞行定位
- * @param hidePointNoradRef 推演打击后隐藏点与标签的 NORAD（由爆炸特效代替）
+ * @param struckSatelliteNoradRef 推演中已被打击的卫星 NORAD（显示为红色）
  * @param timelinePlaybackActiveRef 时间轴播放中（选中星持续高亮并始终显示名称）
  */
 export const useBattleGlobeSatellites = (
@@ -47,7 +56,7 @@ export const useBattleGlobeSatellites = (
   currentTimeMsRef: Ref<number> | ComputedRef<number>,
   selectedNoradRef: Ref<number | null> | ComputedRef<number | null>,
   followSelectedRef: Ref<boolean> | ComputedRef<boolean> = ref(true),
-  hidePointNoradRef: Ref<number | null> | ComputedRef<number | null> = ref(null),
+  struckSatelliteNoradRef: Ref<number | null> | ComputedRef<number | null> = ref(null),
   timelinePlaybackActiveRef: Ref<boolean> | ComputedRef<boolean> = ref(false)
 ) => {
   const satrecCache = new Map<number, satellitejs.SatRec>()
@@ -61,6 +70,19 @@ export const useBattleGlobeSatellites = (
   const scratchSatelliteDir = new Cesium.Cartesian3()
   const scratchPosition = new Cesium.Cartesian3()
   const scratchFrustumSphere = new Cesium.BoundingSphere()
+
+  /**
+   * 构建卫星名称标签文案；选中时附加系列、类型、用途。
+   *
+   * @param visual 卫星可视化对象
+   * @param selected 是否为当前选中星
+   * @returns Cesium Label 文本
+   */
+  const buildSatelliteLabelText = (visual: SatellitePointVisual, selected: boolean): string => {
+    if (!selected) return visual.name
+    const meta = formatSatelliteMetaInline(visual.series, visual.sysType, visual.usage)
+    return meta ? `${visual.name}\n${meta}` : visual.name
+  }
 
   /**
    * 判断笛卡尔坐标是否有效。
@@ -170,9 +192,19 @@ export const useBattleGlobeSatellites = (
    *
    * @param distance 相机距离（米）
    * @param selected 是否选中
+   * @param struck 是否已被打击
    * @returns 点样式
    */
-  const resolveLodStyle = (distance: number, selected: boolean, playbackSelected: boolean) => {
+  const resolveLodStyle = (
+    distance: number,
+    selected: boolean,
+    playbackSelected: boolean,
+    struck: boolean
+  ) => {
+    if (struck) {
+      const size = playbackSelected || selected ? 14 : distance <= LOD_NEAR_DISTANCE ? 8 : 6
+      return { pixelSize: size, color: STRUCK_SATELLITE_COLOR }
+    }
     if (playbackSelected) {
       return { pixelSize: 14, color: Cesium.Color.YELLOW }
     }
@@ -292,6 +324,9 @@ export const useBattleGlobeSatellites = (
       visualMap.set(sat.norad, {
         norad: sat.norad,
         name: sat.name,
+        series: sat.series,
+        sysType: sat.sysType,
+        usage: sat.usage,
         point,
         label,
         position,
@@ -329,18 +364,12 @@ export const useBattleGlobeSatellites = (
       const selected = selectedNorad === visual.norad
       /** 选中星：加强点大小与名称标签（播放时同样保持） */
       const emphasizeSelected = selected
-      const hideForExplosion = hidePointNoradRef.value === visual.norad
+      const struck = struckSatelliteNoradRef.value === visual.norad
       const facing = isPositionFacingCamera(visual.position, cameraPosition)
       const inFrustum = isPositionInCameraFrustum(viewer, visual.position)
       const distance = Cesium.Cartesian3.distance(cameraPosition, visual.position)
-      const lodStyle = resolveLodStyle(distance, selected, emphasizeSelected)
+      const lodStyle = resolveLodStyle(distance, selected, emphasizeSelected, struck)
       const showLabel = shouldShowSatelliteLabel(distance, selected, emphasizeSelected)
-
-      if (hideForExplosion) {
-        visual.point.show = false
-        visual.label.show = false
-        return
-      }
 
       if (!selected && !facing) {
         visual.point.show = false
@@ -359,14 +388,26 @@ export const useBattleGlobeSatellites = (
       visual.point.color = lodStyle?.color ?? SATELLITE_POINT_COLOR
 
       visual.label.show = showLabel
-      visual.label.fillColor = selected ? Cesium.Color.YELLOW : SATELLITE_POINT_COLOR
-      if (emphasizeSelected) {
+      visual.label.text = buildSatelliteLabelText(visual, selected)
+      visual.label.fillColor = struck
+        ? STRUCK_SATELLITE_COLOR
+        : selected
+          ? Cesium.Color.YELLOW
+          : SATELLITE_POINT_COLOR
+      if (struck) {
+        visual.label.showBackground = true
+        visual.label.backgroundColor = new Cesium.Color(0.35, 0.08, 0.08, 0.58)
+        visual.label.font = 'bold 13px "Microsoft YaHei", sans-serif'
+        visual.label.pixelOffset = new Cesium.Cartesian2(0, -14)
+      } else if (emphasizeSelected) {
         visual.label.showBackground = true
         visual.label.backgroundColor = new Cesium.Color(0.45, 0.35, 0, 0.55)
         visual.label.font = 'bold 13px "Microsoft YaHei", sans-serif'
+        visual.label.pixelOffset = new Cesium.Cartesian2(0, -14)
       } else {
         visual.label.font = 'bold 12px "Microsoft YaHei", sans-serif'
         visual.label.backgroundColor = new Cesium.Color(0, 0, 0, 0.35)
+        visual.label.pixelOffset = new Cesium.Cartesian2(0, -10)
       }
     })
 
@@ -449,7 +490,7 @@ export const useBattleGlobeSatellites = (
     updateSatelliteVisuals()
   })
 
-  watch(hidePointNoradRef, () => {
+  watch(struckSatelliteNoradRef, () => {
     updateSatelliteVisuals()
   })
 

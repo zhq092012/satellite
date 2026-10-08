@@ -1298,7 +1298,7 @@ export const resolveDeductionVisualState = (
   passHighlightReceiveKeys: Set<string>
   /** 当前时刻应高亮的过站窗口（含坐标，用于地图匹配） */
   passHighlightPasses: DeductionStationPassWindow[]
-  /** 是否显示爆炸效果 */
+  /** 卫星是否已进入被打击时刻（地球端以红色点表示） */
   showExplosion: boolean
   /** 被打击的接收站 ID/名称 */
   struckReceiveKeys: Set<string>

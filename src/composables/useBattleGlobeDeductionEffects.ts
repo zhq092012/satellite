@@ -2,7 +2,6 @@ import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
 import { onBeforeUnmount, watch, type ComputedRef, type Ref, ref } from 'vue'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
-import { createOctagonStarExplosionDataUrl } from '@/utils/battleGlobeOctStar'
 import {
   BATTLE_GLOBE_ORBIT_PATH_WIDTH,
   createBattleGlobeOrbitGlowMaterial,
@@ -12,7 +11,7 @@ import {
   type SatelliteDeductionVisualPlan,
 } from '@/utils/buildSatelliteDeductionTimeline'
 //--------------------------------------------------------------------------------------------------------------------
-//本函数主要用于推演播放期间的 Cesium 特效：一轨轨迹、过站虚线、星打击爆炸。
+//本函数主要用于推演播放期间的 Cesium 特效：一轨轨迹、过站虚线（卫星被打击后由点颜色变红表示）。
 //不使用 Entity.path（与 CallbackProperty 及固定 clock 不兼容），以 Polyline 代替 path.show。
 //--------------------------------------------------------------------------------------------------------------------
 /** 推演一轨轨迹折线实体 ID 后缀 */
@@ -21,18 +20,13 @@ const DEDUCTION_ORBIT_PATH_SUFFIX = '-orbit-path'
 const DEDUCTION_SAT_ENTITY_ID = 'battle-deduction-sat-'
 /** 过站连线实体 ID */
 const DEDUCTION_LINK_ENTITY_ID = 'battle-deduction-station-link'
-/** 爆炸 billboard 实体 ID */
-const DEDUCTION_EXPLOSION_ENTITY_ID = 'battle-deduction-explosion'
 /** 推演相机相对卫星的距离（米），保证能看到地球与过站连线，不贴地 */
 const DEDUCTION_CAMERA_RANGE = 12_000_000
 /** 推演跟随相机俯仰角：正俯视（与战场初始俯视一致） */
 const DEDUCTION_CAMERA_PITCH = Cesium.Math.toRadians(-90)
 
-/** 八角星图标 Data URL（懒加载） */
-let octStarDataUrl: string | null = null
-
 /**
- * 推演播放期间的 Cesium 特效：一轨轨迹、过站虚线、星打击爆炸。
+ * 推演播放期间的 Cesium 特效：一轨轨迹、过站虚线。
  * 不使用 Entity.path（与 CallbackProperty 及固定 clock 不兼容），以 Polyline 代替 path.show。
  *
  * @param viewerRef Viewer 引用
@@ -186,12 +180,8 @@ export const useBattleGlobeDeductionEffects = (
    * @param viewer Viewer
    */
   const clearDeductionEntities = (viewer: Cesium.Viewer) => {
-    // 移除过站虚线与爆炸特效
-    [DEDUCTION_LINK_ENTITY_ID, DEDUCTION_EXPLOSION_ENTITY_ID].forEach((id) => {
-      // 获取实体
-      const entity = viewer.entities.getById(id)
-      if (entity) viewer.entities.remove(entity)
-    })
+    const linkEntity = viewer.entities.getById(DEDUCTION_LINK_ENTITY_ID)
+    if (linkEntity) viewer.entities.remove(linkEntity)
     removeDeductionOrbitPathEntities(viewer)
     releaseDeductionCamera(viewer)
     noFollowOverviewApplied = false
@@ -352,56 +342,6 @@ export const useBattleGlobeDeductionEffects = (
   }
 
   /**
-   * 同步卫星打击八角星爆炸（随当前推演时刻的轨道位置移动，打击后至推演结束持续显示）。
-   *
-   * @param viewer Viewer
-   * @param norad NORAD
-   * @param show 是否显示
-   */
-  const syncExplosion = (viewer: Cesium.Viewer, norad: number, show: boolean) => {
-    // 获取爆炸特效实体
-    const existing = viewer.entities.getById(DEDUCTION_EXPLOSION_ENTITY_ID)
-    // 如果不需要显示爆炸特效，则移除爆炸特效实体
-    if (!show) {
-      if (existing) viewer.entities.remove(existing)
-      return
-    }
-
-    // 如果八角星图标 Data URL 为空，则创建八角星图标 Data URL
-    if (!octStarDataUrl) {
-      octStarDataUrl = createOctagonStarExplosionDataUrl(80)
-    }
-
-    // 计算当前时刻毫秒
-    const currentMs = currentTimeMsRef.value > 0 ? currentTimeMsRef.value : Date.now()
-    // 传播卫星位置
-    const position =
-      propagatePosition(norad, new Date(currentMs), true) ??
-      Cesium.Cartesian3.clone(Cesium.Cartesian3.ZERO)
-    // 计算爆炸特效缩放
-    const scale = 0.85 + Math.sin(performance.now() / 180) * 0.15
-    // 如果爆炸特效实体存在，则设置爆炸特效位置与缩放
-    if (existing) {
-      existing.position = new Cesium.ConstantPositionProperty(position)// 设置爆炸特效位置
-      if (existing.billboard) {
-        existing.billboard.scale = new Cesium.ConstantProperty(scale)// 设置爆炸特效缩放
-      }
-      existing.show = true// 显示爆炸特效
-      return
-    }
-    // 如果爆炸特效实体不存在，则添加爆炸特效实体
-    viewer.entities.add({
-      id: DEDUCTION_EXPLOSION_ENTITY_ID,
-      position: new Cesium.ConstantPositionProperty(position),
-      billboard: {
-        image: octStarDataUrl,
-        scale: new Cesium.ConstantProperty(scale),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-    })
-  }
-
-  /**
    * 根据推演状态刷新所有特效。
    */
   const syncDeductionEffects = () => {
@@ -426,8 +366,6 @@ export const useBattleGlobeDeductionEffects = (
     syncDeductionOrbitPath(viewer, norad, plan.orbitPeriodSec, state.showOrbitPath)
     // 同步过站黄色虚线
     syncStationLink(viewer, norad, state.activePass)
-    // 同步卫星打击八角星爆炸
-    syncExplosion(viewer, norad, state.showExplosion)
     if (followCameraRef.value) {
       noFollowOverviewApplied = false
       followDeductionCamera(viewer, norad)
@@ -437,61 +375,6 @@ export const useBattleGlobeDeductionEffects = (
     // 请求渲染
     viewer.scene.requestRender()
   }
-
-  /**
-   * 每帧刷新爆炸位置与脉动（与卫星 TLE 传播时刻一致）。
-   */
-  const updateExplosionOnPostUpdate = () => {
-    const viewer = viewerRef.value
-    if (!viewer || viewer.isDestroyed() || !isDeductionPlayingRef.value) return
-    // 获取推演视觉计划
-    const plan = visualPlanRef.value
-    // 获取选中卫星 NORAD
-    const norad = selectedNoradRef.value
-    // 计算当前时刻毫秒
-    const currentMs = currentTimeMsRef.value
-    // 如果推演视觉计划为空或选中卫星 NORAD 为空或推演视觉计划中的卫星 NORAD 与选中卫星 NORAD 不一致，则返回
-    if (!plan || !norad || plan.norad !== norad) return
-    // 获取推演状态
-    const state = resolveDeductionVisualState(plan, currentMs, true)
-    // 同步卫星打击八角星爆炸
-    syncExplosion(viewer, norad, state.showExplosion)
-  }
-
-  // 爆炸特效 postUpdate 监听器
-  let effectsPostUpdateRemover: (() => void) | null = null
-
-  /**
-   * 注册 postUpdate，使爆炸随推演时钟与卫星同步移动。
-   */
-  const ensureEffectsPostUpdateListener = () => {
-    const viewer = viewerRef.value
-    // 如果 viewer 为空或已销毁或爆炸特效 postUpdate 监听器已存在，则返回
-    if (!viewer || viewer.isDestroyed() || effectsPostUpdateRemover) return
-    // 注册爆炸特效 postUpdate 监听器
-    effectsPostUpdateRemover = viewer.scene.postUpdate.addEventListener(() => {
-      updateExplosionOnPostUpdate()// 每帧刷新爆炸位置与脉动
-    })
-  }
-
-  /**
-   * 移除 postUpdate 监听。
-   */
-  const removeEffectsPostUpdateListener = () => {
-    effectsPostUpdateRemover?.()// 移除爆炸特效 postUpdate 监听器
-    effectsPostUpdateRemover = null
-  }
-
-  watch(
-    // 监听 viewer 变化
-    () => viewerRef.value,
-    (viewer) => {
-      removeEffectsPostUpdateListener()// 移除爆炸特效 postUpdate 监听器
-      if (!viewer || viewer.isDestroyed()) return
-      ensureEffectsPostUpdateListener()// 注册爆炸特效 postUpdate 监听器
-    },
-    { immediate: true }
-  )
 
   watch(
     // 监听推演状态、推演视觉计划、选中卫星 NORAD、当前时刻毫秒变化
@@ -514,9 +397,8 @@ export const useBattleGlobeDeductionEffects = (
   )
 
   onBeforeUnmount(() => {
-    removeEffectsPostUpdateListener()// 移除爆炸特效 postUpdate 监听器  
     const viewer = viewerRef.value
-    if (viewer && !viewer.isDestroyed()) clearDeductionEntities(viewer)// 移除推演相关实体
+    if (viewer && !viewer.isDestroyed()) clearDeductionEntities(viewer)
   })
 
   // 返回同步推演相关特效函数

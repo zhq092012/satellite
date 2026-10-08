@@ -10,22 +10,27 @@
         :is-deduction-playing="isDeductionPlaying" :is-timeline-playing="isTimelinePlaying"
         :deduction-visual-plan="deductionVisualPlan" />
 
-      <div v-if="selectedNorad" class="globe-selected-bar">
-        <span class="globe-selected-label">选中卫星：</span>
-        <span class="globe-selected-name">{{ selectedSatelliteName }}</span>
-        <button type="button" class="globe-deduction-btn" :disabled="!selectedNorad || isDeductionPlaying"
-          @click="handleStartSatelliteDeduction">
-          播放推演
-        </button>
-        <button type="button" class="globe-deduction-btn globe-deduction-btn--pause" :disabled="!isDeductionPlaying"
-          @click="handleStopSatelliteDeduction">
-          暂停推演
-        </button>
-        <label class="globe-follow-check">
-          <input v-model="followDeductionSatellite" type="checkbox" />
-          跟随卫星
-        </label>
-        <button type="button" class="globe-clear-btn" @click="handleClearSelectedSatellite">清除</button>
+      <div v-if="selectedNorad" class="globe-selected-bar globe-selected-bar--satellite">
+        <div class="globe-selected-bar__info">
+          <span class="globe-selected-label">选中卫星：</span>
+          <span class="globe-selected-name">{{ selectedSatelliteName }}</span>
+          <span v-if="selectedSatelliteMetaInline" class="globe-selected-meta">{{ selectedSatelliteMetaInline }}</span>
+        </div>
+        <div class="globe-selected-bar__actions">
+          <button type="button" class="globe-deduction-btn" :disabled="!selectedNorad || isDeductionPlaying"
+            @click="handleStartSatelliteDeduction">
+            播放推演
+          </button>
+          <button type="button" class="globe-deduction-btn globe-deduction-btn--pause" :disabled="!isDeductionPlaying"
+            @click="handleStopSatelliteDeduction">
+            暂停推演
+          </button>
+          <label class="globe-follow-check">
+            <input v-model="followDeductionSatellite" type="checkbox" />
+            跟随卫星
+          </label>
+          <button type="button" class="globe-clear-btn" @click="handleClearSelectedSatellite">清除</button>
+        </div>
       </div>
 
       <div v-if="selectedWeaponId" class="globe-selected-bar globe-selected-bar--weapon">
@@ -127,6 +132,10 @@ import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import { useSatelliteDeductionPlayback } from '@/composables/useSatelliteDeductionPlayback'
+import {
+  formatSatelliteMetaInline,
+  resolveSatelliteDisplayMetaFromAnalysis,
+} from '@/utils/buildSatelliteAnalysisTable'
 
 /** 全局布局 Store */
 const store = useLayoutStore()
@@ -237,10 +246,23 @@ const globeRef = ref<{ restoreOverviewView: () => void } | null>(null)
 /** 当前选中卫星名称 */
 const selectedSatelliteName = computed(() => {
   if (!selectedNorad.value) return ''
+  const meta = resolveSatelliteDisplayMetaFromAnalysis(taskAnalysisData.value, selectedNorad.value)
+  if (meta?.name) return meta.name
   const fromGlobe = globeSatellites.value.find((sat) => sat.norad === selectedNorad.value)
   if (fromGlobe?.name) return fromGlobe.name
   const fromMatrix = matrixData.value?.initMatrixList?.find((sat) => sat.norad === selectedNorad.value)
   return fromMatrix?.name || `Sat-${selectedNorad.value}`
+})
+
+/** 选中卫星的类型、用途等单行摘要（地球顶部条） */
+const selectedSatelliteMetaInline = computed(() => {
+  if (!selectedNorad.value) return ''
+  const fromGlobe = globeSatellites.value.find((sat) => sat.norad === selectedNorad.value)
+  const fromAnalysis = resolveSatelliteDisplayMetaFromAnalysis(taskAnalysisData.value, selectedNorad.value)
+  const series = fromAnalysis?.series || fromGlobe?.series || ''
+  const sysType = fromAnalysis?.sysType || fromGlobe?.sysType || ''
+  const usage = fromAnalysis?.usage || fromGlobe?.usage || ''
+  return formatSatelliteMetaInline(series, sysType, usage)
 })
 
 /**
@@ -730,6 +752,29 @@ onActivated(() => {
     backdrop-filter: blur(12px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
     pointer-events: auto;
+
+    &--satellite {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+  }
+
+  .globe-selected-bar__info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .globe-selected-bar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
   }
 
   .globe-selected-label {
@@ -745,6 +790,15 @@ onActivated(() => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .globe-selected-meta {
+    font-size: 12px;
+    font-weight: 600;
+    color: #7dd3fc;
+    line-height: 1.35;
+    max-width: min(520px, 100%);
+    word-break: break-word;
   }
 
   .globe-selected-bar--weapon {

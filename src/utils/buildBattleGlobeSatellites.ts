@@ -11,12 +11,16 @@ export interface BattleGlobeSatelliteSource {
   line1?: string | null
   /** TLE 第二行 */
   line2?: string | null
+  /** 卫星用途（军用 / 商用等） */
+  usage?: string | null
 }
 
 /** 系列实体中可提取卫星的最小结构 */
 export interface BattleGlobeEntitySource {
   /** 系列名称 */
   series?: string
+  /** 卫星系统类型（侦察 / 通信） */
+  sysType?: string
   /** 初始卫星矩阵列表 */
   initMatrixList?: BattleGlobeSatelliteSource[] | null
 }
@@ -33,6 +37,10 @@ export interface BattleGlobeSatellite {
   line2: string
   /** 所属系列 */
   series: string
+  /** 卫星系统类型（侦察 / 通信） */
+  sysType: string
+  /** 卫星用途（军用 / 商用等） */
+  usage: string
 }
 
 /**
@@ -75,11 +83,13 @@ export const hasValidTle = (line1?: string | null, line2?: string | null): boole
  *
  * @param sat 初始卫星矩阵
  * @param series 系列名称
+ * @param sysType 系统类型
  * @returns 地球渲染卫星或 null
  */
 const toBattleGlobeSatellite = (
   sat: BattleGlobeSatelliteSource,
-  series: string
+  series: string,
+  sysType: string
 ): BattleGlobeSatellite | null => {
   const line1 = sat.line1?.trim() ?? ''
   const line2 = sat.line2?.trim() ?? ''
@@ -90,6 +100,8 @@ const toBattleGlobeSatellite = (
     line1,
     line2,
     series,
+    sysType: sysType.trim(),
+    usage: sat.usage?.trim() ?? '',
   }
 }
 
@@ -109,9 +121,10 @@ export const buildBattleGlobeSatellitesFromEntities = (
 
   entities.forEach((entity) => {
     const series = entity?.series || ''
+    const sysType = entity?.sysType || ''
     ;(entity?.initMatrixList || []).forEach((sat) => {
       if (!sat?.norad || satelliteMap.has(sat.norad)) return
-      const item = toBattleGlobeSatellite(sat, series)
+      const item = toBattleGlobeSatellite(sat, series, sysType)
       if (item) satelliteMap.set(sat.norad, item)
     })
   })
@@ -140,6 +153,6 @@ export const buildBattleGlobeSatellitesFromMatrix = (
 ): BattleGlobeSatellite[] => {
   if (!matrix) return []
   return buildBattleGlobeSatellitesFromEntities([
-    { series: matrix.series, initMatrixList: matrix.initMatrixList },
+    { series: matrix.series, sysType: matrix.sysType, initMatrixList: matrix.initMatrixList },
   ])
 }
