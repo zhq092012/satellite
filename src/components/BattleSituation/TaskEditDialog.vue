@@ -89,7 +89,7 @@
     <template #footer>
       <div class="task-edit-footer">
         <el-button class="task-edit-btn task-edit-btn--ghost" @click="visible = false">取 消</el-button>
-        <el-button v-if="!isEdit" class="task-edit-btn task-edit-btn--primary" type="primary" :loading="submitting"
+        <el-button v-if="canSave" class="task-edit-btn task-edit-btn--primary" type="primary" :loading="submitting"
           @click="handleSubmit">
           保 存
         </el-button>
@@ -102,7 +102,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { getBattleCountrys } from '@/api/dashboard'
+import { getBattleCountrys, updateTask } from '@/api/dashboard'
 import { addTask } from '@/api/task/task'
 import type { TaskForm } from '@/types/dashboard'
 import { useLayoutStore } from '@/store/modules/layout'
@@ -133,11 +133,18 @@ const DEFAULT_TARGET_TYPES = [...SATELLITE_TYPES] as string[]
 /** 新建任务默认时长（小时） */
 const DEFAULT_TASK_DURATION_HOURS = 8
 
+/** 任务弹窗模式：新建、只读查看、可保存修改。 */
+export type TaskEditDialogMode = 'create' | 'view' | 'edit'
+
 const props = defineProps<{
   /** 对话框是否可见。 */
   modelValue: boolean
-  /** 是否为修改模式；false 表示添加任务。 */
+  /** 弹窗模式（推荐）；未传时由 isEdit / viewOnly 推导。 */
+  mode?: TaskEditDialogMode
+  /** @deprecated 请使用 mode；false 表示添加任务。 */
   isEdit?: boolean
+  /** @deprecated 请使用 mode='view'；true 时隐藏保存。 */
+  viewOnly?: boolean
   /** 当前正在编辑的任务；添加任务时为 null。 */
   task: TaskForm | null
 }>()
@@ -205,14 +212,38 @@ const formRules = reactive<FormRules<TaskForm>>({
   endDate: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
 })
 
-/** 对话框可见性与 v-model 同步。 */
-const visible = ref(false)
+/** 对话框可见性与 v-model 同步（初始值与父级一致，避免 remount 后未触发 watch）。 */
+const visible = ref(props.modelValue)
 
-/** 是否为查看/编辑模式（当前后端仅支持新增，编辑时隐藏保存按钮）。 */
-const isEdit = computed(() => !!props.isEdit)
+/**
+ * 解析弹窗模式（mode 优先，兼容旧 isEdit / viewOnly）。
+ *
+ * @returns create | view | edit
+ */
+const dialogMode = computed((): TaskEditDialogMode => {
+  if (props.mode === 'create' || props.mode === 'view' || props.mode === 'edit') {
+    return props.mode
+  }
+  if (!props.isEdit) return 'create'
+  if (props.viewOnly) return 'view'
+  return 'edit'
+})
 
-/** 弹窗标题：添加与修改分开展示。 */
-const dialogTitle = computed(() => (isEdit.value ? '查看任务（暂不支持修改）' : '添加任务'))
+/** 是否打开已有任务（查看或修改）。 */
+const isExistingTaskMode = computed(() => dialogMode.value !== 'create')
+
+/** 是否展示保存按钮（新建或可编辑修改）。 */
+const canSave = computed(() => dialogMode.value === 'create' || dialogMode.value === 'edit')
+
+/** 弹窗标题：添加、查看与修改分开展示。 */
+const dialogTitle = computed(() => {
+  const titles: Record<TaskEditDialogMode, string> = {
+    create: '添加任务',
+    view: '查看任务',
+    edit: '修改任务',
+  }
+  return titles[dialogMode.value]
+})
 
 /** 各装配页组件引用，用于提交时汇总已选资源。 */
 const satelliteAssembleRef = ref<InstanceType<typeof TaskAssembleTab> | null>(null)
@@ -234,9 +265,12 @@ const activeTab = ref<TaskEditTabKey>('basic')
 /** 装配页重置令牌，弹窗每次打开递增。 */
 const assembleResetKey = ref(0)
 
+/**
+ * 父级 v-model、模式或任务变化时同步弹窗并回填表单。
+ */
 watch(
-  () => props.modelValue,
-  (open) => {
+  () => [props.modelValue, dialogMode.value, props.task?.id] as const,
+  ([open]) => {
     visible.value = open
     if (open) {
       activeTab.value = 'basic'
@@ -244,11 +278,14 @@ watch(
       fillForm(props.task)
       loadCountryOptions()
     }
-  }
+  },
+  { immediate: true }
 )
 
 watch(visible, (open) => {
-  emit('update:modelValue', open)
+  if (open !== props.modelValue) {
+    emit('update:modelValue', open)
+  }
 })
 
 /**
@@ -533,7 +570,7 @@ const resetCreateForm = () => {
  * @param task 待编辑任务；添加时为 null
  */
 const fillForm = (task: TaskForm | null) => {
-  if (!task || !props.isEdit) {
+  if (!task || !isExistingTaskMode.value) {
     resetCreateForm()
     return
   }
@@ -676,15 +713,41 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
 }
 
 /**
- * 校验并提交任务：目前仅支持新增（addTask），修改接口未就绪。
+ * 将装配页汇总结果转为可提交/回传的 TaskForm 片段。
+ *
+ * @param taskPayload addTask / updateTask 共用的请求体
+ * @returns 合并当前表单后的任务对象
+ */
+const buildSavedTaskFromPayload = (taskPayload: AddTaskPayload): TaskForm => ({
+  ...taskForm,
+  battleId: taskPayload.battleId,
+  beginDate: taskPayload.beginDate,
+  endDate: taskPayload.endDate,
+  meCountry: taskPayload.meCountry,
+  enemyCountry: taskPayload.enemyCountry,
+  meCountryShow: [...(taskPayload.meCountryShow ?? [])],
+  enemyCountryShow: [...(taskPayload.enemyCountryShow ?? [])],
+  targetType: taskPayload.targetType,
+  targetTypeNew: taskPayload.targetTypeNew,
+  targetTypeShow: [...(taskForm.targetTypeShow || [])],
+  steps: taskForm.steps || '',
+  delayMin: taskPayload.delayMin,
+  coverage: taskPayload.coverage,
+  weaponIds: [...taskPayload.weaponIds],
+  resources: taskPayload.resources.map((item) => ({
+    series: item.series,
+    receiveIds: [...item.receiveIds],
+    stationIds: [...item.stationIds],
+  })),
+})
+
+/**
+ * 校验并提交任务：新建走 addTask，修改走 updateTask。
  */
 const handleSubmit = async () => {
-  if (!formRef.value) return
-  if (props.isEdit) {
-    ElMessage.warning('任务修改接口暂未开放，请新建任务')
-    return
-  }
+  if (!formRef.value || !canSave.value) return
   syncCountryFields()
+  const isUpdate = dialogMode.value === 'edit'
   await formRef.value.validate(async (valid) => {
     if (!valid) {
       activeTab.value = 'basic'
@@ -702,7 +765,11 @@ const handleSubmit = async () => {
       return
     }
     if (!store.battle?.id) {
-      ElMessage.warning('请先选择当前场景后再添加任务')
+      ElMessage.warning(isUpdate ? '请先选择当前场景后再修改任务' : '请先选择当前场景后再添加任务')
+      return
+    }
+    if (isUpdate && !taskForm.id) {
+      ElMessage.error('任务 ID 无效，无法修改')
       return
     }
 
@@ -711,41 +778,35 @@ const handleSubmit = async () => {
 
     submitting.value = true
     try {
-      const res = await addTask(taskPayload)
-      if (res.code === 200) {
+      if (isUpdate) {
         const savedTask: TaskForm = {
-          ...taskForm,
-          battleId: taskPayload.battleId,
-          beginDate: taskPayload.beginDate,
-          endDate: taskPayload.endDate,
-          meCountry: taskPayload.meCountry,
-          enemyCountry: taskPayload.enemyCountry,
-          meCountryShow: [...(taskPayload.meCountryShow ?? [])],
-          enemyCountryShow: [...(taskPayload.enemyCountryShow ?? [])],
-          targetType: taskPayload.targetType,
-          targetTypeNew: taskPayload.targetTypeNew,
-          targetTypeShow: [...(taskForm.targetTypeShow || [])],
-          steps: taskForm.steps || '',
-          delayMin: taskPayload.delayMin,
-          coverage: taskPayload.coverage,
-          weaponIds: [...taskPayload.weaponIds],
-          resources: taskPayload.resources.map((item) => ({
-            series: item.series,
-            receiveIds: [...item.receiveIds],
-            stationIds: [...item.stationIds],
-          })),
+          ...buildSavedTaskFromPayload(taskPayload),
+          id: taskForm.id,
         }
-        const createdId = resolveCreatedTaskId(res.data)
-        if (createdId != null) savedTask.id = createdId
-        ElMessage.success('添加任务成功')
-        visible.value = false
-        emit('saved', savedTask)
+        const res = await updateTask(savedTask)
+        if (res.code === 200) {
+          ElMessage.success('修改任务成功')
+          visible.value = false
+          emit('saved', savedTask)
+        } else {
+          ElMessage.error(res.msg || '修改任务失败')
+        }
       } else {
-        ElMessage.error(res.msg || '添加任务失败')
+        const res = await addTask(taskPayload)
+        if (res.code === 200) {
+          const savedTask = buildSavedTaskFromPayload(taskPayload)
+          const createdId = resolveCreatedTaskId(res.data)
+          if (createdId != null) savedTask.id = createdId
+          ElMessage.success('添加任务成功')
+          visible.value = false
+          emit('saved', savedTask)
+        } else {
+          ElMessage.error(res.msg || '添加任务失败')
+        }
       }
     } catch (error) {
-      console.error('添加任务失败:', error)
-      ElMessage.error('添加任务失败')
+      console.error(isUpdate ? '修改任务失败:' : '添加任务失败:', error)
+      ElMessage.error(isUpdate ? '修改任务失败' : '添加任务失败')
     } finally {
       submitting.value = false
     }

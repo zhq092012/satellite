@@ -72,11 +72,14 @@
                   <span v-else class="text-muted">未开始或未获取</span>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="300" fixed="right" align="center">
+              <el-table-column label="操作" width="380" fixed="right" align="center">
                 <template #default="scope">
                   <div class="table-action-group">
                     <el-button type="success" size="small" plain round @click="handleEditTask(scope.row, battle)">
                       查看任务
+                    </el-button>
+                    <el-button type="primary" size="small" plain round @click="handleModifyTask(scope.row, battle)">
+                      修改任务
                     </el-button>
                     <el-button type="danger" size="small" plain round @click="handleDeleteTask(scope.row)">
                       删除任务
@@ -125,7 +128,8 @@
       </template>
     </el-dialog>
 
-    <TaskEditDialog v-model="taskEditVisible" :is-edit="taskEditIsEdit" :task="editingTask" @saved="handleTaskSaved" />
+    <TaskEditDialog :key="taskEditDialogKey" v-model="taskEditVisible" :mode="taskEditMode" :task="editingTask"
+      @saved="handleTaskSaved" />
 
     <!-- 战场区域地图绘制选择弹窗 -->
     <el-dialog title="战场区域选择" v-model="showPolygonMap" width="1100px">
@@ -147,7 +151,7 @@
 import { nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import PolygonMap from '@/components/cesium/BattleArea.vue'
-import TaskEditDialog from '@/components/BattleSituation/TaskEditDialog.vue'
+import TaskEditDialog, { type TaskEditDialogMode } from '@/components/BattleSituation/TaskEditDialog.vue'
 
 /**
  * 导入后台仪表盘与场景/任务管理相关 API 函数与类型
@@ -184,8 +188,31 @@ const showPolygonMap = ref(false)
 
 /** 任务编辑弹窗（复用态势页 TaskEditDialog） */
 const taskEditVisible = ref(false)
-const taskEditIsEdit = ref(false)
+/** 任务弹窗模式：新建 / 查看 / 修改。 */
+const taskEditMode = ref<TaskEditDialogMode>('create')
+/** 每次打开弹窗递增，避免复用上一次的只读状态。 */
+const taskEditDialogKey = ref(0)
 const editingTask = ref<TaskForm | null>(null)
+
+/**
+ * 打开任务编辑弹窗。
+ *
+ * @param mode 弹窗模式
+ * @param task 当前任务；新建时为 null
+ * @param battle 所属场景
+ */
+const openTaskEditDialog = async (mode: TaskEditDialogMode, task: TaskForm | null, battle: BattleForm) => {
+  store.setActivedBattle(battle)
+  if (taskEditVisible.value) {
+    taskEditVisible.value = false
+    await nextTick()
+  }
+  taskEditMode.value = mode
+  editingTask.value = task
+  taskEditDialogKey.value += 1
+  await nextTick()
+  taskEditVisible.value = true
+}
 
 /** 场景表单绑定的数据结构 */
 const battleForm = reactive<BattleForm>({
@@ -409,18 +436,17 @@ const submitBattleForm = async (formEl: FormInstance | undefined) => {
 /** 打开新建任务弹窗（复用 TaskEditDialog） */
 const handleCreateTask = (battle: BattleForm) => {
   if (!battle.id) return
-  store.setActivedBattle(battle)
-  taskEditIsEdit.value = false
-  editingTask.value = null
-  taskEditVisible.value = true
+  openTaskEditDialog('create', null, battle)
 }
 
-/** 查看任务详情（编辑接口未开放，仅查看） */
+/** 查看任务详情（只读） */
 const handleEditTask = (task: TaskForm, battle: BattleForm) => {
-  store.setActivedBattle(battle)
-  taskEditIsEdit.value = true
-  editingTask.value = task
-  taskEditVisible.value = true
+  openTaskEditDialog('view', task, battle)
+}
+
+/** 打开修改任务弹窗，保存后通过 updateTask 更新列表项 */
+const handleModifyTask = (task: TaskForm, battle: BattleForm) => {
+  openTaskEditDialog('edit', task, battle)
 }
 
 /**
@@ -430,10 +456,6 @@ const handleEditTask = (task: TaskForm, battle: BattleForm) => {
  */
 const handleTaskSaved = async (updated: TaskForm) => {
   const battleId = updated.battleId || store.battle?.id
-  const previousTaskIds = new Set(
-    battleList.value.flatMap((battle) => (battle.tasks || []).map((task) => task.id).filter(Boolean) as number[])
-  )
-  const isCreate = Boolean(updated.id && !previousTaskIds.has(updated.id))
 
   if (!battleId) {
     await loadBattleList()
@@ -445,7 +467,7 @@ const handleTaskSaved = async (updated: TaskForm) => {
   }
   await refreshBattleTasks(battleId)
 
-  if (isCreate && updated.id) {
+  if (updated.id) {
     await startTaskProgressPolling(updated.id)
   }
 }

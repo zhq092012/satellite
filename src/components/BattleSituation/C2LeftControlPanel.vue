@@ -1,10 +1,6 @@
 <template>
   <aside class="c2-panel c2-panel--left dark-theme">
     <div class="panel-header">
-      <button type="button" class="scene-action-btn" @click="openCreateScene">添加场景</button>
-      <button type="button" class="scene-action-btn" :disabled="!store.battle" title="修改当前选择的场景" @click="openEditScene">
-        修改场景
-      </button>
       <button type="button" class="scene-action-btn" @click="openCreateTask">添加任务</button>
     </div>
     <div class="panel-body">
@@ -185,9 +181,7 @@
         </el-button>
       </footer>
     </div>
-    <TaskEditDialog v-model="taskEditVisible" :is-edit="taskEditIsEdit" :task="editingTask" @saved="handleTaskSaved" />
-    <SceneEditDialog v-model="sceneEditVisible" :is-edit="sceneEditIsEdit" :scene="editingScene"
-      @saved="handleSceneSaved" />
+    <TaskEditDialog v-model="taskEditVisible" mode="create" :task="editingTask" @saved="handleTaskSaved" />
   </aside>
 </template>
 <script setup lang="ts">
@@ -199,12 +193,11 @@ import { ElMessage } from 'element-plus'
 import { getTaskList, updateTask, getAllWeapons } from '@/api/dashboard'
 import { getSatelliteSeries } from '@/api/task/task'
 import { getGroundStationList } from '@/api/system/satellite-system-api'
-import type { BattleForm, TaskForm } from '@/types/dashboard'
+import type { TaskForm } from '@/types/dashboard'
 import type { MatrixResult } from '@/api/electronic'
 import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskEditDialog from '@/components/BattleSituation/TaskEditDialog.vue'
-import SceneEditDialog from '@/components/BattleSituation/SceneEditDialog.vue'
 import {
   applyDurationHoursToDraft,
   buildSeriesOptionsFromApiData,
@@ -252,11 +245,7 @@ const taskLoading = ref(false)
 const taskSwitching = ref(false)
 const savingRecalc = ref(false)
 const taskEditVisible = ref(false)
-const taskEditIsEdit = ref(false)
 const editingTask = ref<TaskForm | null>(null)
-const sceneEditVisible = ref(false)
-const sceneEditIsEdit = ref(false)
-const editingScene = ref<BattleForm | null>(null)
 /** 当前选中任务的内联编辑草稿 */
 const editorDraft = ref<C2TaskEditorDraft | null>(null)
 /** 是否启用任务武器配置；关闭时草稿中不携带武器，选择暂存于此 */
@@ -644,37 +633,13 @@ const handleEndInput = (value: string) => {
   if (!editorDraft.value) return
   editorDraft.value.endDate = fromTaskDatetimeLocalValue(value)
 }
-const openCreateScene = () => {
-  sceneEditIsEdit.value = false
-  editingScene.value = null
-  sceneEditVisible.value = true
-}
 const openCreateTask = () => {
   if (!store.battle?.id) {
     ElMessage.warning('请先选择当前场景后再添加任务')
     return
   }
-  taskEditIsEdit.value = false
   editingTask.value = null
   taskEditVisible.value = true
-}
-const openEditScene = () => {
-  if (!store.battle) {
-    ElMessage.warning('请先在顶部选择当前场景')
-    return
-  }
-  sceneEditIsEdit.value = true
-  editingScene.value = store.battle
-  sceneEditVisible.value = true
-}
-const handleSceneSaved = async (scene: BattleForm) => {
-  const prevId = store.battle?.id
-  store.setActivedBattle(scene)
-  await loadBattleTasks()
-  if (scene.id !== prevId) {
-    store.setActivedTask(taskList.value[0] ?? null)
-    store.setSelectedSatSeries('')
-  }
 }
 const handleTaskSaved = async (updated: TaskForm) => {
   const isCreate = !taskList.value.some((item) => item.id === updated.id)

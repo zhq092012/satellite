@@ -339,6 +339,23 @@ export interface TimeEffect {
     receiveName: string;//接收站名称
 }
 
+/** 任务下目标威胁度 */
+export interface TargetThreatLevel {
+    /** 卫星 NORAD 编号 */
+    norad: number
+    /** 卫星名称（展示用） */
+    name: string
+    /** 综合威胁度（排序主键，降序） */
+    compositeThreat: number
+    /** 静态威胁度 */
+    staticThreat: number
+    /** 动态威胁度 */
+    dynamicThreat: number
+    // 链路闭环耗时
+    linkClosedLoopTime: number;
+    // 覆盖率
+    coverPercent: number;
+}
 
 /**
  * 查询卫星系列
@@ -370,4 +387,12 @@ export const getTaskMatrix = (data: { taskId: string }) => {
 export const addTask = (data: TaskFormNew) => {
     const url = '/api/battle/saveTask'
     return requestAPI.post<AxiosResponseType<any>>(url, data)
+}
+
+/**
+ * 获取任务下目标威胁度
+ */
+export const getTargetsThreatLevel = (data: { taskId: string }) => {
+    const url = '/api/ThreatAnalysis/targetsThreatLevel'
+    return requestAPI.post<AxiosResponseType<TargetThreatLevel>>(url, data)
 }
