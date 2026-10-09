@@ -15,10 +15,16 @@
             disabled: taskSwitching,
             'task-progress-item--done': isTaskCalculationComplete(task),
           }" @click="selectTask(task)">
-            <span class="task-progress-name" :title="task.name">
-              <span class="task-progress-name-tag">任务名称</span>
-              <span class="task-progress-name-text">：{{ task.name }}</span>
-            </span>
+            <div class="task-progress-name-row">
+              <span class="task-progress-name" :title="task.name">
+                <span class="task-progress-name-tag">任务名称</span>
+                <span class="task-progress-name-text">：{{ task.name }}</span>
+              </span>
+              <button type="button" class="task-progress-edit-btn" title="编辑任务"
+                :disabled="taskSwitching" @click.stop="openEditTask(task)">
+                编辑
+              </button>
+            </div>
             <div class="task-progress-bar-wrap">
               <div v-if="isTaskCalculationComplete(task)" class="task-progress-done">
                 <span class="task-progress-done-dot" aria-hidden="true" />
@@ -181,14 +187,15 @@
         </el-button>
       </footer>
     </div>
-    <TaskEditDialog v-model="taskEditVisible" mode="create" :task="editingTask" @saved="handleTaskSaved" />
+    <TaskEditDialog :key="taskEditDialogKey" v-model="taskEditVisible" :mode="taskEditMode" :task="editingTask"
+      @saved="handleTaskSaved" />
   </aside>
 </template>
 <script setup lang="ts">
 /**
  * 战场态势 - C2 左侧场景任务面板（上：任务进度列表，中：任务配置，下：保存并重算）。
  */
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getTaskList, updateTask, getAllWeapons } from '@/api/dashboard'
 import { getSatelliteSeries } from '@/api/task/task'
@@ -197,7 +204,7 @@ import type { TaskForm } from '@/types/dashboard'
 import type { MatrixResult } from '@/api/electronic'
 import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
-import TaskEditDialog from '@/components/BattleSituation/TaskEditDialog.vue'
+import TaskEditDialog, { type TaskEditDialogMode } from '@/components/BattleSituation/TaskEditDialog.vue'
 import {
   applyDurationHoursToDraft,
   buildSeriesOptionsFromApiData,
@@ -245,6 +252,10 @@ const taskLoading = ref(false)
 const taskSwitching = ref(false)
 const savingRecalc = ref(false)
 const taskEditVisible = ref(false)
+/** 任务弹窗模式：新建 / 修改 */
+const taskEditMode = ref<TaskEditDialogMode>('create')
+/** 每次打开弹窗递增，避免复用上一次状态 */
+const taskEditDialogKey = ref(0)
 const editingTask = ref<TaskForm | null>(null)
 /** 当前选中任务的内联编辑草稿 */
 const editorDraft = ref<C2TaskEditorDraft | null>(null)
@@ -633,27 +644,59 @@ const handleEndInput = (value: string) => {
   if (!editorDraft.value) return
   editorDraft.value.endDate = fromTaskDatetimeLocalValue(value)
 }
-const openCreateTask = () => {
+/**
+ * 打开任务编辑弹窗（新建或修改）。
+ *
+ * @param mode 弹窗模式
+ * @param task 目标任务；新建时为 null
+ */
+const openTaskEditDialog = async (mode: TaskEditDialogMode, task: TaskForm | null) => {
   if (!store.battle?.id) {
-    ElMessage.warning('请先选择当前场景后再添加任务')
+    ElMessage.warning('请先选择当前场景后再操作任务')
     return
   }
-  editingTask.value = null
+  if (taskEditVisible.value) {
+    taskEditVisible.value = false
+    await nextTick()
+  }
+  taskEditMode.value = mode
+  editingTask.value = task
+  taskEditDialogKey.value += 1
+  await nextTick()
   taskEditVisible.value = true
 }
+
+/** 打开新建任务弹窗 */
+const openCreateTask = () => {
+  void openTaskEditDialog('create', null)
+}
+
+/**
+ * 打开修改任务弹窗（全屏 TaskEditDialog，保存后刷新列表）。
+ *
+ * @param task 待编辑任务
+ */
+const openEditTask = (task: TaskForm) => {
+  if (!task.id) {
+    ElMessage.warning('任务 ID 无效，无法编辑')
+    return
+  }
+  void openTaskEditDialog('edit', task)
+}
+
 const handleTaskSaved = async (updated: TaskForm) => {
   const isCreate = !taskList.value.some((item) => item.id === updated.id)
   await loadBattleTasks()
   if (!updated.id) return
-  if (isCreate) {
-    await startTaskProgressPolling(updated.id)
-  }
+  await startTaskProgressPolling(updated.id)
   const latest = taskList.value.find((item) => item.id === updated.id) || updated
   store.setActivedTask(latest)
   store.setSelectedSatSeries('')
   await syncEditorForTask(latest)
   if (isCreate) {
     ElMessage.success(`已切换到新任务：${latest.name}`)
+  } else {
+    ElMessage.success(`任务已更新：${latest.name}`)
   }
 }
 /**
@@ -868,6 +911,14 @@ onUnmounted(() => {
   }
 }
 
+.task-progress-name-row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .task-progress-name {
   flex: 1;
   min-width: 0;
@@ -878,6 +929,31 @@ onUnmounted(() => {
   font-weight: 700;
   color: #e2efff;
   overflow: hidden;
+}
+
+.task-progress-edit-btn {
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 225, 255, 0.4);
+  background: rgba(0, 225, 255, 0.1);
+  color: #7dd3fc;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+
+  &:hover:not(:disabled) {
+    color: #40f2ff;
+    border-color: #00e1ff;
+    background: rgba(0, 225, 255, 0.2);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
 }
 
 .task-progress-name-tag {
