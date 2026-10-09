@@ -139,8 +139,6 @@ export interface TaskFormNew {
     country?: string
     /** 作战步骤 JSON 字符串 */
     steps?: string
-    /** 关注状态：0 未关注，1 已关注 */
-    focusStatus?: number
     /** 算法计算进度（接口返回） */
     algorithmProgressEntity?: TaskAlgorithmProgressEntity
     /** 关联战场（接口返回） */

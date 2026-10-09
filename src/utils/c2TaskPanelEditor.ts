@@ -130,20 +130,24 @@ export const combatAreaToApiFields = (
 }
 
 /**
- * 提交战场任务接口前：去掉仅前端使用的 `combatArea`，并保证扁平区域字段齐全。
+ * 提交战场任务接口前：去掉仅前端使用的 `combatArea`、不提交的 `focusStatus`，并保证扁平区域字段齐全。
  *
  * @param task 内存中的任务（可含 combatArea）
  * @returns 适合 POST/PUT 的请求体
  */
-export const prepareTaskForBattleApi = <T extends TaskForm>(task: T): Omit<T, 'combatArea'> => {
+export const prepareTaskForBattleApi = <T extends TaskForm>(
+  task: T,
+): Omit<T, 'combatArea' | 'focusStatus'> => {
   const area = task.combatArea
     ? normalizeTaskCombatArea(task.combatArea)
     : resolveTaskCombatAreaFromTask(task)
-  const { combatArea: _omit, ...rest } = task
+  const { combatArea: _omitCombatArea, focusStatus: _omitFocusStatus, ...rest } = task as T & {
+    focusStatus?: number
+  }
   return {
     ...rest,
     ...combatAreaToApiFields(area),
-  } as Omit<T, 'combatArea'>
+  } as Omit<T, 'combatArea' | 'focusStatus'>
 }
 
 /**

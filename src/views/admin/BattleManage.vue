@@ -56,13 +56,6 @@
               </el-table-column>
               <el-table-column prop="meCountry" label="红方" width="120" show-overflow-tooltip />
               <el-table-column prop="enemyCountry" label="蓝方" width="120" show-overflow-tooltip />
-              <el-table-column label="关注状态" width="100" align="center">
-                <template #default="scope">
-                  <el-tag :type="scope.row.focusStatus === 1 ? 'danger' : 'info'" size="small">
-                    {{ scope.row.focusStatus === 1 ? '已关注' : '未关注' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
               <el-table-column label="算法计算进度" width="180">
                 <template #default="scope">
                   <div v-if="getTaskProgress(scope.row)" class="progress-box">

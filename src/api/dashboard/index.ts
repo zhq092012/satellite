@@ -830,11 +830,6 @@ export const checkDefaultBattleAndTask = () => {
     AxiosResponseType<{ battleId: number; taskId: number; battleEntity: BattleForm; battleTaskEntity: TaskForm }>
   >(url)
 }
-// 设置任务为关注任务
-export const setDefaultTask = (focusStatus: number, taskId: number) => {
-  const url = `/api/battle/setTaskFocus?focusStatus=${focusStatus}&taskId=${taskId}`
-  return requestAPI.get<AxiosResponseType<any>>(url)
-}
 // 态势数据
 export type SituationData = {
   红方: {
