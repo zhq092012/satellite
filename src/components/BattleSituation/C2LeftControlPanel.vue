@@ -660,6 +660,9 @@ const removeWeapon = (id: string) => {
     editorDraft.value.selectedWeaponIds.filter((item) => item !== id),
   )
   stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
+  if (!editorDraft.value.selectedWeaponIds.length) {
+    useWeaponsEnabled.value = false
+  }
 }
 const toggleReceive = (id: string) => {
   if (!editorDraft.value || editorDraft.value.selectedReceiveIds.includes(id)) return
