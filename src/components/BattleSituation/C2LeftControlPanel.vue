@@ -15,28 +15,29 @@
             disabled: taskSwitching,
             'task-progress-item--done': isTaskCalculationComplete(task),
           }" @click="selectTask(task)">
-            <div class="task-progress-name-row">
-              <span class="task-progress-name" :title="task.name">
-                <span class="task-progress-name-tag">任务名称</span>
-                <span class="task-progress-name-text">：{{ task.name }}</span>
-              </span>
-              <button type="button" class="task-progress-edit-btn" title="编辑任务"
-                :disabled="taskSwitching" @click.stop="openEditTask(task)">
-                编辑
-              </button>
-            </div>
-            <div class="task-progress-bar-wrap">
-              <div v-if="isTaskCalculationComplete(task)" class="task-progress-done">
-                <span class="task-progress-done-dot" aria-hidden="true" />
-                <span class="task-progress-done-text">计算完成</span>
+            <span class="task-progress-name" :title="task.name">
+              <span class="task-progress-name-tag">任务名称</span>
+              <span class="task-progress-name-text">：{{ task.name }}</span>
+            </span>
+            <div class="task-progress-trailing">
+              <div class="task-progress-status-row">
+                <el-tooltip :content="getTaskProgressDisplay(task).tooltip" placement="top"
+                  :show-after="getTaskProgressDisplay(task).kind === 'running' ? 200 : 0">
+                  <div class="task-progress-mini">
+                    <el-progress v-if="getTaskProgressDisplay(task).kind !== 'done'"
+                      class="task-progress-mini-bar" :percentage="getTaskProgressDisplay(task).percent"
+                      :stroke-width="4" :show-text="false" />
+                    <span class="task-progress-percent" :class="{
+                      'task-progress-percent--done': getTaskProgressDisplay(task).kind === 'done',
+                      'task-progress-percent--idle': getTaskProgressDisplay(task).kind === 'idle',
+                    }">{{ getTaskProgressDisplay(task).text }}</span>
+                  </div>
+                </el-tooltip>
+                <button type="button" class="task-progress-edit-btn" title="编辑任务"
+                  :disabled="taskSwitching || isTaskCalculating(task)" @click.stop="openEditTask(task)">
+                  编辑
+                </button>
               </div>
-              <template v-else-if="getTaskProgress(task)">
-                <el-progress :percentage="getTaskProgressPercent(getTaskProgress(task))" :stroke-width="5"
-                  class="task-progress-bar" />
-                <span v-if="getTaskProgress(task)?.mes" class="task-progress-mes">{{ getTaskProgress(task)?.mes
-                }}</span>
-              </template>
-              <span v-else class="task-progress-mes is-muted">未开始</span>
             </div>
           </li>
         </ul>
@@ -45,7 +46,7 @@
       <section class="panel-zone panel-zone--middle">
         <div v-if="taskSwitching" class="zone-loading">正在切换任务...</div>
         <div v-else-if="!editorDraft" class="zone-empty">请选择任务以编辑配置</div>
-        <div v-else class="task-editor">
+        <div v-else class="task-editor" :class="{ 'task-editor--locked': isActiveTaskCalculating }">
           <div class="tag-section task-time-section">
             <div class="tag-section-head">任务基本信息</div>
             <div class="task-editor-times">
@@ -90,8 +91,8 @@
                 <div class="tag-cloud metric-type-tags">
                   <el-tag v-for="typeName in TASK_PANEL_SATELLITE_TYPES" :key="typeName" class="task-config-tag"
                     :class="{ 'is-selected': isTargetTypeSelected(typeName) }"
-                    :closable="isTargetTypeSelected(typeName)" disable-transitions @close="removeTargetType(typeName)"
-                    @click="toggleTargetType(typeName)">
+                    :closable="isTargetTypeSelected(typeName)" disable-transitions
+                    @close="removeTargetType(typeName)" @click="toggleTargetType(typeName)">
                     {{ typeName }}
                   </el-tag>
                 </div>
@@ -126,12 +127,12 @@
             <div class="tag-section-head">任务卫星</div>
             <div v-if="seriesOptionsLoading" class="tag-hint">正在加载系列...</div>
             <div v-else-if="!seriesTagOptions.length" class="tag-hint">暂无系列候选项</div>
-            <div v-else class="tag-cloud">
-              <el-tag v-for="item in seriesTagOptions" :key="item.id" class="task-config-tag"
-                :class="{ 'is-selected': isSeriesSelected(item.id) }" :closable="isSeriesSelected(item.id)"
-                disable-transitions @close="removeSeries(item.id)" @click="toggleSeries(item.id)">
-                {{ item.label }}
-              </el-tag>
+            <div v-else class="tag-cloud task-config-checkbox-list">
+              <label v-for="item in seriesTagOptions" :key="item.id" class="task-config-checkbox">
+                <el-checkbox :model-value="isSeriesSelected(item.id)" size="small"
+                  @change="(checked) => handleSeriesCheckboxChange(item.id, checked)" />
+                <span class="task-config-checkbox__label">{{ item.label }}</span>
+              </label>
             </div>
           </div>
           <div class="tag-section">
@@ -143,12 +144,12 @@
             <template v-if="useWeaponsEnabled">
               <div v-if="weaponOptionsLoading" class="tag-hint">正在加载武器...</div>
               <div v-else-if="!weaponTagOptions.length" class="tag-hint">暂无武器候选项</div>
-              <div v-else class="tag-cloud">
-                <el-tag v-for="item in weaponTagOptions" :key="item.id" class="task-config-tag"
-                  :class="{ 'is-selected': isWeaponSelected(item.id) }" :closable="isWeaponSelected(item.id)"
-                  disable-transitions @close="removeWeapon(item.id)" @click="toggleWeapon(item.id)">
-                  {{ item.label }}
-                </el-tag>
+              <div v-else class="tag-cloud task-config-checkbox-list">
+                <label v-for="item in weaponTagOptions" :key="item.id" class="task-config-checkbox">
+                  <el-checkbox :model-value="isWeaponSelected(item.id)" size="small"
+                    @change="(checked) => handleWeaponCheckboxChange(item.id, checked)" />
+                  <span class="task-config-checkbox__label">{{ item.label }}</span>
+                </label>
               </div>
             </template>
             <div v-else class="tag-hint">已关闭「使用武器」，武器选择已暂存；重新打开可恢复</div>
@@ -157,24 +158,24 @@
             <div class="tag-section-head">任务地面站</div>
             <div v-if="receiveOptionsLoading" class="tag-hint">正在加载地面站...</div>
             <div v-else-if="!receiveTagOptions.length" class="tag-hint">暂无地面站候选项</div>
-            <div v-else class="tag-cloud">
-              <el-tag v-for="item in receiveTagOptions" :key="item.id" class="task-config-tag"
-                :class="{ 'is-selected': isReceiveSelected(item.id) }" :closable="isReceiveSelected(item.id)"
-                disable-transitions @close="removeReceive(item.id)" @click="toggleReceive(item.id)">
-                {{ item.label }}
-              </el-tag>
+            <div v-else class="tag-cloud task-config-checkbox-list">
+              <label v-for="item in receiveTagOptions" :key="item.id" class="task-config-checkbox">
+                <el-checkbox :model-value="isReceiveSelected(item.id)" size="small"
+                  @change="(checked) => handleReceiveCheckboxChange(item.id, checked)" />
+                <span class="task-config-checkbox__label">{{ item.label }}</span>
+              </label>
             </div>
           </div>
           <div class="tag-section">
             <div class="tag-section-head">任务数据中心</div>
             <div v-if="centerOptionsLoading" class="tag-hint">正在加载数据中心...</div>
             <div v-else-if="!centerTagOptions.length" class="tag-hint">暂无数据中心候选项</div>
-            <div v-else class="tag-cloud">
-              <el-tag v-for="item in centerTagOptions" :key="item.id" class="task-config-tag"
-                :class="{ 'is-selected': isCenterSelected(item.id) }" :closable="isCenterSelected(item.id)"
-                disable-transitions @close="removeCenter(item.id)" @click="toggleCenter(item.id)">
-                {{ item.label }}
-              </el-tag>
+            <div v-else class="tag-cloud task-config-checkbox-list">
+              <label v-for="item in centerTagOptions" :key="item.id" class="task-config-checkbox">
+                <el-checkbox :model-value="isCenterSelected(item.id)" size="small"
+                  @change="(checked) => handleCenterCheckboxChange(item.id, checked)" />
+                <span class="task-config-checkbox__label">{{ item.label }}</span>
+              </label>
             </div>
           </div>
         </div>
@@ -182,7 +183,7 @@
       <!-- 下：保存并重算 -->
       <footer class="panel-zone panel-zone--bottom">
         <el-button type="primary" class="save-recalc-btn" :loading="savingRecalc"
-          :disabled="!editorDraft || taskSwitching" @click="handleSaveAndRecalculate">
+          :disabled="!editorDraft || taskSwitching || isActiveTaskCalculating" @click="handleSaveAndRecalculate">
           保存并重算
         </el-button>
       </footer>
@@ -247,6 +248,51 @@ const {
  */
 const isTaskCalculationComplete = (task: TaskForm): boolean =>
   isTaskProgressComplete(getTaskProgress(task))
+
+/** 任务进度文案类型：已完成 / 计算中 / 未开始 */
+type TaskProgressLabelKind = 'done' | 'running' | 'idle'
+
+/**
+ * 左侧面板任务进度展示文案（100% 时显示「计算完成」而非百分比）。
+ *
+ * @param task 任务项
+ * @returns 展示文案、样式类型与 tooltip
+ */
+const getTaskProgressDisplay = (
+  task: TaskForm
+): { text: string; kind: TaskProgressLabelKind; tooltip: string; percent: number } => {
+  const progress = getTaskProgress(task)
+  if (isTaskCalculationComplete(task) || (progress && getTaskProgressPercent(progress) >= 100)) {
+    return { text: '计算完成', kind: 'done', tooltip: '计算完成', percent: 100 }
+  }
+  if (progress) {
+    const percent = getTaskProgressPercent(progress)
+    return {
+      text: `${percent}%`,
+      kind: 'running',
+      tooltip: progress.mes || '算法计算中',
+      percent,
+    }
+  }
+  return { text: '未开始', kind: 'idle', tooltip: '未开始', percent: 0 }
+}
+
+/**
+ * 任务是否处于算法计算中（有进度且未完成）。
+ *
+ * @param task 任务项
+ * @returns 计算中为 true
+ */
+const isTaskCalculating = (task: TaskForm): boolean =>
+  getTaskProgressDisplay(task).kind === 'running'
+
+/** 当前选中任务是否正在计算（禁止编辑与保存并重算） */
+const isActiveTaskCalculating = computed(() => {
+  const task = store.activedTask
+  if (!task) return false
+  return isTaskCalculating(task)
+})
+
 const taskList = ref<TaskForm[]>([])
 const taskLoading = ref(false)
 const taskSwitching = ref(false)
@@ -626,6 +672,51 @@ const removeCenter = (id: string) => {
   if (!editorDraft.value) return
   editorDraft.value.stationIds = editorDraft.value.stationIds.filter((item) => item !== id)
 }
+
+/**
+ * 卫星系列 checkbox 变更。
+ *
+ * @param series 系列名
+ * @param checked 是否勾选
+ */
+const handleSeriesCheckboxChange = (series: string, checked: boolean | string | number) => {
+  if (checked) toggleSeries(series)
+  else removeSeries(series)
+}
+
+/**
+ * 武器 checkbox 变更。
+ *
+ * @param id 武器 ID
+ * @param checked 是否勾选
+ */
+const handleWeaponCheckboxChange = (id: string, checked: boolean | string | number) => {
+  if (checked) toggleWeapon(id)
+  else removeWeapon(id)
+}
+
+/**
+ * 地面站 checkbox 变更。
+ *
+ * @param id 地面站 ID
+ * @param checked 是否勾选
+ */
+const handleReceiveCheckboxChange = (id: string, checked: boolean | string | number) => {
+  if (checked) toggleReceive(id)
+  else removeReceive(id)
+}
+
+/**
+ * 数据中心 checkbox 变更。
+ *
+ * @param id 数据中心 ID
+ * @param checked 是否勾选
+ */
+const handleCenterCheckboxChange = (id: string, checked: boolean | string | number) => {
+  if (checked) toggleCenter(id)
+  else removeCenter(id)
+}
+
 /**
  * 更新开始时间。
  *
@@ -681,6 +772,10 @@ const openEditTask = (task: TaskForm) => {
     ElMessage.warning('任务 ID 无效，无法编辑')
     return
   }
+  if (isTaskCalculating(task)) {
+    ElMessage.warning('任务计算中，请完成后再编辑')
+    return
+  }
   void openTaskEditDialog('edit', task)
 }
 
@@ -730,6 +825,10 @@ const handleSaveAndRecalculate = async () => {
   const draft = editorDraft.value
   if (!baseTask?.id || !draft || draft.taskId !== baseTask.id) {
     ElMessage.warning('请先选择任务')
+    return
+  }
+  if (isTaskCalculating(baseTask)) {
+    ElMessage.warning('任务计算中，请完成后再保存并重算')
     return
   }
   if (!draft.beginDate || !draft.endDate) {
@@ -911,14 +1010,6 @@ onUnmounted(() => {
   }
 }
 
-.task-progress-name-row {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .task-progress-name {
   flex: 1;
   min-width: 0;
@@ -933,7 +1024,8 @@ onUnmounted(() => {
 
 .task-progress-edit-btn {
   flex-shrink: 0;
-  height: 24px;
+  height: 28px;
+  align-self: center;
   padding: 0 8px;
   border-radius: 4px;
   border: 1px solid rgba(0, 225, 255, 0.4);
@@ -976,52 +1068,66 @@ onUnmounted(() => {
   color: #e2efff;
 }
 
-.task-progress-bar-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 72px;
-  max-width: 168px;
-}
-
-.task-progress-item--done .task-progress-bar-wrap {
-  flex: 0 0 auto;
-  min-width: 0;
-  max-width: none;
-}
-
-.task-progress-done {
+.task-progress-trailing {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+}
+
+.task-progress-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/** 短进度条与文案横向并排，不挤压任务名 */
+.task-progress-mini {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  white-space: nowrap;
 }
 
-.task-progress-done-dot {
+.task-progress-mini-bar {
+  width: 40px;
+  line-height: 0;
   flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #22c55e;
-  box-shadow: 0 0 6px rgba(34, 197, 94, 0.55);
+
+  :deep(.el-progress-bar) {
+    width: 40px;
+  }
+
+  :deep(.el-progress-bar__outer) {
+    height: 4px;
+    border-radius: 2px;
+    background-color: rgba(100, 116, 139, 0.35);
+  }
+
+  :deep(.el-progress-bar__inner) {
+    border-radius: 2px;
+  }
 }
 
-.task-progress-done-text {
-  font-size: 11px;
-  font-weight: 600;
-  color: #86efac;
-  line-height: 1.2;
-}
-
-.task-progress-mes {
+.task-progress-percent {
+  flex-shrink: 0;
   font-size: 10px;
+  font-weight: 700;
   color: #7dd3fc;
-  line-height: 1.3;
+  text-align: left;
+  line-height: 1.2;
+  white-space: nowrap;
 
-  &.is-muted {
+  &--done {
+    min-width: auto;
+    font-size: 11px;
+    color: #86efac;
+  }
+
+  &--idle {
+    min-width: auto;
+    font-size: 11px;
+    font-weight: 600;
     color: #64748b;
   }
 }
@@ -1032,6 +1138,12 @@ onUnmounted(() => {
   overflow-y: auto;
   padding: 10px 12px 12px;
   text-align: left;
+
+  &--locked {
+    pointer-events: none;
+    opacity: 0.62;
+    user-select: none;
+  }
 
   &::-webkit-scrollbar {
     width: 4px;
@@ -1211,6 +1323,15 @@ onUnmounted(() => {
   justify-content: flex-start;
 }
 
+/** 选项列表：多列 grid，每格内 checkbox + 文案列对齐 */
+.task-config-checkbox-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  gap: 8px;
+  width: 100%;
+  align-items: stretch;
+}
+
 .task-config-tag {
   cursor: pointer;
   border-color: rgba(100, 116, 139, 0.45);
@@ -1222,6 +1343,60 @@ onUnmounted(() => {
     background: rgba(0, 225, 255, 0.14);
     color: #e0f2fe;
   }
+}
+
+.task-config-checkbox {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  margin: 0;
+  min-height: 30px;
+  padding: 4px 8px;
+  box-sizing: border-box;
+  border-radius: 4px;
+  border: 1px solid rgba(100, 116, 139, 0.35);
+  background: rgba(15, 23, 42, 0.65);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.18s ease, background 0.18s ease;
+
+  &:has(.el-checkbox.is-checked) {
+    border-color: rgba(0, 225, 255, 0.55);
+    background: rgba(0, 225, 255, 0.1);
+  }
+
+  :deep(.el-checkbox) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 18px;
+    margin: 0;
+    line-height: 1;
+  }
+
+  :deep(.el-checkbox__input) {
+    vertical-align: middle;
+  }
+
+  :deep(.el-checkbox__label) {
+    display: none;
+  }
+}
+
+.task-config-checkbox__label {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-config-checkbox:has(.el-checkbox.is-checked) .task-config-checkbox__label {
+  color: #e0f2fe;
 }
 
 .save-recalc-btn {
