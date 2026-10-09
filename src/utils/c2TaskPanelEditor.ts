@@ -35,6 +35,26 @@ export interface C2TaskEditorDraft {
 }
 
 /**
+ * 规范化任务武器 ID 列表：去掉 null/空串、转字符串并去重（避免接口脏数据残留到 updateTask）。
+ *
+ * @param ids 原始 weaponIds 或草稿中的 selectedWeaponIds
+ * @returns 有效武器 ID 列表
+ */
+export const normalizeTaskWeaponIds = (ids: unknown[] | null | undefined): string[] => {
+  if (!ids?.length) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const raw of ids) {
+    if (raw == null || raw === '') continue
+    const id = String(raw).trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    result.push(id)
+  }
+  return result
+}
+
+/**
  * 新建任务且接口未返回区域时使用的默认示例（台海附近，半径 3000km）。
  */
 export const TASK_COMBAT_AREA_MOCK: TaskCombatArea = {
@@ -146,6 +166,7 @@ export const prepareTaskForBattleApi = <T extends TaskForm>(
   }
   return {
     ...rest,
+    weaponIds: normalizeTaskWeaponIds(rest.weaponIds as unknown[]),
     ...combatAreaToApiFields(area),
   } as Omit<T, 'combatArea' | 'focusStatus'>
 }
@@ -279,7 +300,7 @@ export const createDraftFromTask = (task: TaskForm | null | undefined): C2TaskEd
     beginDate: normalizeTaskDateTime(task.beginDate),
     endDate: normalizeTaskDateTime(task.endDate),
     selectedSeries,
-    selectedWeaponIds: [...(task.weaponIds ?? [])],
+    selectedWeaponIds: normalizeTaskWeaponIds(task.weaponIds as unknown[]),
     selectedReceiveIds,
     stationIds,
     delayMin: Number.isFinite(task.delayMin) ? Number(task.delayMin) : 60,
@@ -316,7 +337,7 @@ export const mergeTaskFormWithDraft = (base: TaskForm, draft: C2TaskEditorDraft)
     ...base,
     beginDate: normalizeTaskDateTime(draft.beginDate),
     endDate: normalizeTaskDateTime(draft.endDate),
-    weaponIds: [...draft.selectedWeaponIds],
+    weaponIds: normalizeTaskWeaponIds(draft.selectedWeaponIds),
     resources: buildTaskResourcesFromDraft(draft),
     delayMin: draft.delayMin,
     coverage: draft.coverage,

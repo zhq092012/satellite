@@ -213,6 +213,7 @@ import {
   fromTaskDatetimeLocalValue,
   isDataCenterStationType,
   mergeTaskFormWithDraft,
+  normalizeTaskWeaponIds,
   parseTaskPanelTimeMs,
   TASK_PANEL_SATELLITE_TYPES,
   toTaskDatetimeLocalValue,
@@ -526,6 +527,7 @@ const syncEditorForTask = async (task: TaskForm | null | undefined) => {
   editorDraft.value = createDraftFromTask(task)
   if (task && editorDraft.value) {
     durationHours.value = calcTaskDurationHours(editorDraft.value.beginDate, editorDraft.value.endDate)
+    editorDraft.value.selectedWeaponIds = normalizeTaskWeaponIds(editorDraft.value.selectedWeaponIds)
     stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
     useWeaponsEnabled.value = editorDraft.value.selectedWeaponIds.length > 0
     store.setTaskCombatArea({ ...editorDraft.value.combatArea })
@@ -638,21 +640,25 @@ const removeSeries = (series: string) => {
 const handleUseWeaponsChange = (enabled: boolean) => {
   if (!editorDraft.value) return
   if (!enabled) {
-    stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
+    stashedWeaponIds.value = normalizeTaskWeaponIds(editorDraft.value.selectedWeaponIds)
     editorDraft.value.selectedWeaponIds = []
     return
   }
-  editorDraft.value.selectedWeaponIds = [...stashedWeaponIds.value]
+  editorDraft.value.selectedWeaponIds = normalizeTaskWeaponIds(stashedWeaponIds.value)
 }
 
 const toggleWeapon = (id: string) => {
-  if (!useWeaponsEnabled.value || !editorDraft.value || editorDraft.value.selectedWeaponIds.includes(id)) return
-  editorDraft.value.selectedWeaponIds = [...editorDraft.value.selectedWeaponIds, id]
+  if (!useWeaponsEnabled.value || !editorDraft.value || !id) return
+  const current = normalizeTaskWeaponIds(editorDraft.value.selectedWeaponIds)
+  if (current.includes(id)) return
+  editorDraft.value.selectedWeaponIds = normalizeTaskWeaponIds([...current, id])
   stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
 }
 const removeWeapon = (id: string) => {
   if (!useWeaponsEnabled.value || !editorDraft.value) return
-  editorDraft.value.selectedWeaponIds = editorDraft.value.selectedWeaponIds.filter((item) => item !== id)
+  editorDraft.value.selectedWeaponIds = normalizeTaskWeaponIds(
+    editorDraft.value.selectedWeaponIds.filter((item) => item !== id),
+  )
   stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
 }
 const toggleReceive = (id: string) => {
