@@ -3,6 +3,7 @@ import type { BattleForm, SatelliteNode, SatelliteRelation, SatelliteStrike, Sat
 import type { AxiosResponsePage, AxiosResponseType } from '@/types/http'
 import type { Strike, StrikeV2 } from '@/types/strike'
 import type { ThreatTaskWeightsResponse } from '@/types/threat'
+import { prepareTaskForBattleApi } from '@/utils/c2TaskPanelEditor'
 import { requestAPI } from '@/utils/tools/request'
 
 /**
@@ -160,7 +161,7 @@ export const deleteBattle = (battleId: number) => {
  */
 export const createTask = (task: TaskForm) => {
   const url = `/api/battle/saveTask`
-  return requestAPI.post<AxiosResponseType<any>>(url, task)
+  return requestAPI.post<AxiosResponseType<any>>(url, prepareTaskForBattleApi(task))
 }
 
 /**
@@ -186,7 +187,7 @@ export const queryTaskProgress = (taskId: number) => {
  */
 export const updateTask = (task: TaskForm) => {
   const url = `/api/battle/updateTask`
-  return requestAPI.put<AxiosResponseType<any>>(url, task)
+  return requestAPI.put<AxiosResponseType<any>>(url, prepareTaskForBattleApi(task))
 }
 /**
  * 删除任务

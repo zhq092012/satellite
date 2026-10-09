@@ -1,5 +1,7 @@
 import type { AxiosResponseType } from '@/types/http'
 
+import { prepareTaskForBattleApi } from '@/utils/c2TaskPanelEditor'
+import type { TaskForm } from '@/types/dashboard'
 import { requestAPI } from '@/utils/tools/request'
 import type { Satellite } from '@/types/cesium/satellite'
 
@@ -121,10 +123,14 @@ export interface TaskFormNew {
     createTime?: string
     /** 更新时间（接口返回） */
     updateTime?: string
-    /** 纬度（接口返回） */
+    /** 任务区域中心纬度（度） */
     latitude?: number | null
-    /** 经度（接口返回） */
+    /** 任务区域中心经度（度） */
     longitude?: number | null
+    /** 任务区域半径（km） */
+    radius?: number | null
+    /** 是否启用任务区域：0 关闭，1 启用 */
+    areaEnable?: number | null
     /** 高度（接口返回） */
     altitude?: number | null
     /** 前推小时（接口返回） */
@@ -386,7 +392,7 @@ export const getTaskMatrix = (data: { taskId: string }) => {
  */
 export const addTask = (data: TaskFormNew) => {
     const url = '/api/battle/saveTask'
-    return requestAPI.post<AxiosResponseType<any>>(url, data)
+    return requestAPI.post<AxiosResponseType<any>>(url, prepareTaskForBattleApi(data as TaskForm))
 }
 
 /**

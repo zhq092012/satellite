@@ -45,8 +45,16 @@ interface TaskForm {
   weaponIds?: string[]
   /** 装配资源 */
   resources?: TaskResourceItem[]
-  /** 任务作战区域（圆形）；后端未接入前可由前端假数据填充 */
+  /** 任务作战区域（仅前端编辑/地图展示；提交接口时用下方扁平字段） */
   combatArea?: TaskCombatArea | null
+  /** 任务区域中心经度（度，接口字段） */
+  longitude?: number | null
+  /** 任务区域中心纬度（度，接口字段） */
+  latitude?: number | null
+  /** 任务区域半径（km，接口字段） */
+  radius?: number | null
+  /** 是否启用任务区域：0 关闭，1 启用（接口字段） */
+  areaEnable?: number | null
   /** 国家汇总 */
   country?: string
   createTime?: string

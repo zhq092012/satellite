@@ -105,6 +105,12 @@ import { ElMessage } from 'element-plus'
 import { getBattleCountrys, updateTask } from '@/api/dashboard'
 import { addTask } from '@/api/task/task'
 import type { TaskForm } from '@/types/dashboard'
+import {
+  combatAreaToApiFields,
+  normalizeTaskCombatArea,
+  resolveTaskCombatAreaFromTask,
+  TASK_COMBAT_AREA_MOCK,
+} from '@/utils/c2TaskPanelEditor'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskAssembleTab, { type TaskAssembleRow } from '@/components/BattleSituation/TaskAssembleTab.vue'
 
@@ -181,6 +187,7 @@ const taskForm = reactive<TaskForm>({
   focusStatus: 0,
   delayMin: 60,
   coverage: 50,
+  combatArea: { ...TASK_COMBAT_AREA_MOCK },
 })
 
 /** 任务表单校验规则。 */
@@ -560,6 +567,7 @@ const resetCreateForm = () => {
     focusStatus: 0,
     delayMin: DEFAULT_DELAY_MIN,
     coverage: DEFAULT_COVERAGE,
+    combatArea: { ...TASK_COMBAT_AREA_MOCK },
   })
   durationHours.value = DEFAULT_TASK_DURATION_HOURS
 }
@@ -591,6 +599,7 @@ const fillForm = (task: TaskForm | null) => {
       receiveIds: [...(item.receiveIds ?? [])],
       stationIds: [...(item.stationIds ?? [])],
     })) : [],
+    combatArea: resolveTaskCombatAreaFromTask(task),
   })
   const begin = normalizeDateTime(task.beginDate)
   const end = normalizeDateTime(task.endDate)
@@ -693,7 +702,7 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
     stationIds,
   }))
 
-  return {
+  const basePayload = {
     battleId: store.battle?.id as number,
     meCountry: taskForm.meCountry,
     enemyCountry: taskForm.enemyCountry,
@@ -710,6 +719,14 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
     weaponIds,
     resources,
   }
+
+  const combatArea = normalizeTaskCombatArea(
+    resolveTaskCombatAreaFromTask({ ...taskForm, combatArea: taskForm.combatArea }),
+  )
+  return {
+    ...basePayload,
+    ...combatAreaToApiFields(combatArea),
+  }
 }
 
 /**
@@ -718,28 +735,33 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
  * @param taskPayload addTask / updateTask 共用的请求体
  * @returns 合并当前表单后的任务对象
  */
-const buildSavedTaskFromPayload = (taskPayload: AddTaskPayload): TaskForm => ({
-  ...taskForm,
-  battleId: taskPayload.battleId,
-  beginDate: taskPayload.beginDate,
-  endDate: taskPayload.endDate,
-  meCountry: taskPayload.meCountry,
-  enemyCountry: taskPayload.enemyCountry,
-  meCountryShow: [...(taskPayload.meCountryShow ?? [])],
-  enemyCountryShow: [...(taskPayload.enemyCountryShow ?? [])],
-  targetType: taskPayload.targetType,
-  targetTypeNew: taskPayload.targetTypeNew,
-  targetTypeShow: [...(taskForm.targetTypeShow || [])],
-  steps: taskForm.steps || '',
-  delayMin: taskPayload.delayMin,
-  coverage: taskPayload.coverage,
-  weaponIds: [...taskPayload.weaponIds],
-  resources: taskPayload.resources.map((item) => ({
-    series: item.series,
-    receiveIds: [...item.receiveIds],
-    stationIds: [...item.stationIds],
-  })),
-})
+const buildSavedTaskFromPayload = (taskPayload: AddTaskPayload): TaskForm => {
+  const combatArea = resolveTaskCombatAreaFromTask(taskPayload as TaskForm)
+  return {
+    ...taskForm,
+    battleId: taskPayload.battleId,
+    beginDate: taskPayload.beginDate,
+    endDate: taskPayload.endDate,
+    meCountry: taskPayload.meCountry,
+    enemyCountry: taskPayload.enemyCountry,
+    meCountryShow: [...(taskPayload.meCountryShow ?? [])],
+    enemyCountryShow: [...(taskPayload.enemyCountryShow ?? [])],
+    targetType: taskPayload.targetType,
+    targetTypeNew: taskPayload.targetTypeNew,
+    targetTypeShow: [...(taskForm.targetTypeShow || [])],
+    steps: taskForm.steps || '',
+    delayMin: taskPayload.delayMin,
+    coverage: taskPayload.coverage,
+    weaponIds: [...taskPayload.weaponIds],
+    resources: taskPayload.resources.map((item) => ({
+      series: item.series,
+      receiveIds: [...item.receiveIds],
+      stationIds: [...item.stationIds],
+    })),
+    combatArea: { ...combatArea },
+    ...combatAreaToApiFields(combatArea),
+  }
+}
 
 /**
  * 校验并提交任务：新建走 addTask，修改走 updateTask。

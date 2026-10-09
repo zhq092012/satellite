@@ -1,4 +1,4 @@
-import type { TaskForm, TaskResourceItem } from '@/types/dashboard'
+import type { TaskCombatArea, TaskForm, TaskResourceItem } from '@/types/dashboard'
 
 /** 标签候选项（系列名或资源 ID + 展示名） */
 export interface TaskPanelTagOption {
@@ -35,8 +35,7 @@ export interface C2TaskEditorDraft {
 }
 
 /**
- * 后端未返回任务区域时使用的默认假数据（台海附近示例圆，半径 3000km）。
- * 接入接口后应改为仅读取 task.combatArea。
+ * 新建任务且接口未返回区域时使用的默认示例（台海附近，半径 3000km）。
  */
 export const TASK_COMBAT_AREA_MOCK: TaskCombatArea = {
   centerLon: 121.5,
@@ -46,27 +45,103 @@ export const TASK_COMBAT_AREA_MOCK: TaskCombatArea = {
 }
 
 /**
- * 从任务或假数据解析作战区域草稿。
+ * 规范化作战区域数值，避免非法值进入请求体。
+ *
+ * @param area 原始区域
+ * @returns 规范化后的区域
+ */
+export const normalizeTaskCombatArea = (area: TaskCombatArea): TaskCombatArea => ({
+  centerLon: Number(area.centerLon),
+  centerLat: Number(area.centerLat),
+  radiusKm: Math.max(1, Number(area.radiusKm)),
+  enabled: Boolean(area.enabled),
+})
+
+/**
+ * 从接口嵌套字段或扁平字段解析是否启用任务区域。
+ *
+ * @param task 任务
+ * @param nestedEnabled combatArea.enabled
+ * @returns 是否启用
+ */
+const resolveTaskAreaEnabledFromTask = (task: TaskForm, nestedEnabled?: boolean): boolean => {
+  if (task.areaEnable != null && Number.isFinite(Number(task.areaEnable))) {
+    return Number(task.areaEnable) === 1
+  }
+  if (nestedEnabled != null) return Boolean(nestedEnabled)
+  return true
+}
+
+/**
+ * 从任务接口数据或假数据解析作战区域草稿。
  *
  * @param task 任务
  * @returns 作战区域配置
  */
 export const resolveTaskCombatAreaFromTask = (task: TaskForm | null | undefined): TaskCombatArea => {
-  const fromTask = task?.combatArea
+  if (!task) return { ...TASK_COMBAT_AREA_MOCK }
+
+  const lon = Number(task.longitude)
+  const lat = Number(task.latitude)
+  const radius = Number(task.radius)
+  if (Number.isFinite(lon) && Number.isFinite(lat) && Number.isFinite(radius)) {
+    return normalizeTaskCombatArea({
+      centerLon: lon,
+      centerLat: lat,
+      radiusKm: radius,
+      enabled: resolveTaskAreaEnabledFromTask(task),
+    })
+  }
+
+  const fromTask = task.combatArea
   if (
     fromTask &&
-    Number.isFinite(fromTask.centerLon) &&
-    Number.isFinite(fromTask.centerLat) &&
-    Number.isFinite(fromTask.radiusKm)
+    Number.isFinite(Number(fromTask.centerLon)) &&
+    Number.isFinite(Number(fromTask.centerLat)) &&
+    Number.isFinite(Number(fromTask.radiusKm))
   ) {
-    return {
+    return normalizeTaskCombatArea({
       centerLon: Number(fromTask.centerLon),
       centerLat: Number(fromTask.centerLat),
-      radiusKm: Math.max(1, Number(fromTask.radiusKm)),
-      enabled: Boolean(fromTask.enabled),
-    }
+      radiusKm: Number(fromTask.radiusKm),
+      enabled: resolveTaskAreaEnabledFromTask(task, fromTask.enabled),
+    })
   }
+
   return { ...TASK_COMBAT_AREA_MOCK }
+}
+
+/**
+ * 作战区域 → 后端任务实体上的扁平字段（saveTask / updateTask 只认这一套）。
+ *
+ * @param area 前端编辑用的区域
+ * @returns longitude、latitude、radius、areaEnable
+ */
+export const combatAreaToApiFields = (
+  area: TaskCombatArea,
+): Pick<TaskForm, 'longitude' | 'latitude' | 'radius' | 'areaEnable'> => {
+  const normalized = normalizeTaskCombatArea(area)
+  return {
+    longitude: normalized.centerLon,
+    latitude: normalized.centerLat,
+    radius: normalized.radiusKm,
+    areaEnable: normalized.enabled ? 1 : 0,
+  }
+}
+
+/**
+ * 提交战场任务接口前：去掉仅前端使用的 `combatArea`，并保证扁平区域字段齐全。
+ *
+ * @param task 内存中的任务（可含 combatArea）
+ * @returns 适合 POST/PUT 的请求体
+ */
+export const prepareTaskForBattleApi = <T extends TaskForm>(task: T): Omit<T, 'combatArea'> => {
+  const area = resolveTaskCombatAreaFromTask(task)
+  const { combatArea: _omit, ...rest } = task
+  return {
+    ...rest,
+    ...combatAreaToApiFields(area),
+  } as Omit<T, 'combatArea'>
 }
 
 /**
@@ -230,6 +305,7 @@ export const buildTaskResourcesFromDraft = (draft: C2TaskEditorDraft): TaskResou
  */
 export const mergeTaskFormWithDraft = (base: TaskForm, draft: C2TaskEditorDraft): TaskForm => {
   const targetTypeValue = draft.targetTypeShow.join(',')
+  const combatArea = normalizeTaskCombatArea(draft.combatArea)
   return {
     ...base,
     beginDate: normalizeTaskDateTime(draft.beginDate),
@@ -241,7 +317,8 @@ export const mergeTaskFormWithDraft = (base: TaskForm, draft: C2TaskEditorDraft)
     targetType: targetTypeValue,
     targetTypeNew: targetTypeValue,
     targetTypeShow: [...draft.targetTypeShow],
-    combatArea: { ...draft.combatArea },
+    combatArea: { ...combatArea },
+    ...combatAreaToApiFields(combatArea),
   }
 }
 
