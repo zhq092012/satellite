@@ -36,7 +36,6 @@ interface TaskForm {
   enemyCountry: string
   meCountryShow: string[]
   enemyCountryShow: string[]
-  focusStatus: number
   /** 链路时延（分钟） */
   delayMin?: number
   /** 覆盖率（0-100） */

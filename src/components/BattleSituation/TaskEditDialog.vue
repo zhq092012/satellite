@@ -109,11 +109,8 @@
               <el-checkbox-group v-model="taskForm.enemyCountryShow" class="country-checkbox-group"
                 @change="handleCountryShowChange">
                 <el-checkbox v-for="item in countryOptions" :key="`enemy-${item}`" :value="item">{{ item
-                  }}</el-checkbox>
+                }}</el-checkbox>
               </el-checkbox-group>
-            </el-form-item>
-            <el-form-item label="设置关注">
-              <el-switch v-model="taskForm.focusStatus" :active-value="1" :inactive-value="0" />
             </el-form-item>
           </el-form>
         </div>
@@ -227,7 +224,6 @@ const taskForm = reactive<TaskForm>({
   enemyCountry: DEFAULT_ENEMY_COUNTRIES.join(','),
   enemyCountryShow: [...DEFAULT_ENEMY_COUNTRIES],
   steps: '',
-  focusStatus: 0,
   delayMin: 60,
   coverage: 50,
   combatArea: { ...TASK_COMBAT_AREA_MOCK },
@@ -619,7 +615,6 @@ const resetCreateForm = () => {
     enemyCountry: DEFAULT_ENEMY_COUNTRIES.join(','),
     enemyCountryShow: [...DEFAULT_ENEMY_COUNTRIES],
     steps: '',
-    focusStatus: 0,
     delayMin: DEFAULT_DELAY_MIN,
     coverage: DEFAULT_COVERAGE,
     combatArea: { ...TASK_COMBAT_AREA_MOCK },
@@ -645,7 +640,6 @@ const fillForm = (task: TaskForm | null) => {
       ? [...task.targetTypeShow]
       : splitCsv(task.targetTypeNew || task.targetType),
     steps: task.steps || '',
-    focusStatus: Number(task.focusStatus) === 1 ? 1 : 0,
     delayMin: Number.isFinite(task.delayMin) ? Number(task.delayMin) : DEFAULT_DELAY_MIN,
     coverage: Number.isFinite(task.coverage) ? Number(task.coverage) : DEFAULT_COVERAGE,
     weaponIds: task.weaponIds ? [...task.weaponIds] : [],
@@ -1334,7 +1328,7 @@ const handleSubmit = async () => {
       padding-left: 8px;
     }
 
-    .atlas-app-checkbox__input.is-checked + .atlas-app-checkbox__label {
+    .atlas-app-checkbox__input.is-checked+.atlas-app-checkbox__label {
       color: #7dd3fc;
     }
 
