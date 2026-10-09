@@ -24,9 +24,8 @@
                 <el-tooltip :content="getTaskProgressDisplay(task).tooltip" placement="top"
                   :show-after="getTaskProgressDisplay(task).kind === 'running' ? 200 : 0">
                   <div class="task-progress-mini">
-                    <el-progress v-if="getTaskProgressDisplay(task).kind !== 'done'"
-                      class="task-progress-mini-bar" :percentage="getTaskProgressDisplay(task).percent"
-                      :stroke-width="4" :show-text="false" />
+                    <el-progress v-if="getTaskProgressDisplay(task).kind !== 'done'" class="task-progress-mini-bar"
+                      :percentage="getTaskProgressDisplay(task).percent" :stroke-width="4" :show-text="false" />
                     <span class="task-progress-percent" :class="{
                       'task-progress-percent--done': getTaskProgressDisplay(task).kind === 'done',
                       'task-progress-percent--idle': getTaskProgressDisplay(task).kind === 'idle',
@@ -91,8 +90,8 @@
                 <div class="tag-cloud metric-type-tags">
                   <el-tag v-for="typeName in TASK_PANEL_SATELLITE_TYPES" :key="typeName" class="task-config-tag"
                     :class="{ 'is-selected': isTargetTypeSelected(typeName) }"
-                    :closable="isTargetTypeSelected(typeName)" disable-transitions
-                    @close="removeTargetType(typeName)" @click="toggleTargetType(typeName)">
+                    :closable="isTargetTypeSelected(typeName)" disable-transitions @close="removeTargetType(typeName)"
+                    @click="toggleTargetType(typeName)">
                     {{ typeName }}
                   </el-tag>
                 </div>
@@ -804,11 +803,17 @@ const selectTask = async (task: TaskForm) => {
   if (store.activedTask?.id === task.id) return
   taskSwitching.value = true
   try {
+    /** 1. 设置当前选中任务 */
     store.setActivedTask(task)
+    /** 2. 清除任务分析数据 */
     store.setSelectedSatSeries('')
+    /** 3. 同步任务编辑器数据 */
     await syncEditorForTask(task)
+
     ElMessage.success(`已切换当前任务：${task.name}`)
+    /** 5. 获取任务分析数据 */
     if (store.selectedSatSeries) {
+      /** 6. 获取任务分析数据 */
       await store.fetchMatrixForCurrentScope(true)
     }
   } catch (err) {
@@ -821,33 +826,43 @@ const selectTask = async (task: TaskForm) => {
  * 校验并提交任务修改，触发后台重算。
  */
 const handleSaveAndRecalculate = async () => {
+  /** 1. 校验任务基本信息 */
   const baseTask = store.activedTask
+  /** 2. 校验任务编辑器数据 */
   const draft = editorDraft.value
+  /** 3. 校验任务编辑器数据与任务基本信息一致 */
   if (!baseTask?.id || !draft || draft.taskId !== baseTask.id) {
     ElMessage.warning('请先选择任务')
     return
   }
+  /** 4. 校验任务是否正在计算 */
   if (isTaskCalculating(baseTask)) {
     ElMessage.warning('任务计算中，请完成后再保存并重算')
     return
   }
+  /** 5. 校验任务开始与结束时间 */
   if (!draft.beginDate || !draft.endDate) {
     ElMessage.warning('请填写开始与结束时间')
     return
   }
+  /** 6. 校验任务开始与结束时间 */
   if (parseTaskPanelTimeMs(draft.endDate) <= parseTaskPanelTimeMs(draft.beginDate)) {
     ElMessage.warning('结束时间必须晚于开始时间')
     return
   }
+  /** 7. 校验任务卫星系列 */
   if (!draft.selectedSeries.length) {
     ElMessage.warning('请至少保留一个卫星系列')
     return
   }
+  /** 8. 校验任务卫星类型 */
   if (!draft.targetTypeShow.length) {
     ElMessage.warning('请至少选择一种卫星类型')
     return
   }
+  /** 9. 合并任务编辑器数据与任务基本信息 */
   const payload = mergeTaskFormWithDraft(baseTask, draft)
+  /** 10. 保存并重算任务 */
   savingRecalc.value = true
   try {
     const res = await updateTask(payload)
@@ -856,13 +871,21 @@ const handleSaveAndRecalculate = async () => {
       return
     }
     ElMessage.success('已保存，任务重新计算中')
+    /** 11. 刷新任务列表 */
     await loadBattleTasks()
+    /** 12. 设置当前选中任务 */
     const latest = taskList.value.find((item) => item.id === baseTask.id) || payload
+    /** 12. 设置当前选中任务 */
     store.setActivedTask(latest)
+    /** 13. 清除任务分析数据 */
     store.setSelectedSatSeries('')
+    /** 13. 清除任务分析数据 */
     store.clearTaskAnalysisData()
+    /** 14. 启动任务进度轮询 */
     await startTaskProgressPolling(baseTask.id)
+    /** 15. 同步任务编辑器数据 */
     await syncEditorForTask(latest)
+    /** 16. 触发任务重算事件 */
     emit('task-recalculated', baseTask.id)
   } catch (error) {
     console.error('保存并重算失败:', error)
