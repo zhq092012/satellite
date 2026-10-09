@@ -136,7 +136,9 @@ export const combatAreaToApiFields = (
  * @returns 适合 POST/PUT 的请求体
  */
 export const prepareTaskForBattleApi = <T extends TaskForm>(task: T): Omit<T, 'combatArea'> => {
-  const area = resolveTaskCombatAreaFromTask(task)
+  const area = task.combatArea
+    ? normalizeTaskCombatArea(task.combatArea)
+    : resolveTaskCombatAreaFromTask(task)
   const { combatArea: _omit, ...rest } = task
   return {
     ...rest,

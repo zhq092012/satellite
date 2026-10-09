@@ -29,27 +29,70 @@
                 :value="toDatetimeLocalValue(taskForm.endDate)"
                 @input="handleEndInput(($event.target as HTMLInputElement).value)" />
             </el-form-item>
-            <el-form-item label="任务时长">
-              <div class="metric-input-row">
-                <el-input-number v-model="durationHours" :min="1" :max="8760" :step="1" :controls="true"
-                  controls-position="right" class="metric-input-number" @change="handleDurationHoursChange" />
-                <span class="metric-input-unit">小时</span>
+            <div class="task-edit-metrics-grid">
+              <el-form-item label="任务时长" class="task-edit-metrics-grid__left-cell">
+                <div class="metric-input-row">
+                  <el-input-number v-model="durationHours" :min="1" :max="8760" :step="1" :controls="true"
+                    controls-position="right" class="metric-input-number" @change="handleDurationHoursChange" />
+                  <span class="metric-input-unit">小时</span>
+                </div>
+              </el-form-item>
+              <div class="task-edit-metrics-grid__right-cell">
+                <div class="task-edit-area-slot">
+                  <span class="task-edit-area-slot__label">任务区域</span>
+                  <el-checkbox v-model="taskForm.combatArea!.enabled" :disabled="!canSave">启用</el-checkbox>
+                </div>
+                <el-form-item label="经度" class="task-edit-coord-item">
+                  <div class="metric-input-row">
+                    <el-input-number v-model="taskForm.combatArea!.centerLon" class="metric-input-number" :min="-180"
+                      :max="180" :step="0.0001" :precision="4" controls-position="right" :disabled="!canSave" />
+                    <span class="metric-input-unit metric-input-unit--reserve" aria-hidden="true">°</span>
+                  </div>
+                </el-form-item>
               </div>
-            </el-form-item>
-            <el-form-item label="链路时延">
-              <div class="metric-input-row">
-                <el-input-number v-model="linkDelayMin" :min="1" :max="4320" :step="1" :controls="true"
-                  controls-position="right" class="metric-input-number" />
-                <span class="metric-input-unit">分钟</span>
+
+              <el-form-item label="链路时延" class="task-edit-metrics-grid__left-cell">
+                <div class="metric-input-row">
+                  <el-input-number v-model="linkDelayMin" :min="1" :max="4320" :step="1" :controls="true"
+                    controls-position="right" class="metric-input-number" />
+                  <span class="metric-input-unit">分钟</span>
+                </div>
+              </el-form-item>
+              <div class="task-edit-metrics-grid__right-cell">
+                <div class="task-edit-area-slot task-edit-area-slot--ghost" aria-hidden="true">
+                  <span class="task-edit-area-slot__label">任务区域</span>
+                  <span>启用</span>
+                </div>
+                <el-form-item label="纬度" class="task-edit-coord-item">
+                  <div class="metric-input-row">
+                    <el-input-number v-model="taskForm.combatArea!.centerLat" class="metric-input-number" :min="-90"
+                      :max="90" :step="0.0001" :precision="4" controls-position="right" :disabled="!canSave" />
+                    <span class="metric-input-unit metric-input-unit--reserve" aria-hidden="true">°</span>
+                  </div>
+                </el-form-item>
               </div>
-            </el-form-item>
-            <el-form-item label="覆盖率">
-              <div class="metric-input-row">
-                <el-input-number v-model="taskCoverage" :min="0" :max="100" :step="1" :controls="true"
-                  controls-position="right" class="metric-input-number" />
-                <span class="metric-input-unit">%</span>
+
+              <el-form-item label="覆盖率" class="task-edit-metrics-grid__left-cell">
+                <div class="metric-input-row">
+                  <el-input-number v-model="taskCoverage" :min="0" :max="100" :step="1" :controls="true"
+                    controls-position="right" class="metric-input-number" />
+                  <span class="metric-input-unit">%</span>
+                </div>
+              </el-form-item>
+              <div class="task-edit-metrics-grid__right-cell">
+                <div class="task-edit-area-slot task-edit-area-slot--ghost" aria-hidden="true">
+                  <span class="task-edit-area-slot__label">任务区域</span>
+                  <span>启用</span>
+                </div>
+                <el-form-item label="半径" class="task-edit-coord-item">
+                  <div class="metric-input-row">
+                    <el-input-number v-model="taskForm.combatArea!.radiusKm" class="metric-input-number" :min="1"
+                      :max="20000" :step="10" :precision="0" controls-position="right" :disabled="!canSave" />
+                    <span class="metric-input-unit">km</span>
+                  </div>
+                </el-form-item>
               </div>
-            </el-form-item>
+            </div>
             <el-form-item label="卫星类型" prop="targetTypeShow">
               <el-select v-model="taskForm.targetTypeShow" multiple placeholder="请选择卫星类型"
                 popper-class="task-edit-select-popper" style="width: 100%" @change="handleTargetTypeShowChange">
@@ -271,6 +314,18 @@ const taskEditMenus: TaskEditMenuItem[] = [
 const activeTab = ref<TaskEditTabKey>('basic')
 /** 装配页重置令牌，弹窗每次打开递增。 */
 const assembleResetKey = ref(0)
+
+/**
+ * 弹窗内编辑 combatArea 时，同步扁平字段，避免与接口解析优先级不一致。
+ */
+watch(
+  () => taskForm.combatArea,
+  (area) => {
+    if (!area) return
+    Object.assign(taskForm, combatAreaToApiFields(normalizeTaskCombatArea(area)))
+  },
+  { deep: true },
+)
 
 /**
  * 父级 v-model、模式或任务变化时同步弹窗并回填表单。
@@ -720,9 +775,7 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
     resources,
   }
 
-  const combatArea = normalizeTaskCombatArea(
-    resolveTaskCombatAreaFromTask({ ...taskForm, combatArea: taskForm.combatArea }),
-  )
+  const combatArea = normalizeTaskCombatArea(taskForm.combatArea!)
   return {
     ...basePayload,
     ...combatAreaToApiFields(combatArea),
@@ -736,7 +789,7 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
  * @returns 合并当前表单后的任务对象
  */
 const buildSavedTaskFromPayload = (taskPayload: AddTaskPayload): TaskForm => {
-  const combatArea = resolveTaskCombatAreaFromTask(taskPayload as TaskForm)
+  const combatArea = normalizeTaskCombatArea(taskForm.combatArea!)
   return {
     ...taskForm,
     battleId: taskPayload.battleId,
@@ -1016,6 +1069,121 @@ const handleSubmit = async () => {
 
     .atlas-app-form-item:last-child {
       margin-bottom: 0;
+    }
+  }
+
+  /**
+   * 左右各占 50% 宽；每行左指标与右（任务区域槽 + 坐标）同行对齐。
+   */
+  .task-edit-metrics-grid {
+    --task-area-slot-width: 118px;
+    --task-coord-label-width: 48px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 32px;
+    row-gap: 16px;
+    width: 100%;
+    margin-bottom: 16px;
+    align-items: center;
+
+    .task-edit-metrics-grid__left-cell.atlas-app-form-item {
+      margin-bottom: 0;
+    }
+
+    .metric-input-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 48px;
+      align-items: center;
+      column-gap: 10px;
+      width: 100%;
+      max-width: 280px;
+    }
+
+    .metric-input-number {
+      width: 100% !important;
+      max-width: 100%;
+    }
+
+    .metric-input-number.atlas-app-input-number,
+    .atlas-app-input-number.metric-input-number {
+      width: 100% !important;
+    }
+
+    .metric-input-unit {
+      width: 48px;
+      text-align: left;
+    }
+
+    .metric-input-unit--reserve {
+      visibility: hidden;
+      user-select: none;
+    }
+
+    .atlas-app-form-item__content {
+      line-height: 32px;
+    }
+  }
+
+  .task-edit-metrics-grid__right-cell {
+    display: grid;
+    grid-template-columns: var(--task-area-slot-width) minmax(0, 1fr);
+    column-gap: 8px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .task-edit-area-slot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    min-height: 32px;
+    white-space: nowrap;
+  }
+
+  .task-edit-area-slot--ghost {
+    visibility: hidden;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .task-edit-area-slot__label {
+    font-size: 13px;
+    color: #7dd3fc;
+  }
+
+  .task-edit-coord-item.atlas-app-form-item {
+    margin-bottom: 0;
+    min-width: 0;
+  }
+
+  .task-edit-coord-item.atlas-app-form-item .atlas-app-form-item__label {
+    width: var(--task-coord-label-width) !important;
+    padding-right: 8px !important;
+    justify-content: flex-end;
+  }
+
+  .task-edit-coord-item.atlas-app-form-item .atlas-app-form-item__content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  @media (max-width: 860px) {
+    .task-edit-metrics-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .task-edit-area-slot--ghost {
+      display: none;
+    }
+
+    .task-edit-metrics-grid__right-cell {
+      grid-template-columns: 1fr;
+    }
+
+    .task-edit-area-slot {
+      justify-content: flex-start;
+      margin-bottom: 4px;
     }
   }
 

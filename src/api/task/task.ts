@@ -400,5 +400,5 @@ export const addTask = (data: TaskFormNew) => {
  */
 export const getTargetsThreatLevel = (data: { taskId: string }) => {
     const url = '/api/ThreatAnalysis/targetsThreatLevel'
-    return requestAPI.post<AxiosResponseType<TargetThreatLevel>>(url, data)
+    return requestAPI.post<AxiosResponseType<TargetThreatLevel[]>>(url, data)
 }

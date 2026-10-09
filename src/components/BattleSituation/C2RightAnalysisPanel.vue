@@ -85,14 +85,14 @@
         </div>
       </section>
 
-      <!-- 3. 卫星打击推荐列表（接口未就绪，当前为假数据） -->
+      <!-- 3. 卫星打击推荐列表（targetsThreatLevel） -->
       <section class="analysis-section analysis-section--table">
         <div class="section-head">
           <span class="section-title">卫星打击推荐列表</span>
           <span class="section-count">共 {{ strikeRecommendDisplayRows.length }} 颗 · 按综合威胁度降序</span>
         </div>
 
-        <el-table :data="strikeRecommendDisplayRows" size="small" row-key="norad"
+        <el-table v-loading="strikeRecommendLoading" :data="strikeRecommendDisplayRows" size="small" row-key="norad"
           class="sat-metric-table strike-recommend-table" empty-text="暂无推荐数据">
           <el-table-column label="序号" width="48" align="center" class-name="strike-recommend-index-col">
             <template #default="{ $index }">
@@ -505,7 +505,11 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getSatelliteThreatInfo, type MatrixResult, type SatelliteThreatInfo } from '@/api/electronic'
-import type { LevelSeriesEntity, SatelliteAnalysisData } from '@/api/task/task'
+import {
+  getTargetsThreatLevel,
+  type LevelSeriesEntity,
+  type SatelliteAnalysisData,
+} from '@/api/task/task'
 import BattleSatelliteCoverageDialog from '@/components/BattleSituation/BattleSatelliteCoverageDialog.vue'
 import BattleSatelliteLinkDelayDialog from '@/components/BattleSituation/BattleSatelliteLinkDelayDialog.vue'
 import SatelliteThreatInfoDialog from '@/components/BattleSituation/SatelliteThreatInfoDialog.vue'
@@ -537,7 +541,7 @@ import {
   type SatelliteMetricTableRow,
 } from '@/utils/buildSatelliteAnalysisTable'
 import {
-  MOCK_SATELLITE_STRIKE_RECOMMENDATIONS,
+  mapTargetThreatLevelListToStrikeRecommend,
   sortStrikeRecommendByCompositeThreat,
   type SatelliteStrikeRecommendItem,
 } from '@/utils/mockSatelliteStrikeRecommendations'
@@ -829,12 +833,39 @@ const coverageReductionText = computed(() =>
   )
 )
 
+/** 卫星打击推荐列表（接口原始行，按任务加载） */
+const satelliteStrikeRecommendRows = ref<SatelliteStrikeRecommendItem[]>([])
+
+/** 卫星打击推荐列表加载中 */
+const strikeRecommendLoading = ref(false)
+
 /**
- * 卫星打击推荐列表展示行（当前为假数据；接入后端后改为 API / analysisData 字段）。
- * 排序规则：综合威胁度降序。
+ * 拉取任务下卫星打击推荐（综合/静态/动态威胁度）。
+ *
+ * @param taskId 任务 ID
+ */
+const loadSatelliteStrikeRecommendations = async (taskId: number) => {
+  strikeRecommendLoading.value = true
+  try {
+    const res = await getTargetsThreatLevel({ taskId: String(taskId) })
+    if (res.code !== 200) {
+      satelliteStrikeRecommendRows.value = []
+      return
+    }
+    satelliteStrikeRecommendRows.value = mapTargetThreatLevelListToStrikeRecommend(res.data)
+  } catch (error) {
+    console.error('获取卫星打击推荐列表失败:', error)
+    satelliteStrikeRecommendRows.value = []
+  } finally {
+    strikeRecommendLoading.value = false
+  }
+}
+
+/**
+ * 卫星打击推荐列表展示行（综合威胁度降序；接口未返回时由 sort 保持空表）。
  */
 const strikeRecommendDisplayRows = computed((): SatelliteStrikeRecommendItem[] =>
-  sortStrikeRecommendByCompositeThreat(MOCK_SATELLITE_STRIKE_RECOMMENDATIONS)
+  sortStrikeRecommendByCompositeThreat(satelliteStrikeRecommendRows.value)
 )
 
 /**
@@ -936,6 +967,20 @@ watch(
     showAllAttackPlans.value = false
     showAllLinkChains.value = false
   }
+)
+
+/** 算法完成后拉取卫星打击推荐列表 */
+watch(
+  () => [store.activedTask?.id, props.algorithmComplete, props.analysisData] as const,
+  ([taskId, complete]) => {
+    if (!taskId || !complete) {
+      satelliteStrikeRecommendRows.value = []
+      strikeRecommendLoading.value = false
+      return
+    }
+    void loadSatelliteStrikeRecommendations(taskId)
+  },
+  { immediate: true }
 )
 
 /** 按打击前覆盖率排序 */
