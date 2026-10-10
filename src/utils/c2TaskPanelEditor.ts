@@ -363,6 +363,30 @@ export const notifyTaskListValidationErrors = (
 }
 
 /**
+ * 提交 saveTask / updateTask 前解析作战区域：优先 `combatArea`，否则读扁平字段（新建任务常只带后者）。
+ *
+ * @param task 内存中的任务
+ * @returns 规范化后的作战区域
+ * @throws 嵌套对象与扁平字段均无法构成有效区域时抛错
+ */
+export const resolveTaskCombatAreaForBattleApiSubmit = (task: TaskForm): TaskCombatArea => {
+  const fromNested = task.combatArea
+  if (
+    fromNested &&
+    Number.isFinite(Number(fromNested.centerLon)) &&
+    Number.isFinite(Number(fromNested.centerLat)) &&
+    Number.isFinite(Number(fromNested.radiusKm))
+  ) {
+    return normalizeTaskCombatArea(fromNested)
+  }
+  const missing = getMissingTaskCombatAreaApiFields(task)
+  if (missing.length) {
+    throw new Error('提交任务缺少作战区域，请先完善任务配置')
+  }
+  return parseTaskCombatAreaFromApiStrict(task)
+}
+
+/**
  * 提交战场任务接口前：去掉仅前端使用的 `combatArea`、不提交的 `focusStatus`，并保证扁平区域字段齐全。
  *
  * @param task 内存中的任务（可含 combatArea）
@@ -371,10 +395,7 @@ export const notifyTaskListValidationErrors = (
 export const prepareTaskForBattleApi = <T extends TaskForm>(
   task: T,
 ): Omit<T, 'combatArea' | 'focusStatus'> => {
-  if (!task.combatArea) {
-    throw new Error('提交任务缺少作战区域，请先完善任务配置')
-  }
-  const area = normalizeTaskCombatArea(task.combatArea)
+  const area = resolveTaskCombatAreaForBattleApiSubmit(task)
   const { combatArea: _omitCombatArea, focusStatus: _omitFocusStatus, ...rest } = task as T & {
     focusStatus?: number
   }
