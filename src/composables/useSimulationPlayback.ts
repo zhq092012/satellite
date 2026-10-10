@@ -18,7 +18,7 @@ export function useSimulationPlayback(
   selectedHistoricalPlan: { value: any | null },
   selectedHistoricalPlanDetail: { value: any | null },
   selectedPlanMissionWindows: { value: StrikePlanV2MissionWindowItem[] },
-  selectedPlanInputCount: { value: number },
+  selectedPlanInputCount: { value: number | null },
   _selectedHistoricalPlanWeaponIds: { value: Set<string> },
   taskWeapons: { value: Weapon[] },
   blueSatellites: { value: BlueSatelliteRecord[] },
@@ -243,9 +243,11 @@ export function useSimulationPlayback(
    * 完成比例
    * @returns 完成比例
    */
-  const completionRatio = computed(() =>
-    selectedPlanInputCount.value > 0 ? completedTargetSatelliteCount.value / selectedPlanInputCount.value : 0
-  )
+  const completionRatio = computed(() => {
+    const total = selectedPlanInputCount.value
+    if (total == null || total <= 0) return 0
+    return completedTargetSatelliteCount.value / total
+  })
 
   /**
    * 武器利用率
@@ -280,9 +282,9 @@ export function useSimulationPlayback(
       id: 'e2',
       label: '已打击/总威胁',
       window:
-        selectedHistoricalPlanDetail.value && selectedPlanInputCount.value > 0
+        selectedHistoricalPlanDetail.value && selectedPlanInputCount.value != null
           ? `${completedTargetSatelliteCount.value} / ${selectedPlanInputCount.value}`
-          : '0 / 0',
+          : '-- / --',
     },
   ])
 
@@ -297,8 +299,14 @@ export function useSimulationPlayback(
     },
     {
       label: '剩余威胁',
-      value: `${Math.max(0, selectedPlanInputCount.value - completedTargetSatelliteCount.value)} 枚`,
-      percent: selectedPlanInputCount.value > 0 ? Math.round((1 - completionRatio.value) * 100) : 0,
+      value:
+        selectedPlanInputCount.value != null
+          ? `${Math.max(0, selectedPlanInputCount.value - completedTargetSatelliteCount.value)} 枚`
+          : '-- 枚',
+      percent:
+        selectedPlanInputCount.value != null && selectedPlanInputCount.value > 0
+          ? Math.round((1 - completionRatio.value) * 100)
+          : 0,
       hint: '总过境卫星-已打击卫星',
     },
     {

@@ -740,7 +740,18 @@ export const useLayoutStore = defineStore('layout-store', {
               taskId,
               sysType: sysType ?? null,
             })
-            return { type, data: res.code === 200 ? res.data : null }
+            if (res.code !== 200) {
+              const { ElMessage } = await import('element-plus')
+              ElMessage.error(
+                res.msg || `获取「${getZhchUsageTypeLabel(type)}」综合打击方案失败（code=${res.code}）`,
+              )
+              return { type, data: null }
+            }
+            if (!res.data) {
+              const { ElMessage } = await import('element-plus')
+              ElMessage.warning(`「${getZhchUsageTypeLabel(type)}」综合打击方案接口返回空数据`)
+            }
+            return { type, data: res.data ?? null }
           })
         )
 

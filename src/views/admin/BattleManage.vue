@@ -156,13 +156,36 @@ import {
   getTaskList,
   saveBattle,
   updateBattle,
+  type TaskListApiResponse,
 } from '@/api/dashboard'
 import type { BattleForm, TaskForm } from '@/types/dashboard'
+import { notifyTaskListValidationErrors } from '@/utils/c2TaskPanelEditor'
 import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 
 /** Store 状态对象 */
 const store = useLayoutStore()
+
+/**
+ * 应用 taskList 接口响应：失败或字段校验错误均提示，不写默认任务字段。
+ *
+ * @param battle 场景
+ * @param res 任务列表响应
+ */
+const applyTaskListResponse = (battle: BattleForm, res: TaskListApiResponse) => {
+  if (res.code !== 200) {
+    ElMessage.error(res.msg || '加载任务列表失败')
+    battle.tasks = []
+    return
+  }
+  const validationErrors = res.taskListValidationErrors ?? res.combatAreaErrors
+  if (validationErrors?.length) {
+    notifyTaskListValidationErrors(validationErrors, (message) => {
+      ElMessage.error({ message, duration: 10000, showClose: true })
+    })
+  }
+  battle.tasks = res.data ?? []
+}
 
 /** 多边形绘制组件引用 */
 const polygonRef = ref<InstanceType<typeof PolygonMap> | null>(null)
@@ -267,11 +290,11 @@ watch(
     if (activeNames.value.length) {
       activeNames.value.forEach(async (battleId) => {
         const res = await getTaskList(Number(battleId))
-        if (res.code === 200) {
-          await resumeTaskProgressPollingForTasks(res.data)
-          const battle = battleList.value.find((s) => s.id === Number(battleId))
-          if (battle) {
-            battle.tasks = res.data
+        const battle = battleList.value.find((s) => s.id === Number(battleId))
+        if (battle) {
+          applyTaskListResponse(battle, res)
+          if (res.code === 200 && res.data?.length) {
+            await resumeTaskProgressPollingForTasks(res.data)
           }
         }
       })
@@ -314,11 +337,11 @@ const clearMap = () => {
  */
 const refreshBattleTasks = async (battleId: number) => {
   const res = await getTaskList(battleId)
-  if (res.code !== 200) return
-  await resumeTaskProgressPollingForTasks(res.data)
   const battle = battleList.value.find((item) => item.id === battleId)
-  if (battle) {
-    battle.tasks = res.data
+  if (!battle) return
+  applyTaskListResponse(battle, res)
+  if (res.code === 200 && res.data?.length) {
+    await resumeTaskProgressPollingForTasks(res.data)
   }
 }
 
@@ -333,16 +356,18 @@ const refreshExpandedTaskLists = async () => {
 /** 加载战场列表，并补回已展开场景的任务 */
 const loadBattleList = async () => {
   const res = await getBattleList()
-  if (res.code === 200) {
-    battleList.value = res.data || []
-    if (battleList.value.length > 0 && activeNames.value.length === 0) {
-      nextTick(() => {
-        activeNames.value = [battleList.value[0].id ?? 0]
-      })
-      return
-    }
-    await refreshExpandedTaskLists()
+  if (res.code !== 200) {
+    ElMessage.error(res.msg || '加载场景列表失败')
+    return
   }
+  battleList.value = res.data ?? []
+  if (battleList.value.length > 0 && activeNames.value.length === 0) {
+    nextTick(() => {
+      activeNames.value = [battleList.value[0].id ?? 0]
+    })
+    return
+  }
+  await refreshExpandedTaskLists()
 }
 
 /** 打开新建场景弹窗 */

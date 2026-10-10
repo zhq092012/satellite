@@ -98,23 +98,21 @@ export function useStrikePlan(
   // ─── 方案详情提取 ───
 
   /**
-   * 取出方案在「自身烈度 + 指定模式」下的详情。
-   *
-   * 方案结构为 `plans[烈度][模式]`，实际数据中烈度键可能与 `intensityLevel` 不一致，
-   * 因此按 烈度键 → 首个烈度 → 指定模式 → threat_first → max_targets 的顺序逐级兜底。
+   * 取出方案在「自身烈度 + 指定模式」下的详情（严格匹配，不切换烈度/模式兜底）。
    *
    * @param plan 历史方案；为空时返回 null
    * @param mode 排序模式，默认取当前选中模式
-   * @returns 方案详情，全部兜底均落空时为 null
+   * @returns 方案详情；结构不匹配时为 null
    */
   const getHistoricalPlanLevelDetail = (
     plan?: StrikePlanV2Extended | null,
     mode: 'threat_first' | 'max_targets' = selectedHistoricalPlanMode.value
   ): StrikePlanV2PlanDetail | null => {
     if (!plan?.plans) return null
-    const levelPlans = plan.plans[plan.intensityLevel as keyof typeof plan.plans] ?? Object.values(plan.plans)[0]
+    const intensityKey = plan.intensityLevel as keyof typeof plan.plans
+    const levelPlans = plan.plans[intensityKey]
     if (!levelPlans) return null
-    return levelPlans[mode] ?? levelPlans.threat_first ?? levelPlans.max_targets ?? null
+    return levelPlans[mode] ?? null
   }
 
   /**
@@ -140,10 +138,15 @@ export function useStrikePlan(
    * 切换方案或模式后需手动调用，保证详情与选中项一致。
    */
   const syncSelectedHistoricalPlanDetail = () => {
-    selectedHistoricalPlanDetail.value = getHistoricalPlanLevelDetail(
-      selectedHistoricalPlan.value,
-      selectedHistoricalPlanMode.value
-    )
+    const plan = selectedHistoricalPlan.value
+    const mode = selectedHistoricalPlanMode.value
+    const detail = getHistoricalPlanLevelDetail(plan, mode)
+    selectedHistoricalPlanDetail.value = detail
+    if (plan && !detail) {
+      ElMessage.error(
+        `方案「${plan.name}」缺少烈度「${plan.intensityLevel}」下模式「${getHistoricalPlanModeLabel(mode)}」的数据，请检查接口返回的 plans 结构。`,
+      )
+    }
   }
 
   // ─── 烈度标准化/格式化 ───
@@ -251,9 +254,10 @@ export function useStrikePlan(
   )
 
   /** 当前选中方案的输入目标数量 */
-  const selectedPlanInputCount = computed(
-    () => selectedHistoricalPlanDetail.value?.plan_summary.overview.input_count ?? 0
-  )
+  const selectedPlanInputCount = computed(() => {
+    const count = selectedHistoricalPlanDetail.value?.plan_summary.overview.input_count
+    return Number.isFinite(Number(count)) ? Number(count) : null
+  })
 
   /** 当前选中方案涉及的武器 ID 集合（地图高亮参战武器用） */
   const selectedHistoricalPlanWeaponIds = computed(
@@ -264,8 +268,8 @@ export function useStrikePlan(
 
   /** 当前选中方案的展示标签：名称 · 版本 · 模式；未选中时回落为默认模式名 */
   const selectedHistoricalPlanLabel = computed(() => {
-    if (!selectedHistoricalPlan.value) return '威胁优先'
-    return `${selectedHistoricalPlan.value.name} · ${selectedHistoricalPlan.value.version} · ${selectedHistoricalPlanMode.value === 'threat_first' ? '威胁优先' : '数量优先'}`
+    if (!selectedHistoricalPlan.value) return '未选择方案'
+    return `${selectedHistoricalPlan.value.name} · ${selectedHistoricalPlan.value.version} · ${getHistoricalPlanModeLabel(selectedHistoricalPlanMode.value)}`
   })
 
   // ─── 方案操作 ───
@@ -339,7 +343,11 @@ export function useStrikePlan(
     if (allKillChainPlans.value.length > 0 || !store.activedTask?.id) return
 
     const res = await getKillChainStrikePlanList(store.activedTask?.id)
-    if (res.code === 200 && res.data) {
+    if (res.code !== 200) {
+      ElMessage.error(res.msg || '获取杀伤链方案列表失败')
+      return
+    }
+    if (res.data) {
       allKillChainPlans.value = res.data
 
       const groupedPlans = allKillChainPlans.value.reduce(
@@ -363,6 +371,8 @@ export function useStrikePlan(
       lowKillChainPlans.value = groupedPlans.low
       middleKillChainPlans.value = groupedPlans.middle
       highKillChainPlans.value = groupedPlans.high
+    } else {
+      ElMessage.warning('杀伤链方案列表为空')
     }
   }
 
@@ -380,7 +390,10 @@ export function useStrikePlan(
     onPlanSelect: (plan: StrikePlanV2Extended, mode: 'threat_first' | 'max_targets') => void
   ) => {
     const mappedPlan = buildHistoricalPlanFromKillChainPlan(plan)
-    if (!mappedPlan) return
+    if (!mappedPlan) {
+      ElMessage.error('杀伤链方案数据结构不完整，无法加载（缺少 plan 明细）')
+      return
+    }
 
     loadedKillChainPlan.value = plan
     onPlanSelect(mappedPlan, mode)

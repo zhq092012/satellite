@@ -52,13 +52,14 @@ export const buildHistoricalPlanFromKillChainPlan = (
       const planLow = plan as RespKillChainPlanLow
       const plans = Array.isArray(planLow.plan) ? planLow.plan : [planLow.plan]
       const targetPlan = plans[0]
+      if (!targetPlan) return null
       const missionWindows: StrikePlanV2MissionWindowItem[] = []
       let windowIndex = 0
 
       if (targetPlan) {
         const stationTypeById = new Map((targetPlan.stationDetails || []).map((item) => [item.stationId, item.type]))
         for (const strike of targetPlan.strikeList || []) {
-          const satelliteType = stationTypeById.get(strike.stationId) || '雷达站'
+          const satelliteType = stationTypeById.get(strike.stationId) ?? ''
           for (const window of strike.windows || []) {
             missionWindows.push({
               index: windowIndex++,
@@ -82,16 +83,19 @@ export const buildHistoricalPlanFromKillChainPlan = (
         weapon_type: weapon.type,
       }))
 
+      const inputCount = Number(targetPlan.targetStationNum)
+      const targetsCount = Number(targetPlan.actualStationNum)
+      if (!Number.isFinite(inputCount) || !Number.isFinite(targetsCount)) return null
       const overview = {
-        input_count: targetPlan?.targetStationNum || targetPlan?.actualStationNum || 0,
-        targets_count: targetPlan?.actualStationNum || 0,
-        assets_count: targetPlan?.elecWeapons?.length || 0,
+        input_count: inputCount,
+        targets_count: targetsCount,
+        assets_count: targetPlan.elecWeapons?.length ?? 0,
         avg_threat: 0,
         avg_strike: 0,
       }
       const timeWindow = {
-        start: targetPlan?.planWindowStart || '',
-        end: targetPlan?.planWindowEnd || '',
+        start: targetPlan.planWindowStart ?? '',
+        end: targetPlan.planWindowEnd ?? '',
         range: '',
       }
 
@@ -125,6 +129,7 @@ export const buildHistoricalPlanFromKillChainPlan = (
       let windowIndex = 0
       const plans = Array.isArray(planMiddle.plan) ? planMiddle.plan : [planMiddle.plan]
       const targetPlan = plans[0]
+      if (!targetPlan) return null
 
       if (targetPlan) {
         // 1. 地面打击窗口
@@ -137,7 +142,7 @@ export const buildHistoricalPlanFromKillChainPlan = (
               window_start: window.windowStart,
               window_end: window.windowEnd,
               satellite_id: strike.stationId as any,
-              satellite_type: strike.stationType || '基站',
+              satellite_type: strike.stationType ?? '',
               satellite_country: strike.stationCountry || '',
               orbit_type: '',
               threat: 0,
@@ -172,16 +177,19 @@ export const buildHistoricalPlanFromKillChainPlan = (
       }
       const assetConfig = Array.from(uniqueAssetsMap.values())
 
+      const inputCountMid = Number(targetPlan.targetStationNum)
+      const actualStationNum = Number(targetPlan.actualStationNum)
+      if (!Number.isFinite(inputCountMid) || !Number.isFinite(actualStationNum)) return null
       const overview = {
-        input_count: targetPlan?.targetStationNum || targetPlan?.actualStationNum || 0,
-        targets_count: (targetPlan?.actualStationNum || 0) + (targetPlan?.directedWindows?.length || 0),
+        input_count: inputCountMid,
+        targets_count: actualStationNum + (targetPlan.directedWindows?.length ?? 0),
         assets_count: assetConfig.length,
         avg_threat: 0,
         avg_strike: 0,
       }
       const timeWindow = {
-        start: targetPlan?.planWindowStart || '',
-        end: targetPlan?.planWindowEnd || '',
+        start: targetPlan.planWindowStart ?? '',
+        end: targetPlan.planWindowEnd ?? '',
         range: '',
       }
 
@@ -217,6 +225,7 @@ export const buildHistoricalPlanFromKillChainPlan = (
       const planHigh = plan as RespKillChainPlanHigh
       const plans = Array.isArray(planHigh.plan) ? planHigh.plan : [planHigh.plan]
       const targetPlan = plans[0]
+      if (!targetPlan?.plans) return null
       return {
         _id: planHigh._id,
         name: planHigh.name,

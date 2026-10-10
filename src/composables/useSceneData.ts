@@ -220,12 +220,14 @@ export function useSceneData() {
 
     const res = await getStrikePlanList(targetTaskId)
     if (res.code === 200) {
-      historicalPlans.value = res.data
+      historicalPlans.value = res.data ?? []
       preloadedHistoricalPlanTaskId.value = targetTaskId
-    } else {
-      historicalPlans.value = []
-      preloadedHistoricalPlanTaskId.value = null
+      return
     }
+    historicalPlans.value = []
+    preloadedHistoricalPlanTaskId.value = null
+    const { ElMessage } = await import('element-plus')
+    ElMessage.error(res.msg || `加载历史打击方案失败（taskId=${targetTaskId}）`)
   }
 
   /**

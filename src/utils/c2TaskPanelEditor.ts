@@ -350,6 +350,19 @@ export const normalizeTaskListFromApi = (tasks: TaskForm[]): NormalizeTaskListFr
 }
 
 /**
+ * 弹出 taskList 字段校验错误（每条任务一条消息）。
+ *
+ * @param errors 校验错误列表
+ * @param emit 消息回调，默认由调用方传入 ElMessage.error
+ */
+export const notifyTaskListValidationErrors = (
+  errors: TaskListItemFromApiError[],
+  emit: (message: string) => void,
+): void => {
+  errors.forEach((err) => emit(err.message))
+}
+
+/**
  * 提交战场任务接口前：去掉仅前端使用的 `combatArea`、不提交的 `focusStatus`，并保证扁平区域字段齐全。
  *
  * @param task 内存中的任务（可含 combatArea）

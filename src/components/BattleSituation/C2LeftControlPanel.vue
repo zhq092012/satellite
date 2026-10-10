@@ -223,6 +223,7 @@ import {
   fromTaskDatetimeLocalValue,
   isDataCenterStationType,
   mergeTaskFormWithDraft,
+  notifyTaskListValidationErrors,
   normalizeTaskWeaponIds,
   parseTaskPanelTimeMs,
   TASK_PANEL_SATELLITE_TYPES,
@@ -562,18 +563,18 @@ watch(
  * 任务列表刷新后，用接口数据覆盖 Pinia 中可能过期的 activedTask（如 localStorage 恢复的旧快照）。
  */
 /**
- * 展示 taskList 作战区域字段校验错误（每条任务单独提示）。
+ * 保存/重算后从 taskList 取最新任务；列表中不存在则报错，不用提交体冒充接口数据。
  *
- * @param errors 校验错误
+ * @param taskId 任务 ID
+ * @returns 列表中的任务或 null
  */
-const showTaskListValidationErrors = (errors: { message: string }[]) => {
-  errors.forEach((err) => {
-    ElMessage.error({
-      message: err.message,
-      duration: 10000,
-      showClose: true,
-    })
-  })
+const requireTaskFromList = (taskId: number): TaskForm | null => {
+  const fresh = taskList.value.find((item) => item.id === taskId)
+  if (!fresh) {
+    ElMessage.error(`任务 id=${taskId} 未出现在 taskList 中，请检查后端列表接口或刷新页面`)
+    return null
+  }
+  return fresh
 }
 
 const reconcileActiveTaskWithTaskList = async () => {
@@ -607,7 +608,9 @@ const loadBattleTasks = async () => {
       taskList.value = res.data
       const validationErrors = res.taskListValidationErrors ?? res.combatAreaErrors
       if (validationErrors?.length) {
-        showTaskListValidationErrors(validationErrors)
+        notifyTaskListValidationErrors(validationErrors, (message) => {
+          ElMessage.error({ message, duration: 10000, showClose: true })
+        })
       }
       await resumeTaskProgressPollingForTasks(res.data)
     } else {
@@ -873,7 +876,8 @@ const handleTaskSaved = async (updated: TaskForm) => {
   await loadBattleTasks()
   if (!updated.id) return
   await startTaskProgressPolling(updated.id)
-  const latest = taskList.value.find((item) => item.id === updated.id) || updated
+  const latest = requireTaskFromList(updated.id)
+  if (!latest) return
   store.setActivedTask(latest)
   store.setSelectedSatSeries('')
   await syncEditorForTask(latest)
@@ -970,9 +974,8 @@ const handleSaveAndRecalculate = async () => {
     ElMessage.success('已保存，任务重新计算中')
     /** 11. 刷新任务列表 */
     await loadBattleTasks()
-    /** 12. 设置当前选中任务 */
-    const latest = taskList.value.find((item) => item.id === baseTask.id) || payload
-    /** 12. 设置当前选中任务 */
+    const latest = requireTaskFromList(baseTask.id)
+    if (!latest) return
     store.setActivedTask(latest)
     /** 13. 清除任务分析数据 */
     store.setSelectedSatSeries('')

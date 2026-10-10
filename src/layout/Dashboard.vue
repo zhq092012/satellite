@@ -109,6 +109,7 @@ import { logout as logoutApi, type MenuItem } from '@/api/auth'
 import { useAuthStore } from '@/store/modules/auth'
 import { useLayoutStore } from '@/store/modules/layout'
 import { getBattleList, getTaskList } from '@/api/dashboard'
+import { notifyTaskListValidationErrors } from '@/utils/c2TaskPanelEditor'
 import type { BattleForm } from '@/types/dashboard'
 
 const authStore = useAuthStore()
@@ -370,13 +371,12 @@ const handleSwitchScene = async (battleId: number | string) => {
 
     const taskRes = await getTaskList(battle.id)
     const tasks = taskRes.code === 200 && Array.isArray(taskRes.data) ? taskRes.data : []
-    taskRes.taskListValidationErrors?.forEach((err) => {
-      ElMessage.error({
-        message: err.message,
-        duration: 10000,
-        showClose: true,
+    const validationErrors = taskRes.taskListValidationErrors ?? taskRes.combatAreaErrors
+    if (validationErrors?.length) {
+      notifyTaskListValidationErrors(validationErrors, (message) => {
+        ElMessage.error({ message, duration: 10000, showClose: true })
       })
-    })
+    }
     layoutStore.setActivedBattle({ ...battle, tasks })
 
     const matchedTask = tasks.find((task) => task.id === layoutStore.activedTask?.id)
