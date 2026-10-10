@@ -29,6 +29,9 @@
                 :value="toDatetimeLocalValue(taskForm.endDate)"
                 @input="handleEndInput(($event.target as HTMLInputElement).value)" />
             </el-form-item>
+            <div v-if="taskListItemApiError" class="task-edit-api-error" role="alert">
+              {{ taskListItemApiError }}
+            </div>
             <div class="task-edit-metrics-grid">
               <el-form-item label="任务时长" class="task-edit-metrics-grid__left-cell">
                 <div class="metric-input-row">
@@ -37,56 +40,56 @@
                   <span class="metric-input-unit">小时</span>
                 </div>
               </el-form-item>
-              <div class="task-edit-metrics-grid__right-cell">
+              <div v-if="taskForm.combatArea" class="task-edit-metrics-grid__right-cell">
                 <div class="task-edit-area-slot">
                   <span class="task-edit-area-slot__label">任务区域</span>
-                  <el-checkbox v-model="taskForm.combatArea!.enabled" :disabled="!canSave">启用</el-checkbox>
+                  <el-checkbox v-model="taskForm.combatArea.enabled" :disabled="!canSave">启用</el-checkbox>
                 </div>
                 <el-form-item label="经度" class="task-edit-coord-item">
                   <div class="metric-input-row">
-                    <el-input-number v-model="taskForm.combatArea!.centerLon" class="metric-input-number" :min="-180"
+                    <el-input-number v-model="taskForm.combatArea.centerLon" class="metric-input-number" :min="-180"
                       :max="180" :step="0.0001" :precision="4" controls-position="right" :disabled="!canSave" />
                     <span class="metric-input-unit metric-input-unit--reserve" aria-hidden="true">°</span>
                   </div>
                 </el-form-item>
               </div>
 
-              <el-form-item label="链路时延" class="task-edit-metrics-grid__left-cell">
+              <el-form-item v-if="showTaskMetricsInputs" label="链路时延" class="task-edit-metrics-grid__left-cell">
                 <div class="metric-input-row">
                   <el-input-number v-model="linkDelayMin" :min="1" :max="4320" :step="1" :controls="true"
                     controls-position="right" class="metric-input-number" />
                   <span class="metric-input-unit">分钟</span>
                 </div>
               </el-form-item>
-              <div class="task-edit-metrics-grid__right-cell">
+              <div v-if="taskForm.combatArea" class="task-edit-metrics-grid__right-cell">
                 <div class="task-edit-area-slot task-edit-area-slot--ghost" aria-hidden="true">
                   <span class="task-edit-area-slot__label">任务区域</span>
                   <span>启用</span>
                 </div>
                 <el-form-item label="纬度" class="task-edit-coord-item">
                   <div class="metric-input-row">
-                    <el-input-number v-model="taskForm.combatArea!.centerLat" class="metric-input-number" :min="-90"
+                    <el-input-number v-model="taskForm.combatArea.centerLat" class="metric-input-number" :min="-90"
                       :max="90" :step="0.0001" :precision="4" controls-position="right" :disabled="!canSave" />
                     <span class="metric-input-unit metric-input-unit--reserve" aria-hidden="true">°</span>
                   </div>
                 </el-form-item>
               </div>
 
-              <el-form-item label="覆盖率" class="task-edit-metrics-grid__left-cell">
+              <el-form-item v-if="showTaskMetricsInputs" label="覆盖率" class="task-edit-metrics-grid__left-cell">
                 <div class="metric-input-row">
                   <el-input-number v-model="taskCoverage" :min="0" :max="100" :step="1" :controls="true"
                     controls-position="right" class="metric-input-number" />
                   <span class="metric-input-unit">%</span>
                 </div>
               </el-form-item>
-              <div class="task-edit-metrics-grid__right-cell">
+              <div v-if="taskForm.combatArea" class="task-edit-metrics-grid__right-cell">
                 <div class="task-edit-area-slot task-edit-area-slot--ghost" aria-hidden="true">
                   <span class="task-edit-area-slot__label">任务区域</span>
                   <span>启用</span>
                 </div>
                 <el-form-item label="半径" class="task-edit-coord-item">
                   <div class="metric-input-row">
-                    <el-input-number v-model="taskForm.combatArea!.radiusKm" class="metric-input-number" :min="1"
+                    <el-input-number v-model="taskForm.combatArea.radiusKm" class="metric-input-number" :min="0"
                       :max="20000" :step="10" :precision="0" controls-position="right" :disabled="!canSave" />
                     <span class="metric-input-unit">km</span>
                   </div>
@@ -147,9 +150,9 @@ import { addTask } from '@/api/task/task'
 import type { TaskForm } from '@/types/dashboard'
 import {
   combatAreaToApiFields,
+  materializeTaskListItemFromApi,
   normalizeTaskCombatArea,
-  resolveTaskCombatAreaFromTask,
-  TASK_COMBAT_AREA_MOCK,
+  TaskListItemFromApiError,
 } from '@/utils/c2TaskPanelEditor'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskAssembleTab, { type TaskAssembleRow } from '@/components/BattleSituation/TaskAssembleTab.vue'
@@ -226,7 +229,7 @@ const taskForm = reactive<TaskForm>({
   steps: '',
   delayMin: 60,
   coverage: 50,
-  combatArea: { ...TASK_COMBAT_AREA_MOCK },
+  combatArea: { centerLon: 0, centerLat: 0, radiusKm: 0, enabled: false },
 })
 
 /** 任务表单校验规则。 */
@@ -278,8 +281,20 @@ const dialogMode = computed((): TaskEditDialogMode => {
 /** 是否打开已有任务（查看或修改）。 */
 const isExistingTaskMode = computed(() => dialogMode.value !== 'create')
 
-/** 是否展示保存按钮（新建或可编辑修改）。 */
-const canSave = computed(() => dialogMode.value === 'create' || dialogMode.value === 'edit')
+/** 编辑已有任务时接口字段校验失败说明 */
+const taskListItemApiError = ref('')
+
+/** 是否展示保存按钮（新建或可编辑修改；接口数据不完整时禁止保存）。 */
+const canSave = computed(
+  () =>
+    (dialogMode.value === 'create' || dialogMode.value === 'edit') &&
+    !taskListItemApiError.value,
+)
+
+/** 是否展示时延/覆盖率输入（编辑模式下接口缺字段时不展示默认值） */
+const showTaskMetricsInputs = computed(
+  () => dialogMode.value === 'create' || (!taskListItemApiError.value && Number.isFinite(taskForm.delayMin)),
+)
 
 /** 弹窗标题：添加、查看与修改分开展示。 */
 const dialogTitle = computed(() => {
@@ -458,17 +473,23 @@ const handleDurationHoursChange = (value: number | undefined) => {
 const DEFAULT_DELAY_MIN = 60
 const DEFAULT_COVERAGE = 50
 
-/** 链路时延（分钟），与 taskForm.delayMin 双向同步。 */
+/** 链路时延（分钟），与 taskForm.delayMin 双向同步（仅新建模式使用默认值）。 */
 const linkDelayMin = computed({
-  get: () => taskForm.delayMin ?? DEFAULT_DELAY_MIN,
+  get: () =>
+    isExistingTaskMode.value
+      ? (taskForm.delayMin as number)
+      : (taskForm.delayMin ?? DEFAULT_DELAY_MIN),
   set: (value: number) => {
     taskForm.delayMin = value
   },
 })
 
-/** 覆盖率（%），与 taskForm.coverage 双向同步。 */
+/** 覆盖率（%），与 taskForm.coverage 双向同步（仅新建模式使用默认值）。 */
 const taskCoverage = computed({
-  get: () => taskForm.coverage ?? DEFAULT_COVERAGE,
+  get: () =>
+    isExistingTaskMode.value
+      ? (taskForm.coverage as number)
+      : (taskForm.coverage ?? DEFAULT_COVERAGE),
   set: (value: number) => {
     taskForm.coverage = value
   },
@@ -599,6 +620,7 @@ const createDefaultEndDate = (beginDate: string, hours: number): string => {
  * 重置为当前场景下的空白任务（添加模式）。
  */
 const resetCreateForm = () => {
+  taskListItemApiError.value = ''
   const beginDate = createDefaultBeginDate()
   const endDate = createDefaultEndDate(beginDate, DEFAULT_TASK_DURATION_HOURS)
   Object.assign(taskForm, {
@@ -617,7 +639,7 @@ const resetCreateForm = () => {
     steps: '',
     delayMin: DEFAULT_DELAY_MIN,
     coverage: DEFAULT_COVERAGE,
-    combatArea: { ...TASK_COMBAT_AREA_MOCK },
+    combatArea: { centerLon: 0, centerLat: 0, radiusKm: 0, enabled: false },
   })
   durationHours.value = DEFAULT_TASK_DURATION_HOURS
 }
@@ -628,32 +650,69 @@ const resetCreateForm = () => {
  * @param task 待编辑任务；添加时为 null
  */
 const fillForm = (task: TaskForm | null) => {
+  taskListItemApiError.value = ''
   if (!task || !isExistingTaskMode.value) {
     resetCreateForm()
     return
   }
-  Object.assign(taskForm, {
-    ...task,
-    meCountryShow: task.meCountryShow?.length ? [...task.meCountryShow] : splitCsv(task.meCountry),
-    enemyCountryShow: task.enemyCountryShow?.length ? [...task.enemyCountryShow] : splitCsv(task.enemyCountry),
-    targetTypeShow: task.targetTypeShow?.length
-      ? [...task.targetTypeShow]
-      : splitCsv(task.targetTypeNew || task.targetType),
-    steps: task.steps || '',
-    delayMin: Number.isFinite(task.delayMin) ? Number(task.delayMin) : DEFAULT_DELAY_MIN,
-    coverage: Number.isFinite(task.coverage) ? Number(task.coverage) : DEFAULT_COVERAGE,
-    weaponIds: task.weaponIds ? [...task.weaponIds] : [],
-    resources: task.resources ? task.resources.map((item) => ({
-      series: item.series,
-      receiveIds: [...(item.receiveIds ?? [])],
-      stationIds: [...(item.stationIds ?? [])],
-    })) : [],
-    combatArea: resolveTaskCombatAreaFromTask(task),
-  })
-  const begin = normalizeDateTime(task.beginDate)
-  const end = normalizeDateTime(task.endDate)
-  taskForm.beginDate = begin
-  taskForm.endDate = end
+  try {
+    const materialized = materializeTaskListItemFromApi(task)
+    Object.assign(taskForm, {
+      ...materialized,
+      meCountryShow: materialized.meCountryShow?.length
+        ? [...materialized.meCountryShow]
+        : splitCsv(materialized.meCountry),
+      enemyCountryShow: materialized.enemyCountryShow?.length
+        ? [...materialized.enemyCountryShow]
+        : splitCsv(materialized.enemyCountry),
+      targetTypeShow: materialized.targetTypeShow?.length
+        ? [...materialized.targetTypeShow]
+        : splitCsv(materialized.targetTypeNew || materialized.targetType),
+      steps: materialized.steps || '',
+      weaponIds: materialized.weaponIds ? [...materialized.weaponIds] : [],
+      resources: materialized.resources
+        ? materialized.resources.map((item) => ({
+            series: item.series,
+            receiveIds: [...(item.receiveIds ?? [])],
+            stationIds: [...(item.stationIds ?? [])],
+          }))
+        : [],
+      combatArea: materialized.combatArea ? { ...materialized.combatArea } : undefined,
+    })
+  } catch (err) {
+    if (err instanceof TaskListItemFromApiError) {
+      taskListItemApiError.value = err.message
+      ElMessage.error({
+        message: err.message,
+        duration: 10000,
+        showClose: true,
+      })
+      Object.assign(taskForm, {
+        ...task,
+        meCountryShow: task.meCountryShow?.length ? [...task.meCountryShow] : splitCsv(task.meCountry),
+        enemyCountryShow: task.enemyCountryShow?.length ? [...task.enemyCountryShow] : splitCsv(task.enemyCountry),
+        targetTypeShow: task.targetTypeShow?.length
+          ? [...task.targetTypeShow]
+          : splitCsv(task.targetTypeNew || task.targetType),
+        steps: task.steps || '',
+        beginDate: normalizeDateTime(task.beginDate),
+        endDate: normalizeDateTime(task.endDate),
+        delayMin: undefined,
+        coverage: undefined,
+        combatArea: undefined,
+        weaponIds: task.weaponIds ? [...task.weaponIds] : [],
+        resources: task.resources
+          ? task.resources.map((item) => ({
+              series: item.series,
+              receiveIds: [...(item.receiveIds ?? [])],
+              stationIds: [...(item.stationIds ?? [])],
+            }))
+          : [],
+      })
+    } else {
+      throw err
+    }
+  }
   syncCountryFields()
   void nextTick(() => {
     restoreAssembleFromTask(task)
@@ -769,7 +828,12 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
     resources,
   }
 
-  const combatArea = normalizeTaskCombatArea(taskForm.combatArea!)
+  if (!taskForm.combatArea) {
+    ElMessage.error(taskListItemApiError.value || '任务作战区域数据不完整，无法提交')
+    activeTab.value = 'basic'
+    return null
+  }
+  const combatArea = normalizeTaskCombatArea(taskForm.combatArea)
   return {
     ...basePayload,
     ...combatAreaToApiFields(combatArea),
@@ -783,7 +847,10 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
  * @returns 合并当前表单后的任务对象
  */
 const buildSavedTaskFromPayload = (taskPayload: AddTaskPayload): TaskForm => {
-  const combatArea = normalizeTaskCombatArea(taskForm.combatArea!)
+  if (!taskForm.combatArea) {
+    throw new Error(taskListItemApiError.value || '任务作战区域数据不完整')
+  }
+  const combatArea = normalizeTaskCombatArea(taskForm.combatArea)
   return {
     ...taskForm,
     battleId: taskPayload.battleId,
@@ -1052,6 +1119,17 @@ const handleSubmit = async () => {
       font-size: 13px;
       line-height: 32px;
     }
+  }
+
+  .task-edit-api-error {
+    margin: 0 0 12px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #ffb4b4;
+    background: rgb(255 80 80 / 12%);
+    border: 1px solid rgb(255 120 120 / 35%);
+    border-radius: 4px;
   }
 
   .task-edit-form {

@@ -3,7 +3,11 @@ import type { BattleForm, SatelliteNode, SatelliteRelation, SatelliteStrike, Sat
 import type { AxiosResponsePage, AxiosResponseType } from '@/types/http'
 import type { Strike, StrikeV2 } from '@/types/strike'
 import type { ThreatTaskWeightsResponse } from '@/types/threat'
-import { prepareTaskForBattleApi } from '@/utils/c2TaskPanelEditor'
+import {
+  normalizeTaskListFromApi,
+  prepareTaskForBattleApi,
+  type TaskListItemFromApiError,
+} from '@/utils/c2TaskPanelEditor'
 import { requestAPI } from '@/utils/tools/request'
 
 /**
@@ -209,9 +213,25 @@ export const getBattleList = () => {
  * 任务列表
  * @param battle
  */
-export const getTaskList = (battleId: number) => {
+/** getTaskList 附加：接口字段校验失败列表（不会写入默认数据） */
+export type TaskListApiResponse = AxiosResponseType<TaskForm[]> & {
+  taskListValidationErrors?: TaskListItemFromApiError[]
+  /** @deprecated 使用 taskListValidationErrors */
+  combatAreaErrors?: TaskListItemFromApiError[]
+}
+
+export const getTaskList = async (battleId: number): Promise<TaskListApiResponse> => {
   const url = `/api/battle/taskList?battleId=${battleId}`
-  return requestAPI.get<AxiosResponseType<TaskForm[]>>(url)
+  const res = await requestAPI.get<TaskListApiResponse>(url)
+  if (res.code === 200 && Array.isArray(res.data)) {
+    const { tasks, errors } = normalizeTaskListFromApi(res.data)
+    res.data = tasks
+    if (errors.length) {
+      res.taskListValidationErrors = errors
+      res.combatAreaErrors = errors
+    }
+  }
+  return res
 }
 /**
  * 根据任务Id获取TLE数据

@@ -24,14 +24,16 @@ export interface C2TaskEditorDraft {
   selectedReceiveIds: string[]
   /** 已选数据中心 ID */
   stationIds: string[]
-  /** 链路时延（分钟） */
-  delayMin: number
-  /** 覆盖率（0–100） */
-  coverage: number
+  /** 链路时延（分钟）；接口缺失时为 null */
+  delayMin: number | null
+  /** 覆盖率（0–100）；接口缺失时为 null */
+  coverage: number | null
   /** 卫星类型（侦察 / 通信） */
   targetTypeShow: string[]
-  /** 任务作战区域 */
-  combatArea: TaskCombatArea
+  /** 任务作战区域；接口未返回完整字段时为 null */
+  combatArea: TaskCombatArea | null
+  /** taskList 接口字段缺失或无效时的说明（禁止静默默认值） */
+  taskApiError?: string
 }
 
 /**
@@ -54,15 +56,6 @@ export const normalizeTaskWeaponIds = (ids: unknown[] | null | undefined): strin
   return result
 }
 
-/**
- * 新建任务且接口未返回区域时使用的默认示例（台海附近，半径 3000km）。
- */
-export const TASK_COMBAT_AREA_MOCK: TaskCombatArea = {
-  centerLon: 121.5,
-  centerLat: 25.0,
-  radiusKm: 3000,
-  enabled: true,
-}
 
 /**
  * 规范化作战区域数值，避免非法值进入请求体。
@@ -73,62 +66,162 @@ export const TASK_COMBAT_AREA_MOCK: TaskCombatArea = {
 export const normalizeTaskCombatArea = (area: TaskCombatArea): TaskCombatArea => ({
   centerLon: Number(area.centerLon),
   centerLat: Number(area.centerLat),
-  radiusKm: Math.max(1, Number(area.radiusKm)),
+  radiusKm: Math.max(0, Number(area.radiusKm)),
   enabled: Boolean(area.enabled),
 })
 
+/** taskList 接口必须返回的作战区域扁平字段名 */
+export type TaskCombatAreaApiField = 'longitude' | 'latitude' | 'radius' | 'areaEnable'
+
+/** taskList 已有任务必须齐全或有效的接口字段 */
+export type TaskListApiField =
+  | TaskCombatAreaApiField
+  | 'delayMin'
+  | 'coverage'
+  | 'beginDate'
+  | 'endDate'
+
 /**
- * 从接口嵌套字段或扁平字段解析是否启用任务区域。
- *
- * @param task 任务
- * @param nestedEnabled combatArea.enabled
- * @returns 是否启用
+ * taskList 单条任务接口字段缺失或无效时抛出（不静默兜底）。
  */
-const resolveTaskAreaEnabledFromTask = (task: TaskForm, nestedEnabled?: boolean): boolean => {
-  if (task.areaEnable != null && Number.isFinite(Number(task.areaEnable))) {
-    return Number(task.areaEnable) === 1
+export class TaskListItemFromApiError extends Error {
+  /** 缺失或无效的接口字段 */
+  readonly missingFields: TaskListApiField[]
+  /** 任务 ID */
+  readonly taskId?: number
+  /** 任务名称 */
+  readonly taskName?: string
+
+  /**
+   * @param task 任务
+   * @param missingFields 缺失字段列表
+   */
+  constructor(task: TaskForm, missingFields: TaskListApiField[]) {
+    const namePart = task.name ? `「${task.name}」` : ''
+    super(
+      `任务${namePart}(id=${task.id ?? '?'}) 接口未返回或无效字段：${missingFields.join('、')}。请检查 taskList 或后端入库。`,
+    )
+    this.name = 'TaskListItemFromApiError'
+    this.missingFields = missingFields
+    this.taskId = task.id
+    this.taskName = task.name
   }
-  if (nestedEnabled != null) return Boolean(nestedEnabled)
-  return true
+}
+
+/** @deprecated 使用 {@link TaskListItemFromApiError} */
+export class TaskCombatAreaFromApiError extends TaskListItemFromApiError {
+  constructor(task: TaskForm, missingFields: TaskCombatAreaApiField[]) {
+    super(task, missingFields)
+    this.name = 'TaskCombatAreaFromApiError'
+  }
+}
+
+/** 任务列表接口可能附带的区域字段别名（与前端 combatArea 命名一致） */
+type TaskWithAreaFieldAliases = TaskForm & {
+  centerLon?: number | string | null
+  centerLat?: number | string | null
+  radiusKm?: number | string | null
 }
 
 /**
- * 从任务接口数据或假数据解析作战区域草稿。
+ * 将接口返回的 unknown 解析为有限数字。
+ *
+ * @param value 原始值
+ * @returns 有限数字或 null
+ */
+const parseFiniteAreaNumber = (value: unknown): number | null => {
+  if (value == null || value === '') return null
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+/**
+ * 读取任务上的作战区域扁平字段（含接口别名）。
+ *
+ * @param task 任务实体
+ * @returns 经纬度、半径及是否存在任意接口区域字段
+ */
+const readTaskAreaScalarsFromApi = (
+  task: TaskForm,
+): { lon: number | null; lat: number | null; radius: number | null } => {
+  const withAliases = task as TaskWithAreaFieldAliases
+  const lon = parseFiniteAreaNumber(task.longitude ?? withAliases.centerLon)
+  const lat = parseFiniteAreaNumber(task.latitude ?? withAliases.centerLat)
+  const radius = parseFiniteAreaNumber(task.radius ?? withAliases.radiusKm)
+  return { lon, lat, radius }
+}
+
+/**
+ * 列出 taskList 任务实体上缺失的作战区域接口字段（四项必须齐全，缺一即报错）。
+ *
+ * @param task 接口任务
+ * @returns 缺失字段名
+ */
+export const getMissingTaskCombatAreaApiFields = (task: TaskForm): TaskCombatAreaApiField[] => {
+  const missing: TaskCombatAreaApiField[] = []
+  const { lon, lat, radius } = readTaskAreaScalarsFromApi(task)
+  if (lon == null) missing.push('longitude')
+  if (lat == null) missing.push('latitude')
+  if (radius == null) missing.push('radius')
+  if (task.areaEnable == null || !Number.isFinite(Number(task.areaEnable))) {
+    missing.push('areaEnable')
+  }
+  return missing
+}
+
+/**
+ * 严格从 taskList 接口解析作战区域，缺字段则抛错（禁止默认「启用」或补全半径）。
+ *
+ * @param task 接口任务
+ * @returns 作战区域
+ * @throws {TaskCombatAreaFromApiError} 接口字段不完整
+ */
+export const parseTaskCombatAreaFromApiStrict = (task: TaskForm): TaskCombatArea => {
+  const missing = getMissingTaskCombatAreaApiFields(task)
+  if (missing.length) {
+    throw new TaskListItemFromApiError(task, missing)
+  }
+  const { lon, lat, radius } = readTaskAreaScalarsFromApi(task)
+  return normalizeTaskCombatArea({
+    centerLon: lon!,
+    centerLat: lat!,
+    radiusKm: radius!,
+    enabled: Number(task.areaEnable) === 1,
+  })
+}
+
+/**
+ * 从已加载任务解析作战区域：优先用户编辑中的 combatArea，否则严格读接口扁平字段。
  *
  * @param task 任务
  * @returns 作战区域配置
+ * @throws {TaskListItemFromApiError} 已有任务但接口字段不完整
  */
 export const resolveTaskCombatAreaFromTask = (task: TaskForm | null | undefined): TaskCombatArea => {
-  if (!task) return { ...TASK_COMBAT_AREA_MOCK }
-
-  const lon = Number(task.longitude)
-  const lat = Number(task.latitude)
-  const radius = Number(task.radius)
-  if (Number.isFinite(lon) && Number.isFinite(lat) && Number.isFinite(radius)) {
-    return normalizeTaskCombatArea({
-      centerLon: lon,
-      centerLat: lat,
-      radiusKm: radius,
-      enabled: resolveTaskAreaEnabledFromTask(task),
-    })
+  if (!task) {
+    return { centerLon: 0, centerLat: 0, radiusKm: 0, enabled: false }
   }
 
-  const fromTask = task.combatArea
+  const fromDraft = task.combatArea
   if (
-    fromTask &&
-    Number.isFinite(Number(fromTask.centerLon)) &&
-    Number.isFinite(Number(fromTask.centerLat)) &&
-    Number.isFinite(Number(fromTask.radiusKm))
+    fromDraft &&
+    Number.isFinite(Number(fromDraft.centerLon)) &&
+    Number.isFinite(Number(fromDraft.centerLat)) &&
+    Number.isFinite(Number(fromDraft.radiusKm))
   ) {
     return normalizeTaskCombatArea({
-      centerLon: Number(fromTask.centerLon),
-      centerLat: Number(fromTask.centerLat),
-      radiusKm: Number(fromTask.radiusKm),
-      enabled: resolveTaskAreaEnabledFromTask(task, fromTask.enabled),
+      centerLon: Number(fromDraft.centerLon),
+      centerLat: Number(fromDraft.centerLat),
+      radiusKm: Number(fromDraft.radiusKm),
+      enabled: Boolean(fromDraft.enabled),
     })
   }
 
-  return { ...TASK_COMBAT_AREA_MOCK }
+  if (task.id) {
+    return parseTaskCombatAreaFromApiStrict(task)
+  }
+
+  return { centerLon: 0, centerLat: 0, radiusKm: 0, enabled: false }
 }
 
 /**
@@ -150,6 +243,113 @@ export const combatAreaToApiFields = (
 }
 
 /**
+ * 列出 taskList 已有任务上缺失或无效的必填接口字段。
+ *
+ * @param task 接口任务
+ * @returns 字段名列表
+ */
+export const getMissingTaskListApiFields = (task: TaskForm): TaskListApiField[] => {
+  const missing: TaskListApiField[] = [...getMissingTaskCombatAreaApiFields(task)]
+  if (task.delayMin == null || !Number.isFinite(Number(task.delayMin))) {
+    missing.push('delayMin')
+  }
+  if (task.coverage == null || !Number.isFinite(Number(task.coverage))) {
+    missing.push('coverage')
+  }
+  const beginNorm = normalizeTaskDateTime(task.beginDate)
+  const endNorm = normalizeTaskDateTime(task.endDate)
+  const beginMs = parseTaskPanelTimeMs(beginNorm)
+  const endMs = parseTaskPanelTimeMs(endNorm)
+  if (!String(task.beginDate ?? '').trim() || !beginMs) {
+    missing.push('beginDate')
+  }
+  if (!String(task.endDate ?? '').trim() || !endMs) {
+    missing.push('endDate')
+  } else if (beginMs && endMs <= beginMs) {
+    missing.push('endDate')
+  }
+  return Array.from(new Set(missing))
+}
+
+/**
+ * 校验 taskList 单条任务接口字段；不通过则抛错。
+ *
+ * @param task 任务
+ * @throws {TaskListItemFromApiError} 字段缺失或无效
+ */
+export const assertTaskListItemFromApi = (task: TaskForm): void => {
+  const missing = getMissingTaskListApiFields(task)
+  if (missing.length) {
+    throw new TaskListItemFromApiError(task, missing)
+  }
+}
+
+/**
+ * 将 taskList 接口任务 materialize 为前端 TaskForm（仅当字段齐全时）。
+ *
+ * @param task 接口原始任务
+ * @returns 含 combatArea 与规范化时间/指标的任务
+ * @throws {TaskListItemFromApiError} 字段缺失或无效
+ */
+export const materializeTaskListItemFromApi = (task: TaskForm): TaskForm => {
+  assertTaskListItemFromApi(task)
+  const combatArea = parseTaskCombatAreaFromApiStrict(task)
+  return {
+    ...task,
+    beginDate: normalizeTaskDateTime(task.beginDate),
+    endDate: normalizeTaskDateTime(task.endDate),
+    delayMin: Number(task.delayMin),
+    coverage: Number(task.coverage),
+    combatArea,
+    ...combatAreaToApiFields(combatArea),
+  }
+}
+
+/**
+ * 将 taskList 接口返回的单条任务规范化为前端使用的 TaskForm。
+ *
+ * @param task 接口原始任务
+ * @returns 规范化后的任务或校验错误
+ */
+export const normalizeTaskFormFromApi = (
+  task: TaskForm,
+): { task: TaskForm; error?: TaskListItemFromApiError } => {
+  try {
+    return { task: materializeTaskListItemFromApi(task) }
+  } catch (err) {
+    if (err instanceof TaskListItemFromApiError) {
+      const { combatArea: _drop, ...rest } = task
+      return { task: { ...rest, combatArea: undefined }, error: err }
+    }
+    throw err
+  }
+}
+
+/** 任务列表规范化结果 */
+export interface NormalizeTaskListFromApiResult {
+  /** 字段不全的条目保持原样且不写入 combatArea */
+  tasks: TaskForm[]
+  /** 接口字段校验错误 */
+  errors: TaskListItemFromApiError[]
+}
+
+/**
+ * 批量规范化任务列表接口数据；字段不全的任务不会注入默认作战区域。
+ *
+ * @param tasks 接口任务数组
+ * @returns 任务列表与错误集合
+ */
+export const normalizeTaskListFromApi = (tasks: TaskForm[]): NormalizeTaskListFromApiResult => {
+  const errors: TaskListItemFromApiError[] = []
+  const normalized = tasks.map((item) => {
+    const { task, error } = normalizeTaskFormFromApi(item)
+    if (error) errors.push(error)
+    return task
+  })
+  return { tasks: normalized, errors }
+}
+
+/**
  * 提交战场任务接口前：去掉仅前端使用的 `combatArea`、不提交的 `focusStatus`，并保证扁平区域字段齐全。
  *
  * @param task 内存中的任务（可含 combatArea）
@@ -158,17 +358,29 @@ export const combatAreaToApiFields = (
 export const prepareTaskForBattleApi = <T extends TaskForm>(
   task: T,
 ): Omit<T, 'combatArea' | 'focusStatus'> => {
-  const area = task.combatArea
-    ? normalizeTaskCombatArea(task.combatArea)
-    : resolveTaskCombatAreaFromTask(task)
+  if (!task.combatArea) {
+    throw new Error('提交任务缺少作战区域，请先完善任务配置')
+  }
+  const area = normalizeTaskCombatArea(task.combatArea)
   const { combatArea: _omitCombatArea, focusStatus: _omitFocusStatus, ...rest } = task as T & {
     focusStatus?: number
   }
-  return {
+  const payload = {
     ...rest,
     weaponIds: normalizeTaskWeaponIds(rest.weaponIds as unknown[]),
     ...combatAreaToApiFields(area),
-  } as Omit<T, 'combatArea' | 'focusStatus'>
+  } as TaskForm
+  if (task.id) {
+    assertTaskListItemFromApi(payload)
+  } else if (
+    !Number.isFinite(Number(payload.delayMin)) ||
+    !Number.isFinite(Number(payload.coverage)) ||
+    !parseTaskPanelTimeMs(payload.beginDate) ||
+    !parseTaskPanelTimeMs(payload.endDate)
+  ) {
+    throw new Error('新建任务缺少时延、覆盖率或有效起止时间')
+  }
+  return payload as Omit<T, 'combatArea' | 'focusStatus'>
 }
 
 /**
@@ -243,16 +455,16 @@ export const formatDateToTaskPanelTime = (date: Date): string => {
 }
 
 /**
- * 根据起止时间计算任务时长（小时，至少 1）。
+ * 根据起止时间计算任务时长（小时）；时间无效时不兜底为 1 小时。
  *
  * @param beginDate 开始时间
  * @param endDate 结束时间
- * @returns 小时数
+ * @returns 小时数；无效时为 null
  */
-export const calcTaskDurationHours = (beginDate: string, endDate: string): number => {
+export const calcTaskDurationHours = (beginDate: string, endDate: string): number | null => {
   const beginMs = parseTaskPanelTimeMs(beginDate)
   const endMs = parseTaskPanelTimeMs(endDate)
-  if (!beginMs || !endMs || endMs <= beginMs) return 1
+  if (!beginMs || !endMs || endMs <= beginMs) return null
   return Math.max(1, Math.round((endMs - beginMs) / 3600000))
 }
 
@@ -295,18 +507,39 @@ export const createDraftFromTask = (task: TaskForm | null | undefined): C2TaskEd
   const selectedSeries = resources.map((item) => item.series).filter(Boolean)
   const selectedReceiveIds = [...new Set(resources.flatMap((item) => item.receiveIds ?? []))]
   const stationIds = [...new Set(resources.flatMap((item) => item.stationIds ?? []))]
+  let combatArea: TaskCombatArea | null = null
+  let delayMin: number | null = null
+  let coverage: number | null = null
+  let beginDate = normalizeTaskDateTime(task.beginDate)
+  let endDate = normalizeTaskDateTime(task.endDate)
+  let taskApiError: string | undefined
+  try {
+    const materialized = materializeTaskListItemFromApi(task)
+    combatArea = materialized.combatArea ?? null
+    delayMin = materialized.delayMin ?? null
+    coverage = materialized.coverage ?? null
+    beginDate = materialized.beginDate
+    endDate = materialized.endDate
+  } catch (err) {
+    if (err instanceof TaskListItemFromApiError) {
+      taskApiError = err.message
+    } else {
+      throw err
+    }
+  }
   return {
     taskId: task.id,
-    beginDate: normalizeTaskDateTime(task.beginDate),
-    endDate: normalizeTaskDateTime(task.endDate),
+    beginDate,
+    endDate,
     selectedSeries,
     selectedWeaponIds: normalizeTaskWeaponIds(task.weaponIds as unknown[]),
     selectedReceiveIds,
     stationIds,
-    delayMin: Number.isFinite(task.delayMin) ? Number(task.delayMin) : 60,
-    coverage: Number.isFinite(task.coverage) ? Number(task.coverage) : 50,
+    delayMin,
+    coverage,
     targetTypeShow: resolveTaskTargetTypesFromForm(task),
-    combatArea: resolveTaskCombatAreaFromTask(task),
+    combatArea,
+    taskApiError,
   }
 }
 
@@ -331,6 +564,9 @@ export const buildTaskResourcesFromDraft = (draft: C2TaskEditorDraft): TaskResou
  * @returns 更新后的任务表单
  */
 export const mergeTaskFormWithDraft = (base: TaskForm, draft: C2TaskEditorDraft): TaskForm => {
+  if (draft.taskApiError || draft.combatArea == null || draft.delayMin == null || draft.coverage == null) {
+    throw new Error(draft.taskApiError || '任务接口字段不完整，无法保存')
+  }
   const targetTypeValue = draft.targetTypeShow.join(',')
   const combatArea = normalizeTaskCombatArea(draft.combatArea)
   return {

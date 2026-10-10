@@ -67,19 +67,26 @@
                 <span class="metric-label">国家/组织</span>
                 <span class="metric-value" :title="enemyCountryDisplayText">{{ enemyCountryDisplayText }}</span>
               </div>
+              <div v-if="editorDraft.taskApiError" class="combat-area-api-error" role="alert">
+                {{ editorDraft.taskApiError }}
+              </div>
+              <div v-if="scheduleDurationError" class="combat-area-api-error" role="alert">
+                {{ scheduleDurationError }}
+              </div>
               <div class="metric-row">
                 <span class="metric-label">任务时长</span>
                 <el-input-number v-model="durationHours" class="metric-input-number" size="small" :min="1" :max="8760"
-                  :step="1" controls-position="right" @change="handleDurationHoursChange" />
+                  :step="1" controls-position="right" :disabled="Boolean(editorDraft.taskApiError || scheduleDurationError)"
+                  @change="handleDurationHoursChange" />
                 <span class="metric-unit">小时</span>
               </div>
-              <div class="metric-row">
+              <div v-if="editorDraft.delayMin != null" class="metric-row">
                 <span class="metric-label">链路时延</span>
                 <el-input-number v-model="editorDraft.delayMin" class="metric-input-number" size="small" :min="1"
                   :max="4320" :step="1" controls-position="right" />
                 <span class="metric-unit">分钟</span>
               </div>
-              <div class="metric-row">
+              <div v-if="editorDraft.coverage != null" class="metric-row">
                 <span class="metric-label">覆盖率</span>
                 <el-input-number v-model="editorDraft.coverage" class="metric-input-number" size="small" :min="0"
                   :max="100" :step="1" controls-position="right" />
@@ -98,28 +105,30 @@
               </div>
               <div class="metric-row metric-row--combat-head">
                 <span class="metric-label">作战区域</span>
-                <label class="combat-area-enable">
+                <label v-if="editorDraft.combatArea" class="combat-area-enable">
                   <el-checkbox v-model="editorDraft.combatArea.enabled">启用</el-checkbox>
                 </label>
               </div>
-              <div class="metric-row">
-                <span class="metric-label">经度</span>
-                <el-input-number v-model="editorDraft.combatArea.centerLon" class="metric-input-number" size="small"
-                  :controls="false" :precision="4" :step="0.0001" :min="-180" :max="180" />
-                <span class="metric-unit metric-unit--empty" aria-hidden="true" />
-              </div>
-              <div class="metric-row">
-                <span class="metric-label">纬度</span>
-                <el-input-number v-model="editorDraft.combatArea.centerLat" class="metric-input-number" size="small"
-                  :controls="false" :precision="4" :step="0.0001" :min="-90" :max="90" />
-                <span class="metric-unit metric-unit--empty" aria-hidden="true" />
-              </div>
-              <div class="metric-row">
-                <span class="metric-label">半径</span>
-                <el-input-number v-model="editorDraft.combatArea.radiusKm" class="metric-input-number" size="small"
-                  :controls="false" :precision="0" :step="10" :min="1" :max="20000" />
-                <span class="metric-unit">km</span>
-              </div>
+              <template v-if="editorDraft.combatArea">
+                <div class="metric-row">
+                  <span class="metric-label">经度</span>
+                  <el-input-number v-model="editorDraft.combatArea.centerLon" class="metric-input-number" size="small"
+                    :controls="false" :precision="4" :step="0.0001" :min="-180" :max="180" />
+                  <span class="metric-unit metric-unit--empty" aria-hidden="true" />
+                </div>
+                <div class="metric-row">
+                  <span class="metric-label">纬度</span>
+                  <el-input-number v-model="editorDraft.combatArea.centerLat" class="metric-input-number" size="small"
+                    :controls="false" :precision="4" :step="0.0001" :min="-90" :max="90" />
+                  <span class="metric-unit metric-unit--empty" aria-hidden="true" />
+                </div>
+                <div class="metric-row">
+                  <span class="metric-label">半径</span>
+                  <el-input-number v-model="editorDraft.combatArea.radiusKm" class="metric-input-number" size="small"
+                    :controls="false" :precision="0" :step="10" :min="0" :max="20000" />
+                  <span class="metric-unit">km</span>
+                </div>
+              </template>
             </div>
           </div>
           <div class="tag-section">
@@ -182,7 +191,8 @@
       <!-- 下：保存并重算 -->
       <footer class="panel-zone panel-zone--bottom">
         <el-button type="primary" class="save-recalc-btn" :loading="savingRecalc"
-          :disabled="!editorDraft || taskSwitching || isActiveTaskCalculating" @click="handleSaveAndRecalculate">
+          :disabled="!editorDraft || taskSwitching || isActiveTaskCalculating || Boolean(editorDraft?.taskApiError || scheduleDurationError)"
+          @click="handleSaveAndRecalculate">
           保存并重算
         </el-button>
       </footer>
@@ -311,6 +321,8 @@ const useWeaponsEnabled = ref(false)
 const stashedWeaponIds = ref<string[]>([])
 /** 任务时长（小时），与起止时间联动 */
 const durationHours = ref(8)
+/** 起止时间无效时的说明（不默认 1 小时） */
+const scheduleDurationError = ref('')
 const seriesTagOptions = ref<TaskPanelTagOption[]>([])
 const weaponTagOptions = ref<TaskPanelTagOption[]>([])
 const receiveTagOptions = ref<TaskPanelTagOption[]>([])
@@ -325,39 +337,6 @@ const sceneSummaryText = computed(() => {
   const current = store.activedTask?.name || '未选择'
   return `当前场景：${scene}（${count} 个任务）· 当前任务：${current}`
 })
-/**
- * 拉取当前场景任务列表。
- */
-const loadBattleTasks = async () => {
-  const battleId = store.battle?.id
-  if (!battleId) {
-    taskList.value = store.battle?.tasks || []
-    return
-  }
-  taskLoading.value = true
-  taskList.value = []
-  try {
-    const res = await getTaskList(battleId)
-    if (res.code === 200 && Array.isArray(res.data)) {
-      taskList.value = res.data
-      await resumeTaskProgressPollingForTasks(res.data)
-    } else {
-      taskList.value = store.battle?.tasks || []
-    }
-  } catch (error) {
-    console.error('加载场景任务列表失败:', error)
-    taskList.value = store.battle?.tasks || []
-  } finally {
-    taskLoading.value = false
-  }
-}
-watch(
-  () => store.battle?.id,
-  () => {
-    void loadBattleTasks()
-  },
-  { immediate: true }
-)
 /**
  * 解析任务卫星类型列表。
  *
@@ -525,12 +504,28 @@ const loadCenterTagOptions = async () => {
  */
 const syncEditorForTask = async (task: TaskForm | null | undefined) => {
   editorDraft.value = createDraftFromTask(task)
+  scheduleDurationError.value = ''
   if (task && editorDraft.value) {
-    durationHours.value = calcTaskDurationHours(editorDraft.value.beginDate, editorDraft.value.endDate)
+    const hours = calcTaskDurationHours(editorDraft.value.beginDate, editorDraft.value.endDate)
+    if (hours == null) {
+      scheduleDurationError.value =
+        '任务 beginDate/endDate 缺失或无效，无法计算时长。请检查 taskList 接口。'
+    } else {
+      durationHours.value = hours
+    }
     editorDraft.value.selectedWeaponIds = normalizeTaskWeaponIds(editorDraft.value.selectedWeaponIds)
     stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
     useWeaponsEnabled.value = editorDraft.value.selectedWeaponIds.length > 0
-    store.setTaskCombatArea({ ...editorDraft.value.combatArea })
+    if (editorDraft.value.taskApiError) {
+      ElMessage.error({
+        message: editorDraft.value.taskApiError,
+        duration: 10000,
+        showClose: true,
+      })
+    }
+    store.setTaskCombatArea(
+      editorDraft.value.combatArea ? { ...editorDraft.value.combatArea } : null,
+    )
   } else {
     stashedWeaponIds.value = []
     useWeaponsEnabled.value = false
@@ -562,6 +557,82 @@ watch(
   },
   { deep: true }
 )
+
+/**
+ * 任务列表刷新后，用接口数据覆盖 Pinia 中可能过期的 activedTask（如 localStorage 恢复的旧快照）。
+ */
+/**
+ * 展示 taskList 作战区域字段校验错误（每条任务单独提示）。
+ *
+ * @param errors 校验错误
+ */
+const showTaskListValidationErrors = (errors: { message: string }[]) => {
+  errors.forEach((err) => {
+    ElMessage.error({
+      message: err.message,
+      duration: 10000,
+      showClose: true,
+    })
+  })
+}
+
+const reconcileActiveTaskWithTaskList = async () => {
+  const tasks = taskList.value
+  if (!tasks.length) return
+  if (store.battle?.id) {
+    store.setActivedBattle({ ...store.battle, tasks })
+  }
+  const activeId = store.activedTask?.id
+  if (!activeId) return
+  const fresh = tasks.find((item) => item.id === activeId)
+  if (!fresh) return
+  store.setActivedTask(fresh)
+  await syncEditorForTask(fresh)
+}
+
+/**
+ * 拉取当前场景任务列表。
+ */
+const loadBattleTasks = async () => {
+  const battleId = store.battle?.id
+  if (!battleId) {
+    taskList.value = []
+    return
+  }
+  taskLoading.value = true
+  taskList.value = []
+  try {
+    const res = await getTaskList(battleId)
+    if (res.code === 200 && Array.isArray(res.data)) {
+      taskList.value = res.data
+      const validationErrors = res.taskListValidationErrors ?? res.combatAreaErrors
+      if (validationErrors?.length) {
+        showTaskListValidationErrors(validationErrors)
+      }
+      await resumeTaskProgressPollingForTasks(res.data)
+    } else {
+      taskList.value = []
+      ElMessage.error(res.msg || '加载任务列表失败')
+    }
+  } catch (error) {
+    console.error('加载场景任务列表失败:', error)
+    taskList.value = []
+    ElMessage.error('加载场景任务列表失败，请检查网络或后端服务')
+  } finally {
+    taskLoading.value = false
+  }
+  await reconcileActiveTaskWithTaskList()
+}
+
+watch(
+  () => store.battle?.id,
+  () => {
+    // 监听战场id变化，重新加载任务列表
+    void loadBattleTasks()
+  },
+  { immediate: true }
+)
+
 watch(
   () =>
     editorDraft.value
@@ -569,7 +640,14 @@ watch(
       : null,
   (range) => {
     if (!range || !editorDraft.value) return
-    durationHours.value = calcTaskDurationHours(range[0], range[1])
+    const hours = calcTaskDurationHours(range[0], range[1])
+    if (hours == null) {
+      scheduleDurationError.value =
+        '任务 beginDate/endDate 缺失或无效，无法计算时长。请检查 taskList 接口。'
+    } else {
+      scheduleDurationError.value = ''
+      durationHours.value = hours
+    }
   }
 )
 const isTargetTypeSelected = (typeName: string) =>
@@ -786,7 +864,10 @@ const openEditTask = (task: TaskForm) => {
   }
   void openTaskEditDialog('edit', task)
 }
-
+/**
+ * 保存任务后处理
+ * @param updated 
+ */
 const handleTaskSaved = async (updated: TaskForm) => {
   const isCreate = !taskList.value.some((item) => item.id === updated.id)
   await loadBattleTasks()
@@ -870,7 +951,14 @@ const handleSaveAndRecalculate = async () => {
     return
   }
   /** 9. 合并任务编辑器数据与任务基本信息 */
-  const payload = mergeTaskFormWithDraft(baseTask, draft)
+  let payload: TaskForm
+  try {
+    payload = mergeTaskFormWithDraft(baseTask, draft)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '作战区域数据不完整，无法保存'
+    ElMessage.error(msg)
+    return
+  }
   /** 10. 保存并重算任务 */
   savingRecalc.value = true
   try {
@@ -1213,6 +1301,17 @@ onUnmounted(() => {
 .metric-row--combat-head {
   grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
+}
+
+.combat-area-api-error {
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ffb4b4;
+  background: rgb(255 80 80 / 12%);
+  border: 1px solid rgb(255 120 120 / 35%);
+  border-radius: 4px;
 }
 
 .combat-area-enable {

@@ -749,7 +749,7 @@ const emit = defineEmits<{
 }>()
 
 /**
- * 从系列矩阵中推算打击前平均覆盖率（接口未返回时兜底）。
+ * 读取接口返回的打击前平均覆盖率（未返回时为 null，不从矩阵推算）。
  *
  * @param data 任务分析数据
  * @returns 打击前平均覆盖率；无法计算时返回 null
@@ -759,18 +759,7 @@ const resolveBeforeAvgCoverage = (data: SatelliteAnalysisData | null): number | 
   if (Number.isFinite(data.beforeAvgCoverage)) {
     return Number(data.beforeAvgCoverage)
   }
-
-  const coverages: number[] = []
-    ; (data.levelSeriesEntities || []).forEach((entity) => {
-      ; (entity.initMatrixList || []).forEach((sat) => {
-        if (Number.isFinite(sat.coverage)) {
-          coverages.push(sat.coverage)
-        }
-      })
-    })
-
-  if (!coverages.length) return null
-  return coverages.reduce((sum, value) => sum + value, 0) / coverages.length
+  return null
 }
 
 /**

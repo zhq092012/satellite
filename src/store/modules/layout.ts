@@ -10,7 +10,7 @@ import { type ChainNode } from '@/utils/satelliteFullChainAnalysis'
 import { prefetchSeriesTransmissionLinks } from '@/utils/prefetchTransmissionLinks'
 import { getTaskMatrix, type SatelliteAnalysisData } from '@/api/task/task'
 import { isTaskProgressComplete, taskProgressMap } from '@/composables/useTaskProgressPolling'
-import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
+import type { BattleForm, SatelliteData, TaskCombatArea, TaskForm } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import type { SatelliteDetail } from '@/types/cesium/satellite'
 

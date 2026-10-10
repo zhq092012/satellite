@@ -370,6 +370,13 @@ const handleSwitchScene = async (battleId: number | string) => {
 
     const taskRes = await getTaskList(battle.id)
     const tasks = taskRes.code === 200 && Array.isArray(taskRes.data) ? taskRes.data : []
+    taskRes.taskListValidationErrors?.forEach((err) => {
+      ElMessage.error({
+        message: err.message,
+        duration: 10000,
+        showClose: true,
+      })
+    })
     layoutStore.setActivedBattle({ ...battle, tasks })
 
     const matchedTask = tasks.find((task) => task.id === layoutStore.activedTask?.id)
