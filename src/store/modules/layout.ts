@@ -431,10 +431,16 @@ export const useLayoutStore = defineStore('layout-store', {
           return res.data
         }
         this.clearTaskAnalysisData()
+        const { ElMessage } = await import('element-plus')
+        ElMessage.error(
+          res.msg || `获取任务算法分析结果失败（taskId=${taskId}，code=${res.code ?? '未知'}）`,
+        )
         return null
       } catch (err) {
         console.error('获取任务算法分析结果失败:', err)
         this.clearTaskAnalysisData()
+        const { ElMessage } = await import('element-plus')
+        ElMessage.error('获取任务算法分析结果请求异常，请检查网络或 getTaskMatrix 接口')
         return null
       } finally {
         this.taskAnalysisLoading = false

@@ -108,18 +108,12 @@
 
 <script setup lang="ts">
 import {
-  buildBattleGlobeSatellites,
-  buildBattleGlobeSatellitesFromMatrix,
+  buildBattleGlobeSatellitesWithValidation,
+  notifyBattleGlobeSatelliteValidationErrors,
 } from '@/utils/buildBattleGlobeSatellites'
-import {
-  buildBattleGlobeWeapons,
-  buildBattleGlobeWeaponsFromMatrix,
-} from '@/utils/buildBattleGlobeWeapons'
-import {
-  buildBattleGlobeGroundTargets,
-  buildBattleGlobeGroundTargetsFromMatrix,
-  parseGroundTargetKey,
-} from '@/utils/buildBattleGlobeGroundTargets'
+import { buildBattleGlobeWeapons } from '@/utils/buildBattleGlobeWeapons'
+import { buildBattleGlobeGroundTargets, parseGroundTargetKey } from '@/utils/buildBattleGlobeGroundTargets'
+import { ElMessage } from 'element-plus'
 import { computed, nextTick, onActivated, onBeforeUnmount, ref, watch } from 'vue'
 import { ArrowDown, ArrowUp, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
@@ -219,26 +213,43 @@ const taskStartMs = computed(() => parseTaskTimeMs(taskTimeRange.value?.start))
 /** 任务结束时间（毫秒） */
 const taskEndMs = computed(() => parseTaskTimeMs(taskTimeRange.value?.end))
 
-/** 地球渲染卫星列表（优先任务分析全量数据，兜底当前系列矩阵） */
-const globeSatellites = computed(() => {
-  const fromAnalysis = buildBattleGlobeSatellites(taskAnalysisData.value)
-  if (fromAnalysis.length) return fromAnalysis
-  return buildBattleGlobeSatellitesFromMatrix(matrixData.value)
+/** 任务分析汇总卫星（含 TLE/名称校验错误，不静默跳过） */
+const globeSatellitesBuild = computed(() => {
+  if (!algorithmComplete.value || !taskAnalysisData.value) {
+    return { satellites: [] as ReturnType<typeof buildBattleGlobeSatellitesWithValidation>['satellites'], errors: [] as ReturnType<typeof buildBattleGlobeSatellitesWithValidation>['errors'] }
+  }
+  return buildBattleGlobeSatellitesWithValidation(taskAnalysisData.value)
 })
 
-/** 地球渲染武器列表（优先任务分析全量数据，兜底当前系列矩阵） */
-const globeWeapons = computed(() => {
-  const fromAnalysis = buildBattleGlobeWeapons(taskAnalysisData.value)
-  if (fromAnalysis.length) return fromAnalysis
-  return buildBattleGlobeWeaponsFromMatrix(matrixData.value)
-})
+/** 地球渲染卫星列表（仅任务分析全量数据，禁止矩阵兜底） */
+const globeSatellites = computed(() => globeSatellitesBuild.value.satellites)
 
-/** 地球渲染接收站/数据中心列表 */
-const globeGroundTargets = computed(() => {
-  const fromAnalysis = buildBattleGlobeGroundTargets(taskAnalysisData.value)
-  if (fromAnalysis.length) return fromAnalysis
-  return buildBattleGlobeGroundTargetsFromMatrix(matrixData.value)
-})
+/** 地球渲染武器列表（仅任务分析全量数据） */
+const globeWeapons = computed(() => buildBattleGlobeWeapons(taskAnalysisData.value))
+
+/** 地球渲染接收站/数据中心列表（仅任务分析全量数据） */
+const globeGroundTargets = computed(() => buildBattleGlobeGroundTargets(taskAnalysisData.value))
+
+/** 已提示过的卫星 TLE 校验错误签名，避免 watch 重复弹窗 */
+let lastGlobeSatelliteValidationKey = ''
+
+watch(
+  () =>
+    [
+      store.activedTask?.id,
+      algorithmComplete.value,
+      taskAnalysisLoading.value,
+      globeSatellitesBuild.value.errors.map((err) => err.message).join('\n'),
+    ] as const,
+  ([taskId, complete, loading, errorKey]) => {
+    if (!taskId || !complete || loading || !errorKey) return
+    if (errorKey === lastGlobeSatelliteValidationKey) return
+    lastGlobeSatelliteValidationKey = errorKey
+    notifyBattleGlobeSatelliteValidationErrors(globeSatellitesBuild.value.errors, (message) => {
+      ElMessage.error(message)
+    })
+  },
+)
 
 /** 地球组件引用 */
 const globeRef = ref<{ restoreOverviewView: () => void } | null>(null)
@@ -272,7 +283,7 @@ const handleStartSatelliteDeduction = () => {
   const norad = selectedNorad.value
   if (!norad) return
   stopTimelinePlayback()
-  startDeduction(norad, taskAnalysisData.value, matrixData.value)
+  startDeduction(norad, taskAnalysisData.value)
 }
 
 /** 暂停选中卫星推演 */
@@ -656,6 +667,7 @@ watch(
   (taskId, prevTaskId) => {
     if (taskId !== prevTaskId) {
       autoTimelinePlaybackTaskId = null
+      lastGlobeSatelliteValidationKey = ''
     }
     if (!taskId) {
       store.clearTaskAnalysisData()

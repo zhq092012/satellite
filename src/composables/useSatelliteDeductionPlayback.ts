@@ -1,7 +1,6 @@
 import type { Ref } from 'vue'
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { MatrixResult } from '@/api/electronic'
 import type { SatelliteAnalysisData } from '@/api/task/task'
 import {
   buildSatelliteDeductionBundle,
@@ -199,23 +198,28 @@ export function useSatelliteDeductionPlayback(currentTimeMs: Ref<number>) {
    *
    * @param norad 卫星 NORAD
    * @param analysisData 任务分析数据
-   * @param matrixFallback 当前系列矩阵（分析数据未命中时兜底）
    * @returns 是否成功启动
    */
   const startDeduction = (
     norad: number,
     analysisData: SatelliteAnalysisData | null,
-    matrixFallback?: MatrixResult | null
   ): boolean => {
     if (!norad) return false
 
-    const entity = resolveLevelSeriesEntityForNorad(norad, analysisData, matrixFallback)
+    const entity = resolveLevelSeriesEntityForNorad(norad, analysisData)
     if (!entity) {
-      ElMessage.warning('未找到该卫星的矩阵数据，无法推演')
+      ElMessage.error('未在任务分析结果中找到该卫星的系列实体，无法推演。请确认 getTaskMatrix 已返回完整数据。')
       return false
     }
 
-    const bundle = buildSatelliteDeductionBundle(entity, norad, matrixFallback)
+    let bundle: ReturnType<typeof buildSatelliteDeductionBundle>
+    try {
+      bundle = buildSatelliteDeductionBundle(entity, norad)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '构建推演数据失败'
+      ElMessage.error(message)
+      return false
+    }
     if (!bundle?.events.length) {
       ElMessage.warning('无可推演事件')
       return false

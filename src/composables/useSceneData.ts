@@ -24,6 +24,43 @@ import { useLayoutStore } from '@/store/modules/layout'
 import type { BlueSatelliteRecord } from '@/types/strike'
 import type { Weapon } from '@/types/dashboard'
 import type { SatelliteDetail, SatelliteTle, StepSatellite } from '@/types/cesium/satellite'
+import { hasValidTle } from '@/utils/buildBattleGlobeSatellites'
+
+/** 步骤卫星扁平化时因缺少坐标被跳过的条目 */
+export interface StepSatelliteGeoSkip {
+  /** NORAD 编号字符串 */
+  noradId: string
+  /** 卫星英文名（接口原值） */
+  name?: string
+  /** 所属阶段名 */
+  stageName: string
+}
+
+/** flattenStepSatellites 返回结构 */
+export interface FlattenStepSatellitesResult {
+  /** 有效坐标的卫星 */
+  satellites: BlueSatelliteRecord[]
+  /** 缺少有效 geoCoordinates 的条目 */
+  skipped: StepSatelliteGeoSkip[]
+}
+
+/**
+ * 仿真场景中卫星位置计算失败（缺少 TLE 或传播失败），禁止回退到静态经纬度。
+ */
+export class SatelliteScenePositionError extends Error {
+  /** NORAD 编号 */
+  readonly noradId: string
+
+  /**
+   * @param noradId NORAD
+   * @param reason 原因说明
+   */
+  constructor(noradId: string, reason: string) {
+    super(`卫星 NORAD ${noradId} 位置计算失败：${reason}`)
+    this.name = 'SatelliteScenePositionError'
+    this.noradId = noradId
+  }
+}
 
 export function useSceneData() {
   const store = useLayoutStore()
@@ -49,31 +86,77 @@ export function useSceneData() {
   }
 
   /**
-   * 确保卫星 TLE 缓存已更新
-   * 如果缓存中已有数据且任务 ID 匹配则复用，否则重新获取
+   * 确保任务内全部卫星 TLE 已加载且有效；任一缺失或接口失败时抛出并提示。
+   *
+   * @param taskId 任务 ID
+   * @param satellites 场景内卫星列表
+   * @throws 接口失败或存在 NORAD 无有效 TLE
    */
   const ensureSatelliteTleCache = async (taskId: number, satellites: BlueSatelliteRecord[]) => {
     if (cachedSatelliteTleTaskId === taskId && satelliteTleCache.size > 0) {
+      const norads = Array.from(
+        new Set(satellites.map((satellite) => String(satellite.noradId).trim()).filter(Boolean)),
+      )
+      const missingFromCache = norads.filter((noradId) => {
+        const tle = satelliteTleCache.get(noradId)
+        return !tle || !hasValidTle(tle.line1, tle.line2)
+      })
+      if (missingFromCache.length) {
+        throw new Error(`TLE 缓存不完整，缺少 NORAD：${missingFromCache.join('、')}`)
+      }
       return
     }
 
     satelliteTleCache.clear()
     satelliteSatrecCache.clear()
 
-    const norads = Array.from(new Set(satellites.map((satellite) => Number(satellite.noradId)).filter(Number.isFinite)))
+    const noradIds = Array.from(
+      new Set(satellites.map((satellite) => String(satellite.noradId).trim()).filter(Boolean)),
+    )
+    const norads = noradIds.map((id) => Number(id)).filter(Number.isFinite)
+
     if (norads.length === 0) {
       cachedSatelliteTleTaskId = taskId
       return
     }
 
     const tleDataRes = await getSatelliteTLEData({ norads })
-    if (tleDataRes.code === 200 && Array.isArray(tleDataRes.data)) {
-      tleDataRes.data.forEach((item) => {
-        if (item?.satelliteTleResp?.line1 && item?.satelliteTleResp?.line2) {
-          satelliteTleCache.set(String(item.noradId), item.satelliteTleResp)
-        }
+    const { ElMessage } = await import('element-plus')
+
+    if (tleDataRes.code !== 200) {
+      const message = tleDataRes.msg || `获取卫星 TLE 失败（taskId=${taskId}，code=${tleDataRes.code}）`
+      ElMessage.error(message)
+      throw new Error(message)
+    }
+
+    if (!Array.isArray(tleDataRes.data)) {
+      const message = `卫星 TLE 接口返回 data 非数组（taskId=${taskId}）`
+      ElMessage.error(message)
+      throw new Error(message)
+    }
+
+    tleDataRes.data.forEach((item) => {
+      const noradKey = String(item?.noradId ?? '').trim()
+      const tle = item?.satelliteTleResp
+      if (!noradKey || !tle || !hasValidTle(tle.line1, tle.line2)) return
+      satelliteTleCache.set(noradKey, tle)
+    })
+
+    cachedSatelliteTleTaskId = taskId
+
+    const missingNorads: string[] = []
+    for (const noradId of noradIds) {
+      const tle = satelliteTleCache.get(noradId)
+      if (!tle || !hasValidTle(tle.line1, tle.line2)) {
+        missingNorads.push(noradId)
+      }
+    }
+
+    if (missingNorads.length) {
+      missingNorads.forEach((noradId) => {
+        ElMessage.error(`卫星 NORAD ${noradId} 缺少有效 TLE，无法仿真定位。请检查 TLE 接口或入库数据。`)
       })
-      cachedSatelliteTleTaskId = taskId
+      throw new Error(`缺少有效 TLE 的 NORAD：${missingNorads.join('、')}`)
     }
   }
 
@@ -91,7 +174,7 @@ export function useSceneData() {
   /** 获取卫星运行周期（分钟） */
   const getSatellitePeriodMinutes = (
     satrec: ReturnType<typeof satellitejs.twoline2satrec>,
-    detail?: SatelliteDetail | null
+    detail?: SatelliteDetail | null,
   ): number => {
     const detailCycle = Number(detail?.cycle)
     if (Number.isFinite(detailCycle) && detailCycle > 0) {
@@ -106,40 +189,53 @@ export function useSceneData() {
     return 0
   }
 
-  /** 根据 Date 对象计算卫星三维位置 */
+  /**
+   * 根据 Date 对象计算卫星三维位置（必须已有有效 TLE 缓存）。
+   *
+   * @param satellite 卫星记录
+   * @param currentDate 当前时刻
+   * @returns ECI 米制坐标
+   * @throws {SatelliteScenePositionError} 缺少时间、TLE 或 SGP4 失败
+   */
   const getSatellitePositionAtDate = (satellite: BlueSatelliteRecord, currentDate?: Date): Cesium.Cartesian3 => {
-    const fallback = Cesium.Cartesian3.fromDegrees(satellite.longitude, satellite.latitude, satellite.altitude)
-    if (!currentDate || Number.isNaN(currentDate.getTime())) return fallback
+    const noradId = String(satellite.noradId)
+    if (!currentDate || Number.isNaN(currentDate.getTime())) {
+      throw new SatelliteScenePositionError(noradId, '缺少有效仿真时刻')
+    }
 
-    const tleData = satelliteTleCache.get(satellite.noradId)
-    if (!tleData?.line1 || !tleData?.line2) return fallback
+    const tleData = satelliteTleCache.get(noradId)
+    if (!tleData || !hasValidTle(tleData.line1, tleData.line2)) {
+      throw new SatelliteScenePositionError(noradId, '缺少有效 TLE，请先成功执行 ensureSatelliteTleCache')
+    }
 
-    const satrec = getSatelliteSatrec(satellite.noradId, tleData)
-    if (!satrec) return fallback
+    const satrec = getSatelliteSatrec(noradId, tleData)
+    if (!satrec) {
+      throw new SatelliteScenePositionError(noradId, 'TLE 无法解析为 satrec')
+    }
 
     try {
       const positionAndVelocity = satellitejs.propagate(satrec, currentDate)
-      if (!positionAndVelocity?.position) return fallback
-
-      const gmst = satellitejs.gstime(currentDate)
-      const positionEcf = satellitejs.eciToEcf(positionAndVelocity.position, gmst)
-      if (!positionEcf) return fallback
+      if (!positionAndVelocity?.position) {
+        throw new SatelliteScenePositionError(noradId, 'SGP4 传播未返回位置')
+      }
 
       return new Cesium.Cartesian3(
         positionAndVelocity.position.x * 1000,
         positionAndVelocity.position.y * 1000,
-        positionAndVelocity.position.z * 1000
+        positionAndVelocity.position.z * 1000,
       )
     } catch (error) {
-      console.warn('calculate satellite position failed', satellite.noradId, error)
-      return fallback
+      if (error instanceof SatelliteScenePositionError) throw error
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new SatelliteScenePositionError(noradId, `SGP4 传播异常：${detail}`)
     }
   }
 
   /** 根据 JulianDate 计算卫星三维位置 */
   const getSatellitePositionAtTime = (satellite: BlueSatelliteRecord, currentTime?: Cesium.JulianDate): Cesium.Cartesian3 => {
-    const fallback = Cesium.Cartesian3.fromDegrees(satellite.longitude, satellite.latitude, satellite.altitude)
-    if (!currentTime) return fallback
+    if (!currentTime) {
+      throw new SatelliteScenePositionError(String(satellite.noradId), '缺少 Cesium 时钟时刻')
+    }
     return getSatellitePositionAtDate(satellite, Cesium.JulianDate.toDate(currentTime))
   }
 
@@ -147,16 +243,23 @@ export function useSceneData() {
   const buildSatelliteOrbitPositions = (
     satellite: BlueSatelliteRecord,
     currentTime: Cesium.JulianDate,
-    detail?: SatelliteDetail | null
+    detail?: SatelliteDetail | null,
   ): Cesium.Cartesian3[] => {
-    const tleData = satelliteTleCache.get(satellite.noradId)
-    if (!tleData?.line1 || !tleData?.line2) return []
+    const noradId = String(satellite.noradId)
+    const tleData = satelliteTleCache.get(noradId)
+    if (!tleData || !hasValidTle(tleData.line1, tleData.line2)) {
+      throw new SatelliteScenePositionError(noradId, '缺少有效 TLE，无法绘制轨道')
+    }
 
-    const satrec = getSatelliteSatrec(satellite.noradId, tleData)
-    if (!satrec) return []
+    const satrec = getSatelliteSatrec(noradId, tleData)
+    if (!satrec) {
+      throw new SatelliteScenePositionError(noradId, 'TLE 无法解析为 satrec')
+    }
 
     const periodMinutes = getSatellitePeriodMinutes(satrec, detail)
-    if (!Number.isFinite(periodMinutes) || periodMinutes <= 0) return []
+    if (!Number.isFinite(periodMinutes) || periodMinutes <= 0) {
+      throw new SatelliteScenePositionError(noradId, '无法计算轨道周期')
+    }
 
     const currentDate = Cesium.JulianDate.toDate(currentTime)
     const segmentCount = Math.max(120, Math.min(360, Math.ceil(periodMinutes * 6)))
@@ -172,15 +275,25 @@ export function useSceneData() {
   }
 
   /**
-   * 将任务步骤数据中的卫星扁平化处理
-   * 提取每个卫星的基本信息和位置，按 NORAD ID 去重
+   * 将任务步骤数据中的卫星扁平化处理，并记录缺少 geoCoordinates 的条目（不静默跳过）。
+   *
+   * @param items 步骤卫星列表
+   * @returns 有效卫星与跳过条目
    */
-  const flattenStepSatellites = (items: StepSatellite[]): BlueSatelliteRecord[] => {
+  const flattenStepSatellites = (items: StepSatellite[]): FlattenStepSatellitesResult => {
     const satellitesByNorad = new Map<string, BlueSatelliteRecord>()
+    const skipped: StepSatelliteGeoSkip[] = []
+
     for (const step of items) {
-      const stageName = step.taskStepResp?.name ?? '未知阶段'
+      const stageName = step.taskStepResp?.name?.trim() || '未知阶段'
       for (const structure of step.structureList ?? []) {
         for (const item of structure.gjList ?? []) {
+          const noradId = String(item.norad_id ?? '').trim()
+          if (!noradId) {
+            skipped.push({ noradId: '?', name: item.name_en, stageName })
+            continue
+          }
+
           const position = item.geoCoordinates
           if (
             position &&
@@ -188,8 +301,8 @@ export function useSceneData() {
             Number.isFinite(position.latitude) &&
             Number.isFinite(position.altitude)
           ) {
-            satellitesByNorad.set(String(item.norad_id), {
-              noradId: String(item.norad_id),
+            satellitesByNorad.set(noradId, {
+              noradId,
               name: item.name_en,
               country: item.country,
               satType: item.sat_type,
@@ -198,11 +311,13 @@ export function useSceneData() {
               altitude: position.altitude,
               stageName,
             })
+          } else {
+            skipped.push({ noradId, name: item.name_en, stageName })
           }
         }
       }
     }
-    return Array.from(satellitesByNorad.values())
+    return { satellites: Array.from(satellitesByNorad.values()), skipped }
   }
 
   /**
@@ -240,7 +355,7 @@ export function useSceneData() {
     blueCountries: string[],
     redCountries: string[],
     onDataLoaded: (resetEntities: boolean) => void,
-    resetEntities = false
+    resetEntities = false,
   ) => {
     const taskId = store.activedTask?.id
     if (!taskId) {
@@ -254,51 +369,78 @@ export function useSceneData() {
     }
 
     loadingScene.value = true
+    const { ElMessage } = await import('element-plus')
     try {
       const [satelliteRes, weaponRes, groundStationRes, missileBaseRes] = await Promise.all([
         getBattleSegmentSatellites(
           taskId,
           undefined,
-          blueCountries.length ? blueCountries : undefined
+          blueCountries.length ? blueCountries : undefined,
         ),
         getTaskWeapons(taskId, redCountries.length ? redCountries : undefined),
         getGroundStationList({ type: '', name: '', country: '' }),
         getMissileBaseListAll({ country: '', name: '' }),
       ])
 
-      if (satelliteRes.code === 200 && satelliteRes.data) {
-        taskSatellites.value = flattenStepSatellites(satelliteRes.data)
-      } else {
+      if (satelliteRes.code !== 200 || !satelliteRes.data) {
         taskSatellites.value = []
+        const message =
+          satelliteRes.msg || `加载任务卫星步骤失败（taskId=${taskId}，code=${satelliteRes.code}）`
+        ElMessage.error(message)
+        throw new Error(message)
       }
+
+      const flattened = flattenStepSatellites(satelliteRes.data)
+      if (flattened.skipped.length) {
+        flattened.skipped.forEach((item) => {
+          ElMessage.error(
+            `卫星 NORAD ${item.noradId}${item.name ? `「${item.name}」` : ''} 在阶段「${item.stageName}」缺少有效 geoCoordinates，请检查 battleSegmentSatellites 接口。`,
+          )
+        })
+        throw new Error(`共 ${flattened.skipped.length} 颗卫星缺少有效坐标`)
+      }
+      taskSatellites.value = flattened.satellites
 
       await ensureSatelliteTleCache(taskId, taskSatellites.value)
 
-      if (weaponRes.code === 200 && weaponRes.data?.weapons) {
-        taskWeapons.value = weaponRes.data.weapons.filter(
-          (weapon) => Number.isFinite(weapon.longitude) && Number.isFinite(weapon.latitude)
-        )
-      } else {
+      if (weaponRes.code !== 200 || !weaponRes.data?.weapons) {
         taskWeapons.value = []
+        const message = weaponRes.msg || `加载任务武器失败（taskId=${taskId}，code=${weaponRes.code}）`
+        ElMessage.error(message)
+        throw new Error(message)
       }
+      const invalidWeapons = weaponRes.data.weapons.filter(
+        (weapon) => !Number.isFinite(weapon.longitude) || !Number.isFinite(weapon.latitude),
+      )
+      if (invalidWeapons.length) {
+        invalidWeapons.forEach((weapon) => {
+          ElMessage.error(`武器「${weapon.name ?? weapon.id ?? '?'}」缺少有效经纬度，请检查 getTaskWeapons 接口。`)
+        })
+        throw new Error(`共 ${invalidWeapons.length} 个武器缺少有效经纬度`)
+      }
+      taskWeapons.value = weaponRes.data.weapons
 
-      if (groundStationRes.code === 200 && groundStationRes.data) {
-        baseStations.value = groundStationRes.data
-      } else {
+      if (groundStationRes.code !== 200 || !groundStationRes.data) {
         baseStations.value = []
+        const message =
+          groundStationRes.msg || `加载地面站列表失败（code=${groundStationRes.code}）`
+        ElMessage.error(message)
+        throw new Error(message)
       }
+      baseStations.value = groundStationRes.data
 
-      if (missileBaseRes.code === 200 && missileBaseRes.data) {
-        missileBases.value = missileBaseRes.data
-      } else {
+      if (missileBaseRes.code !== 200 || !missileBaseRes.data) {
         missileBases.value = []
+        const message =
+          missileBaseRes.msg || `加载导弹基地列表失败（code=${missileBaseRes.code}）`
+        ElMessage.error(message)
+        throw new Error(message)
       }
+      missileBases.value = missileBaseRes.data
 
       onDataLoaded(resetEntities)
     } catch (error) {
       console.error(error)
-      const { ElMessage } = await import('element-plus')
-      ElMessage.error('仿真场景加载失败')
     } finally {
       loadingScene.value = false
     }

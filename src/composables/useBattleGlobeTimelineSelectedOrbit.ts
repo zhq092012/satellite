@@ -175,6 +175,14 @@ export const useBattleGlobeTimelineSelectedOrbit = (
     if (!sat) return
 
     const orbitPeriodSec = resolveBattleGlobeOrbitPeriodSec(sat)
+    if (orbitPeriodSec == null) {
+      void import('element-plus').then(({ ElMessage }) => {
+        ElMessage.error(
+          `卫星「${sat.name}」(norad=${norad}) TLE 无效，无法绘制轨道周期。请检查 initMatrix 或 TLE 数据。`,
+        )
+      })
+      return
+    }
     const start = Cesium.JulianDate.fromDate(new Date(startMs))
     const stop = Cesium.JulianDate.fromDate(new Date(endMs))
     const positionProperty = buildTaskSampledPosition(norad, start, stop, orbitPeriodSec)

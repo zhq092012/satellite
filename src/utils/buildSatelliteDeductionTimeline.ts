@@ -20,6 +20,7 @@ import {
 } from '@/utils/buildSatelliteAnalysisTable'
 import { parseReceiveLatLonString } from '@/utils/buildBattleGlobeGroundTargets'
 import * as satellitejs from 'satellite.js'
+import { hasValidTle } from '@/utils/buildBattleGlobeSatellites'
 
 //-----------------------------构建推演时间轴-----------------------------
 // 本函数主要用于构建推演时间轴，将推演事件按照时间顺序排列，并构建推演提示文本。
@@ -506,28 +507,13 @@ const resolvePlanBeginTimeText = (plan: AttackPlan): string => {
 }
 
 /**
- * 推演打击方案列表：当前系列矩阵包含该星时，用矩阵的 `attackPlanList`（与你在接口里看到的 JSON 一致）；
- * 否则回退任务分析实体上的列表。
+ * 推演打击方案列表：仅使用任务分析实体上的 attackPlanList。
  *
- * @param entity 系列实体（任务分析或矩阵）
- * @param norad 当前卫星 NORAD
- * @param satName 当前卫星名称
- * @param matrixFallback 当前选中系列矩阵
+ * @param entity 系列实体（任务分析）
  * @returns 用于生成打击事件的方案列表
  */
-const resolveDeductionAttackPlans = (
-  entity: LevelSeriesEntity,
-  norad: number,
-  _satName: string,
-  matrixFallback?: MatrixResult | null
-): AttackPlan[] => {
-  const satInMatrix =
-    Boolean(matrixFallback?.initMatrixList?.some((sat) => sat.norad === norad)) ||
-    Boolean(matrixFallback?.satelliteMatrixList?.some((sat) => sat.norad === norad))
-  if (satInMatrix && (matrixFallback?.attackPlanList?.length || 0) > 0) {
-    return matrixFallback!.attackPlanList as AttackPlan[]
-  }
-  return entity.attackPlanList || []
+const resolveDeductionAttackPlans = (entity: LevelSeriesEntity): AttackPlan[] => {
+  return entity.attackPlanList ?? []
 }
 
 /**
@@ -689,39 +675,18 @@ export const findLevelSeriesEntityForNorad = (
 }
 
 /**
- * 解析推演用的系列实体：优先任务全量分析，兜底当前系列矩阵。
+ * 解析推演用的系列实体（仅任务全量分析，禁止矩阵兜底）。
  *
  * @param norad 卫星 NORAD
  * @param analysisData 任务分析数据
- * @param matrixFallback 当前选中系列矩阵
  * @returns 系列实体；未找到时 null
  */
 export const resolveLevelSeriesEntityForNorad = (
-  // 卫星 NORAD
   norad: number,
-  // 任务分析数据
   analysisData?: SatelliteAnalysisData | null,
-  // 当前选中系列矩阵
-  matrixFallback?: MatrixResult | null
 ): LevelSeriesEntity | null => {
-  // 如果卫星 NORAD 为空，则返回 null
   if (!norad) return null
-  // 从任务分析数据中获取系列实体
-  const fromAnalysis = findLevelSeriesEntityForNorad(analysisData, norad)
-  // 如果从任务分析数据中获取系列实体不为空，则返回系列实体
-  if (fromAnalysis) return fromAnalysis
-  // 获取当前选中系列矩阵
-  const matrix = matrixFallback
-  // 如果当前选中系列矩阵为空，则返回 null
-  if (!matrix) return null
-  // 判断当前选中系列矩阵是否包含该卫星 NORAD
-  const inInit = matrix.initMatrixList?.some((sat) => sat.norad === norad)
-  // 判断当前选中系列矩阵是否包含该卫星 NORAD
-  const inPost = matrix.satelliteMatrixList?.some((sat) => sat.norad === norad)
-  // 如果当前选中系列矩阵包含该卫星 NORAD，则返回当前选中系列矩阵
-  if (inInit || inPost) return matrix as unknown as LevelSeriesEntity
-  // 如果当前选中系列矩阵不包含该卫星 NORAD，则返回 null
-  return null
+  return findLevelSeriesEntityForNorad(analysisData, norad)
 }
 
 /**
@@ -864,38 +829,23 @@ const resolveReceiveCoordsForWindow = (
 }
 
 /**
- * 从 TLE 估算轨道周期（秒）。
+ * 从 TLE 估算轨道周期（秒）；无效时不按 orbitType 猜测默认值。
  *
  * @param initSat 打击前卫星
- * @returns 周期秒数
+ * @returns 周期秒数；TLE 无效时 null
  */
-const resolveOrbitPeriodSec = (initSat: InitMatrix): number => {
+const resolveOrbitPeriodSec = (initSat: InitMatrix): number | null => {
+  if (!hasValidTle(initSat.line1, initSat.line2)) return null
   try {
-    // 解析卫星轨道周期
-    const satrec = satellitejs.twoline2satrec(initSat.line1, initSat.line2)
-    // 如果卫星轨道周期大于0，则返回卫星轨道周期
+    const satrec = satellitejs.twoline2satrec(initSat.line1.trim(), initSat.line2.trim())
     if (satrec?.no && satrec.no > 0) {
-      // 返回卫星轨道周期
-      return Math.max(300, (2 * Math.PI) / satrec.no * 60)
+      return Math.max(300, ((2 * Math.PI) / satrec.no) * 60)
     }
   } catch {
-    /* fallback below */
+    return null
   }
-  // 获取卫星轨道类型
-  const orbitType = initSat.orbitType ?? postSatOrbitFallback(initSat)
-  // 如果卫星轨道类型为1，则返回90分钟
-  if (orbitType === 1) return 90 * 60
-  // 如果卫星轨道类型为2，则返回12小时
-  if (orbitType === 2) return 12 * 3600
-  // 如果卫星轨道类型为3，则返回24小时
-  return 24 * 3600
+  return null
 }
-
-/**
- * @param initSat 卫星矩阵
- * @returns 轨道类型 默认1:低轨
- */
-const postSatOrbitFallback = (initSat: InitMatrix): number => initSat.orbitType ?? 1 // 默认1:低轨
 
 /**
  * 构建推演视觉计划。
@@ -969,11 +919,18 @@ const buildVisualPlanFromContext = (ctx: VisualPlanContext): SatelliteDeductionV
     strikeMs = strikeEvent?.atMs ?? null
   }
 
+  const orbitPeriodSec = resolveOrbitPeriodSec(ctx.initSat)
+  if (orbitPeriodSec == null) {
+    throw new Error(
+      `卫星 NORAD ${ctx.norad} 缺少有效 TLE，无法计算推演轨道周期。请检查 initMatrix 或 TLE 入库。`,
+    )
+  }
+
   return {
     // 获取卫星 NORAD
     norad: ctx.norad,
     // 获取轨道周期
-    orbitPeriodSec: resolveOrbitPeriodSec(ctx.initSat),
+    orbitPeriodSec,
     // 获取过站窗口
     stationPasses,
     // 获取卫星打击时间戳
@@ -995,34 +952,13 @@ const buildSatelliteDeductionTimelineInternal = (
   // 获取打击后卫星
   const postSat = entity.satelliteMatrixList?.find((sat) => sat.norad === norad)
 
-  // 如果打击前卫星不存在，则使用打击后卫星
-  if (!initSat && postSat) {
-    // 构建打击前卫星
-    initSat = {
-      // 设置卫星 NORAD
-      norad: postSat.norad,
-      // 设置卫星名称
-      name: postSat.name,
-      // 设置卫星类型
-      satType: postSat.satType,
-      // 设置卫星轨道线1
-      line1: '',
-      // 设置卫星轨道线2
-      line2: '',
-      // 设置卫星轨道类型
-      orbitType: postSat.orbitType,
-      // 设置卫星用途
-      usage: postSat.usage,
-      // 设置战场窗口
-      battleWindow: postSat.battleWindow,
-      height: postSat.height,
-      initWindows: mapStationWindowsForDeduction(postSat, []),
-      coverage: postSat.coverage,
-    }
-  }
-
-  // 如果打击前卫星不存在，则返回 null
   if (!initSat) return null
+
+  if (!hasValidTle(initSat.line1, initSat.line2)) {
+    throw new Error(
+      `卫星 NORAD ${norad} 缺少有效 TLE，无法构建推演时间轴。请检查 initMatrix 或 TLE 入库。`,
+    )
+  }
   // 获取卫星名称
   const satName = initSat.name?.trim() || postSat?.name?.trim() || `NORAD-${norad}`
   // 过站时间只取 satelliteMatrixList.stationWindows（peakWindow / endWindow）
@@ -1241,19 +1177,13 @@ const buildSatelliteDeductionTimelineInternal = (
  *
  * @param entity 系列实体
  * @param norad 卫星 NORAD
- * @param matrixFallback 当前选中系列矩阵；有该星时打击时间以矩阵 attackPlanList.beginTime 为准
  * @returns 事件与视觉计划；无 init 卫星时 null
  */
 export const buildSatelliteDeductionBundle = (
   entity: LevelSeriesEntity,
   norad: number,
-  matrixFallback?: MatrixResult | null
 ): SatelliteDeductionBundle | null => {
-  const satName =
-    entity.initMatrixList?.find((sat) => sat.norad === norad)?.name?.trim() ||
-    entity.satelliteMatrixList?.find((sat) => sat.norad === norad)?.name?.trim() ||
-    ''
-  const attackPlanList = resolveDeductionAttackPlans(entity, norad, satName, matrixFallback)
+  const attackPlanList = resolveDeductionAttackPlans(entity)
   const entityForTimeline =
     attackPlanList === entity.attackPlanList ? entity : { ...entity, attackPlanList }
   const internal = buildSatelliteDeductionTimelineInternal(entityForTimeline, norad)
