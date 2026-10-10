@@ -839,25 +839,41 @@ const satelliteStrikeRecommendRows = ref<SatelliteStrikeRecommendItem[]>([])
 /** 卫星打击推荐列表加载中 */
 const strikeRecommendLoading = ref(false)
 
+/** 并发请求序号：仅最新一次 `getTargetsThreatLevel` 可写回列表 */
+let strikeRecommendLoadToken = 0
+
+/** 已成功加载过的任务 ID（同一任务、分析数据未清空时不重复请求） */
+let strikeRecommendLoadedTaskId: number | null = null
+
 /**
  * 拉取任务下卫星打击推荐（综合/静态/动态威胁度）。
  *
  * @param taskId 任务 ID
+ * @param force 是否忽略「已加载」缓存（任务重算后由 watch 清空缓存再拉取）
  */
-const loadSatelliteStrikeRecommendations = async (taskId: number) => {
+const loadSatelliteStrikeRecommendations = async (taskId: number, force = false) => {
+  if (!force && strikeRecommendLoadedTaskId === taskId) return
+  const token = ++strikeRecommendLoadToken
   strikeRecommendLoading.value = true
   try {
     const res = await getTargetsThreatLevel({ taskId: String(taskId) })
+    if (token !== strikeRecommendLoadToken) return
     if (res.code !== 200) {
       satelliteStrikeRecommendRows.value = []
+      strikeRecommendLoadedTaskId = null
       return
     }
     satelliteStrikeRecommendRows.value = mapTargetThreatLevelListToStrikeRecommend(res.data)
+    strikeRecommendLoadedTaskId = taskId
   } catch (error) {
+    if (token !== strikeRecommendLoadToken) return
     console.error('获取卫星打击推荐列表失败:', error)
     satelliteStrikeRecommendRows.value = []
+    strikeRecommendLoadedTaskId = null
   } finally {
-    strikeRecommendLoading.value = false
+    if (token === strikeRecommendLoadToken) {
+      strikeRecommendLoading.value = false
+    }
   }
 }
 
@@ -969,11 +985,20 @@ watch(
   }
 )
 
-/** 算法完成后拉取卫星打击推荐列表 */
+/**
+ * 算法完成且 getTaskMatrix 分析数据就绪后拉取推荐列表。
+ * 不再监听 analysisData 引用本身，避免刷新时 matrix 多次赋值触发重复请求。
+ */
 watch(
-  () => [store.activedTask?.id, props.algorithmComplete, props.analysisData] as const,
-  ([taskId, complete]) => {
-    if (!taskId || !complete) {
+  () => {
+    const taskId = store.activedTask?.id
+    if (!taskId || !props.algorithmComplete || !props.analysisData) return null
+    return taskId
+  },
+  (taskId) => {
+    if (taskId == null) {
+      strikeRecommendLoadToken += 1
+      strikeRecommendLoadedTaskId = null
       satelliteStrikeRecommendRows.value = []
       strikeRecommendLoading.value = false
       return
