@@ -296,7 +296,30 @@ export const buildBattleGlobeSatellitesFromMatrix = (
   buildBattleGlobeSatellitesFromMatrixWithValidation(matrix).satellites
 
 /**
- * 弹出卫星 TLE/字段校验错误（每条卫星一条消息）。
+ * 将 TLE / 接口字段校验失败的卫星输出到控制台，便于对照 getTaskMatrix / initMatrix 数据。
+ *
+ * @param errors 校验错误列表
+ */
+export const logBattleGlobeSatelliteValidationErrorsToConsole = (
+  errors: BattleGlobeSatelliteFromApiError[],
+): void => {
+  if (!errors.length) return
+  console.warn(
+    `[态势地球] 共 ${errors.length} 颗卫星 TLE 错误或接口未返回有效字段，已跳过渲染：`,
+    errors.map((err) => ({
+      norad: err.norad,
+      name: err.satelliteName,
+      series: err.series,
+      missingFields: [...err.missingFields],
+    })),
+  )
+  errors.forEach((err) => {
+    console.warn('[态势地球]', err.message)
+  })
+}
+
+/**
+ * 弹出卫星 TLE/字段校验错误（每条卫星一条消息），并同步写入控制台。
  *
  * @param errors 校验错误列表
  * @param emit 消息回调，默认由调用方传入 ElMessage.error
@@ -305,5 +328,6 @@ export const notifyBattleGlobeSatelliteValidationErrors = (
   errors: BattleGlobeSatelliteFromApiError[],
   emit: (message: string) => void,
 ): void => {
+  logBattleGlobeSatelliteValidationErrorsToConsole(errors)
   errors.forEach((err) => emit(err.message))
 }

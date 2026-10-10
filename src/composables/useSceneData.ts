@@ -153,7 +153,14 @@ export function useSceneData() {
     }
 
     if (missingNorads.length) {
+      console.warn(
+        `[场景仿真] TLE 接口未返回或 line1/line2 无效的卫星（taskId=${taskId}）：`,
+        missingNorads,
+      )
       missingNorads.forEach((noradId) => {
+        console.warn(
+          `[场景仿真] 卫星 NORAD ${noradId} 缺少有效 TLE，无法仿真定位。请检查 TLE 接口或入库数据。`,
+        )
         ElMessage.error(`卫星 NORAD ${noradId} 缺少有效 TLE，无法仿真定位。请检查 TLE 接口或入库数据。`)
       })
       throw new Error(`缺少有效 TLE 的 NORAD：${missingNorads.join('、')}`)
