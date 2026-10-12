@@ -130,6 +130,17 @@ const clearTaskProgressReconnectTimer = (taskId: number): void => {
 }
 
 /**
+ * 指定任务是否已有进行中的进度 WebSocket（OPEN 或 CONNECTING）。
+ *
+ * @param taskId 任务 ID
+ * @returns 已连接或连接中时为 true
+ */
+export const hasActiveTaskProgressSocket = (taskId: number): boolean => {
+  const socket = taskProgressSocketMap.get(taskId)
+  return !!socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)
+}
+
+/**
  * 关闭指定任务的 WebSocket（不触发自动重连）。
  *
  * @param taskId 任务 ID
@@ -295,6 +306,8 @@ export const resumeTaskProgressPollingForTasks = async (tasks: TaskForm[]): Prom
   for (const task of tasks) {
     if (!task.id) continue
 
+    if (hasActiveTaskProgressSocket(task.id)) continue
+
     const cached = taskProgressMap[task.id]
     const entity = task.algorithmProgressEntity
     if (isTaskProgressComplete(cached) || isTaskProgressComplete(entity as unknown as TaskProgressInfo)) continue
@@ -334,6 +347,7 @@ export const useTaskProgressPolling = () => {
     getTaskProgress,
     getTaskProgressPercent,
     isTaskProgressComplete,
+    hasActiveTaskProgressSocket,
     startTaskProgressPolling,
     stopTaskProgressPolling,
     stopAllTaskProgressPolling,

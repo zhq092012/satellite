@@ -21,15 +21,15 @@
             </span>
             <div class="task-progress-trailing">
               <div class="task-progress-status-row">
-                <el-tooltip :content="getTaskProgressDisplay(task).tooltip" placement="top"
-                  :show-after="getTaskProgressDisplay(task).kind === 'running' ? 200 : 0">
+                <el-tooltip :content="resolveTaskProgressDisplay(task).tooltip" placement="top"
+                  :show-after="resolveTaskProgressDisplay(task).kind === 'running' ? 200 : 0">
                   <div class="task-progress-mini">
-                    <el-progress v-if="getTaskProgressDisplay(task).kind !== 'done'" class="task-progress-mini-bar"
-                      :percentage="getTaskProgressDisplay(task).percent" :stroke-width="4" :show-text="false" />
+                    <el-progress v-if="resolveTaskProgressDisplay(task).kind !== 'done'" class="task-progress-mini-bar"
+                      :percentage="resolveTaskProgressDisplay(task).percent" :stroke-width="4" :show-text="false" />
                     <span class="task-progress-percent" :class="{
-                      'task-progress-percent--done': getTaskProgressDisplay(task).kind === 'done',
-                      'task-progress-percent--idle': getTaskProgressDisplay(task).kind === 'idle',
-                    }">{{ getTaskProgressDisplay(task).text }}</span>
+                      'task-progress-percent--done': resolveTaskProgressDisplay(task).kind === 'done',
+                      'task-progress-percent--idle': resolveTaskProgressDisplay(task).kind === 'idle',
+                    }">{{ resolveTaskProgressDisplay(task).text }}</span>
                   </div>
                 </el-tooltip>
                 <button type="button" class="task-progress-edit-btn" title="编辑任务"
@@ -76,7 +76,8 @@
               <div class="metric-row">
                 <span class="metric-label">任务时长</span>
                 <el-input-number v-model="durationHours" class="metric-input-number" size="small" :min="1" :max="8760"
-                  :step="1" controls-position="right" :disabled="Boolean(editorDraft.taskApiError || scheduleDurationError)"
+                  :step="1" controls-position="right"
+                  :disabled="Boolean(editorDraft.taskApiError || scheduleDurationError)"
                   @change="handleDurationHoursChange" />
                 <span class="metric-unit">小时</span>
               </div>
@@ -212,7 +213,7 @@ import { getSatelliteSeries } from '@/api/task/task'
 import { getGroundStationList } from '@/api/system/satellite-system-api'
 import type { TaskForm } from '@/types/dashboard'
 import type { MatrixResult } from '@/api/electronic'
-import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
+import { taskProgressMap, useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskEditDialog, { type TaskEditDialogMode } from '@/components/BattleSituation/TaskEditDialog.vue'
 import {
@@ -288,6 +289,27 @@ const getTaskProgressDisplay = (
   return { text: '未开始', kind: 'idle', tooltip: '未开始', percent: 0 }
 }
 
+const taskList = ref<TaskForm[]>([])
+
+/** 任务列表进度展示（显式依赖 taskProgressMap，保证 WS 推送后重渲染） */
+const taskProgressDisplayById = computed(() => {
+  const map = new Map<number, ReturnType<typeof getTaskProgressDisplay>>()
+  for (const task of taskList.value) {
+    if (!task.id) continue
+    void taskProgressMap[task.id]
+    map.set(task.id, getTaskProgressDisplay(task))
+  }
+  return map
+})
+
+/**
+ * 左侧面板任务进度展示（优先读 computed 缓存）。
+ *
+ * @param task 任务项
+ */
+const resolveTaskProgressDisplay = (task: TaskForm) =>
+  (task.id ? taskProgressDisplayById.value.get(task.id) : undefined) ?? getTaskProgressDisplay(task)
+
 /**
  * 任务是否处于算法计算中（有进度且未完成）。
  *
@@ -295,7 +317,7 @@ const getTaskProgressDisplay = (
  * @returns 计算中为 true
  */
 const isTaskCalculating = (task: TaskForm): boolean =>
-  getTaskProgressDisplay(task).kind === 'running'
+  resolveTaskProgressDisplay(task).kind === 'running'
 
 /** 当前选中任务是否正在计算（禁止编辑与保存并重算） */
 const isActiveTaskCalculating = computed(() => {
@@ -304,7 +326,8 @@ const isActiveTaskCalculating = computed(() => {
   return isTaskCalculating(task)
 })
 
-const taskList = ref<TaskForm[]>([])
+/** 已对某任务触发过「计算完成」后续处理，避免 watch 重复 emit */
+const taskProgressCompleteNotified = new Set<number>()
 const taskLoading = ref(false)
 const taskSwitching = ref(false)
 const savingRecalc = ref(false)
@@ -627,6 +650,66 @@ const loadBattleTasks = async () => {
   await reconcileActiveTaskWithTaskList()
 }
 
+/**
+ * WS 进度三项均为「完成」时，回写 taskList / activedTask 的 algorithmProgressEntity。
+ *
+ * @param taskId 任务 ID
+ */
+const applyCompletedProgressToTaskList = (taskId: number): void => {
+  const progress = taskProgressMap[taskId]
+  if (!isTaskProgressComplete(progress)) return
+
+  const patchTask = (task: TaskForm): TaskForm => {
+    if (task.id !== taskId) return task
+    const prev = task.algorithmProgressEntity
+    return {
+      ...task,
+      algorithmProgressEntity: {
+        _id: prev?._id ?? '',
+        taskId,
+        totalMin: prev?.totalMin ?? null,
+        transitMin: prev?.transitMin ?? null,
+        threatAndStrikeMin: prev?.threatAndStrikeMin ?? null,
+        totalStatus: progress!.totalStatus,
+        transitStatus: progress!.transitStatus,
+        threatAndStrikeStatus: progress!.threatAndStrikeStatus,
+        mes: progress!.mes ?? prev?.mes ?? null,
+      },
+    }
+  }
+
+  taskList.value = taskList.value.map(patchTask)
+  if (store.activedTask?.id === taskId) {
+    // 回写当前激活任务的进度实体
+    store.setActivedTask(patchTask(store.activedTask))
+  }
+}
+
+watch(
+  () =>
+    taskList.value
+      .map((t) => {
+        if (!t.id) return ''
+        const p = taskProgressMap[t.id]
+        return p
+          ? `${t.id}:${p.totalStatus}:${p.transitStatus}:${p.threatAndStrikeStatus}`
+          : `${t.id}:`
+      })
+      .join('|'),
+  () => {
+    for (const task of taskList.value) {
+      if (!task.id) continue
+      if (!isTaskProgressComplete(taskProgressMap[task.id])) continue
+      applyCompletedProgressToTaskList(task.id)
+      if (taskProgressCompleteNotified.has(task.id)) continue
+      taskProgressCompleteNotified.add(task.id)
+      if (store.activedTask?.id === task.id) {
+        emit('task-recalculated', task.id)
+      }
+    }
+  },
+)
+
 watch(
   () => store.battle?.id,
   () => {
@@ -873,9 +956,10 @@ const openEditTask = (task: TaskForm) => {
  */
 const handleTaskSaved = async (updated: TaskForm) => {
   const isCreate = !taskList.value.some((item) => item.id === updated.id)
-  await loadBattleTasks()
   if (!updated.id) return
+  taskProgressCompleteNotified.delete(updated.id)
   await startTaskProgressPolling(updated.id)
+  await loadBattleTasks()
   const latest = requireTaskFromList(updated.id)
   if (!latest) return
   store.setActivedTask(latest)
@@ -972,17 +1056,17 @@ const handleSaveAndRecalculate = async () => {
       return
     }
     ElMessage.success('已保存，任务重新计算中')
-    /** 11. 刷新任务列表 */
+    taskProgressCompleteNotified.delete(baseTask.id)
+    /** 11. 先订阅 WS，避免 loadBattleTasks 期间完成推送被后续 start 重置 */
+    await startTaskProgressPolling(baseTask.id)
+    /** 12. 刷新任务列表 */
     await loadBattleTasks()
     const latest = requireTaskFromList(baseTask.id)
     if (!latest) return
     store.setActivedTask(latest)
     /** 13. 清除任务分析数据 */
     store.setSelectedSatSeries('')
-    /** 13. 清除任务分析数据 */
     store.clearTaskAnalysisData()
-    /** 14. 启动任务进度轮询 */
-    await startTaskProgressPolling(baseTask.id)
     /** 15. 同步任务编辑器数据 */
     await syncEditorForTask(latest)
     /** 16. 触发任务重算事件 */

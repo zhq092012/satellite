@@ -58,16 +58,17 @@ interface TaskForm {
   country?: string
   createTime?: string
   updateTime?: string
+  /** 任务进度实体 */
   algorithmProgressEntity?: {
     _id: string
     taskId: number
-    totalStatus: string
-    totalMin: number | null
-    transitStatus: string
-    transitMin: number | null
-    threatAndStrikeStatus: string
-    threatAndStrikeMin: number | null
-    mes: string | null
+    totalStatus: string// 总体计算状态
+    totalMin: number | null// 总体计算耗时（分钟）
+    transitStatus: string// 过境计算状态
+    transitMin: number | null// 过境计算耗时（分钟）
+    threatAndStrikeStatus: string// 威胁与打击计算状态
+    threatAndStrikeMin: number | null// 威胁与打击计算耗时（分钟）
+    mes: string | null// 进度描述信息
   }
 }
 interface BattleForm {
