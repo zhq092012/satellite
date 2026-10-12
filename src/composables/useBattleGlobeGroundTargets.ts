@@ -58,6 +58,7 @@ interface GroundTargetVisual {
  * @param deductionStruckReceiveKeysRef 推演中已被打击的接收站 ID/名称集合
  * @param deductionPassHighlightReceiveKeysRef 推演当前过站窗口内接收站 ID/名称集合
  * @param deductionPassHighlightPassesRef 推演高亮过站窗口（含坐标）
+ * @param selectedLabelDetailTextRef 选中地面目标时 Label 展示的详情（多行）
  */
 export const useBattleGlobeGroundTargets = (
   viewerRef: Ref<Cesium.Viewer | null>,
@@ -69,7 +70,8 @@ export const useBattleGlobeGroundTargets = (
   ),
   deductionPassHighlightPassesRef: Ref<DeductionStationPassWindow[]> | ComputedRef<
     DeductionStationPassWindow[]
-  > = ref([])
+  > = ref([]),
+  selectedLabelDetailTextRef: Ref<string | null> | ComputedRef<string | null> = ref(null)
 ) => {
   // 可视化对象映射
   const visualMap = new Map<string, GroundTargetVisual>()
@@ -421,6 +423,10 @@ export const useBattleGlobeGroundTargets = (
 
       // 显示标签
       visual.label.show = showLabel
+      visual.label.text =
+        selected && selectedLabelDetailTextRef.value
+          ? selectedLabelDetailTextRef.value
+          : visual.name
       visual.label.fillColor = selected
         ? Cesium.Color.YELLOW
         : passHighlightInDeduction
@@ -511,6 +517,10 @@ export const useBattleGlobeGroundTargets = (
     // 如果选中目标键不为空，则飞到目标
     if (targetKey) flyToGroundTarget(targetKey)
     // 更新地面站可视化
+    updateGroundTargetVisuals()
+  })
+
+  watch(selectedLabelDetailTextRef, () => {
     updateGroundTargetVisuals()
   })
 

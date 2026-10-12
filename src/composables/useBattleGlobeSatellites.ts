@@ -49,6 +49,7 @@ interface SatellitePointVisual {
  * @param followSelectedRef 选中卫星时是否自动飞行定位
  * @param struckSatelliteNoradRef 推演中已被打击的卫星 NORAD（显示为红色）
  * @param timelinePlaybackActiveRef 时间轴播放中（选中星持续高亮并始终显示名称）
+ * @param selectedLabelDetailTextRef 选中卫星时 Label 展示的详情（多行）；为空则用默认名称+摘要
  */
 export const useBattleGlobeSatellites = (
   viewerRef: Ref<Cesium.Viewer | null>,
@@ -57,7 +58,8 @@ export const useBattleGlobeSatellites = (
   selectedNoradRef: Ref<number | null> | ComputedRef<number | null>,
   followSelectedRef: Ref<boolean> | ComputedRef<boolean> = ref(true),
   struckSatelliteNoradRef: Ref<number | null> | ComputedRef<number | null> = ref(null),
-  timelinePlaybackActiveRef: Ref<boolean> | ComputedRef<boolean> = ref(false)
+  timelinePlaybackActiveRef: Ref<boolean> | ComputedRef<boolean> = ref(false),
+  selectedLabelDetailTextRef: Ref<string | null> | ComputedRef<string | null> = ref(null)
 ) => {
   const satrecCache = new Map<number, satellitejs.SatRec>()
   const visualMap = new Map<number, SatellitePointVisual>()
@@ -388,7 +390,10 @@ export const useBattleGlobeSatellites = (
       visual.point.color = lodStyle?.color ?? SATELLITE_POINT_COLOR
 
       visual.label.show = showLabel
-      visual.label.text = buildSatelliteLabelText(visual, selected)
+      visual.label.text =
+        selected && selectedLabelDetailTextRef.value
+          ? selectedLabelDetailTextRef.value
+          : buildSatelliteLabelText(visual, selected)
       visual.label.fillColor = struck
         ? STRUCK_SATELLITE_COLOR
         : selected
@@ -487,6 +492,10 @@ export const useBattleGlobeSatellites = (
 
   watch(selectedNoradRef, (norad) => {
     if (norad && followSelectedRef.value) flyToSatellite(norad)
+    updateSatelliteVisuals()
+  })
+
+  watch(selectedLabelDetailTextRef, () => {
     updateSatelliteVisuals()
   })
 

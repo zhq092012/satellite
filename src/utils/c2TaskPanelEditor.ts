@@ -1,4 +1,8 @@
-import type { TaskCombatArea, TaskForm, TaskResourceItem } from '@/types/dashboard'
+import type { BaseStationInfo } from '@/api/system/satellite-system-api'
+import type { TaskCombatArea, TaskForm, TaskResourceItem, Weapon } from '@/types/dashboard'
+
+/** 左侧面板资源类型（卫星系列 / 武器 / 地面站 / 数据中心） */
+export type TaskPanelResourceKind = 'series' | 'weapon' | 'receive' | 'center'
 
 /** 标签候选项（系列名或资源 ID + 展示名） */
 export interface TaskPanelTagOption {
@@ -6,6 +10,18 @@ export interface TaskPanelTagOption {
   id: string
   /** 展示文案 */
   label: string
+}
+
+/** 左侧面板资源详情事件载荷（含当前已加载的接口原始记录，供地图 Label 展示） */
+export interface TaskPanelResourceDetailPayload {
+  /** 资源类型 */
+  kind: TaskPanelResourceKind
+  /** 候选项 */
+  item: TaskPanelTagOption
+  /** 武器库接口记录（kind=weapon 时可选） */
+  weapon?: Weapon
+  /** 基站/数据中心库记录（kind=receive|center 时可选） */
+  groundStation?: BaseStationInfo
 }
 
 /** 左侧面板内联编辑草稿 */

@@ -141,12 +141,10 @@
                 <div class="resource-pick-group__title">已选择（{{ seriesTagOptionGroups.selected.length }}）</div>
                 <div v-if="!seriesTagOptionGroups.selected.length" class="tag-hint">暂无已选系列</div>
                 <div v-else class="tag-cloud task-config-checkbox-list">
-                  <label v-for="item in seriesTagOptionGroups.selected" :key="`sel-${item.id}`"
-                    class="task-config-checkbox task-config-checkbox--selected">
-                    <el-checkbox :model-value="true" size="small"
-                      @change="(checked) => handleSeriesCheckboxChange(item.id, checked)" />
-                    <span class="task-config-checkbox__label">{{ item.label }}</span>
-                  </label>
+                  <TaskPanelResourceCheckbox v-for="item in seriesTagOptionGroups.selected" :key="`sel-${item.id}`"
+                    :item="item" :selected="true" resource-kind="series"
+                    @change="(checked) => handleSeriesCheckboxChange(item.id, checked)"
+                    @detail="handleTaskResourceDetail" />
                 </div>
               </div>
               <div v-if="seriesTagOptionGroups.unselected.length" class="resource-pick-group resource-pick-group--pool">
@@ -158,12 +156,10 @@
                     aria-hidden="true">▸</span>
                 </button>
                 <div v-show="resourcePoolExpanded.series" class="tag-cloud task-config-checkbox-list">
-                  <label v-for="item in seriesTagOptionGroups.unselected" :key="`pool-${item.id}`"
-                    class="task-config-checkbox">
-                    <el-checkbox :model-value="false" size="small"
-                      @change="(checked) => handleSeriesCheckboxChange(item.id, checked)" />
-                    <span class="task-config-checkbox__label">{{ item.label }}</span>
-                  </label>
+                  <TaskPanelResourceCheckbox v-for="item in seriesTagOptionGroups.unselected" :key="`pool-${item.id}`"
+                    :item="item" :selected="false" resource-kind="series"
+                    @change="(checked) => handleSeriesCheckboxChange(item.id, checked)"
+                    @detail="handleTaskResourceDetail" />
                 </div>
               </div>
             </div>
@@ -182,12 +178,10 @@
                   <div class="resource-pick-group__title">已选择（{{ weaponTagOptionGroups.selected.length }}）</div>
                   <div v-if="!weaponTagOptionGroups.selected.length" class="tag-hint">暂无已选武器</div>
                   <div v-else class="tag-cloud task-config-checkbox-list">
-                    <label v-for="item in weaponTagOptionGroups.selected" :key="`sel-${item.id}`"
-                      class="task-config-checkbox task-config-checkbox--selected">
-                      <el-checkbox :model-value="true" size="small"
-                        @change="(checked) => handleWeaponCheckboxChange(item.id, checked)" />
-                      <span class="task-config-checkbox__label">{{ item.label }}</span>
-                    </label>
+                    <TaskPanelResourceCheckbox v-for="item in weaponTagOptionGroups.selected" :key="`sel-${item.id}`"
+                      :item="item" :selected="true" resource-kind="weapon"
+                      @change="(checked) => handleWeaponCheckboxChange(item.id, checked)"
+                      @detail="handleTaskResourceDetail" />
                   </div>
                 </div>
                 <div v-if="weaponTagOptionGroups.unselected.length" class="resource-pick-group resource-pick-group--pool">
@@ -199,12 +193,10 @@
                       aria-hidden="true">▸</span>
                   </button>
                   <div v-show="resourcePoolExpanded.weapon" class="tag-cloud task-config-checkbox-list">
-                    <label v-for="item in weaponTagOptionGroups.unselected" :key="`pool-${item.id}`"
-                      class="task-config-checkbox">
-                      <el-checkbox :model-value="false" size="small"
-                        @change="(checked) => handleWeaponCheckboxChange(item.id, checked)" />
-                      <span class="task-config-checkbox__label">{{ item.label }}</span>
-                    </label>
+                    <TaskPanelResourceCheckbox v-for="item in weaponTagOptionGroups.unselected" :key="`pool-${item.id}`"
+                      :item="item" :selected="false" resource-kind="weapon"
+                      @change="(checked) => handleWeaponCheckboxChange(item.id, checked)"
+                      @detail="handleTaskResourceDetail" />
                   </div>
                 </div>
               </div>
@@ -220,12 +212,10 @@
                 <div class="resource-pick-group__title">已选择（{{ receiveTagOptionGroups.selected.length }}）</div>
                 <div v-if="!receiveTagOptionGroups.selected.length" class="tag-hint">暂无已选地面站</div>
                 <div v-else class="tag-cloud task-config-checkbox-list">
-                  <label v-for="item in receiveTagOptionGroups.selected" :key="`sel-${item.id}`"
-                    class="task-config-checkbox task-config-checkbox--selected">
-                    <el-checkbox :model-value="true" size="small"
-                      @change="(checked) => handleReceiveCheckboxChange(item.id, checked)" />
-                    <span class="task-config-checkbox__label">{{ item.label }}</span>
-                  </label>
+                  <TaskPanelResourceCheckbox v-for="item in receiveTagOptionGroups.selected" :key="`sel-${item.id}`"
+                    :item="item" :selected="true" resource-kind="receive"
+                    @change="(checked) => handleReceiveCheckboxChange(item.id, checked)"
+                    @detail="handleTaskResourceDetail" />
                 </div>
               </div>
               <div v-if="receiveTagOptionGroups.unselected.length" class="resource-pick-group resource-pick-group--pool">
@@ -237,12 +227,10 @@
                     aria-hidden="true">▸</span>
                 </button>
                 <div v-show="resourcePoolExpanded.receive" class="tag-cloud task-config-checkbox-list">
-                  <label v-for="item in receiveTagOptionGroups.unselected" :key="`pool-${item.id}`"
-                    class="task-config-checkbox">
-                    <el-checkbox :model-value="false" size="small"
-                      @change="(checked) => handleReceiveCheckboxChange(item.id, checked)" />
-                    <span class="task-config-checkbox__label">{{ item.label }}</span>
-                  </label>
+                  <TaskPanelResourceCheckbox v-for="item in receiveTagOptionGroups.unselected" :key="`pool-${item.id}`"
+                    :item="item" :selected="false" resource-kind="receive"
+                    @change="(checked) => handleReceiveCheckboxChange(item.id, checked)"
+                    @detail="handleTaskResourceDetail" />
                 </div>
               </div>
             </div>
@@ -256,12 +244,10 @@
                 <div class="resource-pick-group__title">已选择（{{ centerTagOptionGroups.selected.length }}）</div>
                 <div v-if="!centerTagOptionGroups.selected.length" class="tag-hint">暂无已选数据中心</div>
                 <div v-else class="tag-cloud task-config-checkbox-list">
-                  <label v-for="item in centerTagOptionGroups.selected" :key="`sel-${item.id}`"
-                    class="task-config-checkbox task-config-checkbox--selected">
-                    <el-checkbox :model-value="true" size="small"
-                      @change="(checked) => handleCenterCheckboxChange(item.id, checked)" />
-                    <span class="task-config-checkbox__label">{{ item.label }}</span>
-                  </label>
+                  <TaskPanelResourceCheckbox v-for="item in centerTagOptionGroups.selected" :key="`sel-${item.id}`"
+                    :item="item" :selected="true" resource-kind="center"
+                    @change="(checked) => handleCenterCheckboxChange(item.id, checked)"
+                    @detail="handleTaskResourceDetail" />
                 </div>
               </div>
               <div v-if="centerTagOptionGroups.unselected.length" class="resource-pick-group resource-pick-group--pool">
@@ -273,12 +259,10 @@
                     aria-hidden="true">▸</span>
                 </button>
                 <div v-show="resourcePoolExpanded.center" class="tag-cloud task-config-checkbox-list">
-                  <label v-for="item in centerTagOptionGroups.unselected" :key="`pool-${item.id}`"
-                    class="task-config-checkbox">
-                    <el-checkbox :model-value="false" size="small"
-                      @change="(checked) => handleCenterCheckboxChange(item.id, checked)" />
-                    <span class="task-config-checkbox__label">{{ item.label }}</span>
-                  </label>
+                  <TaskPanelResourceCheckbox v-for="item in centerTagOptionGroups.unselected" :key="`pool-${item.id}`"
+                    :item="item" :selected="false" resource-kind="center"
+                    @change="(checked) => handleCenterCheckboxChange(item.id, checked)"
+                    @detail="handleTaskResourceDetail" />
                 </div>
               </div>
             </div>
@@ -306,12 +290,13 @@ import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getTaskList, updateTask, getAllWeapons } from '@/api/dashboard'
 import { getSatelliteSeries } from '@/api/task/task'
-import { getGroundStationList } from '@/api/system/satellite-system-api'
-import type { TaskForm } from '@/types/dashboard'
+import { getGroundStationList, type BaseStationInfo } from '@/api/system/satellite-system-api'
+import type { TaskForm, Weapon } from '@/types/dashboard'
 import type { MatrixResult } from '@/api/electronic'
 import { taskProgressMap, useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskEditDialog, { type TaskEditDialogMode } from '@/components/BattleSituation/TaskEditDialog.vue'
+import TaskPanelResourceCheckbox from '@/components/BattleSituation/TaskPanelResourceCheckbox.vue'
 import {
   applyDurationHoursToDraft,
   buildSeriesOptionsFromApiData,
@@ -326,6 +311,7 @@ import {
   TASK_PANEL_SATELLITE_TYPES,
   toTaskDatetimeLocalValue,
   type C2TaskEditorDraft,
+  type TaskPanelResourceDetailPayload,
   type TaskPanelTagOption,
 } from '@/utils/c2TaskPanelEditor'
 defineProps<{
@@ -338,6 +324,8 @@ const emit = defineEmits<{
   (e: 'select-satellite', norad: number | null): void
   /** 保存并重算已提交，右侧面板应重新等待/拉取分析结果 */
   (e: 'task-recalculated', taskId: number): void
+  /** 资源详情：地图定位并在 Label 展示当前已有字段 */
+  (e: 'focus-resource-detail', payload: TaskPanelResourceDetailPayload): void
 }>()
 const store = useLayoutStore()
 const {
@@ -448,6 +436,12 @@ const weaponTagOptions = ref<TaskPanelTagOption[]>([])
 const receiveTagOptions = ref<TaskPanelTagOption[]>([])
 const centerTagOptions = ref<TaskPanelTagOption[]>([])
 
+/** 武器库 ID → 接口记录（详情展示用） */
+const weaponRecordById = ref<Map<string, Weapon>>(new Map())
+
+/** 基站/数据中心 ID → 接口记录（详情展示用） */
+const groundStationRecordById = ref<Map<string, BaseStationInfo>>(new Map())
+
 /** 候选项「未选择」分区是否展开（默认折叠） */
 const resourcePoolExpanded = ref({
   series: false,
@@ -550,17 +544,24 @@ const loadWeaponTagOptions = async () => {
   try {
     const res = await getAllWeapons()
     const list = res.code === 200 ? (res.data?.weapons ?? []) : []
+    const recordMap = new Map<string, Weapon>()
     weaponTagOptions.value = list
-      .map((weapon) => ({
-        id: String(weapon.id ?? ''),
-        label: weapon.name || String(weapon.id ?? ''),
-      }))
+      .map((weapon) => {
+        const id = String(weapon.id ?? '')
+        if (id) recordMap.set(id, weapon)
+        return {
+          id,
+          label: weapon.name || id,
+        }
+      })
       .filter((item) => item.id)
+    weaponRecordById.value = recordMap
   } catch {
     weaponTagOptions.value = (editorDraft.value?.selectedWeaponIds || []).map((id) => ({
       id,
       label: id,
     }))
+    weaponRecordById.value = new Map()
   } finally {
     weaponOptionsLoading.value = false
   }
@@ -573,13 +574,19 @@ const loadReceiveTagOptions = async () => {
   try {
     const res = await getGroundStationList({ type: '', name: '', country: '' })
     const list = res.code === 200 ? (res.data ?? []) : []
+    const recordMap = new Map(groundStationRecordById.value)
     receiveTagOptions.value = list
       .filter((item) => !isDataCenterStationType(item.type || ''))
-      .map((item) => ({
-        id: item._id || item.name,
-        label: item.name || item._id || '',
-      }))
+      .map((item) => {
+        const id = item._id || item.name
+        if (id) recordMap.set(id, item)
+        return {
+          id,
+          label: item.name || item._id || '',
+        }
+      })
       .filter((item) => item.id)
+    groundStationRecordById.value = recordMap
     const knownIds = new Set(receiveTagOptions.value.map((item) => item.id))
       ; (editorDraft.value?.selectedReceiveIds || []).forEach((id) => {
         if (!knownIds.has(id)) {
@@ -603,13 +610,19 @@ const loadCenterTagOptions = async () => {
   try {
     const res = await getGroundStationList({ type: '', name: '', country: '' })
     const list = res.code === 200 ? (res.data ?? []) : []
+    const recordMap = new Map(groundStationRecordById.value)
     centerTagOptions.value = list
       .filter((item) => isDataCenterStationType(item.type || ''))
-      .map((item) => ({
-        id: item._id || item.name,
-        label: item.name || item._id || '',
-      }))
+      .map((item) => {
+        const id = item._id || item.name
+        if (id) recordMap.set(id, item)
+        return {
+          id,
+          label: item.name || item._id || '',
+        }
+      })
       .filter((item) => item.id)
+    groundStationRecordById.value = recordMap
     const knownIds = new Set(centerTagOptions.value.map((item) => item.id))
       ; (editorDraft.value?.stationIds || []).forEach((id) => {
         if (!knownIds.has(id)) {
@@ -1024,11 +1037,27 @@ const handleReceiveCheckboxChange = (id: string, checked: boolean | string | num
 }
 
 /**
- * 数据中心 checkbox 变更。
+ * 任务资源详情：交由父组件在地球上定位，并在目标 Label 展示当前已有字段。
  *
- * @param id 数据中心 ID
- * @param checked 是否勾选
+ * @param payload 资源类型与候选项
  */
+const handleTaskResourceDetail = (payload: {
+  kind: TaskPanelResourceDetailPayload['kind']
+  item: TaskPanelTagOption
+}): void => {
+  const detailPayload: TaskPanelResourceDetailPayload = {
+    kind: payload.kind,
+    item: payload.item,
+  }
+  if (payload.kind === 'weapon') {
+    detailPayload.weapon = weaponRecordById.value.get(payload.item.id)
+  }
+  if (payload.kind === 'receive' || payload.kind === 'center') {
+    detailPayload.groundStation = groundStationRecordById.value.get(payload.item.id)
+  }
+  emit('focus-resource-detail', detailPayload)
+}
+
 const handleCenterCheckboxChange = (id: string, checked: boolean | string | number) => {
   if (checked) toggleCenter(id)
   else removeCenter(id)
@@ -1756,61 +1785,6 @@ onUnmounted(() => {
     background: rgba(0, 225, 255, 0.14);
     color: #e0f2fe;
   }
-}
-
-.task-config-checkbox {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: center;
-  column-gap: 8px;
-  margin: 0;
-  min-height: 30px;
-  padding: 4px 8px;
-  box-sizing: border-box;
-  border-radius: 4px;
-  border: 1px solid rgba(100, 116, 139, 0.35);
-  background: rgba(15, 23, 42, 0.65);
-  cursor: pointer;
-  user-select: none;
-  transition: border-color 0.18s ease, background 0.18s ease;
-
-  &:has(.el-checkbox.is-checked),
-  &.task-config-checkbox--selected {
-    border-color: rgba(0, 225, 255, 0.55);
-    background: rgba(0, 225, 255, 0.1);
-  }
-
-  :deep(.el-checkbox) {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 18px;
-    margin: 0;
-    line-height: 1;
-  }
-
-  :deep(.el-checkbox__input) {
-    vertical-align: middle;
-  }
-
-  :deep(.el-checkbox__label) {
-    display: none;
-  }
-}
-
-.task-config-checkbox__label {
-  min-width: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: #94a3b8;
-  line-height: 1.35;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.task-config-checkbox:has(.el-checkbox.is-checked) .task-config-checkbox__label {
-  color: #e0f2fe;
 }
 
 .save-recalc-btn {

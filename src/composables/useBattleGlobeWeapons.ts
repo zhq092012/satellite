@@ -1,5 +1,5 @@
 import * as Cesium from 'cesium'
-import { onBeforeUnmount, watch, type ComputedRef, type Ref } from 'vue'
+import { onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
 
 /** 近距离 LOD 阈值（米） */
@@ -35,11 +35,13 @@ interface WeaponPointVisual {
  * @param viewerRef Cesium Viewer 引用
  * @param weaponsRef 武器列表
  * @param selectedWeaponIdRef 当前选中武器 ID
+ * @param selectedLabelDetailTextRef 选中武器时 Label 展示的详情（多行）
  */
 export const useBattleGlobeWeapons = (
   viewerRef: Ref<Cesium.Viewer | null>,
   weaponsRef: Ref<BattleGlobeWeapon[]> | ComputedRef<BattleGlobeWeapon[]>,
-  selectedWeaponIdRef: Ref<string | null> | ComputedRef<string | null>
+  selectedWeaponIdRef: Ref<string | null> | ComputedRef<string | null>,
+  selectedLabelDetailTextRef: Ref<string | null> | ComputedRef<string | null> = ref(null)
 ) => {
   const visualMap = new Map<string, WeaponPointVisual>()
   let pointCollection: Cesium.PointPrimitiveCollection | null = null
@@ -284,6 +286,10 @@ export const useBattleGlobeWeapons = (
       visual.point.color = lodStyle.color
 
       visual.label.show = showLabel
+      visual.label.text =
+        selected && selectedLabelDetailTextRef.value
+          ? selectedLabelDetailTextRef.value
+          : visual.name
       visual.label.fillColor = selected ? Cesium.Color.YELLOW : WEAPON_POINT_COLOR
     })
 
@@ -352,6 +358,10 @@ export const useBattleGlobeWeapons = (
 
   watch(selectedWeaponIdRef, (weaponId) => {
     if (weaponId) flyToWeapon(weaponId)
+    updateWeaponVisuals()
+  })
+
+  watch(selectedLabelDetailTextRef, () => {
     updateWeaponVisuals()
   })
 

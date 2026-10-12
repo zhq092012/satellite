@@ -54,6 +54,8 @@ const props = withDefaults(
     isTimelinePlaying?: boolean
     /** 推演视觉计划 */
     deductionVisualPlan?: SatelliteDeductionVisualPlan | null
+    /** 当前选中目标（卫星/武器/地面站）的 Label 详情文案（多行） */
+    selectedResourceDetailText?: string | null
   }>(),
   {
     satellites: () => [],
@@ -70,8 +72,12 @@ const props = withDefaults(
     isDeductionPlaying: false,
     isTimelinePlaying: false,
     deductionVisualPlan: null,
+    selectedResourceDetailText: null,
   }
 )
+
+/** 选中目标 Label 详情（与选中态同步，由父组件在资源详情点击时写入） */
+const selectedResourceDetailText = computed(() => props.selectedResourceDetailText ?? null)
 
 /** 全局布局 Store */
 const store = useLayoutStore()
@@ -122,7 +128,8 @@ useBattleGlobeSatellites(
   computed(() => props.selectedNorad),
   computed(() => props.followSelectedSatellite),
   computed(() => deductionGlobeVisualState.value.struckSatelliteNorad),
-  computed(() => props.isTimelinePlaying)
+  computed(() => props.isTimelinePlaying),
+  selectedResourceDetailText
 )
 
 /** 选中卫星 Entity.path 轨迹（单星推演时由推演模块绘制） */
@@ -140,7 +147,8 @@ useBattleGlobeTimelineSelectedOrbit(
 useBattleGlobeWeapons(
   viewerRef,
   computed(() => props.weapons),
-  computed(() => props.selectedWeaponId)
+  computed(() => props.selectedWeaponId),
+  selectedResourceDetailText
 )
 
 /** 推演地面站视觉状态（打击变红、过站高亮） */
@@ -222,7 +230,8 @@ useBattleGlobeGroundTargets(
   computed(() => props.selectedGroundTargetKey),
   deductionStruckReceiveKeys,
   deductionPassHighlightReceiveKeys,
-  deductionPassHighlightPasses
+  deductionPassHighlightPasses,
+  selectedResourceDetailText
 )
 
 /** 推演 Cesium 特效 */
