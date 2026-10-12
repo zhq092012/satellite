@@ -136,12 +136,36 @@
             <div class="tag-section-head">任务卫星</div>
             <div v-if="seriesOptionsLoading" class="tag-hint">正在加载系列...</div>
             <div v-else-if="!seriesTagOptions.length" class="tag-hint">暂无系列候选项</div>
-            <div v-else class="tag-cloud task-config-checkbox-list">
-              <label v-for="item in seriesTagOptions" :key="item.id" class="task-config-checkbox">
-                <el-checkbox :model-value="isSeriesSelected(item.id)" size="small"
-                  @change="(checked) => handleSeriesCheckboxChange(item.id, checked)" />
-                <span class="task-config-checkbox__label">{{ item.label }}</span>
-              </label>
+            <div v-else class="resource-pick-block">
+              <div class="resource-pick-group">
+                <div class="resource-pick-group__title">已选择（{{ seriesTagOptionGroups.selected.length }}）</div>
+                <div v-if="!seriesTagOptionGroups.selected.length" class="tag-hint">暂无已选系列</div>
+                <div v-else class="tag-cloud task-config-checkbox-list">
+                  <label v-for="item in seriesTagOptionGroups.selected" :key="`sel-${item.id}`"
+                    class="task-config-checkbox task-config-checkbox--selected">
+                    <el-checkbox :model-value="true" size="small"
+                      @change="(checked) => handleSeriesCheckboxChange(item.id, checked)" />
+                    <span class="task-config-checkbox__label">{{ item.label }}</span>
+                  </label>
+                </div>
+              </div>
+              <div v-if="seriesTagOptionGroups.unselected.length" class="resource-pick-group resource-pick-group--pool">
+                <button type="button" class="resource-pick-group__toggle"
+                  :aria-expanded="resourcePoolExpanded.series"
+                  @click="resourcePoolExpanded.series = !resourcePoolExpanded.series">
+                  <span>未选择（{{ seriesTagOptionGroups.unselected.length }}）</span>
+                  <span class="resource-pick-group__chevron" :class="{ 'is-open': resourcePoolExpanded.series }"
+                    aria-hidden="true">▸</span>
+                </button>
+                <div v-show="resourcePoolExpanded.series" class="tag-cloud task-config-checkbox-list">
+                  <label v-for="item in seriesTagOptionGroups.unselected" :key="`pool-${item.id}`"
+                    class="task-config-checkbox">
+                    <el-checkbox :model-value="false" size="small"
+                      @change="(checked) => handleSeriesCheckboxChange(item.id, checked)" />
+                    <span class="task-config-checkbox__label">{{ item.label }}</span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
           <div class="tag-section">
@@ -153,12 +177,36 @@
             <template v-if="useWeaponsEnabled">
               <div v-if="weaponOptionsLoading" class="tag-hint">正在加载武器...</div>
               <div v-else-if="!weaponTagOptions.length" class="tag-hint">暂无武器候选项</div>
-              <div v-else class="tag-cloud task-config-checkbox-list">
-                <label v-for="item in weaponTagOptions" :key="item.id" class="task-config-checkbox">
-                  <el-checkbox :model-value="isWeaponSelected(item.id)" size="small"
-                    @change="(checked) => handleWeaponCheckboxChange(item.id, checked)" />
-                  <span class="task-config-checkbox__label">{{ item.label }}</span>
-                </label>
+              <div v-else class="resource-pick-block">
+                <div class="resource-pick-group">
+                  <div class="resource-pick-group__title">已选择（{{ weaponTagOptionGroups.selected.length }}）</div>
+                  <div v-if="!weaponTagOptionGroups.selected.length" class="tag-hint">暂无已选武器</div>
+                  <div v-else class="tag-cloud task-config-checkbox-list">
+                    <label v-for="item in weaponTagOptionGroups.selected" :key="`sel-${item.id}`"
+                      class="task-config-checkbox task-config-checkbox--selected">
+                      <el-checkbox :model-value="true" size="small"
+                        @change="(checked) => handleWeaponCheckboxChange(item.id, checked)" />
+                      <span class="task-config-checkbox__label">{{ item.label }}</span>
+                    </label>
+                  </div>
+                </div>
+                <div v-if="weaponTagOptionGroups.unselected.length" class="resource-pick-group resource-pick-group--pool">
+                  <button type="button" class="resource-pick-group__toggle"
+                    :aria-expanded="resourcePoolExpanded.weapon"
+                    @click="resourcePoolExpanded.weapon = !resourcePoolExpanded.weapon">
+                    <span>未选择（{{ weaponTagOptionGroups.unselected.length }}）</span>
+                    <span class="resource-pick-group__chevron" :class="{ 'is-open': resourcePoolExpanded.weapon }"
+                      aria-hidden="true">▸</span>
+                  </button>
+                  <div v-show="resourcePoolExpanded.weapon" class="tag-cloud task-config-checkbox-list">
+                    <label v-for="item in weaponTagOptionGroups.unselected" :key="`pool-${item.id}`"
+                      class="task-config-checkbox">
+                      <el-checkbox :model-value="false" size="small"
+                        @change="(checked) => handleWeaponCheckboxChange(item.id, checked)" />
+                      <span class="task-config-checkbox__label">{{ item.label }}</span>
+                    </label>
+                  </div>
+                </div>
               </div>
             </template>
             <div v-else class="tag-hint">已关闭「使用武器」，武器选择已暂存；重新打开可恢复</div>
@@ -167,24 +215,72 @@
             <div class="tag-section-head">任务地面站</div>
             <div v-if="receiveOptionsLoading" class="tag-hint">正在加载地面站...</div>
             <div v-else-if="!receiveTagOptions.length" class="tag-hint">暂无地面站候选项</div>
-            <div v-else class="tag-cloud task-config-checkbox-list">
-              <label v-for="item in receiveTagOptions" :key="item.id" class="task-config-checkbox">
-                <el-checkbox :model-value="isReceiveSelected(item.id)" size="small"
-                  @change="(checked) => handleReceiveCheckboxChange(item.id, checked)" />
-                <span class="task-config-checkbox__label">{{ item.label }}</span>
-              </label>
+            <div v-else class="resource-pick-block">
+              <div class="resource-pick-group">
+                <div class="resource-pick-group__title">已选择（{{ receiveTagOptionGroups.selected.length }}）</div>
+                <div v-if="!receiveTagOptionGroups.selected.length" class="tag-hint">暂无已选地面站</div>
+                <div v-else class="tag-cloud task-config-checkbox-list">
+                  <label v-for="item in receiveTagOptionGroups.selected" :key="`sel-${item.id}`"
+                    class="task-config-checkbox task-config-checkbox--selected">
+                    <el-checkbox :model-value="true" size="small"
+                      @change="(checked) => handleReceiveCheckboxChange(item.id, checked)" />
+                    <span class="task-config-checkbox__label">{{ item.label }}</span>
+                  </label>
+                </div>
+              </div>
+              <div v-if="receiveTagOptionGroups.unselected.length" class="resource-pick-group resource-pick-group--pool">
+                <button type="button" class="resource-pick-group__toggle"
+                  :aria-expanded="resourcePoolExpanded.receive"
+                  @click="resourcePoolExpanded.receive = !resourcePoolExpanded.receive">
+                  <span>未选择（{{ receiveTagOptionGroups.unselected.length }}）</span>
+                  <span class="resource-pick-group__chevron" :class="{ 'is-open': resourcePoolExpanded.receive }"
+                    aria-hidden="true">▸</span>
+                </button>
+                <div v-show="resourcePoolExpanded.receive" class="tag-cloud task-config-checkbox-list">
+                  <label v-for="item in receiveTagOptionGroups.unselected" :key="`pool-${item.id}`"
+                    class="task-config-checkbox">
+                    <el-checkbox :model-value="false" size="small"
+                      @change="(checked) => handleReceiveCheckboxChange(item.id, checked)" />
+                    <span class="task-config-checkbox__label">{{ item.label }}</span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
           <div class="tag-section">
             <div class="tag-section-head">任务数据中心</div>
             <div v-if="centerOptionsLoading" class="tag-hint">正在加载数据中心...</div>
             <div v-else-if="!centerTagOptions.length" class="tag-hint">暂无数据中心候选项</div>
-            <div v-else class="tag-cloud task-config-checkbox-list">
-              <label v-for="item in centerTagOptions" :key="item.id" class="task-config-checkbox">
-                <el-checkbox :model-value="isCenterSelected(item.id)" size="small"
-                  @change="(checked) => handleCenterCheckboxChange(item.id, checked)" />
-                <span class="task-config-checkbox__label">{{ item.label }}</span>
-              </label>
+            <div v-else class="resource-pick-block">
+              <div class="resource-pick-group">
+                <div class="resource-pick-group__title">已选择（{{ centerTagOptionGroups.selected.length }}）</div>
+                <div v-if="!centerTagOptionGroups.selected.length" class="tag-hint">暂无已选数据中心</div>
+                <div v-else class="tag-cloud task-config-checkbox-list">
+                  <label v-for="item in centerTagOptionGroups.selected" :key="`sel-${item.id}`"
+                    class="task-config-checkbox task-config-checkbox--selected">
+                    <el-checkbox :model-value="true" size="small"
+                      @change="(checked) => handleCenterCheckboxChange(item.id, checked)" />
+                    <span class="task-config-checkbox__label">{{ item.label }}</span>
+                  </label>
+                </div>
+              </div>
+              <div v-if="centerTagOptionGroups.unselected.length" class="resource-pick-group resource-pick-group--pool">
+                <button type="button" class="resource-pick-group__toggle"
+                  :aria-expanded="resourcePoolExpanded.center"
+                  @click="resourcePoolExpanded.center = !resourcePoolExpanded.center">
+                  <span>未选择（{{ centerTagOptionGroups.unselected.length }}）</span>
+                  <span class="resource-pick-group__chevron" :class="{ 'is-open': resourcePoolExpanded.center }"
+                    aria-hidden="true">▸</span>
+                </button>
+                <div v-show="resourcePoolExpanded.center" class="tag-cloud task-config-checkbox-list">
+                  <label v-for="item in centerTagOptionGroups.unselected" :key="`pool-${item.id}`"
+                    class="task-config-checkbox">
+                    <el-checkbox :model-value="false" size="small"
+                      @change="(checked) => handleCenterCheckboxChange(item.id, checked)" />
+                    <span class="task-config-checkbox__label">{{ item.label }}</span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -351,6 +447,14 @@ const seriesTagOptions = ref<TaskPanelTagOption[]>([])
 const weaponTagOptions = ref<TaskPanelTagOption[]>([])
 const receiveTagOptions = ref<TaskPanelTagOption[]>([])
 const centerTagOptions = ref<TaskPanelTagOption[]>([])
+
+/** 候选项「未选择」分区是否展开（默认折叠） */
+const resourcePoolExpanded = ref({
+  series: false,
+  weapon: false,
+  receive: false,
+  center: false,
+})
 const seriesOptionsLoading = ref(false)
 const weaponOptionsLoading = ref(false)
 const receiveOptionsLoading = ref(false)
@@ -776,6 +880,47 @@ const isSeriesSelected = (series: string) => editorDraft.value?.selectedSeries.i
 const isWeaponSelected = (id: string) => editorDraft.value?.selectedWeaponIds.includes(id) ?? false
 const isReceiveSelected = (id: string) => editorDraft.value?.selectedReceiveIds.includes(id) ?? false
 const isCenterSelected = (id: string) => editorDraft.value?.stationIds.includes(id) ?? false
+
+/** 按是否已选拆分候选项（上：已选，下：未选） */
+interface TaskPanelTagOptionGroups {
+  /** 已勾选项 */
+  selected: TaskPanelTagOption[]
+  /** 未勾选项 */
+  unselected: TaskPanelTagOption[]
+}
+
+/**
+ * 将候选项拆成已选 / 未选两组。
+ *
+ * @param options 全部候选项
+ * @param isSelected 是否已选
+ * @returns 分组结果
+ */
+const splitTaskPanelTagOptions = (
+  options: TaskPanelTagOption[],
+  isSelected: (id: string) => boolean,
+): TaskPanelTagOptionGroups => {
+  const selected: TaskPanelTagOption[] = []
+  const unselected: TaskPanelTagOption[] = []
+  for (const item of options) {
+    if (isSelected(item.id)) selected.push(item)
+    else unselected.push(item)
+  }
+  return { selected, unselected }
+}
+
+const seriesTagOptionGroups = computed(() =>
+  splitTaskPanelTagOptions(seriesTagOptions.value, isSeriesSelected),
+)
+const weaponTagOptionGroups = computed(() =>
+  splitTaskPanelTagOptions(weaponTagOptions.value, isWeaponSelected),
+)
+const receiveTagOptionGroups = computed(() =>
+  splitTaskPanelTagOptions(receiveTagOptions.value, isReceiveSelected),
+)
+const centerTagOptionGroups = computed(() =>
+  splitTaskPanelTagOptions(centerTagOptions.value, isCenterSelected),
+)
 /**
  * 切换系列选中状态。
  *
@@ -1529,6 +1674,56 @@ onUnmounted(() => {
   margin-bottom: 12px;
 }
 
+.resource-pick-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.resource-pick-group__title {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-align: left;
+}
+
+.resource-pick-group--pool {
+  padding-top: 8px;
+  border-top: 1px solid rgba(100, 116, 139, 0.28);
+}
+
+.resource-pick-group__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover {
+    color: #cbd5e1;
+  }
+}
+
+.resource-pick-group__chevron {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+
+  &.is-open {
+    transform: rotate(90deg);
+  }
+}
+
 .tag-hint {
   font-size: 11px;
   color: #64748b;
@@ -1579,7 +1774,8 @@ onUnmounted(() => {
   user-select: none;
   transition: border-color 0.18s ease, background 0.18s ease;
 
-  &:has(.el-checkbox.is-checked) {
+  &:has(.el-checkbox.is-checked),
+  &.task-config-checkbox--selected {
     border-color: rgba(0, 225, 255, 0.55);
     background: rgba(0, 225, 255, 0.1);
   }
