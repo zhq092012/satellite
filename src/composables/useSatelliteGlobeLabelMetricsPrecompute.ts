@@ -8,29 +8,47 @@ import {
   findEntityForSatelliteLabelMetrics,
   findSatelliteMatrixRowsForNorad,
   pickSatelliteLabelMetricSampleForPlayhead,
-  resolveNextStationTransitLabel,
   toSatelliteGlobeLabelDisplayMetrics,
   type SatelliteGlobeLabelDisplayMetrics,
   type SatelliteGlobeLabelMetricSample,
 } from '@/utils/computeSatelliteLabelMetrics'
+import {
+  collectGroundObserversForSatellitePass,
+  computeGroundPassStartsFromTle,
+  DEFAULT_GROUND_STATION_MIN_ELEVATION_DEG,
+  formatNextGroundPassLabelAfterMs,
+  GROUND_PASS_SCAN_STEP_SEC,
+  resolveGroundPassScanRangeMs,
+  type GroundObserverSite,
+  type SatelliteGroundPassStart,
+} from '@/utils/computeSatelliteGroundPass'
 import { onBeforeUnmount, type Ref } from 'vue'
 
 /** 单颗卫星预计算结果 */
 interface NoradMetricCacheEntry {
   /** 预计算时间轴 */
   samples: SatelliteGlobeLabelMetricSample[]
+  /** TLE 推算的接收站过境开始列表 */
+  passStarts: SatelliteGroundPassStart[]
   /** 预计算时的 TLE 指纹，用于失效判断 */
   tleKey: string
+  /** 扫描参数指纹 */
+  scanKey: string
 }
 
 let metricsWorker: Worker | null = null
 let workerRequestId = 0
+interface LabelMetricsPrecomputeResult {
+  samples: SatelliteGlobeLabelMetricSample[]
+  passStarts: SatelliteGroundPassStart[]
+}
+
 const pendingWorkerRequests = new Map<
   number,
   {
     norad: number
     tleKey: string
-    resolve: (samples: SatelliteGlobeLabelMetricSample[]) => void
+    resolve: (result: LabelMetricsPrecomputeResult) => void
     reject: (error: Error) => void
   }
 >()
@@ -53,6 +71,7 @@ const getSatelliteLabelMetricsWorker = (): Worker | null => {
         requestId: number
         ok: boolean
         samples?: SatelliteGlobeLabelMetricSample[]
+        passStarts?: SatelliteGroundPassStart[]
         error?: string
       }>,
     ) => {
@@ -60,7 +79,10 @@ const getSatelliteLabelMetricsWorker = (): Worker | null => {
       if (!pending) return
       pendingWorkerRequests.delete(event.data.requestId)
       if (event.data.ok && event.data.samples) {
-        pending.resolve(event.data.samples)
+        pending.resolve({
+          samples: event.data.samples,
+          passStarts: event.data.passStarts ?? [],
+        })
         return
       }
       pending.reject(new Error(event.data.error || '卫星 Label 指标 Worker 计算失败'))
@@ -93,13 +115,36 @@ const runSatelliteLabelMetricsPrecompute = (
   line2: string,
   timestamps: number[],
   altitudeOverrides: Map<number, number>,
-): Promise<SatelliteGlobeLabelMetricSample[]> => {
+  passScan: {
+    startMs: number
+    endMs: number
+    stepSec: number
+    minElevationDeg: number
+    observers: GroundObserverSite[]
+  } | null,
+): Promise<LabelMetricsPrecomputeResult> => {
   const tleKey = `${line1}\n${line2}`
   const worker = getSatelliteLabelMetricsWorker()
   if (!worker) {
-    return Promise.resolve(
-      computeSatelliteLabelMetricTimelineFromTle(line1, line2, timestamps, altitudeOverrides),
+    const samples = computeSatelliteLabelMetricTimelineFromTle(
+      line1,
+      line2,
+      timestamps,
+      altitudeOverrides,
     )
+    const passStarts =
+      passScan && passScan.observers.length
+        ? computeGroundPassStartsFromTle({
+            line1,
+            line2,
+            startMs: passScan.startMs,
+            endMs: passScan.endMs,
+            stepSec: passScan.stepSec,
+            minElevationDeg: passScan.minElevationDeg,
+            observers: passScan.observers,
+          })
+        : []
+    return Promise.resolve({ samples, passStarts })
   }
 
   const requestId = ++workerRequestId
@@ -111,6 +156,7 @@ const runSatelliteLabelMetricsPrecompute = (
       line2,
       timestamps,
       altitudeOverrides: [...altitudeOverrides.entries()],
+      passScan: passScan && passScan.observers.length ? passScan : undefined,
     })
   })
 }
@@ -157,27 +203,42 @@ export const useSatelliteGlobeLabelMetricsPrecompute = (
     if (!timestamps.length) return
 
     const tleKey = `${sat.line1}\n${sat.line2}`
+    const { initSat } = findSatelliteMatrixRowsForNorad(entity, norad)
+    const observers = collectGroundObserversForSatellitePass(entity, initSat)
+    const { startMs, endMs } = resolveGroundPassScanRangeMs(
+      taskStartMsRef.value,
+      taskEndMsRef.value,
+    )
+    const scanKey = `${startMs}|${endMs}|${observers.map((o) => o.id).join(',')}|${DEFAULT_GROUND_STATION_MIN_ELEVATION_DEG}`
     const cached = cacheByNorad.get(norad)
-    if (cached && cached.tleKey === tleKey && cached.samples.length === timestamps.length) {
+    if (cached && cached.tleKey === tleKey && cached.scanKey === scanKey && cached.samples.length === timestamps.length) {
       const sameTimeline = cached.samples.every((sample, index) => sample.atMs === timestamps[index])
       if (sameTimeline) return
     }
 
     const token = ++activePrecomputeToken
     inFlightNorad = norad
-    const { initSat } = findSatelliteMatrixRowsForNorad(entity, norad)
     const altitudeOverrides = buildMatrixPeakAltitudeOverrides(initSat)
 
     try {
-      const samples = await runSatelliteLabelMetricsPrecompute(
+      const { samples, passStarts } = await runSatelliteLabelMetricsPrecompute(
         norad,
         sat.line1,
         sat.line2,
         timestamps,
         altitudeOverrides,
+        observers.length
+          ? {
+              startMs,
+              endMs,
+              stepSec: GROUND_PASS_SCAN_STEP_SEC,
+              minElevationDeg: DEFAULT_GROUND_STATION_MIN_ELEVATION_DEG,
+              observers,
+            }
+          : null,
       )
       if (token !== activePrecomputeToken) return
-      cacheByNorad.set(norad, { samples, tleKey })
+      cacheByNorad.set(norad, { samples, passStarts, tleKey, scanKey })
     } catch (error) {
       console.error(`卫星 NORAD ${norad} Label 指标预计算失败:`, error)
     } finally {
@@ -186,7 +247,7 @@ export const useSatelliteGlobeLabelMetricsPrecompute = (
   }
 
   /**
-   * 解析播放头处的 Label 指标（仅查表 + 矩阵下次过境，不在此传播 TLE）。
+   * 解析播放头处的 Label 指标（仅查表 + 预计算过境列表，不在此传播 TLE）。
    *
    * @param norad 卫星 NORAD
    * @param playheadMs 播放头毫秒
@@ -199,8 +260,7 @@ export const useSatelliteGlobeLabelMetricsPrecompute = (
     if (!entry?.samples.length) return null
     const sample = pickSatelliteLabelMetricSampleForPlayhead(entry.samples, playheadMs)
     if (!sample) return null
-    const entity = findEntityForSatelliteLabelMetrics(taskAnalysisDataRef.value, norad)
-    const nextTransitLabel = resolveNextStationTransitLabel(entity, norad, playheadMs)
+    const nextTransitLabel = formatNextGroundPassLabelAfterMs(entry.passStarts, playheadMs)
     return toSatelliteGlobeLabelDisplayMetrics(sample, nextTransitLabel)
   }
 

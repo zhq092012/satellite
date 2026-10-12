@@ -238,57 +238,6 @@ export const pickSatelliteLabelMetricSampleForPlayhead = (
   return chosen ?? samples[0] ?? null
 }
 
-interface TransitCandidate {
-  /** 过境开始（peak）毫秒 */
-  atMs: number
-  /** 展示用时间原文 */
-  timeText: string
-  /** 接收站名称（可为空） */
-  stationName: string | null
-}
-
-/**
- * 解析预计下次过站时间（取所有 init / 打击后窗口中晚于参考时刻的最早 peak）。
- *
- * @param entity 系列实体
- * @param norad 卫星 NORAD
- * @param afterMs 参考时刻（通常为当前播放头）
- * @returns 展示文案；无未来窗口时 null
- */
-export const resolveNextStationTransitLabel = (
-  entity: LevelSeriesEntity | null | undefined,
-  norad: number,
-  afterMs: number,
-): string | null => {
-  if (!entity || !Number.isFinite(afterMs)) return null
-  const { initSat, postSat } = findSatelliteMatrixRowsForNorad(entity, norad)
-  const candidates: TransitCandidate[] = []
-
-  const push = (peak?: string | null, stationName?: string | null) => {
-    const atMs = parseMatrixTimeMs(peak)
-    const timeText = peak?.trim()
-    if (atMs == null || !timeText) return
-    candidates.push({
-      atMs,
-      timeText,
-      stationName: stationName?.trim() || null,
-    })
-  }
-
-  initSat?.initWindows?.forEach((win) => push(win.peakWindow, win.receiveName))
-  postSat?.stationWindows?.forEach((win) => push(win.peakWindow, win.receiveName))
-
-  const next = candidates
-    .filter((item) => item.atMs > afterMs)
-    .sort((a, b) => a.atMs - b.atMs)[0]
-
-  if (!next) return null
-  if (next.stationName) {
-    return `${next.timeText}（${next.stationName}）`
-  }
-  return next.timeText
-}
-
 /**
  * 合并样本与下次过境文案，供 Label 格式化。
  *
