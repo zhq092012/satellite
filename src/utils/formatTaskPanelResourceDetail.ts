@@ -28,7 +28,7 @@ export const formatSeriesGlobeDetailLines = (
   series: string,
   satellites: BattleGlobeSatellite[],
 ): string => {
-  const preview = satellites.slice(0, 6).map((sat) => `${sat.name} (${sat.norad})`)
+  const preview = satellites.slice(0, 6).map((sat) => sat.name)
   return joinGlobeLabelDetailLines([
     `系列：${series}`,
     `任务内卫星数：${satellites.length}`,
@@ -49,7 +49,6 @@ export const formatSatelliteGlobeDetailLines = (sat: BattleGlobeSatellite): stri
   return joinGlobeLabelDetailLines([
     sat.name,
     meta,
-    `NORAD：${sat.norad}`,
     sat.series ? `系列：${sat.series}` : '',
   ])
 }
@@ -68,7 +67,6 @@ export const formatWeaponGlobeDetailLines = (
   const name = globe?.name || fallback?.name
   const type = globe?.type || fallback?.type
   const country = globe?.country || fallback?.country
-  const id = globe?.id || fallback?.id
   const lon = globe?.longitude ?? fallback?.longitude
   const lat = globe?.latitude ?? fallback?.latitude
   const range = fallback?.range
@@ -83,7 +81,6 @@ export const formatWeaponGlobeDetailLines = (
     range != null && Number.isFinite(Number(range)) ? `射程/高度：${range} km` : '',
     interval ? `打击间隔：${interval} 分钟` : '',
     satelliteType ? `适用卫星：${satelliteType}` : '',
-    id ? `ID：${id}` : '',
   ])
 }
 
@@ -102,7 +99,6 @@ export const formatGroundStationGlobeDetailLines = (
 ): string => {
   const kindLabel = kind === 'station' ? '数据中心' : '地面接收站'
   const name = globe?.name || fallback?.name
-  const id = globe?.id || fallback?._id || fallback?.name
   const usage = globe?.usage || fallback?.function
   const country = fallback?.country
   const type = fallback?.type
@@ -125,6 +121,5 @@ export const formatGroundStationGlobeDetailLines = (
       : '',
     status ? `状态：${status}` : '',
     intro ? `简介：${intro}` : '',
-    id ? `ID：${id}` : '',
   ])
 }
