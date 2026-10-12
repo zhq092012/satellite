@@ -76,10 +76,10 @@ interface RawDeductionEvent {
   kind: SatelliteDeductionEventKind
   /** 事件时刻（毫秒） */
   atMs: number
-  /** 展示文案行 */
+  /** 展示文案行（纯文本，多行用换行） */
   line: string
-  /** 高亮提示行 */
-  highlightLine: DeductionToastLine
+  /** 高亮提示行（过境类事件含标题行 + 过境时间 + 过境时长） */
+  highlightLines: DeductionToastLine[]
 }
 
 /**
@@ -356,6 +356,121 @@ export const formatDeductionHmLabel = (timeText?: string | null): string => {
   const second = String(parts.second).padStart(2, '0')
   return `${parts.year}年${month}月${day}日 ${hour}时${minute}分${second}秒`
 }
+
+/**
+ * 将毫秒时长格式化为中文「X小时Y分Z秒 / X分Y秒 / X秒」。
+ *
+ * @param durationMs 时长（毫秒）
+ * @returns 展示文案；无效时返回 null
+ */
+const formatTransitDurationLabel = (durationMs: number): string | null => {
+  if (!Number.isFinite(durationMs) || durationMs < 0) return null
+  if (durationMs === 0) return '0秒'
+  const totalSec = Math.floor(durationMs / 1000)
+  const hours = Math.floor(totalSec / 3600)
+  const minutes = Math.floor((totalSec % 3600) / 60)
+  const seconds = totalSec % 60
+  const parts: string[] = []
+  if (hours > 0) parts.push(`${hours}小时`)
+  if (minutes > 0) parts.push(`${minutes}分`)
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}秒`)
+  return parts.join('')
+}
+
+/**
+ * 格式化过境时间展示：单时刻或起止区间。
+ *
+ * @param startText 开始时间原文
+ * @param endText 结束时间原文；无则仅展示开始
+ * @returns 中文时间文案
+ */
+const formatTransitTimeDisplayLabel = (startText: string, endText?: string | null): string => {
+  const startLabel = formatDeductionHmLabel(startText)
+  if (!endText?.trim()) return startLabel
+  const endLabel = formatDeductionHmLabel(endText)
+  if (endLabel === '--' || endLabel === startLabel) return startLabel
+  return `${startLabel} ~ ${endLabel}`
+}
+
+/**
+ * 解析战场过境窗口（支持单时刻或 `~` 分隔的起止区间）。
+ *
+ * @param battleWindowText 接口 battleWindow 原文
+ * @returns 起止毫秒与原文
+ */
+const parseBattleTransitRange = (
+  battleWindowText: string
+): { startMs: number | null; endMs: number | null; startText: string; endText: string | null } => {
+  const text = battleWindowText.trim()
+  if (!text) {
+    return { startMs: null, endMs: null, startText: '', endText: null }
+  }
+  const tildeParts = text.split(/\s*[~～]\s*/)
+  if (tildeParts.length >= 2) {
+    const startText = tildeParts[0].trim()
+    const endText = tildeParts.slice(1).join('~').trim()
+    return {
+      startMs: parseMatrixTimeMs(startText),
+      endMs: parseMatrixTimeMs(endText),
+      startText,
+      endText,
+    }
+  }
+  return {
+    startMs: parseMatrixTimeMs(text),
+    endMs: null,
+    startText: text,
+    endText: null,
+  }
+}
+
+/**
+ * 构建「过境战场 / 地面站」推演提示行：标题一行，过境时间与过境时长各一行（左对齐展示）。
+ *
+ * @param satName 卫星名称
+ * @param passTarget 过境目标类型
+ * @param stationName 地面站名称（passTarget=ground 时必填）
+ * @param timeLabel 过境时间展示文案
+ * @param durationLabel 过境时长；无有效区间时为 null（展示 --）
+ * @returns 结构化提示行
+ */
+const buildTransitPassHighlightLines = (
+  satName: string,
+  passTarget: 'battle' | 'ground',
+  stationName: string | null,
+  timeLabel: string,
+  durationLabel: string | null
+): DeductionToastLine[] => {
+  const titleSegments: DeductionToastSegment[] = [
+    seg('卫星', 'default'),
+    seg(satName, 'satellite'),
+    seg(' ', 'default'),
+    seg('过境', 'default'),
+  ]
+  if (passTarget === 'battle') {
+    titleSegments.push(seg('战场', 'event'))
+  } else {
+    titleSegments.push(seg(stationName || '--', 'station'))
+    titleSegments.push(seg('地面站', 'default'))
+  }
+
+  return [
+    { segments: titleSegments },
+    { segments: [seg('过境时间：', 'default'), seg(timeLabel, 'time')] },
+    { segments: [seg('过境时长：', 'default'), seg(durationLabel ?? '--', 'time')] },
+  ]
+}
+
+/**
+ * 拼接过境类事件的纯文本行（与 highlightLines 一致，供兼容字段使用）。
+ *
+ * @param titleLine 标题行
+ * @param timeLine 过境时间行
+ * @param durationLine 过境时长行
+ * @returns 多行纯文本
+ */
+const joinTransitPassPlainLines = (titleLine: string, timeLine: string, durationLine: string): string =>
+  [titleLine, timeLine, durationLine].join('\n')
 
 /**
  * 将矩阵时间字段解析为本地毫秒时间戳（按墙上时钟，不做 UTC 换算）。
@@ -977,32 +1092,24 @@ const buildSatelliteDeductionTimelineInternal = (
   const raw: RawDeductionEvent[] = []
   // 获取经过战场窗口文本
   const battleWindowText = initSat.battleWindow?.trim() || postSat?.battleWindow?.trim() || ''
-  // 解析战场窗口时间戳
-  const battleMs = parseMatrixTimeMs(battleWindowText)
-  // 如果战场窗口时间戳不为空，则添加经过战场事件
+  const battleRange = parseBattleTransitRange(battleWindowText)
+  const battleMs = battleRange.startMs
   if (battleMs != null) {
-    const timeHm = formatDeductionHmLabel(battleWindowText)
+    const timeLabel = formatTransitTimeDisplayLabel(battleRange.startText, battleRange.endText)
+    const durationLabel =
+      battleRange.endMs != null && battleRange.startMs != null
+        ? formatTransitDurationLabel(battleRange.endMs - battleRange.startMs)
+        : null
+    const passLines = buildTransitPassHighlightLines(satName, 'battle', null, timeLabel, durationLabel)
     raw.push({
-      // 设置事件类型
       kind: 'battlePass',
-      // 设置事件时间戳
       atMs: battleMs,
-      // 设置事件文本
-      line: `卫星${satName}经过战场，时间：${timeHm}`,
-      // 设置事件高亮行
-      highlightLine: {
-        segments: [
-          // 设置卫星名称
-          seg('卫星', 'default'),
-          // 设置卫星名称
-          seg(satName, 'satellite'),
-          seg(' ', 'default'),
-          // 设置经过战场事件
-          seg('经过战场', 'event'),
-          seg('，时间：', 'default'),
-          seg(timeHm, 'time'),
-        ],
-      },
+      line: joinTransitPassPlainLines(
+        `卫星${satName}过境战场`,
+        `过境时间：${timeLabel}`,
+        `过境时长：${durationLabel ?? '--'}`,
+      ),
+      highlightLines: passLines,
     })
   }
   // 遍历过站窗口
@@ -1013,29 +1120,21 @@ const buildSatelliteDeductionTimelineInternal = (
     if (atMs == null) return
     // 获取接收站名称
     const stationName = resolveReceiveDisplayName(win)
-    // 格式化过站时间
-    const timeHm = formatDeductionHmLabel(win.peakWindow)
+    const endWindowText = win.endWindow?.trim() || ''
+    const timeLabel = formatTransitTimeDisplayLabel(win.peakWindow, endWindowText || null)
+    const endMs = parseMatrixTimeMs(endWindowText)
+    const durationLabel =
+      endMs != null && atMs != null ? formatTransitDurationLabel(endMs - atMs) : null
+    const passLines = buildTransitPassHighlightLines(satName, 'ground', stationName, timeLabel, durationLabel)
     raw.push({
-      // 设置事件类型
       kind: 'stationPass',
-      // 设置事件时间戳
       atMs,
-      // 设置事件文本
-      line: `卫星${satName}过${stationName}接收站，时间：${timeHm}`,
-      // 设置事件高亮行
-      highlightLine: {
-        segments: [
-          // 设置卫星名称
-          seg('卫星', 'default'),
-          // 设置卫星名称
-          seg(satName, 'satellite'),
-          seg(' ', 'default'),
-          // 设置过站接收站事件
-          seg(`过${stationName}接收站`, 'event'),
-          seg('，时间：', 'default'),
-          seg(timeHm, 'time'),
-        ],
-      },
+      line: joinTransitPassPlainLines(
+        `卫星${satName}过境${stationName}地面站`,
+        `过境时间：${timeLabel}`,
+        `过境时长：${durationLabel ?? '--'}`,
+      ),
+      highlightLines: passLines,
     })
   })
 
@@ -1053,15 +1152,17 @@ const buildSatelliteDeductionTimelineInternal = (
           kind: 'receiveStrike',
           atMs,
           line: `${stationLabel}接收站被打击，时间：${timeHm}`,
-          highlightLine: {
-            segments: [
-              seg(stationLabel, 'station'),
-              seg('接收站', 'default'),
-              seg('被打击', 'event'),
-              seg('，时间：', 'default'),
-              seg(timeHm, 'time'),
-            ],
-          },
+          highlightLines: [
+            {
+              segments: [
+                seg(stationLabel, 'station'),
+                seg('接收站', 'default'),
+                seg('被打击', 'event'),
+                seg('，时间：', 'default'),
+                seg(timeHm, 'time'),
+              ],
+            },
+          ],
         })
         return
       }
@@ -1076,17 +1177,19 @@ const buildSatelliteDeductionTimelineInternal = (
           kind: 'satelliteStrike',
           atMs,
           line: `卫星：${satName}，被打击，武器：${weaponName}，时间：${timeHm}`,
-          highlightLine: {
-            segments: [
-              seg('卫星', 'default'),
-              seg(satName, 'satellite'),
-              seg(' ', 'default'),
-              seg('被打击，武器', 'event'),
-              seg(weaponName, 'weapon'),
-              seg('；时间：', 'default'),
-              seg(timeHm, 'time'),
-            ],
-          },
+          highlightLines: [
+            {
+              segments: [
+                seg('卫星', 'default'),
+                seg(satName, 'satellite'),
+                seg(' ', 'default'),
+                seg('被打击，武器', 'event'),
+                seg(weaponName, 'weapon'),
+                seg('；时间：', 'default'),
+                seg(timeHm, 'time'),
+              ],
+            },
+          ],
         })
       }
     })
@@ -1104,14 +1207,10 @@ const buildSatelliteDeductionTimelineInternal = (
       metricHighlightEntries.forEach((entry) => {
         // 添加指标变化事件
         raw.push({
-          // 设置事件类型
           kind: 'metricChange',
-          // 设置事件时间戳
           atMs: attachMs,
-          // 设置事件文本
           line: entry.line,
-          // 设置事件高亮行
-          highlightLine: entry.highlightLine,
+          highlightLines: [entry.highlightLine],
         })
       })
     }
@@ -1134,18 +1233,13 @@ const buildSatelliteDeductionTimelineInternal = (
     if (last && last.atMs === item.atMs) {
       // 如果事件文本不包含，则添加事件文本
       if (!last.lines.includes(item.line)) last.lines.push(item.line)
-      // 添加事件高亮行
-      last.highlightLines.push(item.highlightLine)
+      last.highlightLines.push(...item.highlightLines)
       return
     }
-    // 添加事件
     merged.push({
-      // 设置事件时间戳
       atMs: item.atMs,
-      // 设置事件文本
       lines: [item.line],
-      // 设置事件高亮行
-      highlightLines: [item.highlightLine],
+      highlightLines: [...item.highlightLines],
     })
   })
 

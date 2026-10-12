@@ -89,6 +89,7 @@ const hasMetrics = computed(
   min-width: 0;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   justify-content: center;
 }
 
@@ -106,14 +107,19 @@ const hasMetrics = computed(
 
 .globe-deduction-toast-line {
   margin: 0;
+  width: 100%;
   font-size: 13px;
   line-height: 1.55;
   color: #e2e8f0;
   text-align: left;
 
   & + & {
-    margin-top: 4px;
+    margin-top: 6px;
   }
+}
+
+.globe-deduction-segment {
+  display: inline;
 }
 
 .globe-deduction-metric {

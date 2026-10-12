@@ -499,6 +499,23 @@ const enemyCountryDisplayText = computed(() => {
   const countries = resolveEnemyCountries(store.activedTask)
   return countries.length ? countries.join('、') : '--'
 })
+/** 进行中的 getSatelliteSeries 请求（同参数合并，避免刷新时重复调用） */
+let seriesOptionsInflight: { queryKey: string; promise: Promise<void> } | null = null
+
+/**
+ * 生成系列候选项接口查询键（国家 + 卫星类型）。
+ *
+ * @param task 当前任务
+ * @returns 用于去重的键
+ */
+const buildSeriesOptionsQueryKey = (task: TaskForm | null | undefined): string => {
+  const countries = resolveEnemyCountries(task)
+  const types = editorDraft.value?.targetTypeShow?.length
+    ? [...editorDraft.value.targetTypeShow]
+    : resolveTaskTargetTypes(task)
+  return `${[...countries].sort().join('\u0001')}|${[...types].sort().join('\u0001')}`
+}
+
 /**
  * 加载卫星系列候选项。
  *
@@ -516,28 +533,45 @@ const loadSeriesTagOptions = async (task: TaskForm | null | undefined) => {
     }))
     return
   }
-  seriesOptionsLoading.value = true
-  try {
-    const res = await getSatelliteSeries(countries)
-    if (res.code === 200 && res.data) {
-      const options = buildSeriesOptionsFromApiData(res.data, types)
-      const merged = new Set([...options, ...(editorDraft.value?.selectedSeries || [])])
-      seriesTagOptions.value = [...merged]
-        .sort((a, b) => a.localeCompare(b, 'zh-CN'))
-        .map((series) => ({ id: series, label: series }))
-    } else {
+  const queryKey = buildSeriesOptionsQueryKey(task)
+  if (seriesOptionsInflight?.queryKey === queryKey) {
+    await seriesOptionsInflight.promise
+    return
+  }
+
+  const loadPromise = (async () => {
+    seriesOptionsLoading.value = true
+    try {
+      const res = await getSatelliteSeries(countries)
+      if (res.code === 200 && res.data) {
+        const options = buildSeriesOptionsFromApiData(res.data, types)
+        const merged = new Set([...options, ...(editorDraft.value?.selectedSeries || [])])
+        seriesTagOptions.value = [...merged]
+          .sort((a, b) => a.localeCompare(b, 'zh-CN'))
+          .map((series) => ({ id: series, label: series }))
+      } else {
+        seriesTagOptions.value = (editorDraft.value?.selectedSeries || []).map((series) => ({
+          id: series,
+          label: series,
+        }))
+      }
+    } catch {
       seriesTagOptions.value = (editorDraft.value?.selectedSeries || []).map((series) => ({
         id: series,
         label: series,
       }))
+    } finally {
+      seriesOptionsLoading.value = false
     }
-  } catch {
-    seriesTagOptions.value = (editorDraft.value?.selectedSeries || []).map((series) => ({
-      id: series,
-      label: series,
-    }))
+  })()
+
+  seriesOptionsInflight = { queryKey, promise: loadPromise }
+  try {
+    await loadPromise
   } finally {
-    seriesOptionsLoading.value = false
+    if (seriesOptionsInflight?.promise === loadPromise) {
+      seriesOptionsInflight = null
+    }
   }
 }
 /**
@@ -646,8 +680,13 @@ const loadCenterTagOptions = async () => {
  * 切换任务时同步编辑草稿与候选项。
  *
  * @param task 当前任务
+ * @param options.reloadTagOptions 是否重新拉取系列/武器/地面站候选项；列表 reconcile 时传 false 避免与 activedTask watch 重复请求
  */
-const syncEditorForTask = async (task: TaskForm | null | undefined) => {
+const syncEditorForTask = async (
+  task: TaskForm | null | undefined,
+  options?: { reloadTagOptions?: boolean },
+) => {
+  const reloadTagOptions = options?.reloadTagOptions ?? true
   editorDraft.value = createDraftFromTask(task)
   scheduleDurationError.value = ''
   if (task && editorDraft.value) {
@@ -677,6 +716,7 @@ const syncEditorForTask = async (task: TaskForm | null | undefined) => {
     store.setTaskCombatArea(null)
   }
   if (!task) return
+  if (!reloadTagOptions) return
   await Promise.all([
     loadSeriesTagOptions(task),
     loadWeaponTagOptions(),
@@ -732,7 +772,7 @@ const reconcileActiveTaskWithTaskList = async () => {
   const fresh = tasks.find((item) => item.id === activeId)
   if (!fresh) return
   store.setActivedTask(fresh)
-  await syncEditorForTask(fresh)
+  await syncEditorForTask(fresh, { reloadTagOptions: false })
 }
 
 /**
