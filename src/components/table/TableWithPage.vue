@@ -31,18 +31,31 @@
   </el-card>
 </template>
 <script setup lang="ts">
+/**
+ * 带分页的表格卡片：默认前端分页；`count > 0` 时视为服务端分页，翻页触发 `loadPageData`。
+ * 通过 slot 注入 `el-table-column`，对外暴露 `clearSelection` / `getSelectionRows`。
+ */
 import { getPageData } from '@/utils/tools/funcs'
 import type { TableInstance } from 'element-plus'
 import { computed, ref } from 'vue'
 
+/** 表格与分页配置 */
 interface Props {
+  /** 表格数据源；服务端分页时当前页数据由父组件传入 */
   tableData: any[]
+  /** 服务端总条数；大于 0 启用服务端分页 */
   count?: number
+  /** 是否显示边框 */
   border?: boolean
+  /** 是否斑马纹 */
   stripe?: boolean
+  /** 行唯一键字段名 */
   rowKey?: string
+  /** 表格高度（预留） */
   tableHeight?: number
+  /** 卡片标题；空则不显示标题区 */
   tableTitle?: string
+  /** 是否显示底部分页器 */
   hasPage?: boolean
 }
 const props = withDefaults(defineProps<Props>(), {
@@ -57,16 +70,20 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 interface Emits {
+  /** 服务端分页：页码或每页条数变化 */
   (e: 'loadPageData', page: number, page_size: number): void
+  /** 多选变化 */
   (e: 'handleSelectionChange', rows: any[]): void
 }
 const emit = defineEmits<Emits>()
 const tbRef = ref<TableInstance>()
-// 清空选择
+
+/** 清空表格多选 */
 const clearSelection = () => {
   tbRef.value?.clearSelection()
 }
-// 获取选择行
+
+/** @returns 当前选中的行数据 */
 const getSelectionRows = () => {
   return tbRef.value?.getSelectionRows()
 }

@@ -1,3 +1,6 @@
+/**
+ * 电子战矩阵数据 → Cesium 可视化桥接：地面站坐标、链路状态与材质派生。
+ */
 import { computed, type Ref } from 'vue'
 import * as Cesium from 'cesium'
 import type {

@@ -1,3 +1,6 @@
+/**
+ * 跨页面公共工具：数组去重、分页切片、静态资源 URL、reactive 深同步、删除确认框、日期偏移等。
+ */
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { isReactive, type Ref } from 'vue'
 
@@ -106,6 +109,12 @@ export function syncSharedDeep(tar: Record<string, any>, src: Record<string, any
 }
 
 const isPlainObject = (v: any): v is Record<string, any> => v !== null && typeof v === 'object' && !Array.isArray(v)
+
+/**
+ * 弹出 Element Plus 删除确认框，确认后执行回调。
+ *
+ * @param func 用户确认删除后执行的逻辑
+ */
 export function elConfirm(func: () => void) {
   ElMessageBox.confirm('删除后无法恢复，是否继续删除?', '警告！', {
     confirmButtonText: '确定',

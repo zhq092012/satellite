@@ -1,15 +1,17 @@
+/**
+ * 全局单例：卫星档案弹窗可见性与 NORAD（多页面共享同一弹窗状态）。
+ */
 import { ref } from 'vue'
 
+/** 弹窗是否打开 */
 const satelliteProfileVisible = ref(false)
+/** 当前展示的卫星 NORAD */
 const satelliteProfileNorad = ref<number | null>(null)
+
 /**
- * 卫星详细信息弹窗
- * @returns {
- *   satelliteProfileVisible: 卫星详细信息弹窗是否可见
- *   satelliteProfileNorad: 卫星NORAD编号
- *   closeSatelliteProfile: 关闭卫星详细信息弹窗
- *   openSatelliteProfile: 打开卫星详细信息弹窗
- * }
+ * 控制卫星档案弹窗的打开/关闭（模块级单例 ref）。
+ *
+ * @returns 可见性、NORAD 及 open/close 方法
  */
 export function useSatelliteProfileDialog() {
   /**

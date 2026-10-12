@@ -1,3 +1,7 @@
+/**
+ * 统一 HTTP 客户端：Axios 实例、Token 注入、401 登出与 Loading 封装。
+ * 业务模块应通过导出的 `requestAPI` 发起请求，勿直接 new Axios。
+ */
 import type { HttpRequestOptions } from '@/types/http'
 import router from '@/router'
 import axios from 'axios'

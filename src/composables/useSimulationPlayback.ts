@@ -12,6 +12,11 @@ import type { ActiveStrikeQueueItem, BlueSatelliteRecord, MetricCard, StageItem 
 import { formatClock, formatDateTime, formatFullDateTime, parseMissionWindowDate } from '@/utils/tools/dateFormat'
 import type { TaskSteps } from '@/types/cesium/satellite'
 
+/**
+ * 历史方案仿真播放：Cesium 时钟、阶段条、打击队列与指标卡片同步。
+ *
+ * @returns 播放状态、进度控制与阶段切换方法（参数见函数签名，由方案页注入 Viewer 与方案数据）
+ */
 export function useSimulationPlayback(
   viewer: ShallowRef<Cesium.Viewer | null>,
   taskSteps: { value: TaskSteps[] },

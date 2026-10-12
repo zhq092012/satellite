@@ -62,6 +62,11 @@ export class SatelliteScenePositionError extends Error {
   }
 }
 
+/**
+ * 仿真/电子战场景数据 Hook：加载任务卫星与武器、TLE 缓存、轨道传播与历史方案预取。
+ *
+ * @returns 场景 reactive 状态、TLE 缓存方法、位置计算与 `loadSceneData` 入口
+ */
 export function useSceneData() {
   const store = useLayoutStore()
 

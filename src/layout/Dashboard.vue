@@ -100,6 +100,10 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 登录后主布局：顶栏场景切换、权限菜单、用户操作区，以及 `router-view` 主内容。
+ * 首页相关路由使用统一 keep-alive key（`Home`），避免在 `/home/*` 子路径间切换时销毁态势页状态。
+ */
 import { computed, onMounted, ref } from 'vue'
 import { type RouteRecordRaw, useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -118,11 +122,16 @@ const layoutStore = useLayoutStore()
 const route = useRoute()
 const router = useRouter()
 
+/** 顶栏/侧栏菜单节点（由后端 menuTree 转换而来） */
 type DashboardMenuNode = Omit<RouteRecordRaw, 'children' | 'meta'> & {
   meta?: {
+    /** 菜单展示标题 */
     title?: string
+    /** 图标标识或 emoji */
     icon?: string
+    /** 是否在导航中展示 */
     showInMenu?: boolean
+    /** 访问所需权限码；admin 角色不受限 */
     permission?: string
   }
   children?: DashboardMenuNode[]
@@ -130,6 +139,13 @@ type DashboardMenuNode = Omit<RouteRecordRaw, 'children' | 'meta'> & {
 
 const activeMenu = computed(() => (typeof route.path === 'string' ? route.path : '/home'))
 
+/**
+ * 将后端菜单树转为 Vue Router 可用的菜单节点列表。
+ *
+ * @param menus 后端菜单项
+ * @param parentPath 父级 path 前缀，用于拼接相对 path
+ * @returns 扁平化后的顶栏菜单树
+ */
 const buildMenuRoutes = (menus: MenuItem[], parentPath = ''): DashboardMenuNode[] => {
   const result: DashboardMenuNode[] = []
 

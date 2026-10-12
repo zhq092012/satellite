@@ -32,12 +32,19 @@
   </div>
 </template>
 <script setup lang="ts">
+/**
+ * 无 el-card 外壳的分页表格，行为与 `TableWithPage` 一致，额外支持 `toggleRowSelection`。
+ * 适用于嵌入对话框或嵌套布局，避免双层卡片样式。
+ */
 import { getPageData } from '@/utils/tools/funcs'
 import type { TableInstance } from 'element-plus'
 import { computed, nextTick, ref } from 'vue'
 
+/** 表格与分页配置（同 TableWithPage） */
 interface Props {
+  /** 表格数据源 */
   tableData: any[]
+  /** 服务端总条数；大于 0 启用服务端分页 */
   count?: number
   border?: boolean
   stripe?: boolean
@@ -63,16 +70,24 @@ interface Emits {
 }
 const emit = defineEmits<Emits>()
 const tbRef = ref<TableInstance>()
-// 清空选择
+
+/** 清空表格多选 */
 const clearSelection = () => {
   tbRef.value?.clearSelection()
 }
-// 获取选择行
+
+/** @returns 当前选中的行数据 */
 const getSelectionRows = () => {
   return tbRef.value?.getSelectionRows()
 }
 
-// 选中某一行
+/**
+ * 切换指定行的选中状态（nextTick 后执行，确保表格已渲染）。
+ *
+ * @param row 行数据
+ * @param selected 目标选中状态
+ * @param ignoreSelectable 是否忽略 selectable 限制（预留，与 Element Plus API 对齐）
+ */
 const toggleRowSelection = (row: any, selected?: boolean, ignoreSelectable: boolean = true) => {
   nextTick(() => {
     tbRef.value?.toggleRowSelection(row, selected)

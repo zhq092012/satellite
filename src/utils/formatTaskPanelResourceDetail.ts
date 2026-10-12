@@ -1,3 +1,6 @@
+/**
+ * 态势地球资源详情 Label 文案：卫星/武器/地面站/系列格式化与左右面板统一入口 `resolveGlobeResourceDetailText`。
+ */
 import type { BaseStationInfo } from '@/api/system/satellite-system-api'
 import type { Weapon } from '@/types/dashboard'
 import { parseGroundTargetKey, type BattleGlobeGroundTarget } from '@/utils/buildBattleGlobeGroundTargets'

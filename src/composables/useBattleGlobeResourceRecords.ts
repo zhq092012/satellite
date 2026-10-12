@@ -1,3 +1,6 @@
+/**
+ * 态势页武器与地面站库记录预加载，供地图 Label 详情与左右面板选中逻辑共用。
+ */
 import { ref } from 'vue'
 import { getAllWeapons } from '@/api/dashboard'
 import { getGroundStationList, type BaseStationInfo } from '@/api/system/satellite-system-api'

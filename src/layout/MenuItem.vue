@@ -31,6 +31,9 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 菜单子树渲染组件：由 `MenuTree` 递归引用，处理多级 el-sub-menu / el-menu-item。
+ */
 import { type RouteRecordRaw } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useLayoutStore } from '@/store/modules/layout'
@@ -39,8 +42,11 @@ defineOptions({
   name: 'MenuItem',
 })
 
+/** 子菜单 Props */
 interface Props {
+  /** 当前层级的路由菜单项 */
   menuData: RouteRecordRaw[]
+  /** 是否向子项传递图标展示（预留） */
   showIcon?: boolean
 }
 withDefaults(defineProps<Props>(), {

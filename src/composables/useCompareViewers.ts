@@ -12,6 +12,17 @@ const CHINA_OVERVIEW_LON = 107.4
 const CHINA_OVERVIEW_LAT = 33.42
 const CHINA_OVERVIEW_HEIGHT = 40000000
 
+/**
+ * 方案对比页多 Cesium 视口生命周期管理。
+ *
+ * @param _viewer 主视图 Viewer（预留联动）
+ * @param blueSatellites 蓝方卫星列表
+ * @param selectedComparePlanCards 参与对比的方案卡片
+ * @param completedTargetSatelliteIds 已完成打击目标 NORAD 集合
+ * @param activeLayerOption 当前图层选项
+ * @param selectedHistoricalPlanDetail 选中方案详情
+ * @returns 对比 Viewer 数组及创建/销毁/刷新方法
+ */
 export function useCompareViewers(
   _viewer: ShallowRef<Cesium.Viewer | null>,
   blueSatellites: { value: BlueSatelliteRecord[] },

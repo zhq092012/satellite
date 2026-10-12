@@ -41,6 +41,9 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 递归导航菜单（水平/垂直）：支持图标、路由跳转，并在未选任务时禁用算法管理相关入口。
+ */
 import { type RouteRecordRaw } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useLayoutStore } from '@/store/modules/layout'
@@ -50,11 +53,17 @@ defineOptions({
   name: 'MenuTree',
 })
 
+/** 组件 Props：菜单数据与展示模式 */
 interface Props {
+  /** 当前高亮菜单 path（与 el-menu default-active 对齐） */
   activeMenu?: string
+  /** 是否折叠（侧栏模式） */
   isCollapse?: boolean
+  /** 菜单路由节点列表 */
   menuData: RouteRecordRaw[]
+  /** 水平顶栏或垂直侧栏 */
   menuMode?: 'horizontal' | 'vertical'
+  /** 是否展示 meta.icon */
   showIcon?: boolean
 }
 withDefaults(defineProps<Props>(), {

@@ -1,3 +1,7 @@
+/**
+ * 任务后台算法进度：WebSocket 订阅、模块级 `taskProgressMap`、完成判定与重连策略。
+ * 左侧面板任务列表与态势页共用同一进度快照。
+ */
 import { reactive } from 'vue'
 import type { TaskForm } from '@/types/dashboard'
 

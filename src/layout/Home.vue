@@ -10,6 +10,11 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 系统首页容器：顶栏五个分析页（整体态势 / 拓扑 / 甘特 / 打击窗口 / 方案管理）共用本组件。
+ * 通过 `keep-alive` 缓存 `BattleSituation` 与 `StrikePlanGenerator`，切换路由时仅替换动态子组件。
+ * 路由 path 与 `layoutStore.mainActiveTab` 双向同步，保证顶栏菜单与内容区一致。
+ */
 import { computed, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BattleSituation from '@/components/BattleSituation/BattleSituation.vue'
