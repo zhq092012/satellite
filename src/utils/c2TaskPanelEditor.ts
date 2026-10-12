@@ -4,6 +4,12 @@ import type { TaskCombatArea, TaskForm, TaskResourceItem, Weapon } from '@/types
 /** 左侧面板资源类型（卫星系列 / 武器 / 地面站 / 数据中心） */
 export type TaskPanelResourceKind = 'series' | 'weapon' | 'receive' | 'center'
 
+/**
+ * 任务新建/编辑界面是否展示「任务时长、链路时延、覆盖率」表单项。
+ * 仅控制前端可见性，不影响草稿、校验与 saveTask / updateTask 请求体。
+ */
+export const SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI = false
+
 /** 标签候选项（系列名或资源 ID + 展示名） */
 export interface TaskPanelTagOption {
   /** 唯一键（系列名或资源 ID） */

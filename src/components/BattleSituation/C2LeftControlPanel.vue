@@ -73,7 +73,7 @@
               <div v-if="scheduleDurationError" class="combat-area-api-error" role="alert">
                 {{ scheduleDurationError }}
               </div>
-              <div class="metric-row">
+              <div v-if="showTaskDurationDelayCoverageInUi" class="metric-row">
                 <span class="metric-label">任务时长</span>
                 <el-input-number v-model="durationHours" class="metric-input-number" size="small" :min="1" :max="8760"
                   :step="1" controls-position="right"
@@ -81,13 +81,13 @@
                   @change="handleDurationHoursChange" />
                 <span class="metric-unit">小时</span>
               </div>
-              <div v-if="editorDraft.delayMin != null" class="metric-row">
+              <div v-if="showTaskDurationDelayCoverageInUi && editorDraft.delayMin != null" class="metric-row">
                 <span class="metric-label">链路时延</span>
                 <el-input-number v-model="editorDraft.delayMin" class="metric-input-number" size="small" :min="1"
                   :max="4320" :step="1" controls-position="right" />
                 <span class="metric-unit">分钟</span>
               </div>
-              <div v-if="editorDraft.coverage != null" class="metric-row">
+              <div v-if="showTaskDurationDelayCoverageInUi && editorDraft.coverage != null" class="metric-row">
                 <span class="metric-label">覆盖率</span>
                 <el-input-number v-model="editorDraft.coverage" class="metric-input-number" size="small" :min="0"
                   :max="100" :step="1" controls-position="right" />
@@ -308,6 +308,7 @@ import {
   notifyTaskListValidationErrors,
   normalizeTaskWeaponIds,
   parseTaskPanelTimeMs,
+  SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI,
   TASK_PANEL_SATELLITE_TYPES,
   toTaskDatetimeLocalValue,
   type C2TaskEditorDraft,
@@ -327,6 +328,9 @@ const emit = defineEmits<{
   /** 资源详情：地图定位并在 Label 展示当前已有字段 */
   (e: 'focus-resource-detail', payload: TaskPanelResourceDetailPayload): void
 }>()
+/** 是否展示任务时长 / 链路时延 / 覆盖率表单项（仅 UI） */
+const showTaskDurationDelayCoverageInUi = SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI
+
 const store = useLayoutStore()
 const {
   getTaskProgress,
