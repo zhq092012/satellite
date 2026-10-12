@@ -7,6 +7,7 @@ import { parseGroundTargetKey, type BattleGlobeGroundTarget } from '@/utils/buil
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
 import { formatSatelliteMetaInline } from '@/utils/buildSatelliteAnalysisTable'
+import type { SatelliteGlobeLabelDisplayMetrics } from '@/utils/computeSatelliteLabelMetrics'
 import type {
   BattleGlobeGroundStationRecordMap,
   BattleGlobeWeaponRecordMap,
@@ -24,6 +25,8 @@ export interface GlobeResourceDetailContext {
   weaponRecords: BattleGlobeWeaponRecordMap
   /** 地面站/数据中心库记录 */
   groundRecords: BattleGlobeGroundStationRecordMap
+  /** 选中卫星在当前播放头的预计算轨道指标（仅 kind=satellite 时使用） */
+  satelliteLabelMetrics?: SatelliteGlobeLabelDisplayMetrics | null
 }
 
 /** 统一详情解析入参（左侧面板详情、右侧面板选中、地球定位共用） */
@@ -84,12 +87,103 @@ export const formatSeriesGlobeDetailLines = (
 }
 
 /**
- * 单颗卫星详情（地图上已有 TLE 的卫星）。
+ * 格式化纬度/经度半球后缀。
+ *
+ * @param deg 角度（度）
+ * @param positiveHem 正半球字母（如 N/E）
+ * @param negativeHem 负半球字母（如 S/W）
+ */
+const formatLatLonHemisphere = (deg: number, positiveHem: string, negativeHem: string): string => {
+  const abs = Math.abs(deg)
+  const hem = deg >= 0 ? positiveHem : negativeHem
+  return `${abs.toFixed(2)}° ${hem}`
+}
+
+/** 卫星 Label 网格中的单个指标项 */
+export interface GlobeSatelliteDetailMetricCell {
+  /** 指标名称（如「轨道高度」） */
+  label: string
+  /** 展示值（如「599 km」） */
+  value: string
+}
+
+/** 卫星 HTML 浮层 Label 结构化视图（2 列 Grid） */
+export interface GlobeSatelliteDetailLabelViewModel {
+  /** 卫星名称 */
+  name: string
+  /** 系列 / 类型 / 用途摘要行 */
+  metaLine: string
+  /** 轨道指标（6 项，按 2 列排列） */
+  metricCells: GlobeSatelliteDetailMetricCell[]
+  /** 预计下次过境（占满一行） */
+  nextTransit: GlobeSatelliteDetailMetricCell
+}
+
+/**
+ * 构建卫星 Label 网格视图；无预计算指标时返回 null。
  *
  * @param sat 卫星
+ * @param metrics 播放头对应指标
+ * @returns Grid 视图；指标未就绪时 null
+ */
+export const buildSatelliteGlobeDetailViewModel = (
+  sat: BattleGlobeSatellite,
+  metrics?: SatelliteGlobeLabelDisplayMetrics | null,
+): GlobeSatelliteDetailLabelViewModel | null => {
+  if (!metrics) return null
+  const metaLine = formatSatelliteMetaInline(sat.series, sat.sysType, sat.usage)
+  return {
+    name: sat.name,
+    metaLine,
+    metricCells: [
+      { label: '轨道高度', value: `${Math.round(metrics.altitudeKm)} km` },
+      { label: '轨道倾角', value: `${metrics.inclinationDeg.toFixed(1)}°` },
+      {
+        label: '地心距离',
+        value: `${Math.round(metrics.geocentricDistanceKm).toLocaleString('en-US')} km`,
+      },
+      { label: '运行速度', value: `${metrics.speedKmS.toFixed(2)} km/s` },
+      { label: '纬度', value: formatLatLonHemisphere(metrics.latitudeDeg, 'N', 'S') },
+      { label: '经度', value: formatLatLonHemisphere(metrics.longitudeDeg, 'E', 'W') },
+    ],
+    nextTransit: {
+      label: '预计下次过境',
+      value: metrics.nextTransitLabel ?? '--',
+    },
+  }
+}
+
+/**
+ * 将卫星 Grid 视图转为 Tooltip / 纯文本 fallback（每行一项，便于复制）。
+ *
+ * @param view 结构化视图
+ * @returns 多行文本
+ */
+export const formatSatelliteGlobeDetailTooltipText = (
+  view: GlobeSatelliteDetailLabelViewModel,
+): string => {
+  const lines = [
+    view.name,
+    view.metaLine,
+    ...view.metricCells.map((cell) => `${cell.label}：${cell.value}`),
+    `${view.nextTransit.label}：${view.nextTransit.value}`,
+  ]
+  return joinGlobeLabelDetailLines(lines)
+}
+
+/**
+ * 单颗卫星详情（地图上已有 TLE 的卫星）；无 Grid 时使用纯文本。
+ *
+ * @param sat 卫星
+ * @param metrics 播放头对应指标（预计算查表结果）
  * @returns Label 详情文案
  */
-export const formatSatelliteGlobeDetailLines = (sat: BattleGlobeSatellite): string => {
+export const formatSatelliteGlobeDetailLines = (
+  sat: BattleGlobeSatellite,
+  metrics?: SatelliteGlobeLabelDisplayMetrics | null,
+): string => {
+  const view = buildSatelliteGlobeDetailViewModel(sat, metrics)
+  if (view) return formatSatelliteGlobeDetailTooltipText(view)
   const meta = formatSatelliteMetaInline(sat.series, sat.sysType, sat.usage)
   return joinGlobeLabelDetailLines([sat.name, meta])
 }
@@ -185,7 +279,7 @@ export const resolveGlobeResourceDetailText = (
 ): string | null => {
   if (request.kind === 'satellite') {
     const sat = ctx.satellites.find((item) => item.norad === request.norad)
-    return sat ? formatSatelliteGlobeDetailLines(sat) : null
+    return sat ? formatSatelliteGlobeDetailLines(sat, ctx.satelliteLabelMetrics) : null
   }
 
   if (request.kind === 'series') {

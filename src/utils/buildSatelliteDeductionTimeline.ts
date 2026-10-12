@@ -478,7 +478,7 @@ const joinTransitPassPlainLines = (titleLine: string, timeLine: string, duration
  * @param value 时间字符串
  * @returns 毫秒时间戳；无效时返回 null
  */
-const parseMatrixTimeMs = (value?: string | null): number | null => {
+export const parseMatrixTimeMs = (value?: string | null): number | null => {
   if (!value?.trim() || value.trim() === '无' || value.trim() === '--') return null
   const parts = parseWallClockParts(value)
   if (!parts) return null

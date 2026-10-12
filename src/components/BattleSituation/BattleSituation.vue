@@ -6,6 +6,7 @@
         :ground-targets="globeGroundTargets" :current-time-ms="currentTimeMs" :selected-norad="selectedNorad"
         :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
         :selected-resource-detail-text="selectedResourceDetailText"
+        :selected-satellite-detail-view="selectedSatelliteDetailView"
         :task-start-ms="taskStartMs" :task-end-ms="taskEndMs"         :follow-selected-satellite="!isDeductionPlaying"
         :follow-deduction-satellite="followDeductionSatellite"
         :is-deduction-playing="isDeductionPlaying" :is-timeline-playing="isTimelinePlaying"
@@ -117,10 +118,15 @@ import { buildBattleGlobeWeapons } from '@/utils/buildBattleGlobeWeapons'
 import { buildBattleGlobeGroundTargets, buildGroundTargetKey, parseGroundTargetKey } from '@/utils/buildBattleGlobeGroundTargets'
 import type { TaskPanelResourceDetailPayload } from '@/utils/c2TaskPanelEditor'
 import {
+  buildSatelliteGlobeDetailViewModel,
+  formatSatelliteGlobeDetailLines,
+  formatSatelliteGlobeDetailTooltipText,
   resolveGlobeResourceDetailText,
   type GlobeResourceDetailRequest,
+  type GlobeSatelliteDetailLabelViewModel,
 } from '@/utils/formatTaskPanelResourceDetail'
 import { useBattleGlobeResourceRecords } from '@/composables/useBattleGlobeResourceRecords'
+import { useSatelliteGlobeLabelMetricsPrecompute } from '@/composables/useSatelliteGlobeLabelMetricsPrecompute'
 import { ElMessage } from 'element-plus'
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ArrowDown, ArrowUp, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
@@ -163,6 +169,9 @@ const selectedGroundTargetKey = ref<string | null>(null)
 
 /** 当前选中目标在地球 Label 上展示的详情（多行） */
 const selectedResourceDetailText = ref<string | null>(null)
+
+/** 选中卫星时的 Grid Label 视图（轨道指标两列布局） */
+const selectedSatelliteDetailView = ref<GlobeSatelliteDetailLabelViewModel | null>(null)
 
 /** 武器/地面站库记录（右侧面板选中时与左侧详情字段对齐） */
 const { weaponRecordById, groundStationRecordById, ensureResourceRecordsLoaded } =
@@ -250,6 +259,18 @@ const globeWeapons = computed(() => buildBattleGlobeWeapons(taskAnalysisData.val
 
 /** 地球渲染接收站/数据中心列表（仅任务分析全量数据） */
 const globeGroundTargets = computed(() => buildBattleGlobeGroundTargets(taskAnalysisData.value))
+
+/** 选中卫星 Label 轨道指标预计算（Worker + 关键节点） */
+const {
+  schedulePrecomputeForNorad,
+  resolveDisplayMetricsAtPlayhead,
+  clearSatelliteLabelMetricsCache,
+} = useSatelliteGlobeLabelMetricsPrecompute(
+  taskAnalysisData,
+  globeSatellites,
+  taskStartMs,
+  taskEndMs,
+)
 
 /** 已提示过的卫星 TLE 校验错误签名，避免 watch 重复弹窗 */
 let lastGlobeSatelliteValidationKey = ''
@@ -492,6 +513,7 @@ const handleSelectionPlayback = (hadSelection: boolean, hasNewSelection: boolean
  */
 const clearGlobeResourceDetail = () => {
   selectedResourceDetailText.value = null
+  selectedSatelliteDetailView.value = null
 }
 
 /**
@@ -503,6 +525,10 @@ const buildGlobeResourceDetailContext = () => ({
   groundTargets: globeGroundTargets.value,
   weaponRecords: weaponRecordById.value,
   groundRecords: groundStationRecordById.value,
+  satelliteLabelMetrics:
+    selectedNorad.value != null
+      ? resolveDisplayMetricsAtPlayhead(selectedNorad.value, currentTimeMs.value)
+      : null,
 })
 
 /**
@@ -511,7 +537,41 @@ const buildGlobeResourceDetailContext = () => ({
  * @param request 资源类型与标识
  */
 const applyGlobeResourceDetail = (request: GlobeResourceDetailRequest) => {
-  selectedResourceDetailText.value = resolveGlobeResourceDetailText(request, buildGlobeResourceDetailContext())
+  const ctx = buildGlobeResourceDetailContext()
+  if (request.kind === 'satellite') {
+    const sat = ctx.satellites.find((item) => item.norad === request.norad)
+    if (!sat) {
+      selectedResourceDetailText.value = null
+      selectedSatelliteDetailView.value = null
+      return
+    }
+    const viewModel = buildSatelliteGlobeDetailViewModel(sat, ctx.satelliteLabelMetrics)
+    selectedSatelliteDetailView.value = viewModel
+    selectedResourceDetailText.value = viewModel
+      ? formatSatelliteGlobeDetailTooltipText(viewModel)
+      : formatSatelliteGlobeDetailLines(sat)
+    return
+  }
+  selectedSatelliteDetailView.value = null
+  selectedResourceDetailText.value = resolveGlobeResourceDetailText(request, ctx)
+}
+
+/** 播放头或预计算完成后，刷新当前选中卫星的 Label（仅查表，不传播 TLE） */
+const refreshSelectedSatelliteGlobeDetail = () => {
+  const norad = selectedNorad.value
+  if (norad == null || selectedWeaponId.value || selectedGroundTargetKey.value) return
+  applyGlobeResourceDetail({ kind: 'satellite', norad })
+}
+
+/** 调度选中卫星的关键节点指标预计算 */
+const scheduleSelectedSatelliteLabelMetrics = () => {
+  const norad = selectedNorad.value
+  if (norad == null) return
+  void schedulePrecomputeForNorad(norad, currentTimeMs.value).then(() => {
+    if (selectedNorad.value === norad) {
+      refreshSelectedSatelliteGlobeDetail()
+    }
+  })
 }
 
 /** 库记录异步加载完成后，刷新当前选中武器/地面目标的 Label 详情 */
@@ -782,7 +842,27 @@ watch(selectedNorad, (norad, prevNorad) => {
   if (norad !== prevNorad) {
     resetDeductionUi()
   }
+  if (norad != null) {
+    scheduleSelectedSatelliteLabelMetrics()
+  }
 })
+
+watch(currentTimeMs, () => {
+  refreshSelectedSatelliteGlobeDetail()
+})
+
+watch(
+  () =>
+    [
+      taskAnalysisData.value,
+      globeSatellites.value.length,
+      taskStartMs.value,
+      taskEndMs.value,
+    ] as const,
+  () => {
+    scheduleSelectedSatelliteLabelMetrics()
+  },
+)
 
 onBeforeUnmount(() => {
   stopTimelinePlayback()
@@ -804,6 +884,7 @@ watch(
     if (taskId !== prevTaskId) {
       autoTimelinePlaybackTaskId = null
       lastGlobeSatelliteValidationKey = ''
+      clearSatelliteLabelMetricsCache()
     }
     if (!taskId) {
       store.clearTaskAnalysisData()

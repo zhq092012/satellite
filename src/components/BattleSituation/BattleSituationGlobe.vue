@@ -1,13 +1,34 @@
 <template>
   <div ref="cesiumContainer" class="battle-globe-layer">
     <div ref="creditEl" class="credit"></div>
-    <div v-if="detailLabelPresentation && detailLabelScreen" class="globe-entity-detail-label" :style="{
+    <div v-if="showEntityDetailLabel && detailLabelScreen" class="globe-entity-detail-label"
+      :class="{ 'globe-entity-detail-label--satellite-metrics': hasSatelliteGridLabel }"
+      :style="{
       left: `${detailLabelScreen.left}px`,
       top: `${detailLabelScreen.top}px`,
     }">
-      <el-tooltip :content="detailLabelPresentation.fullText" placement="top" :show-after="200"
+      <el-tooltip :content="detailLabelTooltipText" placement="top" :show-after="200"
         popper-class="globe-entity-detail-label-tooltip">
-        <div class="globe-entity-detail-label__inner">{{ detailLabelPresentation.displayText }}</div>
+        <div v-if="hasSatelliteGridLabel && satelliteDetailView"
+          class="globe-entity-detail-label__inner globe-entity-detail-label__inner--grid">
+          <div class="globe-sat-detail__title">{{ satelliteDetailView.name }}</div>
+          <div v-if="satelliteDetailView.metaLine" class="globe-sat-detail__meta">{{ satelliteDetailView.metaLine }}
+          </div>
+          <div class="globe-sat-detail__grid">
+            <div v-for="(cell, index) in satelliteDetailView.metricCells" :key="`${cell.label}-${index}`"
+              class="globe-sat-detail__cell">
+              <span class="globe-sat-detail__cell-label">{{ cell.label }}</span>
+              <span class="globe-sat-detail__cell-value">{{ cell.value }}</span>
+            </div>
+            <div class="globe-sat-detail__cell globe-sat-detail__cell--full">
+              <span class="globe-sat-detail__cell-label">{{ satelliteDetailView.nextTransit.label }}</span>
+              <span class="globe-sat-detail__cell-value">{{ satelliteDetailView.nextTransit.value }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="detailLabelPresentation" class="globe-entity-detail-label__inner">
+          {{ detailLabelPresentation.displayText }}
+        </div>
       </el-tooltip>
     </div>
   </div>
@@ -24,7 +45,11 @@ import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
 import type { BattleGlobeGroundTarget } from '@/utils/buildBattleGlobeGroundTargets'
 import { mergeDeductionPassGroundTargets, parseGroundTargetKey } from '@/utils/buildBattleGlobeGroundTargets'
-import { buildGlobeDetailLabelDisplay } from '@/utils/globeDetailLabelDisplay'
+import {
+  buildGlobeDetailLabelDisplay,
+  GLOBE_DETAIL_LABEL_MAX_WIDTH_PX,
+} from '@/utils/globeDetailLabelDisplay'
+import type { GlobeSatelliteDetailLabelViewModel } from '@/utils/formatTaskPanelResourceDetail'
 import { useBattleGlobeGroundTargets } from '@/composables/useBattleGlobeGroundTargets'
 import { useBattleGlobeDeductionEffects } from '@/composables/useBattleGlobeDeductionEffects'
 import { useBattleGlobeTimelineSelectedOrbit } from '@/composables/useBattleGlobeTimelineSelectedOrbit'
@@ -67,6 +92,8 @@ const props = withDefaults(
     deductionVisualPlan?: SatelliteDeductionVisualPlan | null
     /** 当前选中目标（卫星/武器/地面站）的 Label 详情文案（多行） */
     selectedResourceDetailText?: string | null
+    /** 选中卫星时的 Grid Label 视图 */
+    selectedSatelliteDetailView?: GlobeSatelliteDetailLabelViewModel | null
   }>(),
   {
     satellites: () => [],
@@ -84,17 +111,38 @@ const props = withDefaults(
     isTimelinePlaying: false,
     deductionVisualPlan: null,
     selectedResourceDetailText: null,
+    selectedSatelliteDetailView: null,
   }
 )
 
 /** 选中目标 Label 详情（与选中态同步，由父组件在资源详情点击时写入） */
 const selectedResourceDetailText = computed(() => props.selectedResourceDetailText ?? null)
 
+/** 选中卫星 Grid 视图 */
+const satelliteDetailView = computed(() => props.selectedSatelliteDetailView ?? null)
+
+/** 是否使用卫星指标 Grid 浮层 */
+const hasSatelliteGridLabel = computed(() => Boolean(satelliteDetailView.value?.metricCells.length))
+
 /** 详情 Label 展示（约 300px 宽、行内 …） */
 const detailLabelPresentation = computed(() => {
+  if (hasSatelliteGridLabel.value) return null
   const full = selectedResourceDetailText.value
   if (!full?.trim()) return null
-  return buildGlobeDetailLabelDisplay(full)
+  return buildGlobeDetailLabelDisplay(full, GLOBE_DETAIL_LABEL_MAX_WIDTH_PX)
+})
+
+/** 是否显示 HTML 详情浮层 */
+const showEntityDetailLabel = computed(
+  () => hasSatelliteGridLabel.value || Boolean(detailLabelPresentation.value),
+)
+
+/** Tooltip 全文 */
+const detailLabelTooltipText = computed(() => {
+  if (hasSatelliteGridLabel.value && satelliteDetailView.value) {
+    return selectedResourceDetailText.value?.trim() || satelliteDetailView.value.name
+  }
+  return detailLabelPresentation.value?.fullText ?? ''
 })
 
 /** 详情 HTML Label 屏幕坐标（跟随选中目标） */
@@ -158,7 +206,7 @@ const resolveSelectedDetailWorldPosition = (): Cesium.Cartesian3 | null => {
 /** 将详情 Label 同步到屏幕坐标（地球旋转/缩放后跟随目标） */
 const syncDetailLabelScreenPosition = () => {
   const viewer = viewerRef.value
-  if (!viewer || viewer.isDestroyed() || !detailLabelPresentation.value) {
+  if (!viewer || viewer.isDestroyed() || !showEntityDetailLabel.value) {
     detailLabelScreen.value = null
     return
   }
@@ -180,7 +228,7 @@ const syncDetailLabelPostRenderListener = () => {
   detailLabelPostRenderRemover?.()
   detailLabelPostRenderRemover = null
   const viewer = viewerRef.value
-  if (!viewer || viewer.isDestroyed() || !detailLabelPresentation.value) {
+  if (!viewer || viewer.isDestroyed() || !showEntityDetailLabel.value) {
     detailLabelScreen.value = null
     return
   }
@@ -674,6 +722,7 @@ watch(
     [
       viewerRef.value,
       detailLabelPresentation.value?.fullText,
+      props.selectedSatelliteDetailView,
       props.selectedNorad,
       props.selectedWeaponId,
       props.selectedGroundTargetKey,
@@ -717,6 +766,10 @@ onBeforeUnmount(() => {
   pointer-events: auto;
   transform: translate(8px, calc(-100% - 16px));
   max-width: 300px;
+
+  &--satellite-metrics {
+    max-width: 380px;
+  }
 }
 
 .globe-entity-detail-label__inner {
@@ -734,6 +787,71 @@ onBeforeUnmount(() => {
   background: rgba(0, 0, 0, 0.58);
   border-radius: 4px;
   cursor: default;
+}
+
+.globe-entity-detail-label--satellite-metrics .globe-entity-detail-label__inner {
+  max-width: 380px;
+}
+
+.globe-entity-detail-label__inner--grid {
+  min-width: 320px;
+  max-width: 380px;
+  padding: 8px 10px;
+  white-space: normal;
+  word-break: normal;
+}
+
+.globe-sat-detail__title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #facc15;
+  margin-bottom: 2px;
+}
+
+.globe-sat-detail__meta {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: rgba(250, 204, 21, 0.82);
+  margin-bottom: 6px;
+}
+
+.globe-sat-detail__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 12px;
+  row-gap: 8px;
+  align-items: start;
+  justify-items: start;
+  text-align: left;
+}
+
+.globe-sat-detail__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.globe-sat-detail__cell--full {
+  grid-column: 1 / -1;
+}
+
+.globe-sat-detail__cell-label {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.globe-sat-detail__cell-value {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #f8fafc;
+  word-break: break-word;
 }
 </style>
 
