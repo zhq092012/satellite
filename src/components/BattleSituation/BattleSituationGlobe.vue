@@ -1,11 +1,21 @@
 <template>
   <div ref="cesiumContainer" class="battle-globe-layer">
     <div ref="creditEl" class="credit"></div>
+    <div v-if="detailLabelPresentation && detailLabelScreen" class="globe-entity-detail-label" :style="{
+      left: `${detailLabelScreen.left}px`,
+      top: `${detailLabelScreen.top}px`,
+    }">
+      <el-tooltip :content="detailLabelPresentation.fullText" placement="top" :show-after="200"
+        popper-class="globe-entity-detail-label-tooltip">
+        <div class="globe-entity-detail-label__inner">{{ detailLabelPresentation.displayText }}</div>
+      </el-tooltip>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import * as Cesium from 'cesium'
+import * as satellitejs from 'satellite.js'
 import { markBattleArea, markTaskCombatArea, resolveBattleSpaceLabelPosition } from '@/utils/tools/functionTool'
 import { useLayoutStore } from '@/store/modules/layout'
 import { useBattleGlobeSatellites } from '@/composables/useBattleGlobeSatellites'
@@ -13,7 +23,8 @@ import { useBattleGlobeWeapons } from '@/composables/useBattleGlobeWeapons'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
 import type { BattleGlobeGroundTarget } from '@/utils/buildBattleGlobeGroundTargets'
-import { mergeDeductionPassGroundTargets } from '@/utils/buildBattleGlobeGroundTargets'
+import { mergeDeductionPassGroundTargets, parseGroundTargetKey } from '@/utils/buildBattleGlobeGroundTargets'
+import { buildGlobeDetailLabelDisplay } from '@/utils/globeDetailLabelDisplay'
 import { useBattleGlobeGroundTargets } from '@/composables/useBattleGlobeGroundTargets'
 import { useBattleGlobeDeductionEffects } from '@/composables/useBattleGlobeDeductionEffects'
 import { useBattleGlobeTimelineSelectedOrbit } from '@/composables/useBattleGlobeTimelineSelectedOrbit'
@@ -78,6 +89,106 @@ const props = withDefaults(
 
 /** 选中目标 Label 详情（与选中态同步，由父组件在资源详情点击时写入） */
 const selectedResourceDetailText = computed(() => props.selectedResourceDetailText ?? null)
+
+/** 详情 Label 展示（约 300px 宽、行内 …） */
+const detailLabelPresentation = computed(() => {
+  const full = selectedResourceDetailText.value
+  if (!full?.trim()) return null
+  return buildGlobeDetailLabelDisplay(full)
+})
+
+/** 详情 HTML Label 屏幕坐标（跟随选中目标） */
+const detailLabelScreen = ref<{ left: number; top: number } | null>(null)
+
+/** postRender：更新详情 Label 屏幕位置 */
+let detailLabelPostRenderRemover: (() => void) | null = null
+
+/**
+ * 根据 TLE 计算卫星在指定时刻的 ECEF 坐标（米）。
+ *
+ * @param sat 卫星
+ * @param timeMs 时刻（毫秒）
+ * @returns 世界坐标；失败时 null
+ */
+const propagateSatelliteWorldPosition = (
+  sat: BattleGlobeSatellite,
+  timeMs: number,
+): Cesium.Cartesian3 | null => {
+  try {
+    const satrec = satellitejs.twoline2satrec(sat.line1, sat.line2)
+    const pv = satellitejs.propagate(satrec, new Date(timeMs))
+    if (!pv?.position) return null
+    const gmst = satellitejs.gstime(new Date(timeMs))
+    const ecef = satellitejs.eciToEcf(pv.position, gmst)
+    return new Cesium.Cartesian3(ecef.x * 1000, ecef.y * 1000, ecef.z * 1000)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 解析当前选中目标的世界坐标（用于详情 Label 锚点）。
+ *
+ * @returns 世界坐标；无选中或无坐标时 null
+ */
+const resolveSelectedDetailWorldPosition = (): Cesium.Cartesian3 | null => {
+  if (props.selectedWeaponId) {
+    const weapon = props.weapons.find((item) => item.id === props.selectedWeaponId)
+    if (weapon) return Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 0)
+  }
+  if (props.selectedGroundTargetKey) {
+    const parsed = parseGroundTargetKey(props.selectedGroundTargetKey)
+    if (parsed) {
+      const target = props.groundTargets.find(
+        (item) => item.kind === parsed.kind && item.id === parsed.id,
+      )
+      if (target) return Cesium.Cartesian3.fromDegrees(target.longitude, target.latitude, 0)
+    }
+  }
+  if (props.selectedNorad) {
+    const sat = props.satellites.find((item) => item.norad === props.selectedNorad)
+    if (sat) {
+      const timeMs = props.currentTimeMs > 0 ? props.currentTimeMs : Date.now()
+      return propagateSatelliteWorldPosition(sat, timeMs)
+    }
+  }
+  return null
+}
+
+/** 将详情 Label 同步到屏幕坐标（地球旋转/缩放后跟随目标） */
+const syncDetailLabelScreenPosition = () => {
+  const viewer = viewerRef.value
+  if (!viewer || viewer.isDestroyed() || !detailLabelPresentation.value) {
+    detailLabelScreen.value = null
+    return
+  }
+  const world = resolveSelectedDetailWorldPosition()
+  if (!world) {
+    detailLabelScreen.value = null
+    return
+  }
+  const windowPos = Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, world)
+  if (!windowPos) {
+    detailLabelScreen.value = null
+    return
+  }
+  detailLabelScreen.value = { left: windowPos.x, top: windowPos.y }
+}
+
+/** 注册/注销详情 Label 的 postRender 跟随 */
+const syncDetailLabelPostRenderListener = () => {
+  detailLabelPostRenderRemover?.()
+  detailLabelPostRenderRemover = null
+  const viewer = viewerRef.value
+  if (!viewer || viewer.isDestroyed() || !detailLabelPresentation.value) {
+    detailLabelScreen.value = null
+    return
+  }
+  detailLabelPostRenderRemover = viewer.scene.postRender.addEventListener(() => {
+    syncDetailLabelScreenPosition()
+  })
+  syncDetailLabelScreenPosition()
+}
 
 /** 全局布局 Store */
 const store = useLayoutStore()
@@ -558,7 +669,25 @@ watch(
   }
 )
 
+watch(
+  () =>
+    [
+      viewerRef.value,
+      detailLabelPresentation.value?.fullText,
+      props.selectedNorad,
+      props.selectedWeaponId,
+      props.selectedGroundTargetKey,
+      props.currentTimeMs,
+    ] as const,
+  () => {
+    syncDetailLabelPostRenderListener()
+  },
+  { immediate: true },
+)
+
 onBeforeUnmount(() => {
+  detailLabelPostRenderRemover?.()
+  detailLabelPostRenderRemover = null
   clearBattleLabel()
   resizeObserver?.disconnect()
   resizeObserver = null
@@ -580,5 +709,40 @@ onBeforeUnmount(() => {
   .credit {
     display: none;
   }
+}
+
+.globe-entity-detail-label {
+  position: absolute;
+  z-index: 6;
+  pointer-events: auto;
+  transform: translate(8px, calc(-100% - 16px));
+  max-width: 300px;
+}
+
+.globe-entity-detail-label__inner {
+  box-sizing: border-box;
+  max-width: 300px;
+  padding: 6px 8px;
+  text-align: left;
+  white-space: pre-line;
+  word-break: break-all;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #facc15;
+  background: rgba(0, 0, 0, 0.58);
+  border-radius: 4px;
+  cursor: default;
+}
+</style>
+
+<style lang="scss">
+.globe-entity-detail-label-tooltip {
+  max-width: 360px !important;
+  white-space: pre-line !important;
+  word-break: break-word;
+  text-align: left;
+  line-height: 1.45;
 }
 </style>

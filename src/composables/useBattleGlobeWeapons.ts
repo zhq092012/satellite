@@ -285,11 +285,10 @@ export const useBattleGlobeWeapons = (
       visual.point.pixelSize = lodStyle.pixelSize
       visual.point.color = lodStyle.color
 
-      visual.label.show = showLabel
-      visual.label.text =
-        selected && selectedLabelDetailTextRef.value
-          ? selectedLabelDetailTextRef.value
-          : visual.name
+      const useHtmlDetailLabel = selected && !!selectedLabelDetailTextRef.value
+      visual.label.show = showLabel && !useHtmlDetailLabel
+      visual.label.text = visual.name
+      visual.label.horizontalOrigin = Cesium.HorizontalOrigin.CENTER
       visual.label.fillColor = selected ? Cesium.Color.YELLOW : WEAPON_POINT_COLOR
     })
 

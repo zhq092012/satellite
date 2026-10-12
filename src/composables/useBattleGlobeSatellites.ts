@@ -389,11 +389,10 @@ export const useBattleGlobeSatellites = (
       visual.point.pixelSize = lodStyle?.pixelSize ?? 6
       visual.point.color = lodStyle?.color ?? SATELLITE_POINT_COLOR
 
-      visual.label.show = showLabel
-      visual.label.text =
-        selected && selectedLabelDetailTextRef.value
-          ? selectedLabelDetailTextRef.value
-          : buildSatelliteLabelText(visual, selected)
+      const useHtmlDetailLabel = selected && !!selectedLabelDetailTextRef.value
+      visual.label.show = showLabel && !useHtmlDetailLabel
+      visual.label.text = buildSatelliteLabelText(visual, selected)
+      visual.label.horizontalOrigin = Cesium.HorizontalOrigin.CENTER
       visual.label.fillColor = struck
         ? STRUCK_SATELLITE_COLOR
         : selected

@@ -421,12 +421,10 @@ export const useBattleGlobeGroundTargets = (
       visual.point.pixelSize = lodStyle.pixelSize
       visual.point.color = lodStyle.color
 
-      // 显示标签
-      visual.label.show = showLabel
-      visual.label.text =
-        selected && selectedLabelDetailTextRef.value
-          ? selectedLabelDetailTextRef.value
-          : visual.name
+      const useHtmlDetailLabel = selected && !!selectedLabelDetailTextRef.value
+      visual.label.show = showLabel && !useHtmlDetailLabel
+      visual.label.text = visual.name
+      visual.label.horizontalOrigin = Cesium.HorizontalOrigin.CENTER
       visual.label.fillColor = selected
         ? Cesium.Color.YELLOW
         : passHighlightInDeduction
