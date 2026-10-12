@@ -89,10 +89,13 @@
       <section class="analysis-section analysis-section--table">
         <div class="section-head">
           <span class="section-title">卫星打击推荐列表</span>
-          <span class="section-count">共 {{ strikeRecommendDisplayRows.length }} 颗 · 按综合威胁度降序</span>
+          <span class="section-count">
+            展示 {{ displayedSatelliteStrikeRecommendRows.length }} / 共 {{ strikeRecommendDisplayRows.length }} 颗 · 按综合威胁度降序
+          </span>
         </div>
 
-        <el-table v-loading="strikeRecommendLoading" :data="strikeRecommendDisplayRows" size="small" row-key="norad"
+        <el-table v-loading="strikeRecommendLoading" :data="displayedSatelliteStrikeRecommendRows" size="small"
+          row-key="norad"
           class="sat-metric-table strike-recommend-table" empty-text="暂无推荐数据">
           <el-table-column label="序号" width="48" align="center" class-name="strike-recommend-index-col">
             <template #default="{ $index }">
@@ -125,16 +128,28 @@
             </template>
           </el-table-column>
         </el-table>
+
+        <div v-if="strikeRecommendDisplayRows.length > SATELLITE_TABLE_TOP_COUNT" class="table-more-actions">
+          <button v-if="!showAllSatelliteStrikeRecommend" type="button" class="table-more-btn"
+            @click="showAllSatelliteStrikeRecommend = true">
+            查看更多（{{ strikeRecommendDisplayRows.length - SATELLITE_TABLE_TOP_COUNT }}）
+          </button>
+          <button v-else type="button" class="table-more-btn" @click="showAllSatelliteStrikeRecommend = false">
+            收起
+          </button>
+        </div>
       </section>
 
       <!-- 3b. 接收站打击推荐列表（接口未就绪，当前为假数据） -->
       <section class="analysis-section analysis-section--table">
         <div class="section-head">
           <span class="section-title">接收站打击推荐列表</span>
-          <span class="section-count">共 {{ receiveStrikeRecommendDisplayRows.length }} 个 · 按综合威胁度降序</span>
+          <span class="section-count">
+            展示 {{ displayedReceiveStrikeRecommendRows.length }} / 共 {{ receiveStrikeRecommendDisplayRows.length }} 个 · 按综合威胁度降序
+          </span>
         </div>
 
-        <el-table :data="receiveStrikeRecommendDisplayRows" size="small" row-key="targetKey"
+        <el-table :data="displayedReceiveStrikeRecommendRows" size="small" row-key="targetKey"
           class="sat-metric-table strike-recommend-table" empty-text="暂无推荐数据">
           <el-table-column label="序号" width="48" align="center" class-name="strike-recommend-index-col">
             <template #default="{ $index }">
@@ -167,6 +182,16 @@
             </template>
           </el-table-column>
         </el-table>
+
+        <div v-if="receiveStrikeRecommendDisplayRows.length > SATELLITE_TABLE_TOP_COUNT" class="table-more-actions">
+          <button v-if="!showAllReceiveStrikeRecommend" type="button" class="table-more-btn"
+            @click="showAllReceiveStrikeRecommend = true">
+            查看更多（{{ receiveStrikeRecommendDisplayRows.length - SATELLITE_TABLE_TOP_COUNT }}）
+          </button>
+          <button v-else type="button" class="table-more-btn" @click="showAllReceiveStrikeRecommend = false">
+            收起
+          </button>
+        </div>
       </section>
 
       <!-- 4. 卫星指标表格 -->
@@ -294,196 +319,6 @@
         </div>
       </section>
 
-      <!-- 4. 打击计划 -->
-      <section class="analysis-section analysis-section--table">
-        <div class="section-head">
-          <span class="section-title">打击计划</span>
-          <span class="section-count">
-            展示 {{ displayedAttackPlanTableRows.length }} / 共 {{ attackPlanTableRows.length }} 条
-          </span>
-        </div>
-
-        <div class="attack-plan-table-wrap">
-          <el-table :data="displayedAttackPlanTableRows" size="small" row-key="id"
-            class="sat-metric-table attack-plan-table" empty-text="暂无打击计划">
-            <el-table-column label="卫星/站" min-width="0" show-overflow-tooltip>
-              <template #default="{ row }">
-                <el-tooltip :content="row.targetType ? `${row.target}（${row.targetType}）` : row.target" placement="left"
-                  :show-after="200">
-                  <span class="plan-target-text">{{ row.target }}</span>
-                </el-tooltip>
-              </template>
-            </el-table-column>
-
-            <el-table-column label="武器" min-width="0" show-overflow-tooltip>
-              <template #default="{ row }">
-                <span v-if="row.weaponId" class="plan-weapon-text plan-weapon-text--clickable"
-                  :class="{ 'plan-weapon-text--selected': selectedWeaponId === row.weaponId }"
-                  @click="emit('select-weapon', row.weaponId)">
-                  {{ row.weaponName }}
-                </span>
-                <span v-else class="plan-weapon-text">{{ row.weaponName }}</span>
-              </template>
-            </el-table-column>
-
-            <el-table-column label="开始时间" min-width="0" sortable :sort-method="sortAttackPlanByBeginTime">
-              <template #default="{ row }">
-                <el-tooltip :content="row.beginTime" placement="top" :show-after="200">
-                  <div class="plan-time-text">
-                    <span class="plan-time-date">{{ getPlanTimeParts(row.beginTime).date }}</span>
-                    <span v-if="getPlanTimeParts(row.beginTime).time" class="plan-time-clock">
-                      {{ getPlanTimeParts(row.beginTime).time }}
-                    </span>
-                  </div>
-                </el-tooltip>
-              </template>
-            </el-table-column>
-
-            <el-table-column label="结束时间" min-width="0" sortable :sort-method="sortAttackPlanByEndTime">
-              <template #default="{ row }">
-                <el-tooltip :content="row.endTime" placement="top" :show-after="200">
-                  <div class="plan-time-text">
-                    <span class="plan-time-date">{{ getPlanTimeParts(row.endTime).date }}</span>
-                    <span v-if="getPlanTimeParts(row.endTime).time" class="plan-time-clock">
-                      {{ getPlanTimeParts(row.endTime).time }}
-                    </span>
-                  </div>
-                </el-tooltip>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-
-        <div v-if="attackPlanTableRows.length > ATTACK_PLAN_TOP_COUNT" class="table-more-actions">
-          <button v-if="!showAllAttackPlans" type="button" class="table-more-btn" @click="showAllAttackPlans = true">
-            查看更多（{{ attackPlanTableRows.length - ATTACK_PLAN_TOP_COUNT }}）
-          </button>
-          <button v-else type="button" class="table-more-btn" @click="showAllAttackPlans = false">
-            收起
-          </button>
-        </div>
-      </section>
-
-      <!-- 5. 通信链路 -->
-      <section class="analysis-section analysis-section--table">
-        <div class="section-head">
-          <span class="section-title">通信链路</span>
-          <span class="section-count">
-            展示 {{ displayedLinkChainTableRows.length }} / 共 {{ linkChainTableRows.length }} 条
-          </span>
-        </div>
-
-        <div class="link-chain-table-wrap">
-          <el-table :data="displayedLinkChainTableRows" size="small" row-key="id"
-            class="sat-metric-table link-chain-table" empty-text="暂无通信链路">
-            <el-table-column label="链路" min-width="0">
-              <template #default="{ row }">
-                <el-tooltip :content="row.chainText" placement="left" :show-after="200">
-                  <span class="link-chain-text" :class="{ 'link-chain-text--relay': row.hasRelay }">
-                    {{ row.chainText }}
-                  </span>
-                </el-tooltip>
-              </template>
-            </el-table-column>
-
-            <el-table-column label="开始时间" min-width="0" sortable :sort-method="sortLinkChainByBeginTime">
-              <template #default="{ row }">
-                <el-tooltip :content="row.beginTime" placement="top" :show-after="200">
-                  <div class="plan-time-text">
-                    <span class="plan-time-date">{{ getPlanTimeParts(row.beginTime).date }}</span>
-                    <span v-if="getPlanTimeParts(row.beginTime).time" class="plan-time-clock">
-                      {{ getPlanTimeParts(row.beginTime).time }}
-                    </span>
-                  </div>
-                </el-tooltip>
-              </template>
-            </el-table-column>
-
-            <el-table-column label="结束时间" min-width="0" sortable :sort-method="sortLinkChainByEndTime">
-              <template #default="{ row }">
-                <el-tooltip :content="row.endTime" placement="top" :show-after="200">
-                  <div class="plan-time-text">
-                    <span class="plan-time-date">{{ getPlanTimeParts(row.endTime).date }}</span>
-                    <span v-if="getPlanTimeParts(row.endTime).time" class="plan-time-clock">
-                      {{ getPlanTimeParts(row.endTime).time }}
-                    </span>
-                  </div>
-                </el-tooltip>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-
-        <div v-if="linkChainTableRows.length > LINK_CHAIN_TOP_COUNT" class="table-more-actions">
-          <button v-if="!showAllLinkChains" type="button" class="table-more-btn" @click="showAllLinkChains = true">
-            查看更多（{{ linkChainTableRows.length - LINK_CHAIN_TOP_COUNT }}）
-          </button>
-          <button v-else type="button" class="table-more-btn" @click="showAllLinkChains = false">
-            收起
-          </button>
-        </div>
-      </section>
-
-      <!-- 6. 接收站 -->
-      <section class="analysis-section analysis-section--table">
-        <div class="section-head">
-          <span class="section-title">接收站</span>
-          <span class="section-count">共 {{ receiveStationTableRows.length }} 个</span>
-        </div>
-
-        <el-table :data="receiveStationTableRows" size="small" row-key="key"
-          class="sat-metric-table ground-station-table" empty-text="暂无接收站数据">
-          <el-table-column label="名称" min-width="0" show-overflow-tooltip>
-            <template #default="{ row }">
-              <button type="button" class="ground-target-name"
-                :class="{
-                  'ground-target-name--struck': row.struck,
-                  'ground-target-name--selected': selectedGroundTargetKey === row.key,
-                }"
-                @click="emit('select-ground-target', row.key)">
-                {{ row.name }}
-              </button>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="64">
-            <template #default="{ row }">
-              <span :class="{ 'ground-target-status--struck': row.struck }">{{ row.statusText }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="经纬度" min-width="0" show-overflow-tooltip prop="latLonText" />
-          <el-table-column label="用途" min-width="0" show-overflow-tooltip prop="usage" />
-        </el-table>
-      </section>
-
-      <!-- 7. 数据中心 -->
-      <section class="analysis-section analysis-section--table">
-        <div class="section-head">
-          <span class="section-title">数据中心</span>
-          <span class="section-count">共 {{ dataCenterTableRows.length }} 个</span>
-        </div>
-
-        <el-table :data="dataCenterTableRows" size="small" row-key="key"
-          class="sat-metric-table ground-station-table" empty-text="暂无数据中心数据">
-          <el-table-column label="名称" min-width="0" show-overflow-tooltip>
-            <template #default="{ row }">
-              <button type="button" class="ground-target-name"
-                :class="{
-                  'ground-target-name--struck': row.struck,
-                  'ground-target-name--selected': selectedGroundTargetKey === row.key,
-                }"
-                @click="emit('select-ground-target', row.key)">
-                {{ row.name }}
-              </button>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="64">
-            <template #default="{ row }">
-              <span :class="{ 'ground-target-status--struck': row.struck }">{{ row.statusText }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="经纬度" min-width="0" show-overflow-tooltip prop="latLonText" />
-        </el-table>
-      </section>
     </div>
   </aside>
 
@@ -516,20 +351,6 @@ import SatelliteThreatInfoDialog from '@/components/BattleSituation/SatelliteThr
 import { levelSeriesEntityToMatrix } from '@/utils/seriesLinkTimeline'
 import { useLayoutStore } from '@/store/modules/layout'
 import {
-  ATTACK_PLAN_TOP_COUNT,
-  buildAttackPlanTableRows,
-  type AttackPlanTableRow,
-} from '@/utils/buildAttackPlanTable'
-import {
-  buildDataCenterTableRows,
-  buildReceiveStationTableRows,
-} from '@/utils/buildGroundStationTable'
-import {
-  buildLinkChainTableRows,
-  LINK_CHAIN_TOP_COUNT,
-  type LinkChainTableRow,
-} from '@/utils/buildLinkChainTable'
-import {
   buildSatelliteAnalysisTableRows,
   compareNullableMetric,
   formatSatelliteMetaInline,
@@ -556,9 +377,6 @@ import {
   parseFeedbackTimeAndLink,
   splitDateTimeDisplay,
 } from '@/utils/zhchPlanDisplay'
-
-/** 打击计划时间拆分为日期/时分秒两行展示 */
-const getPlanTimeParts = splitDateTimeDisplay
 
 /** 全局布局 Store（当前任务 ID） */
 const store = useLayoutStore()
@@ -883,7 +701,25 @@ const receiveStrikeRecommendDisplayRows = computed((): ReceiveStationStrikeRecom
 /** 推荐列表威胁度数值格式化（与卫星指标表一致） */
 const formatStrikeRecommendThreat = formatSatelliteThreat
 
-/** 是否展示全部卫星（默认仅展示综合排序前 10 条） */
+/** 是否展示全部卫星打击推荐（默认前 10 条） */
+const showAllSatelliteStrikeRecommend = ref(false)
+
+/** 是否展示全部接收站打击推荐（默认前 10 条） */
+const showAllReceiveStrikeRecommend = ref(false)
+
+/** 当前表格展示的卫星打击推荐行 */
+const displayedSatelliteStrikeRecommendRows = computed(() => {
+  if (showAllSatelliteStrikeRecommend.value) return strikeRecommendDisplayRows.value
+  return strikeRecommendDisplayRows.value.slice(0, SATELLITE_TABLE_TOP_COUNT)
+})
+
+/** 当前表格展示的接收站打击推荐行 */
+const displayedReceiveStrikeRecommendRows = computed(() => {
+  if (showAllReceiveStrikeRecommend.value) return receiveStrikeRecommendDisplayRows.value
+  return receiveStrikeRecommendDisplayRows.value.slice(0, SATELLITE_TABLE_TOP_COUNT)
+})
+
+/** 是否展示全部卫星指标（默认仅展示综合排序前 10 条） */
 const showAllSatellites = ref(false)
 
 /** 卫星指标表格全量行 */
@@ -969,8 +805,8 @@ watch(
   () => props.analysisData,
   () => {
     showAllSatellites.value = false
-    showAllAttackPlans.value = false
-    showAllLinkChains.value = false
+    showAllSatelliteStrikeRecommend.value = false
+    showAllReceiveStrikeRecommend.value = false
   }
 )
 
@@ -1009,51 +845,6 @@ const sortByDelayBefore = (a: SatelliteMetricTableRow, b: SatelliteMetricTableRo
 const sortByThreatBefore = (a: SatelliteMetricTableRow, b: SatelliteMetricTableRow) =>
   compareNullableMetric(a.threatBefore, b.threatBefore)
 
-/** 打击计划按开始时间排序 */
-const sortAttackPlanByBeginTime = (a: AttackPlanTableRow, b: AttackPlanTableRow) =>
-  compareNullableMetric(a.beginTimeMs, b.beginTimeMs)
-
-/** 打击计划按结束时间排序 */
-const sortAttackPlanByEndTime = (a: AttackPlanTableRow, b: AttackPlanTableRow) =>
-  compareNullableMetric(a.endTimeMs, b.endTimeMs)
-
-/** 通信链路按开始时间排序 */
-const sortLinkChainByBeginTime = (a: LinkChainTableRow, b: LinkChainTableRow) =>
-  compareNullableMetric(a.beginTimeMs, b.beginTimeMs)
-
-/** 通信链路按结束时间排序 */
-const sortLinkChainByEndTime = (a: LinkChainTableRow, b: LinkChainTableRow) =>
-  compareNullableMetric(a.endTimeMs, b.endTimeMs)
-
-/** 是否展示全部打击计划（默认仅展示前 10 条） */
-const showAllAttackPlans = ref(false)
-
-/** 打击计划表格全量行（按开始时间升序） */
-const attackPlanTableRows = computed(() => buildAttackPlanTableRows(props.analysisData))
-
-/** 接收站表格行 */
-const receiveStationTableRows = computed(() => buildReceiveStationTableRows(props.analysisData))
-
-/** 数据中心表格行 */
-const dataCenterTableRows = computed(() => buildDataCenterTableRows(props.analysisData))
-
-/** 当前表格展示的打击计划行 */
-const displayedAttackPlanTableRows = computed(() => {
-  if (showAllAttackPlans.value) return attackPlanTableRows.value
-  return attackPlanTableRows.value.slice(0, ATTACK_PLAN_TOP_COUNT)
-})
-
-/** 是否展示全部通信链路（默认仅展示前 10 条） */
-const showAllLinkChains = ref(false)
-
-/** 通信链路表格全量行（按开始时间升序） */
-const linkChainTableRows = computed(() => buildLinkChainTableRows(props.analysisData))
-
-/** 当前表格展示的通信链路行 */
-const displayedLinkChainTableRows = computed(() => {
-  if (showAllLinkChains.value) return linkChainTableRows.value
-  return linkChainTableRows.value.slice(0, LINK_CHAIN_TOP_COUNT)
-})
 </script>
 
 <style lang="scss" scoped>
@@ -1445,115 +1236,6 @@ const displayedLinkChainTableRows = computed(() => {
   }
 }
 
-.attack-plan-table-wrap {
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.attack-plan-table {
-  width: 100%;
-  max-width: 100%;
-
-  :deep(.atlas-app-table__inner-wrapper) {
-    overflow-x: hidden !important;
-  }
-
-  :deep(.atlas-app-table__header-wrapper),
-  :deep(.atlas-app-table__body-wrapper) {
-    overflow-x: hidden !important;
-  }
-
-  :deep(.atlas-app-scrollbar__wrap) {
-    overflow-x: hidden !important;
-  }
-
-  :deep(.atlas-app-scrollbar__bar.is-horizontal) {
-    display: none !important;
-  }
-
-  :deep(.atlas-app-table__body),
-  :deep(.atlas-app-table__header) {
-    width: 100% !important;
-    min-width: 0 !important;
-    table-layout: fixed;
-  }
-
-  :deep(.atlas-app-table__header colgroup col:nth-child(1)),
-  :deep(.atlas-app-table__body colgroup col:nth-child(1)) {
-    width: 35% !important;
-  }
-
-  :deep(.atlas-app-table__header colgroup col:nth-child(2)),
-  :deep(.atlas-app-table__body colgroup col:nth-child(2)) {
-    width: 15% !important;
-  }
-
-  :deep(.atlas-app-table__header colgroup col:nth-child(3)),
-  :deep(.atlas-app-table__body colgroup col:nth-child(3)),
-  :deep(.atlas-app-table__header colgroup col:nth-child(4)),
-  :deep(.atlas-app-table__body colgroup col:nth-child(4)) {
-    width: 25% !important;
-  }
-
-  :deep(col[name='gutter']) {
-    width: 0 !important;
-  }
-
-  :deep(td.atlas-app-table__cell) {
-    padding-top: 6px;
-    padding-bottom: 6px;
-    vertical-align: middle;
-  }
-
-  :deep(td.atlas-app-table__cell .cell) {
-    display: flex;
-    align-items: center;
-    min-height: 100%;
-  }
-}
-
-.plan-target-text {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  color: #4ade80;
-  word-break: break-all;
-  white-space: normal;
-  line-height: 1.35;
-  overflow: hidden;
-}
-
-.plan-weapon-text {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  color: #fbbf24;
-  word-break: break-all;
-  white-space: normal;
-  line-height: 1.35;
-  overflow: hidden;
-}
-
-.plan-weapon-text--clickable {
-  cursor: pointer;
-  transition: color 0.2s ease, text-shadow 0.2s ease;
-
-  &:hover {
-    color: #fde68a;
-    text-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
-  }
-}
-
-.plan-weapon-text--selected {
-  color: #f87171;
-  text-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
-}
-
-.ground-station-table {
-  width: 100%;
-}
-
 .ground-target-name {
   display: block;
   width: 100%;
@@ -1589,102 +1271,6 @@ const displayedLinkChainTableRows = computed(() => {
 .ground-target-status--struck {
   color: #f87171;
   font-weight: 700;
-}
-
-.plan-time-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  font-size: 10px;
-  color: #7dd3fc;
-  font-family: Consolas, 'Courier New', monospace;
-  line-height: 1.35;
-  overflow: hidden;
-  white-space: normal;
-}
-
-.plan-time-date,
-.plan-time-clock {
-  display: block;
-}
-
-.link-chain-table-wrap {
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.link-chain-table {
-  width: 100%;
-  max-width: 100%;
-
-  :deep(.atlas-app-table__inner-wrapper) {
-    overflow-x: hidden !important;
-  }
-
-  :deep(.atlas-app-table__header-wrapper),
-  :deep(.atlas-app-table__body-wrapper) {
-    overflow-x: hidden !important;
-  }
-
-  :deep(.atlas-app-scrollbar__wrap) {
-    overflow-x: hidden !important;
-  }
-
-  :deep(.atlas-app-scrollbar__bar.is-horizontal) {
-    display: none !important;
-  }
-
-  :deep(.atlas-app-table__body),
-  :deep(.atlas-app-table__header) {
-    width: 100% !important;
-    min-width: 0 !important;
-    table-layout: fixed;
-  }
-
-  :deep(.atlas-app-table__header colgroup col:nth-child(1)),
-  :deep(.atlas-app-table__body colgroup col:nth-child(1)) {
-    width: 46% !important;
-  }
-
-  :deep(.atlas-app-table__header colgroup col:nth-child(2)),
-  :deep(.atlas-app-table__body colgroup col:nth-child(2)),
-  :deep(.atlas-app-table__header colgroup col:nth-child(3)),
-  :deep(.atlas-app-table__body colgroup col:nth-child(3)) {
-    width: 27% !important;
-  }
-
-  :deep(col[name='gutter']) {
-    width: 0 !important;
-  }
-
-  :deep(td.atlas-app-table__cell) {
-    padding-top: 6px;
-    padding-bottom: 6px;
-    vertical-align: middle;
-  }
-
-  :deep(td.atlas-app-table__cell .cell) {
-    display: flex;
-    align-items: center;
-    min-height: 100%;
-  }
-}
-
-.link-chain-text {
-  display: block;
-  font-size: 10px;
-  font-weight: 600;
-  color: #7dd3fc;
-  word-break: break-all;
-  white-space: normal;
-  line-height: 1.4;
-  overflow: hidden;
-
-  &--relay {
-    color: #c4b5fd;
-  }
 }
 
 .feedback-kpi-grid {
