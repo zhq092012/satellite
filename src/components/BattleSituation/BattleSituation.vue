@@ -117,13 +117,12 @@ import { buildBattleGlobeWeapons } from '@/utils/buildBattleGlobeWeapons'
 import { buildBattleGlobeGroundTargets, buildGroundTargetKey, parseGroundTargetKey } from '@/utils/buildBattleGlobeGroundTargets'
 import type { TaskPanelResourceDetailPayload } from '@/utils/c2TaskPanelEditor'
 import {
-  formatGroundStationGlobeDetailLines,
-  formatSeriesGlobeDetailLines,
-  formatSatelliteGlobeDetailLines,
-  formatWeaponGlobeDetailLines,
+  resolveGlobeResourceDetailText,
+  type GlobeResourceDetailRequest,
 } from '@/utils/formatTaskPanelResourceDetail'
+import { useBattleGlobeResourceRecords } from '@/composables/useBattleGlobeResourceRecords'
 import { ElMessage } from 'element-plus'
-import { computed, nextTick, onActivated, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ArrowDown, ArrowUp, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
 import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
@@ -133,6 +132,8 @@ import BattleGlobeDeductionToast from '@/components/BattleSituation/BattleGlobeD
 import { taskProgressMap } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
+import type { BaseStationInfo } from '@/api/system/satellite-system-api'
+import type { Weapon } from '@/types/dashboard'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import { useSatelliteDeductionPlayback } from '@/composables/useSatelliteDeductionPlayback'
 import {
@@ -162,6 +163,14 @@ const selectedGroundTargetKey = ref<string | null>(null)
 
 /** 当前选中目标在地球 Label 上展示的详情（多行） */
 const selectedResourceDetailText = ref<string | null>(null)
+
+/** 武器/地面站库记录（右侧面板选中时与左侧详情字段对齐） */
+const { weaponRecordById, groundStationRecordById, ensureResourceRecordsLoaded } =
+  useBattleGlobeResourceRecords()
+
+onMounted(() => {
+  void ensureResourceRecordsLoaded()
+})
 
 /** 时间轴当前时刻（毫秒） */
 const currentTimeMs = ref(0)
@@ -486,6 +495,35 @@ const clearGlobeResourceDetail = () => {
 }
 
 /**
+ * 构建地图 Label 详情上下文（地球数据 + 库记录）。
+ */
+const buildGlobeResourceDetailContext = () => ({
+  satellites: globeSatellites.value,
+  weapons: globeWeapons.value,
+  groundTargets: globeGroundTargets.value,
+  weaponRecords: weaponRecordById.value,
+  groundRecords: groundStationRecordById.value,
+})
+
+/**
+ * 根据当前选中资源统一写入地球 Label 详情文案。
+ *
+ * @param request 资源类型与标识
+ */
+const applyGlobeResourceDetail = (request: GlobeResourceDetailRequest) => {
+  selectedResourceDetailText.value = resolveGlobeResourceDetailText(request, buildGlobeResourceDetailContext())
+}
+
+/** 库记录异步加载完成后，刷新当前选中武器/地面目标的 Label 详情 */
+watch([weaponRecordById, groundStationRecordById], () => {
+  if (selectedWeaponId.value) {
+    applyGlobeResourceDetail({ kind: 'weapon', weaponId: selectedWeaponId.value })
+  } else if (selectedGroundTargetKey.value) {
+    applyGlobeResourceDetail({ kind: 'ground', targetKey: selectedGroundTargetKey.value })
+  }
+})
+
+/**
  * 左侧面板资源详情：地图定位 + 目标 Label 展示当前已有字段。
  *
  * @param payload 资源类型、候选项及已加载的接口记录
@@ -501,8 +539,7 @@ const handleFocusResourceDetail = (payload: TaskPanelResourceDetailPayload) => {
       return
     }
     const anchor = inSeries[0]
-    selectedResourceDetailText.value = formatSeriesGlobeDetailLines(item.id, inSeries)
-    void handleSelectSatellite(anchor.norad)
+    void handleSelectSatellite(anchor.norad, { detailRequest: { kind: 'series', series: item.id } })
     return
   }
 
@@ -514,8 +551,7 @@ const handleFocusResourceDetail = (payload: TaskPanelResourceDetailPayload) => {
       )
       return
     }
-    handleSelectWeapon(fromGlobe.id)
-    selectedResourceDetailText.value = formatWeaponGlobeDetailLines(fromGlobe, weaponRecord ?? null)
+    handleSelectWeapon(fromGlobe.id, { weaponFallback: weaponRecord ?? null })
     return
   }
 
@@ -528,16 +564,16 @@ const handleFocusResourceDetail = (payload: TaskPanelResourceDetailPayload) => {
       )
       return
     }
-    handleSelectGroundTarget(buildGroundTargetKey(targetKind, fromGlobe.id))
-    selectedResourceDetailText.value = formatGroundStationGlobeDetailLines(
-      targetKind,
-      fromGlobe,
-      groundStation ?? null,
-    )
+    handleSelectGroundTarget(buildGroundTargetKey(targetKind, fromGlobe.id), {
+      groundFallback: groundStation ?? null,
+    })
   }
 }
 
-const handleSelectSatellite = async (norad: number | null) => {
+const handleSelectSatellite = async (
+  norad: number | null,
+  options?: { detailRequest?: GlobeResourceDetailRequest },
+) => {
   const previousNorad = selectedNorad.value
   const hadSelection = hasGlobeSelection()
 
@@ -547,6 +583,11 @@ const handleSelectSatellite = async (norad: number | null) => {
     await nextTick()
     selectedNorad.value = norad
     store.setSelectedAnalysisNorad(norad)
+    if (options?.detailRequest) {
+      applyGlobeResourceDetail(options.detailRequest)
+    } else if (norad != null) {
+      applyGlobeResourceDetail({ kind: 'satellite', norad })
+    }
     return
   }
 
@@ -554,11 +595,11 @@ const handleSelectSatellite = async (norad: number | null) => {
     handleSelectionPlayback(hadSelection, true)
     selectedWeaponId.value = null
     selectedGroundTargetKey.value = null
-    if (!selectedResourceDetailText.value) {
-      const sat = globeSatellites.value.find((s) => s.norad === norad)
-      if (sat) {
-        selectedResourceDetailText.value = formatSatelliteGlobeDetailLines(sat)
-      }
+    clearGlobeResourceDetail()
+    if (options?.detailRequest) {
+      applyGlobeResourceDetail(options.detailRequest)
+    } else {
+      applyGlobeResourceDetail({ kind: 'satellite', norad })
     }
   } else {
     clearGlobeResourceDetail()
@@ -573,22 +614,25 @@ const handleSelectSatellite = async (norad: number | null) => {
  *
  * @param weaponId 武器 ID
  */
-const handleSelectWeapon = (weaponId: string | null) => {
+const handleSelectWeapon = (
+  weaponId: string | null,
+  options?: { weaponFallback?: Weapon | null },
+) => {
   if (!weaponId) return
 
   const hadSelection = hasGlobeSelection()
   if (selectedWeaponId.value === weaponId) return
 
-  clearGlobeResourceDetail()
   handleSelectionPlayback(hadSelection, true)
   selectedNorad.value = null
   store.setSelectedAnalysisNorad(null)
   selectedGroundTargetKey.value = null
   selectedWeaponId.value = weaponId
-  const fromGlobe = globeWeapons.value.find((weapon) => weapon.id === weaponId)
-  if (fromGlobe) {
-    selectedResourceDetailText.value = formatWeaponGlobeDetailLines(fromGlobe, null)
-  }
+  applyGlobeResourceDetail({
+    kind: 'weapon',
+    weaponId,
+    weaponFallback: options?.weaponFallback ?? null,
+  })
 }
 
 /**
@@ -596,26 +640,25 @@ const handleSelectWeapon = (weaponId: string | null) => {
  *
  * @param targetKey 目标键 receive: / station:
  */
-const handleSelectGroundTarget = (targetKey: string | null) => {
+const handleSelectGroundTarget = (
+  targetKey: string | null,
+  options?: { groundFallback?: BaseStationInfo | null },
+) => {
   if (!targetKey) return
 
   const hadSelection = hasGlobeSelection()
   if (selectedGroundTargetKey.value === targetKey) return
 
-  clearGlobeResourceDetail()
   handleSelectionPlayback(hadSelection, true)
   selectedNorad.value = null
   store.setSelectedAnalysisNorad(null)
   selectedWeaponId.value = null
   selectedGroundTargetKey.value = targetKey
-  const parsed = parseGroundTargetKey(targetKey)
-  if (!parsed) return
-  const fromGlobe = globeGroundTargets.value.find(
-    (target) => target.kind === parsed.kind && target.id === parsed.id,
-  )
-  if (fromGlobe) {
-    selectedResourceDetailText.value = formatGroundStationGlobeDetailLines(parsed.kind, fromGlobe, null)
-  }
+  applyGlobeResourceDetail({
+    kind: 'ground',
+    targetKey,
+    groundFallback: options?.groundFallback ?? null,
+  })
 }
 
 /**
