@@ -7,45 +7,42 @@
       left: `${detailLabelScreen.left}px`,
       top: `${detailLabelScreen.top}px`,
     }">
-      <el-tooltip :content="detailLabelTooltipText" placement="top" :show-after="200"
-        popper-class="globe-entity-detail-label-tooltip">
-        <div v-if="hasSatelliteGridLabel && satelliteDetailView"
-          class="globe-entity-detail-label__inner globe-entity-detail-label__inner--grid">
-          <div class="globe-sat-detail__title">{{ satelliteDetailView.name }}</div>
-          <div v-if="satelliteDetailView.metaLine" class="globe-sat-detail__meta">{{ satelliteDetailView.metaLine }}
+      <div v-if="hasSatelliteGridLabel && satelliteDetailView"
+        class="globe-entity-detail-label__inner globe-entity-detail-label__inner--grid">
+        <div class="globe-sat-detail__title">{{ satelliteDetailView.name }}</div>
+        <div v-if="satelliteDetailView.metaLine" class="globe-sat-detail__meta">{{ satelliteDetailView.metaLine }}
+        </div>
+        <div class="globe-sat-detail__grid">
+          <div v-for="(cell, index) in satelliteDetailView.metricCells" :key="`${cell.label}-${index}`"
+            class="globe-sat-detail__cell">
+            <span class="globe-sat-detail__cell-label">{{ cell.label }}</span>
+            <span class="globe-sat-detail__cell-value">{{ cell.value }}</span>
           </div>
-          <div class="globe-sat-detail__grid">
-            <div v-for="(cell, index) in satelliteDetailView.metricCells" :key="`${cell.label}-${index}`"
-              class="globe-sat-detail__cell">
-              <span class="globe-sat-detail__cell-label">{{ cell.label }}</span>
-              <span class="globe-sat-detail__cell-value">{{ cell.value }}</span>
-            </div>
-            <div class="globe-sat-detail__cell globe-sat-detail__cell--full">
-              <span class="globe-sat-detail__cell-label">{{ satelliteDetailView.nextTransit.label }}</span>
-              <span class="globe-sat-detail__cell-value">{{ satelliteDetailView.nextTransit.value }}</span>
-            </div>
+          <div class="globe-sat-detail__cell globe-sat-detail__cell--full">
+            <span class="globe-sat-detail__cell-label">{{ satelliteDetailView.nextTransit.label }}</span>
+            <span class="globe-sat-detail__cell-value">{{ satelliteDetailView.nextTransit.value }}</span>
           </div>
         </div>
-        <div v-else-if="hasResourceGridPanel && resourceGridPanelView"
-          class="globe-entity-detail-label__inner globe-entity-detail-label__inner--grid">
-          <div class="globe-sat-detail__title">{{ resourceGridPanelView.name }}</div>
-          <div class="globe-sat-detail__grid">
-            <div v-for="(cell, index) in resourceGridPanelView.metricCells"
-              :key="`grid-${cell.label}-${index}`" class="globe-sat-detail__cell">
-              <span class="globe-sat-detail__cell-label">{{ cell.label }}</span>
-              <span class="globe-sat-detail__cell-value">{{ cell.value }}</span>
-            </div>
-            <div v-for="(cell, index) in resourceGridPanelView.fullWidthCells"
-              :key="`grid-full-${cell.label}-${index}`" class="globe-sat-detail__cell globe-sat-detail__cell--full">
-              <span class="globe-sat-detail__cell-label">{{ cell.label }}</span>
-              <span class="globe-sat-detail__cell-value">{{ cell.value }}</span>
-            </div>
+      </div>
+      <div v-else-if="hasResourceGridPanel && resourceGridPanelView"
+        class="globe-entity-detail-label__inner globe-entity-detail-label__inner--grid">
+        <div class="globe-sat-detail__title">{{ resourceGridPanelView.name }}</div>
+        <div class="globe-sat-detail__grid">
+          <div v-for="(cell, index) in resourceGridPanelView.metricCells" :key="`grid-${cell.label}-${index}`"
+            class="globe-sat-detail__cell">
+            <span class="globe-sat-detail__cell-label">{{ cell.label }}</span>
+            <span class="globe-sat-detail__cell-value">{{ cell.value }}</span>
+          </div>
+          <div v-for="(cell, index) in resourceGridPanelView.fullWidthCells"
+            :key="`grid-full-${cell.label}-${index}`" class="globe-sat-detail__cell globe-sat-detail__cell--full">
+            <span class="globe-sat-detail__cell-label">{{ cell.label }}</span>
+            <span class="globe-sat-detail__cell-value">{{ cell.value }}</span>
           </div>
         </div>
-        <div v-else-if="detailLabelPresentation" class="globe-entity-detail-label__inner">
-          {{ detailLabelPresentation.displayText }}
-        </div>
-      </el-tooltip>
+      </div>
+      <div v-else-if="plainDetailLabelText" class="globe-entity-detail-label__inner globe-entity-detail-label__inner--plain">
+        {{ plainDetailLabelText }}
+      </div>
     </div>
   </div>
 </template>
@@ -61,10 +58,6 @@ import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
 import type { BattleGlobeGroundTarget } from '@/utils/buildBattleGlobeGroundTargets'
 import { mergeDeductionPassGroundTargets, parseGroundTargetKey } from '@/utils/buildBattleGlobeGroundTargets'
-import {
-  buildGlobeDetailLabelDisplay,
-  GLOBE_DETAIL_LABEL_MAX_WIDTH_PX,
-} from '@/utils/globeDetailLabelDisplay'
 import type {
   GlobeGroundDetailLabelViewModel,
   GlobeResourceGridDetailViewModel,
@@ -173,26 +166,17 @@ const hasResourceGridLabel = computed(
   () => hasSatelliteGridLabel.value || hasResourceGridPanel.value,
 )
 
-/** 详情 Label 展示（约 300px 宽、行内 …） */
-const detailLabelPresentation = computed(() => {
+/** 无 Grid 时的纯文本详情（系列等；完整展示、不截断） */
+const plainDetailLabelText = computed(() => {
   if (hasResourceGridLabel.value) return null
-  const full = selectedResourceDetailText.value
-  if (!full?.trim()) return null
-  return buildGlobeDetailLabelDisplay(full, GLOBE_DETAIL_LABEL_MAX_WIDTH_PX)
+  const full = selectedResourceDetailText.value?.trim()
+  return full || null
 })
 
 /** 是否显示 HTML 详情浮层 */
 const showEntityDetailLabel = computed(
-  () => hasResourceGridLabel.value || Boolean(detailLabelPresentation.value),
+  () => hasResourceGridLabel.value || Boolean(plainDetailLabelText.value),
 )
-
-/** Tooltip 全文 */
-const detailLabelTooltipText = computed(() => {
-  if (hasResourceGridLabel.value) {
-    return selectedResourceDetailText.value?.trim() || ''
-  }
-  return detailLabelPresentation.value?.fullText ?? ''
-})
 
 /** 详情 HTML Label 屏幕坐标（跟随选中目标） */
 const detailLabelScreen = ref<{ left: number; top: number } | null>(null)
@@ -770,7 +754,7 @@ watch(
   () =>
     [
       viewerRef.value,
-      detailLabelPresentation.value?.fullText,
+      selectedResourceDetailText.value,
       props.selectedSatelliteDetailView,
       props.selectedGroundDetailView,
       props.selectedWeaponDetailView,
@@ -816,21 +800,17 @@ onBeforeUnmount(() => {
   z-index: 6;
   pointer-events: auto;
   transform: translate(8px, calc(-100% - 16px));
-  max-width: 300px;
+  max-width: min(420px, 42vw);
 
   &--satellite-metrics {
-    max-width: 380px;
+    max-width: min(420px, 42vw);
   }
 }
 
 .globe-entity-detail-label__inner {
   box-sizing: border-box;
-  max-width: 300px;
   padding: 6px 8px;
   text-align: left;
-  white-space: pre-line;
-  word-break: break-all;
-  overflow: hidden;
   font-size: 12px;
   font-weight: 600;
   line-height: 1.45;
@@ -840,16 +820,20 @@ onBeforeUnmount(() => {
   cursor: default;
 }
 
-.globe-entity-detail-label--satellite-metrics .globe-entity-detail-label__inner {
-  max-width: 380px;
+.globe-entity-detail-label__inner--plain {
+  max-width: min(420px, 42vw);
+  white-space: pre-line;
+  word-break: break-word;
+  overflow: visible;
 }
 
 .globe-entity-detail-label__inner--grid {
-  min-width: 320px;
-  max-width: 380px;
+  width: max-content;
+  max-width: min(420px, 42vw);
   padding: 8px 10px;
   white-space: normal;
   word-break: normal;
+  overflow: visible;
 }
 
 .globe-sat-detail__title {
@@ -900,18 +884,10 @@ onBeforeUnmount(() => {
 .globe-sat-detail__cell-value {
   font-size: 12px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.35;
   color: #f8fafc;
   word-break: break-word;
-}
-</style>
-
-<style lang="scss">
-.globe-entity-detail-label-tooltip {
-  max-width: 360px !important;
-  white-space: pre-line !important;
-  word-break: break-word;
-  text-align: left;
-  line-height: 1.45;
+  overflow-wrap: anywhere;
+  max-width: 100%;
 }
 </style>
