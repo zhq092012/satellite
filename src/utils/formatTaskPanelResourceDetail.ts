@@ -99,12 +99,60 @@ const formatLatLonHemisphere = (deg: number, positiveHem: string, negativeHem: s
   return `${abs.toFixed(2)}° ${hem}`
 }
 
-/** 卫星 Label 网格中的单个指标项 */
+/** 地图资源 Label 网格中的单个指标项 */
 export interface GlobeSatelliteDetailMetricCell {
   /** 指标名称（如「轨道高度」） */
   label: string
   /** 展示值（如「599 km」） */
   value: string
+}
+
+/** 地面站 / 武器等 HTML 浮层 Label 通用 Grid 视图（2 列 + 可选整行） */
+export interface GlobeResourceGridDetailViewModel {
+  /** 目标名称 */
+  name: string
+  /** 常规字段（2 列排列） */
+  metricCells: GlobeSatelliteDetailMetricCell[]
+  /** 长文本字段（简介、适用卫星等，占满一行） */
+  fullWidthCells: GlobeSatelliteDetailMetricCell[]
+}
+
+/** 地面站 / 数据中心 Grid 视图 */
+export type GlobeGroundDetailLabelViewModel = GlobeResourceGridDetailViewModel
+
+/** 武器 Grid 视图 */
+export type GlobeWeaponDetailLabelViewModel = GlobeResourceGridDetailViewModel
+
+/**
+ * 向指标列表追加非空单元格。
+ *
+ * @param cells 目标列表
+ * @param label 标签
+ * @param value 值
+ */
+const pushGlobeDetailMetricCell = (
+  cells: GlobeSatelliteDetailMetricCell[],
+  label: string,
+  value?: string | null,
+): void => {
+  const trimmed = value == null ? '' : String(value).trim()
+  if (!trimmed) return
+  cells.push({ label, value: trimmed })
+}
+
+/**
+ * Grid 视图转为 Tooltip 纯文本。
+ *
+ * @param view 结构化视图
+ * @returns 多行文案
+ */
+export const formatResourceGridDetailTooltipText = (view: GlobeResourceGridDetailViewModel): string => {
+  const lines = [
+    view.name,
+    ...view.metricCells.map((cell) => `${cell.label}：${cell.value}`),
+    ...view.fullWidthCells.map((cell) => `${cell.label}：${cell.value}`),
+  ]
+  return joinGlobeLabelDetailLines(lines)
 }
 
 /** 卫星 HTML 浮层 Label 结构化视图（2 列 Grid） */
@@ -189,7 +237,46 @@ export const formatSatelliteGlobeDetailLines = (
 }
 
 /**
- * 武器详情（优先地球渲染数据，否则用武器库接口记录）。
+ * 构建武器 Grid Label 视图（地图浮层用）。
+ *
+ * @param globe 地图上武器
+ * @param fallback 武器库接口记录
+ * @returns 结构化视图
+ */
+export const buildWeaponGlobeDetailViewModel = (
+  globe?: BattleGlobeWeapon | null,
+  fallback?: Weapon | null,
+): GlobeWeaponDetailLabelViewModel => {
+  const name = globe?.name || fallback?.name || '武器'
+  const type = globe?.type || fallback?.type
+  const country = globe?.country || fallback?.country
+  const lon = globe?.longitude ?? fallback?.longitude
+  const lat = globe?.latitude ?? fallback?.latitude
+  const range = fallback?.range
+  const interval = fallback?.interval
+  const satelliteType = fallback?.satellite_type
+  const hasCoords = Number.isFinite(Number(lon)) && Number.isFinite(Number(lat))
+
+  const metricCells: GlobeSatelliteDetailMetricCell[] = []
+  pushGlobeDetailMetricCell(metricCells, '类型', type)
+  pushGlobeDetailMetricCell(metricCells, '国家/地区', country)
+  if (hasCoords) {
+    pushGlobeDetailMetricCell(metricCells, '经度', `${Number(lon).toFixed(4)}°`)
+    pushGlobeDetailMetricCell(metricCells, '纬度', `${Number(lat).toFixed(4)}°`)
+  }
+  if (range != null && Number.isFinite(Number(range))) {
+    pushGlobeDetailMetricCell(metricCells, '射程/高度', `${range} km`)
+  }
+  pushGlobeDetailMetricCell(metricCells, '打击间隔', interval ? `${interval} 分钟` : null)
+
+  const fullWidthCells: GlobeSatelliteDetailMetricCell[] = []
+  pushGlobeDetailMetricCell(fullWidthCells, '适用卫星', satelliteType)
+
+  return { name, metricCells, fullWidthCells }
+}
+
+/**
+ * 武器详情（Grid 视图对应的 Tooltip 文案）。
  *
  * @param globe 地图上武器
  * @param fallback 武器库接口记录
@@ -198,32 +285,65 @@ export const formatSatelliteGlobeDetailLines = (
 export const formatWeaponGlobeDetailLines = (
   globe?: BattleGlobeWeapon | null,
   fallback?: Weapon | null,
-): string => {
-  const name = globe?.name || fallback?.name
-  const type = globe?.type || fallback?.type
-  const country = globe?.country || fallback?.country
-  const lon = globe?.longitude ?? fallback?.longitude
-  const lat = globe?.latitude ?? fallback?.latitude
-  const range = fallback?.range
-  const interval = fallback?.interval
-  const satelliteType = fallback?.satellite_type
-  const coordLine =
-    Number.isFinite(lon) && Number.isFinite(lat)
-      ? `经度：${Number(lon).toFixed(4)}°  纬度：${Number(lat).toFixed(4)}°`
-      : ''
-  return joinGlobeLabelDetailLines([
-    name || '',
-    type ? `类型：${type}` : '',
-    country ? `国家/地区：${country}` : '',
-    coordLine,
-    range != null && Number.isFinite(Number(range)) ? `射程/高度：${range} km` : '',
-    interval ? `打击间隔：${interval} 分钟` : '',
-    satelliteType ? `适用卫星：${satelliteType}` : '',
-  ])
+): string =>
+  formatResourceGridDetailTooltipText(buildWeaponGlobeDetailViewModel(globe, fallback))
+
+/**
+ * 构建地面站 / 数据中心 Grid Label 视图（地图浮层用）。
+ *
+ * @param kind 接收站或数据中心
+ * @param globe 地图目标
+ * @param fallback 基站库记录
+ * @returns 结构化视图
+ */
+export const buildGroundStationGlobeDetailViewModel = (
+  kind: 'receive' | 'station',
+  globe?: BattleGlobeGroundTarget | null,
+  fallback?: BaseStationInfo | null,
+): GlobeGroundDetailLabelViewModel => {
+  const kindLabel = kind === 'station' ? '数据中心' : '地面接收站'
+  const name = globe?.name || fallback?.name || kindLabel
+  const usage = globe?.usage || fallback?.function
+  const country = fallback?.country
+  const location = fallback?.location
+  const latLon = fallback?.latLon
+  const intro = fallback?.introduction
+  const lon = globe?.longitude
+  const lat = globe?.latitude
+  const status =
+    globe?.status === 1 ? '被打击' : globe?.status === 0 ? '正常' : undefined
+  const hasGlobeCoords = Number.isFinite(lon) && Number.isFinite(lat)
+
+  const metricCells: GlobeSatelliteDetailMetricCell[] = []
+  pushGlobeDetailMetricCell(metricCells, '类别', kindLabel)
+  pushGlobeDetailMetricCell(metricCells, '国家/地区', country)
+  pushGlobeDetailMetricCell(metricCells, '用途', usage)
+  pushGlobeDetailMetricCell(metricCells, '位置', location)
+  if (hasGlobeCoords) {
+    pushGlobeDetailMetricCell(metricCells, '经度', `${Number(lon).toFixed(4)}°`)
+    pushGlobeDetailMetricCell(metricCells, '纬度', `${Number(lat).toFixed(4)}°`)
+  } else {
+    pushGlobeDetailMetricCell(metricCells, '坐标', latLon)
+  }
+  pushGlobeDetailMetricCell(metricCells, '状态', status)
+
+  const fullWidthCells: GlobeSatelliteDetailMetricCell[] = []
+  pushGlobeDetailMetricCell(fullWidthCells, '简介', intro)
+
+  return { name, metricCells, fullWidthCells }
 }
 
 /**
- * 地面站 / 数据中心详情（优先任务分析中的坐标，否则用基站库记录）。
+ * 地面站 / 数据中心 Grid 视图转为 Tooltip 纯文本。
+ *
+ * @param view 结构化视图
+ * @returns 多行文案
+ */
+/** @deprecated 使用 {@link formatResourceGridDetailTooltipText} */
+export const formatGroundGlobeDetailTooltipText = formatResourceGridDetailTooltipText
+
+/**
+ * 地面站 / 数据中心详情（优先 Grid 视图对应的 Tooltip 文案）。
  *
  * @param kind 接收站或数据中心
  * @param globe 地图目标
@@ -234,37 +354,7 @@ export const formatGroundStationGlobeDetailLines = (
   kind: 'receive' | 'station',
   globe?: BattleGlobeGroundTarget | null,
   fallback?: BaseStationInfo | null,
-): string => {
-  const kindLabel = kind === 'station' ? '数据中心' : '地面接收站'
-  const name = globe?.name || fallback?.name
-  const usage = globe?.usage || fallback?.function
-  const country = fallback?.country
-  const type = fallback?.type
-  const location = fallback?.location
-  const latLon = fallback?.latLon
-  const intro = fallback?.introduction
-  const lon = globe?.longitude
-  const lat = globe?.latitude
-  const status =
-    globe?.status === 1 ? '被打击' : globe?.status === 0 ? '正常' : undefined
-  const hasGlobeCoords = Number.isFinite(lon) && Number.isFinite(lat)
-  const coordLine = hasGlobeCoords
-    ? `经度：${Number(lon).toFixed(4)}°  纬度：${Number(lat).toFixed(4)}°`
-    : ''
-  const typeLine = type && type.trim() !== kindLabel ? `类型：${type}` : ''
-  return joinGlobeLabelDetailLines([
-    name || kindLabel,
-    `类别：${kindLabel}`,
-    typeLine,
-    country ? `国家/地区：${country}` : '',
-    usage ? `用途：${usage}` : '',
-    location ? `位置：${location}` : '',
-    !hasGlobeCoords && latLon ? `坐标：${latLon}` : '',
-    coordLine,
-    status ? `状态：${status}` : '',
-    intro ? `简介：${intro}` : '',
-  ])
-}
+): string => formatGroundGlobeDetailTooltipText(buildGroundStationGlobeDetailViewModel(kind, globe, fallback))
 
 /**
  * 按选中来源统一生成地图 Label 详情（左右面板、系列详情共用）。

@@ -2,7 +2,7 @@
   <div ref="cesiumContainer" class="battle-globe-layer">
     <div ref="creditEl" class="credit"></div>
     <div v-if="showEntityDetailLabel && detailLabelScreen" class="globe-entity-detail-label"
-      :class="{ 'globe-entity-detail-label--satellite-metrics': hasSatelliteGridLabel }"
+      :class="{ 'globe-entity-detail-label--satellite-metrics': hasResourceGridLabel }"
       :style="{
       left: `${detailLabelScreen.left}px`,
       top: `${detailLabelScreen.top}px`,
@@ -23,6 +23,22 @@
             <div class="globe-sat-detail__cell globe-sat-detail__cell--full">
               <span class="globe-sat-detail__cell-label">{{ satelliteDetailView.nextTransit.label }}</span>
               <span class="globe-sat-detail__cell-value">{{ satelliteDetailView.nextTransit.value }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="hasResourceGridPanel && resourceGridPanelView"
+          class="globe-entity-detail-label__inner globe-entity-detail-label__inner--grid">
+          <div class="globe-sat-detail__title">{{ resourceGridPanelView.name }}</div>
+          <div class="globe-sat-detail__grid">
+            <div v-for="(cell, index) in resourceGridPanelView.metricCells"
+              :key="`grid-${cell.label}-${index}`" class="globe-sat-detail__cell">
+              <span class="globe-sat-detail__cell-label">{{ cell.label }}</span>
+              <span class="globe-sat-detail__cell-value">{{ cell.value }}</span>
+            </div>
+            <div v-for="(cell, index) in resourceGridPanelView.fullWidthCells"
+              :key="`grid-full-${cell.label}-${index}`" class="globe-sat-detail__cell globe-sat-detail__cell--full">
+              <span class="globe-sat-detail__cell-label">{{ cell.label }}</span>
+              <span class="globe-sat-detail__cell-value">{{ cell.value }}</span>
             </div>
           </div>
         </div>
@@ -49,7 +65,12 @@ import {
   buildGlobeDetailLabelDisplay,
   GLOBE_DETAIL_LABEL_MAX_WIDTH_PX,
 } from '@/utils/globeDetailLabelDisplay'
-import type { GlobeSatelliteDetailLabelViewModel } from '@/utils/formatTaskPanelResourceDetail'
+import type {
+  GlobeGroundDetailLabelViewModel,
+  GlobeResourceGridDetailViewModel,
+  GlobeSatelliteDetailLabelViewModel,
+  GlobeWeaponDetailLabelViewModel,
+} from '@/utils/formatTaskPanelResourceDetail'
 import { useBattleGlobeGroundTargets } from '@/composables/useBattleGlobeGroundTargets'
 import { useBattleGlobeDeductionEffects } from '@/composables/useBattleGlobeDeductionEffects'
 import { useBattleGlobeTimelineSelectedOrbit } from '@/composables/useBattleGlobeTimelineSelectedOrbit'
@@ -94,6 +115,10 @@ const props = withDefaults(
     selectedResourceDetailText?: string | null
     /** 选中卫星时的 Grid Label 视图 */
     selectedSatelliteDetailView?: GlobeSatelliteDetailLabelViewModel | null
+    /** 选中地面站 / 数据中心时的 Grid Label 视图 */
+    selectedGroundDetailView?: GlobeGroundDetailLabelViewModel | null
+    /** 选中武器时的 Grid Label 视图 */
+    selectedWeaponDetailView?: GlobeWeaponDetailLabelViewModel | null
   }>(),
   {
     satellites: () => [],
@@ -112,6 +137,8 @@ const props = withDefaults(
     deductionVisualPlan: null,
     selectedResourceDetailText: null,
     selectedSatelliteDetailView: null,
+    selectedGroundDetailView: null,
+    selectedWeaponDetailView: null,
   }
 )
 
@@ -121,12 +148,34 @@ const selectedResourceDetailText = computed(() => props.selectedResourceDetailTe
 /** 选中卫星 Grid 视图 */
 const satelliteDetailView = computed(() => props.selectedSatelliteDetailView ?? null)
 
+/** 选中地面目标 Grid 视图 */
+const groundDetailView = computed(() => props.selectedGroundDetailView ?? null)
+
+/** 选中武器 Grid 视图 */
+const weaponDetailView = computed(() => props.selectedWeaponDetailView ?? null)
+
 /** 是否使用卫星指标 Grid 浮层 */
 const hasSatelliteGridLabel = computed(() => Boolean(satelliteDetailView.value?.metricCells.length))
 
+/** 地面站 / 武器通用 Grid 面板（卫星单独模板） */
+const resourceGridPanelView = computed((): GlobeResourceGridDetailViewModel | null => {
+  const ground = groundDetailView.value
+  if (ground?.metricCells.length) return ground
+  const weapon = weaponDetailView.value
+  if (weapon?.metricCells.length) return weapon
+  return null
+})
+
+const hasResourceGridPanel = computed(() => resourceGridPanelView.value != null)
+
+/** 卫星 / 地面 / 武器 Grid 浮层（加宽样式） */
+const hasResourceGridLabel = computed(
+  () => hasSatelliteGridLabel.value || hasResourceGridPanel.value,
+)
+
 /** 详情 Label 展示（约 300px 宽、行内 …） */
 const detailLabelPresentation = computed(() => {
-  if (hasSatelliteGridLabel.value) return null
+  if (hasResourceGridLabel.value) return null
   const full = selectedResourceDetailText.value
   if (!full?.trim()) return null
   return buildGlobeDetailLabelDisplay(full, GLOBE_DETAIL_LABEL_MAX_WIDTH_PX)
@@ -134,13 +183,13 @@ const detailLabelPresentation = computed(() => {
 
 /** 是否显示 HTML 详情浮层 */
 const showEntityDetailLabel = computed(
-  () => hasSatelliteGridLabel.value || Boolean(detailLabelPresentation.value),
+  () => hasResourceGridLabel.value || Boolean(detailLabelPresentation.value),
 )
 
 /** Tooltip 全文 */
 const detailLabelTooltipText = computed(() => {
-  if (hasSatelliteGridLabel.value && satelliteDetailView.value) {
-    return selectedResourceDetailText.value?.trim() || satelliteDetailView.value.name
+  if (hasResourceGridLabel.value) {
+    return selectedResourceDetailText.value?.trim() || ''
   }
   return detailLabelPresentation.value?.fullText ?? ''
 })
@@ -723,6 +772,8 @@ watch(
       viewerRef.value,
       detailLabelPresentation.value?.fullText,
       props.selectedSatelliteDetailView,
+      props.selectedGroundDetailView,
+      props.selectedWeaponDetailView,
       props.selectedNorad,
       props.selectedWeaponId,
       props.selectedGroundTargetKey,

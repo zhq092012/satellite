@@ -7,6 +7,8 @@
         :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
         :selected-resource-detail-text="selectedResourceDetailText"
         :selected-satellite-detail-view="selectedSatelliteDetailView"
+        :selected-ground-detail-view="selectedGroundDetailView"
+        :selected-weapon-detail-view="selectedWeaponDetailView"
         :task-start-ms="taskStartMs" :task-end-ms="taskEndMs"         :follow-selected-satellite="!isDeductionPlaying"
         :follow-deduction-satellite="followDeductionSatellite"
         :is-deduction-playing="isDeductionPlaying" :is-timeline-playing="isTimelinePlaying"
@@ -118,12 +120,17 @@ import { buildBattleGlobeWeapons } from '@/utils/buildBattleGlobeWeapons'
 import { buildBattleGlobeGroundTargets, buildGroundTargetKey, parseGroundTargetKey } from '@/utils/buildBattleGlobeGroundTargets'
 import type { TaskPanelResourceDetailPayload } from '@/utils/c2TaskPanelEditor'
 import {
+  buildGroundStationGlobeDetailViewModel,
   buildSatelliteGlobeDetailViewModel,
+  buildWeaponGlobeDetailViewModel,
+  formatResourceGridDetailTooltipText,
   formatSatelliteGlobeDetailLines,
   formatSatelliteGlobeDetailTooltipText,
   resolveGlobeResourceDetailText,
+  type GlobeGroundDetailLabelViewModel,
   type GlobeResourceDetailRequest,
   type GlobeSatelliteDetailLabelViewModel,
+  type GlobeWeaponDetailLabelViewModel,
 } from '@/utils/formatTaskPanelResourceDetail'
 import { useBattleGlobeResourceRecords } from '@/composables/useBattleGlobeResourceRecords'
 import { useSatelliteGlobeLabelMetricsPrecompute } from '@/composables/useSatelliteGlobeLabelMetricsPrecompute'
@@ -172,6 +179,12 @@ const selectedResourceDetailText = ref<string | null>(null)
 
 /** 选中卫星时的 Grid Label 视图（轨道指标两列布局） */
 const selectedSatelliteDetailView = ref<GlobeSatelliteDetailLabelViewModel | null>(null)
+
+/** 选中地面站 / 数据中心时的 Grid Label 视图 */
+const selectedGroundDetailView = ref<GlobeGroundDetailLabelViewModel | null>(null)
+
+/** 选中武器时的 Grid Label 视图 */
+const selectedWeaponDetailView = ref<GlobeWeaponDetailLabelViewModel | null>(null)
 
 /** 武器/地面站库记录（右侧面板选中时与左侧详情字段对齐） */
 const { weaponRecordById, groundStationRecordById, ensureResourceRecordsLoaded } =
@@ -514,6 +527,8 @@ const handleSelectionPlayback = (hadSelection: boolean, hasNewSelection: boolean
 const clearGlobeResourceDetail = () => {
   selectedResourceDetailText.value = null
   selectedSatelliteDetailView.value = null
+  selectedGroundDetailView.value = null
+  selectedWeaponDetailView.value = null
 }
 
 /**
@@ -543,16 +558,65 @@ const applyGlobeResourceDetail = (request: GlobeResourceDetailRequest) => {
     if (!sat) {
       selectedResourceDetailText.value = null
       selectedSatelliteDetailView.value = null
+      selectedGroundDetailView.value = null
+      selectedWeaponDetailView.value = null
       return
     }
     const viewModel = buildSatelliteGlobeDetailViewModel(sat, ctx.satelliteLabelMetrics)
     selectedSatelliteDetailView.value = viewModel
+    selectedGroundDetailView.value = null
+    selectedWeaponDetailView.value = null
     selectedResourceDetailText.value = viewModel
       ? formatSatelliteGlobeDetailTooltipText(viewModel)
       : formatSatelliteGlobeDetailLines(sat)
     return
   }
+  if (request.kind === 'weapon') {
+    selectedSatelliteDetailView.value = null
+    selectedGroundDetailView.value = null
+    const fromGlobe = ctx.weapons.find((item) => item.id === request.weaponId)
+    const fallback = request.weaponFallback ?? ctx.weaponRecords.get(request.weaponId) ?? null
+    if (!fromGlobe && !fallback) {
+      selectedResourceDetailText.value = null
+      selectedWeaponDetailView.value = null
+      return
+    }
+    const weaponView = buildWeaponGlobeDetailViewModel(fromGlobe ?? null, fallback)
+    selectedWeaponDetailView.value = weaponView
+    selectedResourceDetailText.value = formatResourceGridDetailTooltipText(weaponView)
+    return
+  }
+  if (request.kind === 'ground') {
+    selectedSatelliteDetailView.value = null
+    selectedWeaponDetailView.value = null
+    const parsed = parseGroundTargetKey(request.targetKey)
+    if (!parsed) {
+      selectedResourceDetailText.value = null
+      selectedGroundDetailView.value = null
+      return
+    }
+    const fromGlobe = ctx.groundTargets.find(
+      (target) => target.kind === parsed.kind && target.id === parsed.id,
+    )
+    const fallback =
+      request.groundFallback ?? ctx.groundRecords.get(parsed.id) ?? null
+    if (!fromGlobe && !fallback) {
+      selectedResourceDetailText.value = null
+      selectedGroundDetailView.value = null
+      return
+    }
+    const groundView = buildGroundStationGlobeDetailViewModel(
+      parsed.kind,
+      fromGlobe ?? null,
+      fallback,
+    )
+    selectedGroundDetailView.value = groundView
+    selectedResourceDetailText.value = formatResourceGridDetailTooltipText(groundView)
+    return
+  }
   selectedSatelliteDetailView.value = null
+  selectedGroundDetailView.value = null
+  selectedWeaponDetailView.value = null
   selectedResourceDetailText.value = resolveGlobeResourceDetailText(request, ctx)
 }
 
