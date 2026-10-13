@@ -679,8 +679,8 @@ const handleTimelineMarkerClick = (payload: {
   updateGraphHighlightState()
 }
 
-// 卫星系列列表（来自当前综合打击方案）
-const seriesOptions = computed<string[]>(() => store.zhchPlanSeriesList)
+/** 卫星系列列表（当前任务已装配系列，与整体态势左侧面板一致） */
+const seriesOptions = computed<string[]>(() => store.taskSelectedSeriesList)
 
 const selectedSeries = computed({
   get: () => store.selectedSatSeries,
@@ -747,17 +747,13 @@ watch(selectedTimelinePoint, () => {
   updateGraphHighlightState()
 })
 
-watch(seriesOptions, (options) => {
-  if (!options.length) {
-    if (store.selectedSatSeries) {
-      store.setSelectedSatSeries('')
-    }
-    return
-  }
-  if (store.selectedSatSeries && !options.includes(store.selectedSatSeries)) {
-    store.setSelectedSatSeries('')
-  }
-})
+watch(
+  seriesOptions,
+  (options) => {
+    store.resolveSelectedSatSeriesForTaskOptions(options)
+  },
+  { immediate: true },
+)
 
 // [变量用途]
 // 后端算法接口返回的矩阵数据对象

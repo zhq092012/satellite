@@ -650,8 +650,8 @@ const currentData = computed<MatrixResult | null>(() => {
   return props.matrixData || store.matrixData || internalMatrixData.value
 })
 
-/** 卫星系列列表（来自当前综合打击方案） */
-const seriesOptions = computed<string[]>(() => store.zhchPlanSeriesList)
+/** 卫星系列列表（当前任务已装配系列，与整体态势左侧面板一致） */
+const seriesOptions = computed<string[]>(() => store.taskSelectedSeriesList)
 
 /** 与 Store 双向绑定的当前卫星系列 */
 const selectedSeries = computed({
@@ -771,19 +771,20 @@ watch(
   }
 )
 
-watch(seriesOptions, (options) => {
-  if (!options.length) {
-    if (store.selectedSatSeries) {
-      store.setSelectedSatSeries('')
+watch(
+  seriesOptions,
+  (options) => {
+    const prev = store.selectedSatSeries
+    store.resolveSelectedSatSeriesForTaskOptions(options)
+    if (prev && prev !== store.selectedSatSeries) {
       internalMatrixData.value = null
     }
-    return
-  }
-  if (store.selectedSatSeries && !options.includes(store.selectedSatSeries)) {
-    store.setSelectedSatSeries('')
-    internalMatrixData.value = null
-  }
-})
+    if (!options.length) {
+      internalMatrixData.value = null
+    }
+  },
+  { immediate: true },
+)
 
 /**
  * [监听器说明]

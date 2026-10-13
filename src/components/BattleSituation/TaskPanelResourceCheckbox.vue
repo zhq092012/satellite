@@ -2,7 +2,7 @@
   <div class="task-config-checkbox" :class="{ 'task-config-checkbox--selected': selected }">
     <label class="task-config-checkbox__select">
       <el-checkbox :model-value="selected" size="small" @change="emit('change', $event)" />
-      <span class="task-config-checkbox__label">{{ item.label }}</span>
+      <span class="task-config-checkbox__label" @click.stop="emit('label-click')">{{ item.label }}</span>
     </label>
     <button type="button" class="task-config-checkbox__detail" title="查看详情" aria-label="查看详情"
       @click.stop="emit('detail', { kind: resourceKind, item })">
@@ -31,6 +31,8 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'change', checked: boolean | string | number): void
   (e: 'detail', payload: { kind: TaskPanelResourceKind; item: TaskPanelTagOption }): void
+  /** 点击系列/资源名称（不含勾选框） */
+  (e: 'label-click'): void
 }>()
 </script>
 
@@ -54,6 +56,11 @@ const emit = defineEmits<{
     border-color: rgba(0, 225, 255, 0.55);
     background: rgba(0, 225, 255, 0.1);
   }
+
+  &.task-config-checkbox--analysis-focus {
+    border-color: rgba(250, 204, 21, 0.75);
+    box-shadow: inset 0 0 0 1px rgba(250, 204, 21, 0.35);
+  }
 }
 
 .task-config-checkbox__select {
@@ -75,6 +82,7 @@ const emit = defineEmits<{
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .task-config-checkbox--selected .task-config-checkbox__label {

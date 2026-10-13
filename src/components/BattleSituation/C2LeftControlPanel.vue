@@ -145,7 +145,9 @@
                 <div v-else class="tag-cloud task-config-checkbox-list">
                   <TaskPanelResourceCheckbox v-for="item in seriesTagOptionGroups.selected" :key="`sel-${item.id}`"
                     :item="item" :selected="true" resource-kind="series"
+                    :class="{ 'task-config-checkbox--analysis-focus': store.selectedSatSeries === item.id }"
                     @change="(checked) => handleSeriesCheckboxChange(item.id, checked)"
+                    @label-click="handleSeriesLabelFocus(item.id)"
                     @detail="handleTaskResourceDetail" />
                 </div>
               </div>
@@ -161,6 +163,7 @@
                   <TaskPanelResourceCheckbox v-for="item in seriesTagOptionGroups.unselected" :key="`pool-${item.id}`"
                     :item="item" :selected="false" resource-kind="series"
                     @change="(checked) => handleSeriesCheckboxChange(item.id, checked)"
+                    @label-click="handleSeriesLabelFocus(item.id)"
                     @detail="handleTaskResourceDetail" />
                 </div>
               </div>
@@ -330,6 +333,8 @@ const emit = defineEmits<{
   (e: 'task-recalculated', taskId: number): void
   /** 资源详情：地图定位并在 Label 展示当前已有字段 */
   (e: 'focus-resource-detail', payload: TaskPanelResourceDetailPayload): void
+  /** 左侧面板聚焦任务卫星系列（地图高亮 + 同步拓扑/甘特图系列） */
+  (e: 'focus-task-series', series: string): void
 }>()
 /** 是否展示任务时长 / 链路时延 / 覆盖率表单项（仅 UI） */
 const showTaskDurationDelayCoverageInUi = SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI
@@ -1058,9 +1063,44 @@ const removeCenter = (id: string) => {
  * @param series 系列名
  * @param checked 是否勾选
  */
+/**
+ * 将当前分析系列同步到 Store 并通知地球高亮。
+ *
+ * @param series 系列名
+ */
+const focusTaskSeriesForAnalysis = (series: string) => {
+  const trimmed = series.trim()
+  if (!trimmed) return
+  if (!editorDraft.value?.selectedSeries.includes(trimmed)) return
+  store.setSelectedSatSeries(trimmed)
+  emit('focus-task-series', trimmed)
+}
+
+/**
+ * 点击系列名称：已装配系列则聚焦到地图与分析页。
+ *
+ * @param series 系列名
+ */
+const handleSeriesLabelFocus = (series: string) => {
+  if (!editorDraft.value?.selectedSeries.includes(series)) return
+  focusTaskSeriesForAnalysis(series)
+}
+
 const handleSeriesCheckboxChange = (series: string, checked: boolean | string | number) => {
-  if (checked) toggleSeries(series)
-  else removeSeries(series)
+  if (checked) {
+    toggleSeries(series)
+    focusTaskSeriesForAnalysis(series)
+  } else {
+    removeSeries(series)
+    if (store.selectedSatSeries === series) {
+      const next = editorDraft.value?.selectedSeries[0]
+      if (next) {
+        focusTaskSeriesForAnalysis(next)
+      } else {
+        store.setSelectedSatSeries('')
+      }
+    }
+  }
 }
 
 /**

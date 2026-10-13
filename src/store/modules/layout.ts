@@ -210,6 +210,22 @@ export const useLayoutStore = defineStore('layout-store', {
       if (state.matrixData?.series) return [state.matrixData.series]
       return []
     },
+    /**
+     * 当前任务已装配的卫星系列（来自 task.resources，去重并保持接口顺序）。
+     * 态势拓扑 / 甘特图系列下拉与整体态势左侧面板共用此列表。
+     */
+    taskSelectedSeriesList(state): string[] {
+      const resources = state.activedTask?.resources ?? []
+      const seen = new Set<string>()
+      const result: string[] = []
+      for (const item of resources) {
+        const series = typeof item.series === 'string' ? item.series.trim() : ''
+        if (!series || seen.has(series)) continue
+        seen.add(series)
+        result.push(series)
+      }
+      return result
+    },
     // 从 battle.area 中解析 lonlats 并计算战场区域边界包围盒
     battleAreaBounds(state): {
       min_lat: number
@@ -360,6 +376,23 @@ export const useLayoutStore = defineStore('layout-store', {
         this.matrixData = null
       }
       this.selectedSatSeries = series
+    },
+    /**
+     * 在任务已装配系列范围内校正当前分析系列：无选中或选中不在列表中时默认第一项。
+     *
+     * @param options 可选系列名列表；默认使用 taskSelectedSeriesList
+     */
+    resolveSelectedSatSeriesForTaskOptions(options?: string[]) {
+      const list = options ?? this.taskSelectedSeriesList
+      if (!list.length) {
+        if (this.selectedSatSeries) {
+          this.setSelectedSatSeries('')
+        }
+        return
+      }
+      if (!this.selectedSatSeries || !list.includes(this.selectedSatSeries)) {
+        this.setSelectedSatSeries(list[0])
+      }
     },
     /**
      * [功能说明]
@@ -588,10 +621,11 @@ export const useLayoutStore = defineStore('layout-store', {
 
       if (
         this.selectedSatSeries &&
-        this.zhchPlanSeriesList.length &&
-        !this.zhchPlanSeriesList.includes(this.selectedSatSeries)
+        this.taskSelectedSeriesList.length &&
+        !this.taskSelectedSeriesList.includes(this.selectedSatSeries)
       ) {
-        this.selectedSatSeries = ''
+        this.setSelectedSatSeries('')
+        this.resolveSelectedSatSeriesForTaskOptions()
       }
 
       await this.fetchMatrixForCurrentScope(true)

@@ -4,6 +4,7 @@
     <div class="map-globe-layer">
       <BattleSituationGlobe ref="globeRef" :satellites="globeSatellites" :weapons="globeWeapons"
         :ground-targets="globeGroundTargets" :current-time-ms="currentTimeMs" :selected-norad="selectedNorad"
+        :highlighted-series="store.selectedSatSeries || null"
         :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
         :selected-resource-detail-text="selectedResourceDetailText"
         :selected-satellite-detail-view="selectedSatelliteDetailView"
@@ -55,7 +56,7 @@
       <div class="panel-inner">
         <C2LeftControlPanel :matrix-data="matrixData" :selected-norad="selectedNorad"
           @select-satellite="handleSelectSatellite" @task-recalculated="handleTaskRecalculated"
-          @focus-resource-detail="handleFocusResourceDetail" />
+          @focus-resource-detail="handleFocusResourceDetail" @focus-task-series="handleFocusTaskSeries" />
       </div>
       <button type="button" class="toggle-btn toggle-btn--left" :title="isLeftCollapsed ? '展开左侧面板' : '收起左侧面板'"
         @click="isLeftCollapsed = !isLeftCollapsed">
@@ -307,7 +308,10 @@ watch(
 )
 
 /** 地球组件引用 */
-const globeRef = ref<{ restoreOverviewView: () => void } | null>(null)
+const globeRef = ref<{
+  restoreOverviewView: () => void
+  flyToSatelliteSeries?: (series: string | null) => void
+} | null>(null)
 
 /** 当前选中卫星名称 */
 const selectedSatelliteName = computed(() => {
@@ -648,6 +652,30 @@ watch([weaponRecordById, groundStationRecordById], () => {
 })
 
 /**
+ * 左侧面板选中卫星系列：同步 Store 分析系列，并在地球上高亮该系列全部卫星及 Label。
+ *
+ * @param series 系列名
+ */
+const handleFocusTaskSeries = (series: string) => {
+  const trimmed = series.trim()
+  if (!trimmed) return
+  const inSeries = globeSatellites.value.filter((sat) => sat.series === trimmed)
+  if (!inSeries.length) {
+    ElMessage.warning(`地图上暂无系列「${trimmed}」的卫星，请等待任务算法完成并拉取分析结果`)
+    return
+  }
+  selectedWeaponId.value = null
+  selectedGroundTargetKey.value = null
+  selectedNorad.value = null
+  store.setSelectedAnalysisNorad(null)
+  clearGlobeResourceDetail()
+  store.setSelectedSatSeries(trimmed)
+  void nextTick(() => {
+    globeRef.value?.flyToSatelliteSeries?.(trimmed)
+  })
+}
+
+/**
  * 左侧面板资源详情：地图定位 + 目标 Label 展示当前已有字段。
  *
  * @param payload 资源类型、候选项及已加载的接口记录
@@ -657,13 +685,7 @@ const handleFocusResourceDetail = (payload: TaskPanelResourceDetailPayload) => {
   clearGlobeResourceDetail()
 
   if (kind === 'series') {
-    const inSeries = globeSatellites.value.filter((sat) => sat.series === item.id)
-    if (!inSeries.length) {
-      ElMessage.warning(`地图上暂无系列「${item.label}」的卫星，请等待任务算法完成并拉取分析结果`)
-      return
-    }
-    const anchor = inSeries[0]
-    void handleSelectSatellite(anchor.norad, { detailRequest: { kind: 'series', series: item.id } })
+    handleFocusTaskSeries(item.id)
     return
   }
 
@@ -932,6 +954,15 @@ onBeforeUnmount(() => {
   stopTimelinePlayback()
   resetDeductionUi()
 })
+
+/** 任务装配系列变化时校正分析系列（默认第一项，保留左侧面板已选且仍在列表中的系列） */
+watch(
+  () => store.taskSelectedSeriesList,
+  (options) => {
+    store.resolveSelectedSatSeriesForTaskOptions(options)
+  },
+  { immediate: true },
+)
 
 /** 系列/任务变化时重新加载矩阵 */
 watch(
