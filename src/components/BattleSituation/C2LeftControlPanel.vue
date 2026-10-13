@@ -104,31 +104,33 @@
                   </el-tag>
                 </div>
               </div>
-              <div class="metric-row metric-row--combat-head">
-                <span class="metric-label">作战区域</span>
-                <label v-if="editorDraft.combatArea" class="combat-area-enable">
-                  <el-checkbox v-model="editorDraft.combatArea.enabled">启用</el-checkbox>
-                </label>
-              </div>
-              <template v-if="editorDraft.combatArea">
-                <div class="metric-row">
-                  <span class="metric-label">经度</span>
-                  <el-input-number v-model="editorDraft.combatArea.centerLon" class="metric-input-number" size="small"
-                    :controls="false" :precision="4" :step="0.0001" :min="-180" :max="180" />
-                  <span class="metric-unit metric-unit--empty" aria-hidden="true" />
+              <template v-if="showTaskCombatAreaInUi">
+                <div class="metric-row metric-row--combat-head">
+                  <span class="metric-label">作战区域</span>
+                  <label v-if="editorDraft.combatArea" class="combat-area-enable">
+                    <el-checkbox v-model="editorDraft.combatArea.enabled">启用</el-checkbox>
+                  </label>
                 </div>
-                <div class="metric-row">
-                  <span class="metric-label">纬度</span>
-                  <el-input-number v-model="editorDraft.combatArea.centerLat" class="metric-input-number" size="small"
-                    :controls="false" :precision="4" :step="0.0001" :min="-90" :max="90" />
-                  <span class="metric-unit metric-unit--empty" aria-hidden="true" />
-                </div>
-                <div class="metric-row">
-                  <span class="metric-label">半径</span>
-                  <el-input-number v-model="editorDraft.combatArea.radiusKm" class="metric-input-number" size="small"
-                    :controls="false" :precision="0" :step="10" :min="0" :max="20000" />
-                  <span class="metric-unit">km</span>
-                </div>
+                <template v-if="editorDraft.combatArea">
+                  <div class="metric-row">
+                    <span class="metric-label">经度</span>
+                    <el-input-number v-model="editorDraft.combatArea.centerLon" class="metric-input-number"
+                      size="small" :controls="false" :precision="4" :step="0.0001" :min="-180" :max="180" />
+                    <span class="metric-unit metric-unit--empty" aria-hidden="true" />
+                  </div>
+                  <div class="metric-row">
+                    <span class="metric-label">纬度</span>
+                    <el-input-number v-model="editorDraft.combatArea.centerLat" class="metric-input-number"
+                      size="small" :controls="false" :precision="4" :step="0.0001" :min="-90" :max="90" />
+                    <span class="metric-unit metric-unit--empty" aria-hidden="true" />
+                  </div>
+                  <div class="metric-row">
+                    <span class="metric-label">半径</span>
+                    <el-input-number v-model="editorDraft.combatArea.radiusKm" class="metric-input-number"
+                      size="small" :controls="false" :precision="0" :step="10" :min="0" :max="20000" />
+                    <span class="metric-unit">km</span>
+                  </div>
+                </template>
               </template>
             </div>
           </div>
@@ -309,6 +311,7 @@ import {
   normalizeTaskWeaponIds,
   parseTaskPanelTimeMs,
   SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI,
+  SHOW_TASK_COMBAT_AREA_IN_UI,
   TASK_PANEL_SATELLITE_TYPES,
   toTaskDatetimeLocalValue,
   type C2TaskEditorDraft,
@@ -330,6 +333,8 @@ const emit = defineEmits<{
 }>()
 /** 是否展示任务时长 / 链路时延 / 覆盖率表单项（仅 UI） */
 const showTaskDurationDelayCoverageInUi = SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI
+/** 是否展示作战区域 / 启用 / 经纬度 / 半径表单项（仅 UI） */
+const showTaskCombatAreaInUi = SHOW_TASK_COMBAT_AREA_IN_UI
 
 const store = useLayoutStore()
 const {

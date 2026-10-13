@@ -4,7 +4,7 @@
       <div class="brand-block">
         <div class="brand-badge">C4</div>
         <p class="brand-kicker">SECURE ACCESS</p>
-        <h1>卫星态势指挥平台</h1>
+        <h1>作战目标选择系统</h1>
         <p class="brand-subtitle">保密环境登录 · 态势感知与任务协同</p>
       </div>
 

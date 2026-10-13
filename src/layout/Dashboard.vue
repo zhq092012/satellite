@@ -469,9 +469,7 @@ onMounted(async () => {
           font-size: 19px;
           font-weight: 800;
           letter-spacing: 1.2px;
-          background: #fff;
           background-clip: text;
-          -webkit-text-fill-color: transparent;
           filter: drop-shadow(0 0 10px rgba(0, 225, 255, 0.3));
         }
 

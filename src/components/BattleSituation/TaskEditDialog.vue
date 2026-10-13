@@ -40,7 +40,7 @@
                   <span class="metric-input-unit">小时</span>
                 </div>
               </el-form-item>
-              <div v-if="taskForm.combatArea" class="task-edit-metrics-grid__right-cell">
+              <div v-if="showTaskCombatAreaInUi && taskForm.combatArea" class="task-edit-metrics-grid__right-cell">
                 <div class="task-edit-area-slot">
                   <span class="task-edit-area-slot__label">任务区域</span>
                   <el-checkbox v-model="taskForm.combatArea.enabled" :disabled="!canSave">启用</el-checkbox>
@@ -61,7 +61,7 @@
                   <span class="metric-input-unit">分钟</span>
                 </div>
               </el-form-item>
-              <div v-if="taskForm.combatArea" class="task-edit-metrics-grid__right-cell">
+              <div v-if="showTaskCombatAreaInUi && taskForm.combatArea" class="task-edit-metrics-grid__right-cell">
                 <div class="task-edit-area-slot task-edit-area-slot--ghost" aria-hidden="true">
                   <span class="task-edit-area-slot__label">任务区域</span>
                   <span>启用</span>
@@ -82,7 +82,7 @@
                   <span class="metric-input-unit">%</span>
                 </div>
               </el-form-item>
-              <div v-if="taskForm.combatArea" class="task-edit-metrics-grid__right-cell">
+              <div v-if="showTaskCombatAreaInUi && taskForm.combatArea" class="task-edit-metrics-grid__right-cell">
                 <div class="task-edit-area-slot task-edit-area-slot--ghost" aria-hidden="true">
                   <span class="task-edit-area-slot__label">任务区域</span>
                   <span>启用</span>
@@ -96,7 +96,8 @@
                 </el-form-item>
               </div>
             </div>
-            <el-form-item v-else-if="taskForm.combatArea" label="任务区域" class="task-edit-combat-area-form-item">
+            <el-form-item v-else-if="showTaskCombatAreaInUi && taskForm.combatArea" label="任务区域"
+              class="task-edit-combat-area-form-item">
               <div class="task-edit-combat-area-inline">
                 <el-checkbox v-model="taskForm.combatArea.enabled" class="task-edit-combat-area-enable"
                   :disabled="!canSave">
@@ -187,11 +188,14 @@ import {
   materializeTaskListItemFromApi,
   normalizeTaskCombatArea,
   SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI,
+  SHOW_TASK_COMBAT_AREA_IN_UI,
   TaskListItemFromApiError,
 } from '@/utils/c2TaskPanelEditor'
 
 /** 是否展示任务时长 / 链路时延 / 覆盖率表单项（仅 UI） */
 const showTaskDurationDelayCoverageInUi = SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI
+/** 是否展示作战区域 / 启用 / 经纬度 / 半径表单项（仅 UI） */
+const showTaskCombatAreaInUi = SHOW_TASK_COMBAT_AREA_IN_UI
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskAssembleTab, { type TaskAssembleRow } from '@/components/BattleSituation/TaskAssembleTab.vue'
 
