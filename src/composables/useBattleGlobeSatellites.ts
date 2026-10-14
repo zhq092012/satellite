@@ -50,6 +50,7 @@ interface SatellitePointVisual {
  * @param struckSatelliteNoradRef 推演中已被打击的卫星 NORAD（显示为红色）
  * @param timelinePlaybackActiveRef 时间轴播放中（选中星持续高亮并始终显示名称）
  * @param selectedLabelDetailTextRef 选中卫星时 Label 展示的详情（多行）；为空则用默认名称+摘要
+ * @param highlightedSeriesRef 左侧面板 / 分析页选中的卫星系列；该系列下全部卫星高亮并显示 Label
  */
 export const useBattleGlobeSatellites = (
   viewerRef: Ref<Cesium.Viewer | null>,
@@ -59,7 +60,8 @@ export const useBattleGlobeSatellites = (
   followSelectedRef: Ref<boolean> | ComputedRef<boolean> = ref(true),
   struckSatelliteNoradRef: Ref<number | null> | ComputedRef<number | null> = ref(null),
   timelinePlaybackActiveRef: Ref<boolean> | ComputedRef<boolean> = ref(false),
-  selectedLabelDetailTextRef: Ref<string | null> | ComputedRef<string | null> = ref(null)
+  selectedLabelDetailTextRef: Ref<string | null> | ComputedRef<string | null> = ref(null),
+  highlightedSeriesRef: Ref<string | null> | ComputedRef<string | null> = ref(null)
 ) => {
   const satrecCache = new Map<number, satellitejs.SatRec>()
   const visualMap = new Map<number, SatellitePointVisual>()
@@ -350,6 +352,7 @@ export const useBattleGlobeSatellites = (
     const date = new Date(currentTime > 0 ? currentTime : Date.now())
     const cameraPosition = viewer.camera.positionWC
     const selectedNorad = selectedNoradRef.value
+    const highlightSeries = highlightedSeriesRef.value
 
     visualMap.forEach((visual) => {
       const position = propagatePosition(visual.norad, date)
@@ -364,22 +367,24 @@ export const useBattleGlobeSatellites = (
       visual.label.position = visual.position
 
       const selected = selectedNorad === visual.norad
-      /** 选中星：加强点大小与名称标签（播放时同样保持） */
-      const emphasizeSelected = selected
+      const seriesHighlighted =
+        !!highlightSeries && visual.series === highlightSeries
+      /** 单星选中或系列高亮：加强点大小与名称标签 */
+      const emphasized = selected || seriesHighlighted
       const struck = struckSatelliteNoradRef.value === visual.norad
       const facing = isPositionFacingCamera(visual.position, cameraPosition)
       const inFrustum = isPositionInCameraFrustum(viewer, visual.position)
       const distance = Cesium.Cartesian3.distance(cameraPosition, visual.position)
-      const lodStyle = resolveLodStyle(distance, selected, emphasizeSelected, struck)
-      const showLabel = shouldShowSatelliteLabel(distance, selected, emphasizeSelected)
+      const lodStyle = resolveLodStyle(distance, emphasized, emphasized, struck)
+      const showLabel = shouldShowSatelliteLabel(distance, emphasized, emphasized)
 
-      if (!selected && !facing) {
+      if (!emphasized && !facing) {
         visual.point.show = false
         visual.label.show = false
         return
       }
 
-      if (!selected && !inFrustum) {
+      if (!emphasized && !inFrustum) {
         visual.point.show = false
         visual.label.show = false
         return
@@ -391,11 +396,11 @@ export const useBattleGlobeSatellites = (
 
       const useHtmlDetailLabel = selected && !!selectedLabelDetailTextRef.value
       visual.label.show = showLabel && !useHtmlDetailLabel
-      visual.label.text = buildSatelliteLabelText(visual, selected)
+      visual.label.text = buildSatelliteLabelText(visual, emphasized)
       visual.label.horizontalOrigin = Cesium.HorizontalOrigin.CENTER
       visual.label.fillColor = struck
         ? STRUCK_SATELLITE_COLOR
-        : selected
+        : emphasized
           ? Cesium.Color.YELLOW
           : SATELLITE_POINT_COLOR
       if (struck) {
@@ -403,7 +408,7 @@ export const useBattleGlobeSatellites = (
         visual.label.backgroundColor = new Cesium.Color(0.35, 0.08, 0.08, 0.58)
         visual.label.font = 'bold 13px "Microsoft YaHei", sans-serif'
         visual.label.pixelOffset = new Cesium.Cartesian2(0, -14)
-      } else if (emphasizeSelected) {
+      } else if (emphasized) {
         visual.label.showBackground = true
         visual.label.backgroundColor = new Cesium.Color(0.45, 0.35, 0, 0.55)
         visual.label.font = 'bold 13px "Microsoft YaHei", sans-serif'
@@ -423,6 +428,37 @@ export const useBattleGlobeSatellites = (
    *
    * @param norad 卫星 NORAD
    */
+  /**
+   * 相机飞到指定系列全部在轨卫星的包围球。
+   *
+   * @param seriesName 卫星系列名
+   */
+  const flyToSatelliteSeries = (seriesName: string | null) => {
+    const viewer = viewerRef.value
+    if (!viewer || viewer.isDestroyed() || !seriesName) return
+
+    const date = new Date(currentTimeMsRef.value > 0 ? currentTimeMsRef.value : Date.now())
+    const positions: Cesium.Cartesian3[] = []
+    visualMap.forEach((visual) => {
+      if (visual.series !== seriesName) return
+      const position = propagatePosition(visual.norad, date)
+      if (position && isFiniteCartesian(position) && Cesium.Cartesian3.magnitude(position) > 1) {
+        positions.push(Cesium.Cartesian3.clone(position))
+      }
+    })
+    if (!positions.length) return
+
+    const sphere = Cesium.BoundingSphere.fromPoints(positions)
+    viewer.camera.flyToBoundingSphere(sphere, {
+      duration: 1.2,
+      offset: new Cesium.HeadingPitchRange(
+        0,
+        Cesium.Math.toRadians(-45),
+        Math.max(sphere.radius * 4, SELECTED_CAMERA_RANGE)
+      ),
+    })
+  }
+
   const flyToSatellite = (norad: number | null) => {
     const viewer = viewerRef.value
     if (!viewer || viewer.isDestroyed() || !norad) return
@@ -506,6 +542,19 @@ export const useBattleGlobeSatellites = (
     updateSatelliteVisuals()
   })
 
+  watch(highlightedSeriesRef, () => {
+    updateSatelliteVisuals()
+  })
+
+  watch(
+    [highlightedSeriesRef, selectedNoradRef],
+    ([series, norad]) => {
+      if (norad == null && series && followSelectedRef.value) {
+        flyToSatelliteSeries(series)
+      }
+    }
+  )
+
   onBeforeUnmount(() => {
     removePostUpdateListener()
     clearSatellitePoints()
@@ -515,6 +564,7 @@ export const useBattleGlobeSatellites = (
     rebuildSatellitePoints,
     updateSatelliteVisuals,
     flyToSatellite,
+    flyToSatelliteSeries,
     clearSatellitePoints,
   }
 }

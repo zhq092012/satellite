@@ -297,6 +297,8 @@ const emit = defineEmits<{
   (e: 'task-recalculated', taskId: number): void
   /** 资源详情：地图定位并在 Label 展示当前已有字段 */
   (e: 'focus-resource-detail', payload: TaskPanelResourceDetailPayload): void
+  /** 左侧面板聚焦任务卫星系列（地图高亮 + 同步拓扑/甘特图系列） */
+  (e: 'focus-task-series', series: string): void
 }>()
 const store = useLayoutStore()
 const {
@@ -1041,10 +1043,9 @@ const handleUseWeaponsChange = (enabled: boolean) => {
 }
 
 /**
- * 卫星系列 checkbox 变更。
+ * 点击系列名称：同步分析页系列选择并高亮系列卫星。
  *
  * @param series 系列名
- * @param checked 是否勾选
  */
 const handleSeriesCheckboxChange = (series: string, checked: boolean | string | number) => {
   if (checked) toggleSeries(series)

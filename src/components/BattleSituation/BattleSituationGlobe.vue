@@ -82,6 +82,8 @@ const props = withDefaults(
     currentTimeMs?: number
     /** 当前选中卫星 NORAD */
     selectedNorad?: number | null
+    /** 当前分析/聚焦的卫星系列（该系列全部卫星在地球上高亮并显示 Label） */
+    highlightedSeries?: string | null
     /** 武器列表 */
     weapons?: BattleGlobeWeapon[]
     /** 接收站/数据中心列表 */
@@ -117,6 +119,7 @@ const props = withDefaults(
     satellites: () => [],
     currentTimeMs: 0,
     selectedNorad: null,
+    highlightedSeries: null,
     weapons: () => [],
     groundTargets: () => [],
     selectedWeaponId: null,
@@ -313,7 +316,7 @@ const deductionGlobeVisualState = computed(() => {
 })
 
 /** 卫星渲染逻辑 */
-useBattleGlobeSatellites(
+const { flyToSatelliteSeries } = useBattleGlobeSatellites(
   viewerRef,
   computed(() => props.satellites),
   computed(() => props.currentTimeMs),
@@ -321,7 +324,8 @@ useBattleGlobeSatellites(
   computed(() => props.followSelectedSatellite),
   computed(() => deductionGlobeVisualState.value.struckSatelliteNorad),
   computed(() => props.isTimelinePlaying),
-  selectedResourceDetailText
+  selectedResourceDetailText,
+  computed(() => props.highlightedSeries ?? null)
 )
 
 /** 选中卫星 Entity.path 轨迹（单星推演时由推演模块绘制） */
@@ -488,6 +492,7 @@ const syncViewerClock = () => {
 
 defineExpose({
   restoreOverviewView,
+  flyToSatelliteSeries,
 })
 
 /** 战场名称标签锚点（用于椭球遮挡判断） */

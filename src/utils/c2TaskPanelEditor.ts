@@ -10,6 +10,12 @@ export type TaskPanelResourceKind = 'series' | 'satellite' | 'weapon' | 'receive
  */
 export const SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI = false
 
+/**
+ * 任务新建/编辑界面是否展示「作战区域、是否启用、经纬度、范围半径」表单项。
+ * 仅控制前端可见性，不影响草稿、校验与 saveTask / updateTask 请求体。
+ */
+export const SHOW_TASK_COMBAT_AREA_IN_UI = false
+
 /** 标签候选项（系列名或资源 ID + 展示名） */
 export interface TaskPanelTagOption {
   /** 唯一键（系列名或资源 ID） */
