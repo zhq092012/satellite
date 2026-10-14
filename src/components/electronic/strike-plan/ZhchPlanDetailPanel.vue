@@ -1,11 +1,5 @@
 <template>
   <div class="zhch-plan-detail" :class="{ 'zhch-plan-detail--align': alignBlocks }">
-    <!-- 1. 计算结果总览 -->
-    <div class="result-header">
-      <h2 class="result-title">计算结果</h2>
-      <p v-if="plan.intensityLevel" class="intensity-badge">打击烈度：{{ plan.intensityLevel }}</p>
-    </div>
-
     <ZhchPlanCapabilityCompareTable :plan="plan" kind="recon" :vertical="!!alignBlocks" />
     <ZhchPlanCapabilityCompareTable :plan="plan" kind="comm" :vertical="!!alignBlocks" />
 
@@ -49,43 +43,13 @@ defineProps<{
   &--align {
     display: grid;
     grid-template-rows: subgrid;
-    grid-row: span 5;
+    // 天基侦察、通信保障、方案概要、打击前后指标对比，共 4 行
+    grid-row: span 4;
     min-height: 0;
     // 与外层 plan-columns--compare 的 --plan-compare-row-gap 保持一致；
     // subgrid 会用自身 gap 覆盖父级 row-gap，写成 0 会导致块与块贴死。
     gap: var(--plan-compare-row-gap, 10px);
-
-    .result-header {
-      height: 100%;
-      box-sizing: border-box;
-    }
   }
-}
-
-.result-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.result-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 800;
-  color: #40f2ff;
-  text-shadow: 0 0 12px rgba(64, 242, 255, 0.5);
-}
-
-.intensity-badge {
-  margin: 0;
-  padding: 4px 14px;
-  font-size: 16px;
-  font-weight: 700;
-  color: #fbbf24;
-  border: 1px solid rgba(251, 191, 36, 0.5);
-  border-radius: 20px;
-  background: rgba(251, 191, 36, 0.1);
 }
 
 .summary-line {

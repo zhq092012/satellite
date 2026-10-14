@@ -319,7 +319,8 @@ watch(
     .plan-column {
       display: grid;
       grid-template-rows: subgrid;
-      grid-row: span 6;
+      // 列标题 1 行 + 方案详情 4 块
+      grid-row: span 5;
       row-gap: var(--plan-compare-row-gap);
       overflow: hidden;
     }
@@ -327,7 +328,8 @@ watch(
     .column-content {
       display: grid;
       grid-template-rows: subgrid;
-      grid-row: span 5;
+      // 天基侦察、通信保障、方案概要、打击前后指标对比
+      grid-row: span 4;
       row-gap: var(--plan-compare-row-gap);
       min-width: 0;
     }
