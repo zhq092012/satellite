@@ -66,14 +66,13 @@
             <el-form-item label="红方" prop="meCountryShow">
               <el-checkbox-group v-model="taskForm.meCountryShow" class="country-checkbox-group"
                 @change="handleCountryShowChange">
-                <el-checkbox v-for="item in countryOptions" :key="`me-${item}`" :value="item">{{ item }}</el-checkbox>
+                <el-checkbox v-for="item in RED_COUNTRY_OPTIONS" :key="`me-${item}`" :value="item">{{ item }}</el-checkbox>
               </el-checkbox-group>
             </el-form-item>
             <el-form-item label="蓝方" prop="enemyCountryShow">
               <el-checkbox-group v-model="taskForm.enemyCountryShow" class="country-checkbox-group"
                 @change="handleCountryShowChange">
-                <el-checkbox v-for="item in countryOptions" :key="`enemy-${item}`" :value="item">{{ item
-                }}</el-checkbox>
+                <el-checkbox v-for="item in BLUE_COUNTRY_OPTIONS" :key="`enemy-${item}`" :value="item">{{ item }}</el-checkbox>
               </el-checkbox-group>
             </el-form-item>
           </el-form>
@@ -106,7 +105,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { getBattleCountrys, updateTask } from '@/api/dashboard'
+import { updateTask } from '@/api/dashboard'
 import { addTask } from '@/api/task/task'
 import type { TaskForm } from '@/types/dashboard'
 import {
@@ -145,6 +144,10 @@ const SATELLITE_TYPES = ['侦察', '通信'] as const
 const DEFAULT_ME_COUNTRIES = ['中国'] as const
 /** 新建任务默认蓝方国家 */
 const DEFAULT_ENEMY_COUNTRIES = ['美国'] as const
+/** 添加/修改任务时红方可选国家 */
+const RED_COUNTRY_OPTIONS = ['中国'] as const
+/** 添加/修改任务时蓝方可选国家 */
+const BLUE_COUNTRY_OPTIONS = ['美国', '日本', '中国台湾'] as const
 /** 新建任务默认卫星类型（侦察、通信全选） */
 const DEFAULT_TARGET_TYPES = [...SATELLITE_TYPES] as string[]
 /** 新建任务默认时长（小时） */
@@ -176,8 +179,6 @@ const emit = defineEmits<{
 const formRef = ref<FormInstance>()
 /** 提交中状态。 */
 const submitting = ref(false)
-/** 红蓝方国家下拉选项。 */
-const countryOptions = ref<string[]>([])
 /** 作战目标下拉选项。 */
 const satelliteTypes = [...SATELLITE_TYPES]
 
@@ -317,7 +318,6 @@ watch(
       activeTab.value = 'basic'
       assembleResetKey.value += 1
       fillForm(props.task)
-      loadCountryOptions()
     }
   },
   { immediate: true }
@@ -708,20 +708,6 @@ const handleTargetTypeShowChange = () => {
 const handleCountryShowChange = () => {
   syncCountryFields()
   formRef.value?.validateField(['meCountryShow', 'enemyCountryShow']).catch(() => undefined)
-}
-
-/**
- * 加载红蓝方可选国家列表。
- */
-const loadCountryOptions = async () => {
-  try {
-    const res = await getBattleCountrys()
-    if (res.code === 200 && Array.isArray(res.data)) {
-      countryOptions.value = res.data
-    }
-  } catch (error) {
-    console.error('加载国家列表失败:', error)
-  }
 }
 
 /**

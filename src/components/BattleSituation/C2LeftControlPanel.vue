@@ -53,17 +53,23 @@
             <div class="tag-section-head">任务时间</div>
             <p class="task-time-readonly" :title="taskTimeRangeText">{{ taskTimeRangeText }}</p>
           </div>
-          <div v-if="!enemyCountriesList.length" class="tag-hint">当前任务未配置敌方国家/组织</div>
+          <div v-if="receiveOptionsLoading || centerOptionsLoading" class="tag-hint">正在加载地面站与数据中心...</div>
+          <div v-if="!panelCountries.length && !receiveOptionsLoading && !centerOptionsLoading" class="tag-hint">
+            当前任务未配置国家资源
+          </div>
           <template v-else>
-            <div v-for="country in enemyCountriesList" :key="country" class="country-block">
-              <label class="country-block__head">
+            <div class="country-filter">
+              <label v-for="country in panelCountries" :key="country" class="country-filter__item">
                 <el-checkbox :model-value="isCountryPanelVisible(country)"
                   @change="(val) => handleCountryPanelChange(country, val)" />
-                <span class="country-block__title">{{ country }}</span>
+                <span class="country-filter__name">{{ country }}</span>
               </label>
-              <div v-show="isCountryPanelVisible(country)" class="country-block__body">
-                <div v-if="seriesOptionsLoading" class="tag-hint">正在加载卫星系列...</div>
-                <template v-else>
+            </div>
+            <div class="tag-section">
+              <div class="tag-section-head">卫星</div>
+              <div v-if="seriesOptionsLoading" class="tag-hint">正在加载卫星系列...</div>
+              <template v-else>
+                <template v-for="country in checkedPanelCountries" :key="`sat-${country}`">
                   <div v-for="series in seriesForCountry(country)" :key="`${country}-${series}`" class="series-block">
                     <div class="series-block__head">
                       <el-checkbox :model-value="isSeriesSelected(series)"
@@ -97,102 +103,93 @@
                       <div v-else class="tag-hint">该系列暂无卫星数据</div>
                     </div>
                   </div>
-                  <div v-if="!seriesForCountry(country).length" class="tag-hint">任务未选择该国卫星系列</div>
                 </template>
-              </div>
-            </div>
-            <div v-if="unmatchedSelectedSeries.length" class="country-block">
-              <div v-for="series in unmatchedSelectedSeries" :key="`unmatched-${series}`" class="series-block">
-                <div class="series-block__head">
-                  <el-checkbox :model-value="isSeriesSelected(series)"
-                    @change="(checked) => handleSeriesCheckboxChange(series, checked)" />
-                  <button type="button" class="series-block__name" @click="handleSeriesFocus(series)">
-                    {{ series }}
-                  </button>
-                </div>
-                <div v-if="isSeriesSelected(series)" class="satellite-table-wrap">
-                  <div v-if="isSatelliteListLoading(series)" class="tag-hint">正在加载卫星...</div>
-                  <div v-else-if="satelliteLoadErrorBySeries[series]" class="combat-area-api-error" role="alert">
-                    {{ satelliteLoadErrorBySeries[series] }}
+                <div v-for="series in unmatchedSelectedSeries" :key="`unmatched-${series}`" class="series-block">
+                  <div class="series-block__head">
+                    <el-checkbox :model-value="isSeriesSelected(series)"
+                      @change="(checked) => handleSeriesCheckboxChange(series, checked)" />
+                    <button type="button" class="series-block__name" @click="handleSeriesFocus(series)">
+                      {{ series }}
+                    </button>
                   </div>
-                  <table v-else-if="satellitesForSeries(series).length" class="satellite-table">
-                    <thead>
-                      <tr>
-                        <th>卫星名称</th>
-                        <th>类型</th>
-                        <th>系列</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="row in satellitesForSeries(series)" :key="row.key" class="satellite-table__row"
-                        @click="handleSatelliteRowClick(row)">
-                        <td>{{ row.name }}</td>
-                        <td>{{ row.satType }}</td>
-                        <td>{{ row.series }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                  <div v-else class="tag-hint">该系列暂无卫星数据</div>
+                  <div v-if="isSeriesSelected(series)" class="satellite-table-wrap">
+                    <div v-if="isSatelliteListLoading(series)" class="tag-hint">正在加载卫星...</div>
+                    <div v-else-if="satelliteLoadErrorBySeries[series]" class="combat-area-api-error" role="alert">
+                      {{ satelliteLoadErrorBySeries[series] }}
+                    </div>
+                    <table v-else-if="satellitesForSeries(series).length" class="satellite-table">
+                      <thead>
+                        <tr>
+                          <th>卫星名称</th>
+                          <th>类型</th>
+                          <th>系列</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in satellitesForSeries(series)" :key="row.key" class="satellite-table__row"
+                          @click="handleSatelliteRowClick(row)">
+                          <td>{{ row.name }}</td>
+                          <td>{{ row.satType }}</td>
+                          <td>{{ row.series }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div v-else class="tag-hint">该系列暂无卫星数据</div>
+                  </div>
                 </div>
-              </div>
+                <div v-if="!checkedPanelCountries.length" class="tag-hint">请勾选国家以查看卫星</div>
+                <div v-else-if="!visibleSeriesCount && !unmatchedSelectedSeries.length" class="tag-hint">
+                  已勾选国家暂无卫星系列
+                </div>
+              </template>
             </div>
             <div class="tag-section">
               <div class="tag-section-head">地面站</div>
               <div v-if="receiveOptionsLoading" class="tag-hint">正在加载地面站...</div>
-              <template v-else>
-                <div v-for="group in receiveGroupsByCountry" :key="`recv-${group.country}`"
-                  v-show="isCountryPanelVisible(group.country) && group.rows.length" class="country-resource-list">
-                  <div class="ground-station-table-wrap">
-                    <table class="satellite-table ground-station-table">
-                      <thead>
-                        <tr>
-                          <th>基站名称</th>
-                          <th>所属国家/地区</th>
-                          <th>地理位置</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="row in group.rows" :key="row.id" class="satellite-table__row"
-                          @click="handleGroundStationRowClick('receive', row)">
-                          <td>{{ row.name }}</td>
-                          <td>{{ row.country }}</td>
-                          <td>{{ row.location }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                <div v-if="!receiveGroupsByCountry.some((g) => g.rows.length)" class="tag-hint">任务未选择地面站</div>
-              </template>
+              <div v-else-if="filteredReceiveRows.length" class="ground-station-table-wrap">
+                <table class="satellite-table ground-station-table">
+                  <thead>
+                    <tr>
+                      <th>基站名称</th>
+                      <th>所属国家/地区</th>
+                      <th>地理位置</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in filteredReceiveRows" :key="row.id" class="satellite-table__row"
+                      @click="handleGroundStationRowClick('receive', row)">
+                      <td>{{ row.name }}</td>
+                      <td>{{ row.country }}</td>
+                      <td>{{ row.location }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div v-else class="tag-hint">已勾选国家暂无地面站</div>
             </div>
             <div class="tag-section">
               <div class="tag-section-head">数据中心</div>
               <div v-if="centerOptionsLoading" class="tag-hint">正在加载数据中心...</div>
-              <template v-else>
-                <div v-for="group in centerGroupsByCountry" :key="`center-${group.country}`"
-                  v-show="isCountryPanelVisible(group.country) && group.rows.length" class="country-resource-list">
-                  <div class="ground-station-table-wrap">
-                    <table class="satellite-table ground-station-table">
-                      <thead>
-                        <tr>
-                          <th>基站名称</th>
-                          <th>所属国家/地区</th>
-                          <th>地理位置</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="row in group.rows" :key="row.id" class="satellite-table__row"
-                          @click="handleGroundStationRowClick('center', row)">
-                          <td>{{ row.name }}</td>
-                          <td>{{ row.country }}</td>
-                          <td>{{ row.location }}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                <div v-if="!centerGroupsByCountry.some((g) => g.rows.length)" class="tag-hint">任务未选择数据中心</div>
-              </template>
+              <div v-else-if="filteredCenterRows.length" class="ground-station-table-wrap">
+                <table class="satellite-table ground-station-table">
+                  <thead>
+                    <tr>
+                      <th>基站名称</th>
+                      <th>所属国家/地区</th>
+                      <th>地理位置</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in filteredCenterRows" :key="row.id" class="satellite-table__row"
+                      @click="handleGroundStationRowClick('center', row)">
+                      <td>{{ row.name }}</td>
+                      <td>{{ row.country }}</td>
+                      <td>{{ row.location }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div v-else class="tag-hint">已勾选国家暂无数据中心</div>
             </div>
           </template>
           <div class="tag-section">
@@ -281,6 +278,7 @@ import {
   groupGroundStationRowsByCountry,
   mapSatellitePreviewToTableRows,
   type C2LeftPanelSatellitePreviewItem,
+  type C2LeftPanelCountryGroundGroup,
   type C2LeftPanelGroundStationTableRow,
   type C2LeftPanelSatelliteTableRow,
   type C2LeftPanelWeaponTableRow,
@@ -472,9 +470,9 @@ const taskTimeRangeText = computed(() =>
 )
 
 /**
- * 同步面板国家勾选（新国家默认勾选）。
+ * 同步面板国家勾选（新出现的国家默认勾选，已有勾选保持不变）。
  *
- * @param countries 敌方国家
+ * @param countries 当前面板国家（敌方国家，以及已选地面站/数据中心所属国家）
  */
 const syncCountryPanelChecked = (countries: string[]) => {
   const next: Record<string, boolean> = {}
@@ -527,7 +525,6 @@ const loadCountrySeriesMap = async (task: TaskForm | null | undefined) => {
   const types = editorDraft.value?.targetTypeShow?.length
     ? [...editorDraft.value.targetTypeShow]
     : resolveTaskTargetTypes(task)
-  syncCountryPanelChecked(countries)
   satellitesBySeries.value = new Map()
   for (const key of Object.keys(satelliteLoadErrorBySeries)) {
     delete satelliteLoadErrorBySeries[key]
@@ -659,6 +656,66 @@ const centerGroupsByCountry = computed(() => {
     enemyCountriesList.value,
   )
 })
+
+/**
+ * 左侧面板国家顺序：先敌方国家，再追加只出现在已选地面站或数据中心里的国家。
+ */
+const panelCountries = computed(() => {
+  const ordered: string[] = []
+  const seen = new Set<string>()
+  const pushCountry = (country: string) => {
+    const name = country.trim()
+    if (!name || seen.has(name)) return
+    seen.add(name)
+    ordered.push(name)
+  }
+  for (const country of enemyCountriesList.value) pushCountry(country)
+  for (const group of receiveGroupsByCountry.value) {
+    if (group.rows.length) pushCountry(group.country)
+  }
+  for (const group of centerGroupsByCountry.value) {
+    if (group.rows.length) pushCountry(group.country)
+  }
+  return ordered
+})
+
+watch(panelCountries, (countries) => {
+  syncCountryPanelChecked(countries)
+}, { immediate: true })
+
+/** 当前勾选、需要展示资源的国家 */
+const checkedPanelCountries = computed(() =>
+  panelCountries.value.filter((country) => isCountryPanelVisible(country)),
+)
+
+/** 已勾选国家下、任务已选的卫星系列数量 */
+const visibleSeriesCount = computed(() =>
+  checkedPanelCountries.value.reduce((count, country) => count + seriesForCountry(country).length, 0),
+)
+
+/**
+ * 把分组表格按已勾选国家收成一张表。没有国家的行仍保留在同一张表里。
+ *
+ * @param groups 按国家分组的地面站或数据中心
+ * @returns 过滤后的表格行
+ */
+const filterRowsByCheckedCountries = (
+  groups: C2LeftPanelCountryGroundGroup[],
+): C2LeftPanelGroundStationTableRow[] => {
+  const rows: C2LeftPanelGroundStationTableRow[] = []
+  for (const group of groups) {
+    if (!group.country || isCountryPanelVisible(group.country)) {
+      rows.push(...group.rows)
+    }
+  }
+  return rows
+}
+
+/** 已勾选国家的地面站，合并为一张表 */
+const filteredReceiveRows = computed(() => filterRowsByCheckedCountries(receiveGroupsByCountry.value))
+
+/** 已勾选国家的数据中心，合并为一张表 */
+const filteredCenterRows = computed(() => filterRowsByCheckedCountries(centerGroupsByCountry.value))
 
 /**
  * 任务已选武器 ID。关闭「使用武器」时草稿被清空，展示仍用暂存的任务选择，而不是武器库全量。
@@ -1588,23 +1645,22 @@ onUnmounted(() => {
   word-break: break-word;
 }
 
-.country-block {
+.country-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   margin-bottom: 12px;
-  padding: 8px 10px;
-  border: 1px solid rgba(79, 147, 221, 0.22);
-  border-radius: 6px;
-  background: rgba(14, 28, 48, 0.45);
 }
 
-.country-block__head {
-  display: flex;
+.country-filter__item {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 6px;
+  margin: 0;
   cursor: pointer;
 }
 
-.country-block__title {
+.country-filter__name {
   font-size: 13px;
   font-weight: 700;
   color: #7dd3fc;
@@ -1696,10 +1752,6 @@ onUnmounted(() => {
 .weapon-table {
   min-width: 880px;
   white-space: nowrap;
-}
-
-.country-resource-list {
-  margin-bottom: 10px;
 }
 
 .task-metric-rows {

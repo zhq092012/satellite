@@ -4,7 +4,7 @@
     <div class="map-globe-layer">
       <BattleSituationGlobe ref="globeRef" :satellites="globeSatellites" :weapons="globeWeapons"
         :ground-targets="globeGroundTargets" :current-time-ms="currentTimeMs" :selected-norad="selectedNorad"
-        :highlighted-series="store.selectedSatSeries || null"
+        :highlighted-series="globeSeriesHighlight"
         :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
         :selected-resource-detail-text="selectedResourceDetailText"
         :selected-satellite-detail-view="selectedSatelliteDetailView"
@@ -167,6 +167,11 @@ const isTimelineCollapsed = ref(false)
 
 /** 当前选中的卫星 NORAD（仅用于右侧面板高亮） */
 const selectedNorad = ref<number | null>(null)
+/**
+ * 地图黄色高亮的系列。仅在用户点击系列后写入，且不显示名称/系列/类型/用途标签。
+ * 初始化自动选中的分析系列不写入，地图上不出现这组标签。
+ */
+const globeSeriesHighlight = ref<string | null>(null)
 
 /** 当前选中的武器 ID */
 const selectedWeaponId = ref<string | null>(null)
@@ -651,7 +656,7 @@ watch([weaponRecordById, groundStationRecordById], () => {
 })
 
 /**
- * 左侧面板选中卫星系列：同步 Store 分析系列，并在地球上高亮该系列全部卫星及 Label。
+ * 左侧面板选中卫星系列：同步 Store 分析系列，并在地球上高亮该系列卫星点，不显示 Label。
  *
  * @param series 系列名
  */
@@ -668,6 +673,7 @@ const handleFocusTaskSeries = (series: string) => {
   selectedNorad.value = null
   store.setSelectedAnalysisNorad(null)
   clearGlobeResourceDetail()
+  globeSeriesHighlight.value = trimmed
   store.setSelectedSatSeries(trimmed)
   void nextTick(() => {
     globeRef.value?.flyToSatelliteSeries?.(trimmed)
@@ -978,6 +984,19 @@ watch(
     store.resolveSelectedSatSeriesForTaskOptions(options)
   },
   { immediate: true },
+)
+
+/**
+ * 分析系列被清空或切到其他系列时，取消地图黄色高亮。
+ * 初始化自动选中第一项不会写入 globeSeriesHighlight，因此不显示卫星标签。
+ */
+watch(
+  () => store.selectedSatSeries,
+  (series) => {
+    if (globeSeriesHighlight.value && globeSeriesHighlight.value !== series) {
+      globeSeriesHighlight.value = null
+    }
+  },
 )
 
 /** 系列/任务变化时重新加载矩阵 */

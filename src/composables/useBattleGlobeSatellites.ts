@@ -50,7 +50,7 @@ interface SatellitePointVisual {
  * @param struckSatelliteNoradRef 推演中已被打击的卫星 NORAD（显示为红色）
  * @param timelinePlaybackActiveRef 时间轴播放中（选中星持续高亮并始终显示名称）
  * @param selectedLabelDetailTextRef 选中卫星时 Label 展示的详情（多行）；为空则用默认名称+摘要
- * @param highlightedSeriesRef 左侧面板 / 分析页选中的卫星系列；该系列下全部卫星高亮并显示 Label
+ * @param highlightedSeriesRef 用户主动聚焦的卫星系列；该系列全部卫星黄色高亮，不显示 Label
  */
 export const useBattleGlobeSatellites = (
   viewerRef: Ref<Cesium.Viewer | null>,
@@ -75,15 +75,15 @@ export const useBattleGlobeSatellites = (
   const scratchPosition = new Cesium.Cartesian3()
   const scratchFrustumSphere = new Cesium.BoundingSphere()
 
-  /**
-   * 构建卫星名称标签文案；选中时附加系列、类型、用途。
+   /**
+   * 构建卫星名称标签文案；单星选中时附加系列、类型、用途。
    *
    * @param visual 卫星可视化对象
-   * @param selected 是否为当前选中星
+   * @param withMeta 是否附加系列、类型、用途
    * @returns Cesium Label 文本
    */
-  const buildSatelliteLabelText = (visual: SatellitePointVisual, selected: boolean): string => {
-    if (!selected) return visual.name
+  const buildSatelliteLabelText = (visual: SatellitePointVisual, withMeta: boolean): string => {
+    if (!withMeta) return visual.name
     const meta = formatSatelliteMetaInline(visual.series, visual.sysType, visual.usage)
     return meta ? `${visual.name}\n${meta}` : visual.name
   }
@@ -369,14 +369,20 @@ export const useBattleGlobeSatellites = (
       const selected = selectedNorad === visual.norad
       const seriesHighlighted =
         !!highlightSeries && visual.series === highlightSeries
-      /** 单星选中或系列高亮：加强点大小与名称标签 */
+      /** 单星选中或用户聚焦系列：加强点大小并使用黄色 */
       const emphasized = selected || seriesHighlighted
       const struck = struckSatelliteNoradRef.value === visual.norad
       const facing = isPositionFacingCamera(visual.position, cameraPosition)
       const inFrustum = isPositionInCameraFrustum(viewer, visual.position)
       const distance = Cesium.Cartesian3.distance(cameraPosition, visual.position)
       const lodStyle = resolveLodStyle(distance, emphasized, emphasized, struck)
-      const showLabel = shouldShowSatelliteLabel(distance, emphasized, emphasized)
+      /**
+       * 系列聚焦只高亮点，不显示名称/系列/类型/用途。
+       * 单独点中的卫星仍显示 Label。
+       */
+      const showLabel = seriesHighlighted && !selected
+        ? false
+        : shouldShowSatelliteLabel(distance, selected, selected)
 
       if (!emphasized && !facing) {
         visual.point.show = false
@@ -396,7 +402,7 @@ export const useBattleGlobeSatellites = (
 
       const useHtmlDetailLabel = selected && !!selectedLabelDetailTextRef.value
       visual.label.show = showLabel && !useHtmlDetailLabel
-      visual.label.text = buildSatelliteLabelText(visual, emphasized)
+      visual.label.text = buildSatelliteLabelText(visual, selected)
       visual.label.horizontalOrigin = Cesium.HorizontalOrigin.CENTER
       visual.label.fillColor = struck
         ? STRUCK_SATELLITE_COLOR

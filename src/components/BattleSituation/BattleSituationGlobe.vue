@@ -82,7 +82,7 @@ const props = withDefaults(
     currentTimeMs?: number
     /** 当前选中卫星 NORAD */
     selectedNorad?: number | null
-    /** 当前分析/聚焦的卫星系列（该系列全部卫星在地球上高亮并显示 Label） */
+    /** 用户主动聚焦的卫星系列（该系列全部卫星黄色高亮，不显示 Label） */
     highlightedSeries?: string | null
     /** 武器列表 */
     weapons?: BattleGlobeWeapon[]
