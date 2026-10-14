@@ -18,74 +18,7 @@
     </div>
 
     <div v-else class="analysis-scroll">
-      <!-- 1. 首次回传时间与延迟 -->
-      <section class="analysis-section">
-        <div class="section-head">
-          <span class="section-title">首次回传时间</span>
-        </div>
-
-        <div class="feedback-kpi-grid">
-          <div class="feedback-cell">
-            <span class="analysis-kpi-label">打击前</span>
-          </div>
-          <div class="feedback-cell">
-            <span class="analysis-kpi-label">打击后</span>
-          </div>
-          <div class="feedback-cell">
-            <span class="analysis-kpi-label">造成延迟</span>
-          </div>
-
-          <div class="feedback-cell">
-            <el-tooltip
-              :disabled="!hasFeedbackLinkTooltip(beforeFeedback.link)"
-              :content="beforeFeedback.link"
-              placement="top"
-              :show-after="200"
-            >
-              <span class="feedback-time">{{ formatFeedbackTimeOnly(beforeFeedback.time) }}</span>
-            </el-tooltip>
-          </div>
-          <div class="feedback-cell">
-            <el-tooltip
-              :disabled="!hasFeedbackLinkTooltip(afterFeedback.link)"
-              :content="afterFeedback.link"
-              placement="top"
-              :show-after="200"
-            >
-              <span class="feedback-time">{{ formatFeedbackTimeOnly(afterFeedback.time) }}</span>
-            </el-tooltip>
-          </div>
-          <div class="feedback-cell">
-            <span class="analysis-kpi-value analysis-kpi-value--delay">{{ strikeDelayText }}</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- 2. 平均覆盖率对比 -->
-      <section class="analysis-section">
-        <div class="section-head">
-          <span class="section-title">平均覆盖率</span>
-        </div>
-
-        <div class="analysis-kpi-row">
-          <div class="analysis-kpi-item">
-            <span class="analysis-kpi-label">打击前</span>
-            <span class="analysis-kpi-value analysis-kpi-value--before">{{ beforeCoverageText }}</span>
-          </div>
-
-          <div class="analysis-kpi-item">
-            <span class="analysis-kpi-label">打击后</span>
-            <span class="analysis-kpi-value analysis-kpi-value--after">{{ afterCoverageText }}</span>
-          </div>
-
-          <div class="analysis-kpi-item">
-            <span class="analysis-kpi-label">覆盖率减少</span>
-            <span class="analysis-kpi-value analysis-kpi-value--reduce">{{ coverageReductionText }}</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- 3. 卫星打击推荐列表（targetsThreatLevel） -->
+      <!-- 卫星打击推荐列表（targetsThreatLevel） -->
       <section class="analysis-section analysis-section--table">
         <div class="section-head">
           <span class="section-title">卫星打击推荐列表</span>
@@ -119,12 +52,18 @@
           </el-table-column>
           <el-table-column label="静态威胁度" width="88" align="right" class-name="strike-recommend-metric-col">
             <template #default="{ row }">
-              <span class="strike-recommend-score">{{ formatStrikeRecommendThreat(row.staticThreat) }}</span>
+              <button type="button" class="strike-recommend-score strike-recommend-score--link"
+                @click.stop="handleStaticThreatClick(row)">
+                {{ formatStrikeRecommendThreat(row.staticThreat) }}
+              </button>
             </template>
           </el-table-column>
           <el-table-column label="动态威胁度" width="88" align="right" class-name="strike-recommend-metric-col">
             <template #default="{ row }">
-              <span class="strike-recommend-score">{{ formatStrikeRecommendThreat(row.dynamicThreat) }}</span>
+              <button type="button" class="strike-recommend-score strike-recommend-score--link"
+                @click.stop="handleDynamicThreatClick(row)">
+                {{ formatStrikeRecommendThreat(row.dynamicThreat) }}
+              </button>
             </template>
           </el-table-column>
         </el-table>
@@ -140,254 +79,74 @@
         </div>
       </section>
 
-      <!-- 3b. 接收站打击推荐列表（接口未就绪，当前为假数据） -->
-      <section class="analysis-section analysis-section--table">
-        <div class="section-head">
-          <span class="section-title">接收站打击推荐列表</span>
-          <span class="section-count">
-            展示 {{ displayedReceiveStrikeRecommendRows.length }} / 共 {{ receiveStrikeRecommendDisplayRows.length }} 个 · 按综合威胁度降序
-          </span>
-        </div>
-
-        <el-table :data="displayedReceiveStrikeRecommendRows" size="small" row-key="targetKey"
-          class="sat-metric-table strike-recommend-table" empty-text="暂无推荐数据">
-          <el-table-column label="序号" width="48" align="center" class-name="strike-recommend-index-col">
-            <template #default="{ $index }">
-              <span class="strike-recommend-index">{{ $index + 1 }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="接收站名称" min-width="100" show-overflow-tooltip class-name="strike-recommend-name-col">
-            <template #default="{ row }">
-              <button type="button" class="sat-name-wrap strike-recommend-name ground-target-name"
-                :class="{ 'ground-target-name--selected': selectedGroundTargetKey === row.targetKey }"
-                @click="emit('select-ground-target', row.targetKey)">
-                {{ row.name }}
-              </button>
-            </template>
-          </el-table-column>
-          <el-table-column label="综合威胁度" width="88" align="right" class-name="strike-recommend-metric-col">
-            <template #default="{ row }">
-              <span class="strike-recommend-score strike-recommend-score--composite">{{
-                formatStrikeRecommendThreat(row.compositeThreat) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="静态威胁度" width="88" align="right" class-name="strike-recommend-metric-col">
-            <template #default="{ row }">
-              <span class="strike-recommend-score">{{ formatStrikeRecommendThreat(row.staticThreat) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="动态威胁度" width="88" align="right" class-name="strike-recommend-metric-col">
-            <template #default="{ row }">
-              <span class="strike-recommend-score">{{ formatStrikeRecommendThreat(row.dynamicThreat) }}</span>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <div v-if="receiveStrikeRecommendDisplayRows.length > SATELLITE_TABLE_TOP_COUNT" class="table-more-actions">
-          <button v-if="!showAllReceiveStrikeRecommend" type="button" class="table-more-btn"
-            @click="showAllReceiveStrikeRecommend = true">
-            查看更多（{{ receiveStrikeRecommendDisplayRows.length - SATELLITE_TABLE_TOP_COUNT }}）
-          </button>
-          <button v-else type="button" class="table-more-btn" @click="showAllReceiveStrikeRecommend = false">
-            收起
-          </button>
-        </div>
-      </section>
-
-      <!-- 4. 卫星指标表格 -->
-      <section class="analysis-section analysis-section--table">
-        <div class="section-head">
-          <div class="section-head-main">
-            <span class="section-title">卫星指标</span>
-            <span v-if="selectedSatelliteMetaInline" class="selected-sat-inline-meta">
-              {{ selectedSatelliteMetaInline }}
-            </span>
-          </div>
-          <span class="section-count">
-            展示 {{ displayedSatelliteTableRows.length }} / 共 {{ rankedSatelliteTableRows.length }} 颗
-          </span>
-        </div>
-
-        <el-table :data="displayedSatelliteTableRows" size="small" row-key="rowKey" class="sat-metric-table"
-          empty-text="暂无卫星数据">
-          <el-table-column label="卫星" width="112" class-name="sat-name-column">
-            <template #default="{ row }">
-              <el-tooltip
-                :content="`${row.name}\n${formatSatelliteSeriesTypeMeta(row.series, row.sysType, row.usage)}`"
-                placement="left"
-                :show-after="200">
-                <div class="sat-name-cell" :class="{ 'sat-name-cell--selected': selectedNorad === row.norad }">
-                  <button type="button" class="sat-name-wrap"
-                    :class="{ 'sat-name-wrap--selected': selectedNorad === row.norad }"
-                    @click="emit('select-satellite', row.norad)">
-                    {{ row.name }}
-                  </button>
-                  <div
-                    v-if="selectedNorad === row.norad || hasSatelliteMeta(row)"
-                    class="sat-name-meta"
-                    :class="{ 'sat-name-meta--selected': selectedNorad === row.norad }">
-                    <div v-if="displaySatelliteSeries(row) !== '--'" class="sat-name-meta__line">
-                      <span class="sat-name-meta__label">系列：</span>
-                      <span class="sat-name-meta__series">{{ displaySatelliteSeries(row) }}</span>
-                    </div>
-                    <div v-if="displaySatelliteSysType(row) !== '--'" class="sat-name-meta__line">
-                      <span class="sat-name-meta__label">类型：</span>
-                      <span class="sat-name-meta__type">{{ displaySatelliteSysType(row) }}</span>
-                    </div>
-                    <div v-if="displaySatelliteUsage(row) !== '--'" class="sat-name-meta__line">
-                      <span class="sat-name-meta__label">用途：</span>
-                      <span class="sat-name-meta__usage">{{ displaySatelliteUsage(row) }}</span>
-                    </div>
-                  </div>
-                </div>
-              </el-tooltip>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="覆盖率" width="96" sortable :sort-method="sortByCoverageBefore">
-            <template #default="{ row }">
-              <div class="metric-cell metric-cell--clickable-metric" role="button" tabindex="0"
-                @click.stop="handleCoverageMetricClick(row)"
-                @keydown.enter.stop="handleCoverageMetricClick(row)">
-                <div class="metric-line">
-                  <span class="metric-line-label">打击前</span>
-                  <span class="metric-line-value">{{ row.coverageBeforeText }}</span>
-                </div>
-                <div class="metric-line">
-                  <span class="metric-line-label">打击后</span>
-                  <span class="metric-line-value">{{ row.coverageAfterText }}</span>
-                </div>
-                <div class="metric-line">
-                  <span class="metric-line-label">覆盖率减少</span>
-                  <span class="metric-line-delta metric-line-delta--green">{{ row.coverageReduceText }}</span>
-                </div>
-              </div>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="链路时延" width="96" sortable :sort-method="sortByDelayBefore">
-            <template #default="{ row }">
-              <div class="metric-cell metric-cell--clickable-metric" role="button" tabindex="0"
-                @click.stop="handleDelayMetricClick(row)"
-                @keydown.enter.stop="handleDelayMetricClick(row)">
-                <div class="metric-line">
-                  <span class="metric-line-label">打击前</span>
-                  <span class="metric-line-value">{{ row.delayBeforeText }}</span>
-                </div>
-                <div class="metric-line">
-                  <span class="metric-line-label">打击后</span>
-                  <span class="metric-line-value">{{ row.delayAfterText }}</span>
-                </div>
-                <div class="metric-line">
-                  <span class="metric-line-label">增加时延</span>
-                  <span class="metric-line-delta metric-line-delta--yellow">{{ row.delayIncreaseText }}</span>
-                </div>
-              </div>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="威胁度" width="96" sortable :sort-method="sortByThreatBefore"
-            class-name="sat-threat-column">
-            <template #default="{ row }">
-              <div class="metric-cell metric-cell--clickable-threat" role="button" tabindex="0"
-                @click.stop="handleThreatMetricClick(row)"
-                @keydown.enter.stop="handleThreatMetricClick(row)">
-                <div class="metric-line">
-                  <span class="metric-line-label">打击前</span>
-                  <span class="metric-line-value">{{ row.threatBeforeText }}</span>
-                </div>
-                <div class="metric-line">
-                  <span class="metric-line-label">打击后</span>
-                  <span class="metric-line-value">{{ row.threatAfterText }}</span>
-                </div>
-                <div class="metric-line">
-                  <span class="metric-line-label">威胁度降低</span>
-                  <span class="metric-line-delta metric-line-delta--green">{{ row.threatReduceText }}</span>
-                </div>
-              </div>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <div v-if="rankedSatelliteTableRows.length > SATELLITE_TABLE_TOP_COUNT" class="table-more-actions">
-          <button v-if="!showAllSatellites" type="button" class="table-more-btn" @click="showAllSatellites = true">
-            查看更多（{{ rankedSatelliteTableRows.length - SATELLITE_TABLE_TOP_COUNT }}）
-          </button>
-          <button v-else type="button" class="table-more-btn" @click="showAllSatellites = false">
-            收起
-          </button>
-        </div>
-      </section>
-
     </div>
   </aside>
 
+  <BattleSatelliteLinkDelayDialog v-model="linkDelayDialogVisible" :matrix="chartMatrix" :norad="chartNorad"
+    :task-end="taskEndDate" :subtitle="chartDialogSubtitle" :threat-metrics="linkDelayThreatMetrics"
+    dialog-title="动态威胁度" />
+
   <SatelliteThreatInfoDialog v-model="threatInfoDialogVisible" :loading="threatInfoLoading"
     :threat-info="threatInfoData" :subtitle="threatInfoSubtitle" :empty-hint="threatInfoEmptyHint" />
-
-  <BattleSatelliteCoverageDialog v-model="coverageDialogVisible" :matrix="chartMatrix" :norad="chartNorad"
-    :task-begin="taskBeginDate" :task-end="taskEndDate" :subtitle="chartDialogSubtitle" />
-
-  <BattleSatelliteLinkDelayDialog v-model="linkDelayDialogVisible" :matrix="chartMatrix" :norad="chartNorad"
-    :task-end="taskEndDate" :subtitle="chartDialogSubtitle" />
 </template>
 
 <script setup lang="ts">
 /**
  * 整体态势分析 - 右侧面板。
- * 根据任务算法进度展示 getTaskMatrix 返回的分析摘要。
+ * 算法完成后仅展示卫星打击推荐列表（综合 / 静态 / 动态威胁度）。
  */
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getSatelliteThreatInfo, type MatrixResult, type SatelliteThreatInfo } from '@/api/electronic'
-import {
-  getTargetsThreatLevel,
-  type LevelSeriesEntity,
-  type SatelliteAnalysisData,
-} from '@/api/task/task'
-import BattleSatelliteCoverageDialog from '@/components/BattleSituation/BattleSatelliteCoverageDialog.vue'
+import { getTargetsThreatLevel, type SatelliteAnalysisData } from '@/api/task/task'
 import BattleSatelliteLinkDelayDialog from '@/components/BattleSituation/BattleSatelliteLinkDelayDialog.vue'
+import type { LinkDelayThreatMetrics } from '@/components/BattleSituation/BattleSatelliteLinkDelayDialog.vue'
 import SatelliteThreatInfoDialog from '@/components/BattleSituation/SatelliteThreatInfoDialog.vue'
-import { levelSeriesEntityToMatrix } from '@/utils/seriesLinkTimeline'
 import { useLayoutStore } from '@/store/modules/layout'
-import {
-  buildSatelliteAnalysisTableRows,
-  compareNullableMetric,
-  formatSatelliteMetaInline,
-  formatSatelliteSeriesTypeMeta,
-  formatSatelliteThreat,
-  rankSatellitesByCompositeBeforeMetrics,
-  resolveSatelliteDisplayMetaFromAnalysis,
-  SATELLITE_TABLE_TOP_COUNT,
-  type SatelliteMetricTableRow,
-} from '@/utils/buildSatelliteAnalysisTable'
+import { formatSatelliteThreat, SATELLITE_TABLE_TOP_COUNT } from '@/utils/buildSatelliteAnalysisTable'
+import { findLevelSeriesEntityForNorad } from '@/utils/buildSatelliteDeductionTimeline'
+import { levelSeriesEntityToMatrix } from '@/utils/seriesLinkTimeline'
 import {
   mapTargetThreatLevelListToStrikeRecommend,
   sortStrikeRecommendByCompositeThreat,
   type SatelliteStrikeRecommendItem,
 } from '@/utils/mockSatelliteStrikeRecommendations'
-import {
-  MOCK_RECEIVE_STATION_STRIKE_RECOMMENDATIONS,
-  type ReceiveStationStrikeRecommendItem,
-} from '@/utils/mockReceiveStationStrikeRecommendations'
-import {
-  formatCoveragePercent,
-  formatCoverageReduction,
-  formatStrikeDelayDuration,
-  parseFeedbackTimeAndLink,
-  splitDateTimeDisplay,
-} from '@/utils/zhchPlanDisplay'
 
 /** 全局布局 Store（当前任务 ID） */
 const store = useLayoutStore()
 
-/** 威胁度算法参数弹窗可见性 */
+const props = defineProps<{
+  /** 任务算法分析结果；就绪后才拉取打击推荐 */
+  analysisData: SatelliteAnalysisData | null
+  /** 当前任务算法是否已完成 */
+  algorithmComplete: boolean
+  /** 分析结果是否正在加载 */
+  analysisLoading?: boolean
+  /** 当前选中的卫星 NORAD，用于推荐列表高亮 */
+  selectedNorad?: number | null
+}>()
+
+/** 选中推荐卫星时通知父组件定位地球 */
+const emit = defineEmits<{
+  (e: 'select-satellite', norad: number): void
+}>()
+
+/** 卫星打击推荐列表（接口原始行，按任务加载） */
+const satelliteStrikeRecommendRows = ref<SatelliteStrikeRecommendItem[]>([])
+
+/** 卫星打击推荐列表加载中 */
+const strikeRecommendLoading = ref(false)
+
+/** 动态威胁度弹窗（复用链路时延的三层链路图）是否可见 */
+const linkDelayDialogVisible = ref(false)
+
+/** 静态威胁度算法参数弹窗是否可见 */
 const threatInfoDialogVisible = ref(false)
 
-/** 威胁度算法参数加载状态 */
+/** 威胁度算法参数是否正在加载 */
 const threatInfoLoading = ref(false)
 
-/** 威胁度算法参数数据 */
+/** 威胁度算法参数 */
 const threatInfoData = ref<SatelliteThreatInfo | null>(null)
 
 /** 威胁度弹窗副标题 */
@@ -396,255 +155,23 @@ const threatInfoSubtitle = ref('')
 /** 威胁度弹窗无数据提示 */
 const threatInfoEmptyHint = ref('')
 
-/** 覆盖率 / 链路时延图表弹窗可见性 */
-const coverageDialogVisible = ref(false)
-const linkDelayDialogVisible = ref(false)
+/** 并发请求序号：仅最新一次威胁度参数请求可写回弹窗 */
+let threatInfoLoadToken = 0
 
-/** 图表弹窗使用的系列矩阵与 NORAD */
+/** 弹窗绘制链路使用的系列矩阵 */
 const chartMatrix = ref<MatrixResult | null>(null)
+
+/** 弹窗聚焦的卫星 NORAD */
 const chartNorad = ref<number | null>(null)
+
+/** 弹窗副标题 */
 const chartDialogSubtitle = ref('')
 
-/** 当前任务时间范围（图表用） */
-const taskBeginDate = computed(() => store.activedTask?.beginDate ?? '')
+/** 弹窗顶部指标，取自已加载的 getTargetsThreatLevel 行 */
+const linkDelayThreatMetrics = ref<LinkDelayThreatMetrics | null>(null)
+
+/** 当前任务结束时间，供链路过站计算 */
 const taskEndDate = computed(() => store.activedTask?.endDate ?? '')
-
-/**
- * 按系列与系统类型查找 levelSeriesEntities 中的矩阵实体。
- *
- * @param row 卫星表格行
- * @returns 系列实体或 null
- */
-const findLevelSeriesEntityForRow = (row: SatelliteMetricTableRow): LevelSeriesEntity | null => {
-  const entities = props.analysisData?.levelSeriesEntities
-  if (!entities?.length) return null
-  if (row.series && row.series !== '--') {
-    const matched = entities.find((entity) => entity.series === row.series && entity.sysType === row.sysType)
-    if (matched) return matched
-  }
-  return entities.find((entity) => entity.sysType === row.sysType) ?? null
-}
-
-/**
- * 打开图表弹窗前的公共校验与矩阵解析。
- *
- * @param row 卫星行
- * @returns 是否可继续
- */
-const prepareChartDialogContext = (row: SatelliteMetricTableRow): boolean => {
-  if (!store.activedTask?.id) {
-    ElMessage.warning('请先选择任务')
-    return false
-  }
-  if (!props.algorithmComplete || !props.analysisData) {
-    ElMessage.warning('请等待任务算法分析完成')
-    return false
-  }
-  const entity = findLevelSeriesEntityForRow(row)
-  if (!entity) {
-    ElMessage.warning('未找到该卫星对应的系列分析数据')
-    return false
-  }
-  chartMatrix.value = levelSeriesEntityToMatrix(entity)
-  chartNorad.value = row.norad
-  chartDialogSubtitle.value = `${row.name}${row.series && row.series !== '--' ? ` · 系列：${row.series}` : ''}${row.sysType && row.sysType !== '--' ? ` · 类型：${row.sysType}` : ''}`
-  return true
-}
-
-/**
- * 点击覆盖率单元格，打击前覆盖率有效且大于 0 时打开热力图。
- *
- * @param row 卫星指标行
- */
-const handleCoverageMetricClick = (row: SatelliteMetricTableRow) => {
-  const before = row.coverageBefore
-  if (before == null || !Number.isFinite(before) || before <= 0) {
-    ElMessage.info('当前卫星没有覆盖率信息')
-    return
-  }
-  if (!prepareChartDialogContext(row)) return
-  linkDelayDialogVisible.value = false
-  coverageDialogVisible.value = true
-}
-
-/**
- * 点击链路时延单元格，打击前时延有效且大于 0 分钟时打开 G6 拓扑。
- *
- * @param row 卫星指标行
- */
-const handleDelayMetricClick = (row: SatelliteMetricTableRow) => {
-  const before = row.delayBefore
-  if (before == null || !Number.isFinite(before) || before <= 0) {
-    ElMessage.info('当前卫星没有链路时延信息')
-    return
-  }
-  if (!prepareChartDialogContext(row)) return
-  coverageDialogVisible.value = false
-  linkDelayDialogVisible.value = true
-}
-
-/**
- * 从接口列表中解析与 NORAD 匹配的威胁度参数。
- *
- * @param list 接口返回列表
- * @param norad 目标 NORAD
- * @returns 匹配项或首项
- */
-const resolveThreatInfoFromResponse = (
-  list: SatelliteThreatInfo[] | null | undefined,
-  norad: number
-): SatelliteThreatInfo | null => {
-  if (!list?.length) return null
-  return list.find((item) => item.satelliteBaseModelResp?.norad === norad) ?? list[0] ?? null
-}
-
-/**
- * 点击威胁度单元格，拉取并展示威胁度算法参数。
- *
- * @param row 卫星指标行
- */
-const handleThreatMetricClick = async (row: SatelliteMetricTableRow) => {
-  const taskId = store.activedTask?.id
-  if (!taskId) {
-    ElMessage.warning('请先选择任务')
-    return
-  }
-  if (!row.sysType || row.sysType === '--') {
-    ElMessage.warning('缺少卫星类型，无法查询威胁度算法参数')
-    return
-  }
-
-  threatInfoDialogVisible.value = true
-  threatInfoLoading.value = true
-  threatInfoData.value = null
-  threatInfoEmptyHint.value = ''
-  threatInfoSubtitle.value = `${row.name}${row.series && row.series !== '--' ? ` · 系列：${row.series}` : ''} · 类型：${row.sysType}`
-
-  try {
-    const res = await getSatelliteThreatInfo({
-      norad: row.norad,
-      sysType: row.sysType,
-      taskId,
-    })
-    if (res?.code !== 200) {
-      threatInfoEmptyHint.value = res?.msg || '未查询到威胁度算法参数'
-      return
-    }
-    const info = resolveThreatInfoFromResponse(res.data, row.norad)
-    threatInfoData.value = info
-    if (!info) {
-      threatInfoEmptyHint.value = '未查询到威胁度算法参数'
-    }
-  } catch (error) {
-    console.error('获取卫星威胁度算法参数失败:', error)
-    threatInfoEmptyHint.value = '加载失败，请稍后重试'
-    ElMessage.error('获取卫星威胁度算法参数失败')
-  } finally {
-    threatInfoLoading.value = false
-  }
-}
-
-const props = defineProps<{
-  /** 任务算法分析结果 */
-  analysisData: SatelliteAnalysisData | null
-  /** 当前任务算法是否已完成 */
-  algorithmComplete: boolean
-  /** 分析结果是否正在加载 */
-  analysisLoading?: boolean
-  /** 当前选中的卫星 NORAD */
-  selectedNorad?: number | null
-  /** 当前选中的武器 ID */
-  selectedWeaponId?: string | null
-  /** 当前选中的地面目标键 */
-  selectedGroundTargetKey?: string | null
-}>()
-
-/** 选中右侧卫星/武器/地面站时通知父组件定位地球 */
-const emit = defineEmits<{
-  (e: 'select-satellite', norad: number): void
-  (e: 'select-weapon', weaponId: string): void
-  (e: 'select-ground-target', targetKey: string): void
-}>()
-
-/**
- * 读取接口返回的打击前平均覆盖率（未返回时为 null，不从矩阵推算）。
- *
- * @param data 任务分析数据
- * @returns 打击前平均覆盖率；无法计算时返回 null
- */
-const resolveBeforeAvgCoverage = (data: SatelliteAnalysisData | null): number | null => {
-  if (!data) return null
-  if (Number.isFinite(data.beforeAvgCoverage)) {
-    return Number(data.beforeAvgCoverage)
-  }
-  return null
-}
-
-/**
- * 首次回传 KPI 单元格仅展示时分秒；无效或「无」时原样返回。
- *
- * @param timeText 解析后的回传时间文本
- * @returns 用于展示的时分秒或占位符
- */
-function formatFeedbackTimeOnly(timeText: string): string {
-  if (timeText === '无' || timeText === '--') return timeText
-  const { time, date } = splitDateTimeDisplay(timeText)
-  return time || date || timeText
-}
-
-/**
- * 是否存在可在 tooltip 中展示的回传链路。
- *
- * @param link 解析后的链路文本
- * @returns 有有效链路时为 true
- */
-function hasFeedbackLinkTooltip(link: string): boolean {
-  const trimmed = link?.trim()
-  return Boolean(trimmed && trimmed !== '--' && trimmed !== '无')
-}
-
-/** 打击前首次回传时间与链路 */
-const beforeFeedback = computed(() =>
-  parseFeedbackTimeAndLink(props.analysisData?.beforeFirstFeedbackTime)
-)
-
-/** 打击后首次回传时间与链路 */
-const afterFeedback = computed(() =>
-  parseFeedbackTimeAndLink(props.analysisData?.afterFirstFeedbackTime)
-)
-
-/** 打击造成的回传延迟 */
-const strikeDelayText = computed(() =>
-  formatStrikeDelayDuration(
-    props.analysisData?.beforeFirstFeedbackTime,
-    props.analysisData?.afterFirstFeedbackTime,
-    taskEndDate.value
-  )
-)
-
-/** 打击前平均覆盖率展示 */
-const beforeCoverageText = computed(() =>
-  formatCoveragePercent(resolveBeforeAvgCoverage(props.analysisData))
-)
-
-/** 打击后平均覆盖率展示 */
-const afterCoverageText = computed(() =>
-  formatCoveragePercent(props.analysisData?.afterAvgCoverage)
-)
-
-/** 覆盖率减少量展示 */
-const coverageReductionText = computed(() =>
-  formatCoverageReduction(
-    resolveBeforeAvgCoverage(props.analysisData),
-    props.analysisData?.afterAvgCoverage
-  )
-)
-
-/** 卫星打击推荐列表（接口原始行，按任务加载） */
-const satelliteStrikeRecommendRows = ref<SatelliteStrikeRecommendItem[]>([])
-
-/** 卫星打击推荐列表加载中 */
-const strikeRecommendLoading = ref(false)
 
 /** 并发请求序号：仅最新一次 `getTargetsThreatLevel` 可写回列表 */
 let strikeRecommendLoadToken = 0
@@ -691,21 +218,105 @@ const strikeRecommendDisplayRows = computed((): SatelliteStrikeRecommendItem[] =
   sortStrikeRecommendByCompositeThreat(satelliteStrikeRecommendRows.value)
 )
 
-/**
- * 接收站打击推荐列表展示行（当前为假数据；接入后端后改为 API / analysisData 字段）。
- */
-const receiveStrikeRecommendDisplayRows = computed((): ReceiveStationStrikeRecommendItem[] =>
-  sortStrikeRecommendByCompositeThreat(MOCK_RECEIVE_STATION_STRIKE_RECOMMENDATIONS)
-)
-
-/** 推荐列表威胁度数值格式化（与卫星指标表一致） */
+/** 推荐列表威胁度数值格式化 */
 const formatStrikeRecommendThreat = formatSatelliteThreat
+
+/**
+ * 从接口列表中取出与 NORAD 匹配的威胁度参数。
+ *
+ * @param list 接口返回列表
+ * @param norad 目标 NORAD
+ * @returns 匹配项；列表为空时返回 null。未命中目标 NORAD 时取首项（接口按 norad 查询，列表通常只有该星）
+ */
+const resolveThreatInfoFromResponse = (
+  list: SatelliteThreatInfo[] | null | undefined,
+  norad: number
+): SatelliteThreatInfo | null => {
+  if (!list?.length) return null
+  return list.find((item) => item.satelliteBaseModelResp?.norad === norad) ?? list[0] ?? null
+}
+
+/**
+ * 点击静态威胁度，打开威胁度算法参数弹窗并拉取 `getSatelliteThreatInfo`。
+ * 卫星类型取该星所在系列实体的 `sysType`，缺失时不请求。
+ *
+ * @param row 当前推荐行
+ */
+const handleStaticThreatClick = async (row: SatelliteStrikeRecommendItem) => {
+  const taskId = store.activedTask?.id
+  if (!taskId) {
+    ElMessage.warning('请先选择任务')
+    return
+  }
+  const entity = props.analysisData
+    ? findLevelSeriesEntityForNorad(props.analysisData, row.norad)
+    : null
+  const sysType = entity?.sysType.trim()
+  if (!entity || !sysType) {
+    ElMessage.warning('缺少卫星类型，无法查询威胁度算法参数')
+    return
+  }
+
+  const token = ++threatInfoLoadToken
+  threatInfoDialogVisible.value = true
+  threatInfoLoading.value = true
+  threatInfoData.value = null
+  threatInfoEmptyHint.value = ''
+  threatInfoSubtitle.value = `${row.name}${entity.series ? ` · 系列：${entity.series}` : ''} · 类型：${sysType}`
+
+  try {
+    const res = await getSatelliteThreatInfo({
+      norad: row.norad,
+      sysType,
+      taskId,
+    })
+    if (token !== threatInfoLoadToken) return
+    if (res.code !== 200) {
+      threatInfoEmptyHint.value = res.msg || '未查询到威胁度算法参数'
+      return
+    }
+    const info = resolveThreatInfoFromResponse(res.data, row.norad)
+    threatInfoData.value = info
+    if (!info) {
+      threatInfoEmptyHint.value = '未查询到威胁度算法参数'
+    }
+  } catch (error) {
+    if (token !== threatInfoLoadToken) return
+    console.error('获取卫星威胁度算法参数失败:', error)
+    threatInfoEmptyHint.value = '获取威胁度算法参数失败'
+  } finally {
+    if (token === threatInfoLoadToken) {
+      threatInfoLoading.value = false
+    }
+  }
+}
+
+/**
+ * 点击动态威胁度，打开该星的指标表和三层链路图。
+ * 指标使用列表已拉取的 `getTargetsThreatLevel` 行，链路矩阵取该星所在系列。
+ *
+ * @param row 当前推荐行
+ */
+const handleDynamicThreatClick = (row: SatelliteStrikeRecommendItem) => {
+  if (!props.analysisData) {
+    ElMessage.warning('请等待任务算法分析完成')
+    return
+  }
+  const entity = findLevelSeriesEntityForNorad(props.analysisData, row.norad)
+  chartMatrix.value = entity ? levelSeriesEntityToMatrix(entity) : null
+  chartNorad.value = row.norad
+  chartDialogSubtitle.value = row.name
+  linkDelayThreatMetrics.value = {
+    name: row.name,
+    dynamicThreat: row.dynamicThreat,
+    linkClosedLoopTime: row.linkClosedLoopTime,
+    coverPercent: row.coverPercent,
+  }
+  linkDelayDialogVisible.value = true
+}
 
 /** 是否展示全部卫星打击推荐（默认前 10 条） */
 const showAllSatelliteStrikeRecommend = ref(false)
-
-/** 是否展示全部接收站打击推荐（默认前 10 条） */
-const showAllReceiveStrikeRecommend = ref(false)
 
 /** 当前表格展示的卫星打击推荐行 */
 const displayedSatelliteStrikeRecommendRows = computed(() => {
@@ -713,100 +324,11 @@ const displayedSatelliteStrikeRecommendRows = computed(() => {
   return strikeRecommendDisplayRows.value.slice(0, SATELLITE_TABLE_TOP_COUNT)
 })
 
-/** 当前表格展示的接收站打击推荐行 */
-const displayedReceiveStrikeRecommendRows = computed(() => {
-  if (showAllReceiveStrikeRecommend.value) return receiveStrikeRecommendDisplayRows.value
-  return receiveStrikeRecommendDisplayRows.value.slice(0, SATELLITE_TABLE_TOP_COUNT)
-})
-
-/** 是否展示全部卫星指标（默认仅展示综合排序前 10 条） */
-const showAllSatellites = ref(false)
-
-/** 卫星指标表格全量行 */
-const satelliteTableRows = computed(() => buildSatelliteAnalysisTableRows(props.analysisData))
-
-/** 按打击前覆盖率、链路时延、威胁度综合排序后的卫星列表 */
-const rankedSatelliteTableRows = computed(() =>
-  rankSatellitesByCompositeBeforeMetrics(satelliteTableRows.value)
-)
-
-/** 当前表格展示的卫星行 */
-const displayedSatelliteTableRows = computed(() => {
-  if (showAllSatellites.value) return rankedSatelliteTableRows.value
-  return rankedSatelliteTableRows.value.slice(0, SATELLITE_TABLE_TOP_COUNT)
-})
-
-/** 当前选中卫星在列表中的元数据（类型 / 用途） */
-const selectedSatelliteMetaInline = computed(() => {
-  const norad = props.selectedNorad
-  if (!norad) return ''
-  const row = rankedSatelliteTableRows.value.find((item) => item.norad === norad)
-  if (row) {
-    return formatSatelliteMetaInline(row.series, row.sysType, row.usage)
-  }
-  const resolved = resolveSatelliteDisplayMetaFromAnalysis(props.analysisData, norad)
-  if (!resolved) return ''
-  return formatSatelliteMetaInline(resolved.series, resolved.sysType, resolved.usage)
-})
-
-/**
- * 解析表格行对应 NORAD 的展示元数据（行内字段优先，选中行可回退到分析数据扫描）。
- *
- * @param row 卫星指标行
- * @returns 元数据或 null
- */
-const resolveRowSatelliteMeta = (row: SatelliteMetricTableRow) => {
-  let series = row.series
-  let sysType = row.sysType
-  let usage = row.usage
-  if (props.selectedNorad === row.norad) {
-    const resolved = resolveSatelliteDisplayMetaFromAnalysis(props.analysisData, row.norad)
-    if (resolved) {
-      if (series === '--') series = resolved.series
-      if (sysType === '--') sysType = resolved.sysType
-      if (usage === '--') usage = resolved.usage
-    }
-  }
-  return { series, sysType, usage }
-}
-
-/**
- * @param row 卫星指标行
- * @returns 系列展示文案
- */
-const displaySatelliteSeries = (row: SatelliteMetricTableRow): string =>
-  resolveRowSatelliteMeta(row)?.series || row.series || '--'
-
-/**
- * @param row 卫星指标行
- * @returns 系统类型展示文案
- */
-const displaySatelliteSysType = (row: SatelliteMetricTableRow): string =>
-  resolveRowSatelliteMeta(row)?.sysType || row.sysType || '--'
-
-/**
- * @param row 卫星指标行
- * @returns 用途展示文案
- */
-const displaySatelliteUsage = (row: SatelliteMetricTableRow): string =>
-  resolveRowSatelliteMeta(row)?.usage || row.usage || '--'
-
-/**
- * @param row 卫星指标行
- * @returns 是否存在可展示的系列/类型/用途
- */
-const hasSatelliteMeta = (row: SatelliteMetricTableRow): boolean =>
-  displaySatelliteSeries(row) !== '--' ||
-  displaySatelliteSysType(row) !== '--' ||
-  displaySatelliteUsage(row) !== '--'
-
-/** 任务分析数据变化时重置「查看更多」状态 */
+/** 任务分析数据变化时收起「查看更多」 */
 watch(
   () => props.analysisData,
   () => {
-    showAllSatellites.value = false
     showAllSatelliteStrikeRecommend.value = false
-    showAllReceiveStrikeRecommend.value = false
   }
 )
 
@@ -826,24 +348,14 @@ watch(
       strikeRecommendLoadedTaskId = null
       satelliteStrikeRecommendRows.value = []
       strikeRecommendLoading.value = false
+      linkDelayDialogVisible.value = false
+      threatInfoDialogVisible.value = false
       return
     }
     void loadSatelliteStrikeRecommendations(taskId)
   },
   { immediate: true }
 )
-
-/** 按打击前覆盖率排序 */
-const sortByCoverageBefore = (a: SatelliteMetricTableRow, b: SatelliteMetricTableRow) =>
-  compareNullableMetric(a.coverageBefore, b.coverageBefore)
-
-/** 按打击前链路时延排序 */
-const sortByDelayBefore = (a: SatelliteMetricTableRow, b: SatelliteMetricTableRow) =>
-  compareNullableMetric(a.delayBefore, b.delayBefore)
-
-/** 按打击前威胁度排序 */
-const sortByThreatBefore = (a: SatelliteMetricTableRow, b: SatelliteMetricTableRow) =>
-  compareNullableMetric(a.threatBefore, b.threatBefore)
 
 </script>
 
@@ -1008,16 +520,6 @@ const sortByThreatBefore = (a: SatelliteMetricTableRow, b: SatelliteMetricTableR
     background: transparent;
     color: #64748b;
   }
-
-  :deep(.caret-wrapper) {
-    width: 14px;
-  }
-
-  :deep(td.sat-name-column) {
-    padding-left: 4px;
-    padding-right: 4px;
-    vertical-align: middle;
-  }
 }
 
 .strike-recommend-table {
@@ -1046,6 +548,19 @@ const sortByThreatBefore = (a: SatelliteMetricTableRow, b: SatelliteMetricTableR
   font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: #cbd5e1;
+}
+
+.strike-recommend-score--link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: #7dd3fc;
+
+  &:hover {
+    color: #40f2ff;
+    text-shadow: 0 0 8px rgba(64, 242, 255, 0.45);
+  }
 }
 
 .strike-recommend-score--composite {
@@ -1078,79 +593,6 @@ const sortByThreatBefore = (a: SatelliteMetricTableRow, b: SatelliteMetricTableR
   }
 }
 
-.section-head-main {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  min-width: 0;
-}
-
-.selected-sat-inline-meta {
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.35;
-  color: #7dd3fc;
-  word-break: break-word;
-}
-
-.sat-name-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  width: 100%;
-  min-width: 0;
-
-  &--selected {
-    padding: 4px 6px;
-    margin: -4px -6px;
-    border-radius: 6px;
-    background: rgba(251, 191, 36, 0.08);
-    border: 1px solid rgba(251, 191, 36, 0.28);
-  }
-}
-
-.sat-name-meta--selected {
-  padding-top: 2px;
-}
-
-.sat-name-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  font-size: 10px;
-  line-height: 1.35;
-  word-break: break-all;
-  white-space: normal;
-}
-
-.sat-name-meta__line {
-  display: block;
-  width: 100%;
-}
-
-.sat-name-meta__label {
-  color: #94a3b8;
-  font-weight: 500;
-}
-
-.sat-name-meta__series {
-  color: #fbbf24;
-  font-weight: 600;
-}
-
-.sat-name-meta__type {
-  color: #22d3ee;
-  font-weight: 600;
-}
-
-.sat-name-meta__usage {
-  color: #a5b4fc;
-  font-weight: 600;
-}
-
 .table-more-actions {
   display: flex;
   justify-content: center;
@@ -1172,186 +614,6 @@ const sortByThreatBefore = (a: SatelliteMetricTableRow, b: SatelliteMetricTableR
     color: #40f2ff;
     border-color: #00e1ff;
     background: rgba(0, 225, 255, 0.16);
-  }
-}
-
-.metric-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-}
-
-.metric-cell--clickable-threat,
-.metric-cell--clickable-metric {
-  cursor: pointer;
-  border-radius: 4px;
-  padding: 2px 4px;
-  margin: -2px -4px;
-  transition: background 0.18s ease, box-shadow 0.18s ease;
-
-  &:hover {
-    background: rgba(0, 225, 255, 0.08);
-    box-shadow: inset 0 0 0 1px rgba(0, 225, 255, 0.22);
-  }
-
-  &:focus-visible {
-    outline: 1px solid rgba(0, 225, 255, 0.45);
-    outline-offset: 1px;
-  }
-}
-
-.metric-line {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  line-height: 1.35;
-}
-
-.metric-line-label {
-  font-size: 10px;
-  color: #64748b;
-}
-
-.metric-line-value {
-  font-size: 12px;
-  color: #e2efff;
-  font-family: Consolas, 'Courier New', monospace;
-  word-break: break-word;
-}
-
-.metric-line-delta {
-  font-size: 12px;
-  font-weight: 700;
-  font-family: Consolas, 'Courier New', monospace;
-  word-break: break-word;
-
-  &--green {
-    color: #4ade80;
-  }
-
-  &--yellow {
-    color: #fbbf24;
-  }
-}
-
-.ground-target-name {
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: none;
-  background: transparent;
-  text-align: left;
-  font-size: 11px;
-  font-weight: 600;
-  color: #7dd3fc;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: color 0.2s ease, text-shadow 0.2s ease;
-
-  &:hover {
-    color: #bae6fd;
-    text-shadow: 0 0 8px rgba(125, 211, 252, 0.45);
-  }
-}
-
-.ground-target-name--struck {
-  color: #f87171;
-  text-shadow: 0 0 8px rgba(248, 113, 113, 0.35);
-}
-
-.ground-target-name--selected {
-  color: #22d3ee;
-  text-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
-}
-
-.ground-target-status--struck {
-  color: #f87171;
-  font-weight: 700;
-}
-
-.feedback-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: auto auto;
-  gap: 8px 8px;
-  padding: 10px 8px;
-  border-radius: 6px;
-  background: rgba(0, 225, 255, 0.04);
-  border: 1px solid rgba(0, 225, 255, 0.1);
-}
-
-.feedback-cell {
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  text-align: left;
-}
-
-.feedback-time {
-  font-size: 13px;
-  font-weight: 700;
-  color: #40f2ff;
-  font-family: Consolas, 'Courier New', monospace;
-  word-break: break-word;
-  line-height: 1.3;
-  text-shadow: 0 0 8px rgba(64, 242, 255, 0.5);
-}
-
-.analysis-kpi-row {
-  display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 4px;
-}
-
-.analysis-kpi-item {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 10px 8px;
-  border-radius: 6px;
-  background: rgba(0, 225, 255, 0.04);
-  border: 1px solid rgba(0, 225, 255, 0.1);
-}
-
-.analysis-kpi-label {
-  font-size: 12px;
-  color: #94a3b8;
-  line-height: 1.3;
-  white-space: nowrap;
-}
-
-.analysis-kpi-value {
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.2;
-  word-break: break-word;
-
-  &--before {
-    color: #4ade80;
-  }
-
-  &--after {
-    color: #fb923c;
-  }
-
-  &--reduce {
-    color: #f87171;
-  }
-
-  &--delay {
-    color: #fbbf24;
-    font-size: 16px;
-    text-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
   }
 }
 

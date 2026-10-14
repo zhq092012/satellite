@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     :model-value="modelValue"
-    title="链路延迟"
+    :title="dialogTitle"
     width="920px"
     append-to-body
     destroy-on-close
@@ -11,6 +11,30 @@
     @update:model-value="emit('update:modelValue', $event)"
     @opened="handleDialogOpened">
     <p v-if="subtitle" class="battle-sat-chart-subtitle">{{ subtitle }}</p>
+    <el-table
+      v-if="threatTableRows.length"
+      :data="threatTableRows"
+      size="small"
+      class="battle-sat-threat-table"
+      empty-text="暂无威胁度数据">
+      <el-table-column label="卫星名称" prop="name" min-width="140" show-overflow-tooltip />
+      <el-table-column label="动态威胁度" min-width="110" align="right">
+        <template #default="{ row }">
+          {{ formatThreatScore(row.dynamicThreat) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="链路闭环耗时" min-width="120" align="right">
+        <template #default="{ row }">
+          {{ formatClosedLoopTime(row.linkClosedLoopTime) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="覆盖率" min-width="100" align="right">
+        <template #default="{ row }">
+          {{ formatCoverage(row.coverPercent) }}
+        </template>
+      </el-table-column>
+    </el-table>
+    <p v-if="threatTableRows.length" class="battle-sat-link-graph-title">三层链路图谱</p>
     <div ref="stageRef" class="battle-sat-link-stage">
       <div class="battle-sat-link-layer-labels">
         <div
@@ -37,6 +61,8 @@ import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import G6, { type Graph } from '@antv/g6'
 import type { MatrixResult } from '@/api/electronic'
 import { resolveTaskEndMs } from '@/utils/satelliteFullChainAnalysis'
+import { formatSatelliteThreat } from '@/utils/buildSatelliteAnalysisTable'
+import { formatCoveragePercent } from '@/utils/zhchPlanDisplay'
 import {
   RECON_LAYER_LABEL_ITEMS,
   RECON_TOPO_GRAPH_DEFAULT_EDGE,
@@ -44,12 +70,25 @@ import {
   formatReconLayerTop,
 } from '@/utils/battleSatelliteCharts/reconTopologyG6'
 
+/**
+ * 弹窗顶部指标表的一行，字段来自 `getTargetsThreatLevel`。
+ */
+export interface LinkDelayThreatMetrics {
+  /** 卫星名称 */
+  name: string
+  /** 动态威胁度 */
+  dynamicThreat: number
+  /** 链路闭环耗时（接口原值） */
+  linkClosedLoopTime: number
+  /** 覆盖率 */
+  coverPercent: number
+}
 
 const props = withDefaults(
   defineProps<{
     /** 弹窗是否可见 */
     modelValue: boolean
-    /** 系列矩阵 */
+    /** 系列矩阵，用于绘制该星三层链路 */
     matrix?: MatrixResult | null
     /** 目标卫星 NORAD */
     norad?: number | null
@@ -57,12 +96,18 @@ const props = withDefaults(
     taskEnd?: string
     /** 副标题 */
     subtitle?: string
+    /** 弹窗标题 */
+    dialogTitle?: string
+    /** 当前卫星的威胁度指标；有值时在链路图上方展示表格 */
+    threatMetrics?: LinkDelayThreatMetrics | null
   }>(),
   {
     matrix: null,
     norad: null,
     taskEnd: '',
     subtitle: '',
+    dialogTitle: '链路延迟',
+    threatMetrics: null,
   }
 )
 
@@ -79,6 +124,26 @@ let graph: Graph | null = null
 
 /** 任务结束毫秒 */
 const taskEndMs = computed(() => resolveTaskEndMs(props.taskEnd))
+
+/** 指标表数据：仅当前点击的卫星一行 */
+const threatTableRows = computed(() => (props.threatMetrics ? [props.threatMetrics] : []))
+
+/** 动态威胁度展示，与右侧列表同一格式 */
+const formatThreatScore = formatSatelliteThreat
+
+/** 覆盖率展示 */
+const formatCoverage = formatCoveragePercent
+
+/**
+ * 链路闭环耗时按接口原值展示。字段未声明单位，不换算、不补单位。
+ *
+ * @param value 接口 `linkClosedLoopTime`
+ * @returns 数值文本；非有限数时返回 `--`
+ */
+const formatClosedLoopTime = (value: number | null | undefined): string => {
+  if (value == null || !Number.isFinite(value)) return '--'
+  return String(value)
+}
 
 /** 左侧层标签（随舞台高度更新 top） */
 const layerLabels = computed(() =>
@@ -115,7 +180,12 @@ const destroyGraph = () => {
  * @returns 是否成功
  */
 const initOrUpdateGraph = (): boolean => {
-  if (!g6ContainerRef.value || !props.matrix || props.norad == null) return false
+  if (!g6ContainerRef.value) return false
+  if (!props.matrix || props.norad == null) {
+    emptyHint.value = '暂无该卫星的传输链路数据'
+    destroyGraph()
+    return true
+  }
   const { width, height } = readStageSize()
   if (width <= 0 || height <= 0) return false
   if (height > 0) stageHeight.value = height
@@ -189,6 +259,42 @@ onUnmounted(() => {
   margin: 0 0 8px;
   font-size: 13px;
   color: #94a3b8;
+}
+
+.battle-sat-link-graph-title {
+  margin: 14px 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #7dd3fc;
+}
+
+.battle-sat-threat-table {
+  width: 100%;
+  --atlas-app-table-border-color: rgba(0, 225, 255, 0.12);
+  --atlas-app-table-header-bg-color: rgba(13, 27, 49, 0.95);
+  --atlas-app-table-bg-color: transparent;
+  --atlas-app-table-tr-bg-color: transparent;
+  --atlas-app-table-row-hover-bg-color: rgba(0, 225, 255, 0.08);
+  --atlas-app-text-color-regular: #cbd5e1;
+  --atlas-app-text-color-primary: #e2efff;
+  background: transparent;
+
+  :deep(.atlas-app-table__inner-wrapper::before) {
+    display: none;
+  }
+
+  :deep(th.atlas-app-table__cell) {
+    color: #00e1ff;
+    font-size: 12px;
+    font-weight: 700;
+    background: rgba(13, 27, 49, 0.95) !important;
+  }
+
+  :deep(td.atlas-app-table__cell) {
+    font-size: 12px;
+    color: #e2efff;
+    background: transparent !important;
+  }
 }
 
 .battle-sat-link-stage {

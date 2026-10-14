@@ -70,9 +70,8 @@
     <div class="floating-panel floating-panel--right" :class="{ 'is-collapsed': isRightCollapsed }">
       <div class="panel-inner">
         <C2RightAnalysisPanel :analysis-data="taskAnalysisData" :algorithm-complete="algorithmComplete"
-          :analysis-loading="taskAnalysisLoading" :selected-norad="selectedNorad" :selected-weapon-id="selectedWeaponId"
-          :selected-ground-target-key="selectedGroundTargetKey" @select-satellite="handleSelectSatellite"
-          @select-weapon="handleSelectWeapon" @select-ground-target="handleSelectGroundTarget" />
+          :analysis-loading="taskAnalysisLoading" :selected-norad="selectedNorad"
+          @select-satellite="handleSelectSatellite" />
       </div>
       <button type="button" class="toggle-btn toggle-btn--right" :title="isRightCollapsed ? '展开右侧面板' : '收起右侧面板'"
         @click="isRightCollapsed = !isRightCollapsed">
@@ -664,6 +663,23 @@ const handleFocusResourceDetail = (payload: TaskPanelResourceDetailPayload) => {
     }
     const anchor = inSeries[0]
     void handleSelectSatellite(anchor.norad, { detailRequest: { kind: 'series', series: item.id } })
+    return
+  }
+
+  if (kind === 'satellite') {
+    const norad = payload.norad
+    if (norad == null || !Number.isFinite(norad)) {
+      ElMessage.warning('卫星 NORAD 无效，无法定位')
+      return
+    }
+    const onGlobe = globeSatellites.value.find((sat) => sat.norad === norad)
+    if (!onGlobe) {
+      ElMessage.warning(
+        `地图上暂无 NORAD ${norad} 的卫星，请等待任务算法完成并拉取分析结果`,
+      )
+      return
+    }
+    void handleSelectSatellite(norad, { detailRequest: { kind: 'satellite', norad } })
     return
   }
 

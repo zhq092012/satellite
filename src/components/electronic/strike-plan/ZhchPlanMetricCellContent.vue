@@ -123,7 +123,7 @@ const toneToDeltaClass = (tone?: ZhchPlanMetricDeltaTone): string => {
 
 .zhch-metric-cell__delta {
   display: block;
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1.3;

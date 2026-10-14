@@ -41,235 +41,201 @@
           </li>
         </ul>
       </section>
-      <!-- 中：当前任务可编辑项（超出时滚动） -->
+      <!-- 中：当前任务资源树（超出时滚动） -->
       <section class="panel-zone panel-zone--middle">
         <div v-if="taskSwitching" class="zone-loading">正在切换任务...</div>
-        <div v-else-if="!editorDraft" class="zone-empty">请选择任务以编辑配置</div>
-        <div v-else class="task-editor" :class="{ 'task-editor--locked': isActiveTaskCalculating }">
+        <div v-else-if="!editorDraft" class="zone-empty">请选择任务以查看资源</div>
+        <div v-else class="task-editor task-editor-scroll" :class="{ 'task-editor--locked': isActiveTaskCalculating }">
+          <div v-if="editorDraft.taskApiError" class="combat-area-api-error" role="alert">
+            {{ editorDraft.taskApiError }}
+          </div>
           <div class="tag-section task-time-section">
-            <div class="tag-section-head">任务基本信息</div>
-            <div class="task-editor-times">
-              <label class="time-field">
-                <span class="time-label">开始时间</span>
-                <input class="task-datetime-input" type="datetime-local" step="60"
-                  :value="toTaskDatetimeLocalValue(editorDraft.beginDate)"
-                  @input="handleBeginInput(($event.target as HTMLInputElement).value)" />
+            <div class="tag-section-head">任务时间</div>
+            <p class="task-time-readonly" :title="taskTimeRangeText">{{ taskTimeRangeText }}</p>
+          </div>
+          <div v-if="!enemyCountriesList.length" class="tag-hint">当前任务未配置敌方国家/组织</div>
+          <template v-else>
+            <div v-for="country in enemyCountriesList" :key="country" class="country-block">
+              <label class="country-block__head">
+                <el-checkbox :model-value="isCountryPanelVisible(country)"
+                  @change="(val) => handleCountryPanelChange(country, val)" />
+                <span class="country-block__title">{{ country }}</span>
               </label>
-              <label class="time-field">
-                <span class="time-label">结束时间</span>
-                <input class="task-datetime-input" type="datetime-local" step="60"
-                  :value="toTaskDatetimeLocalValue(editorDraft.endDate)"
-                  @input="handleEndInput(($event.target as HTMLInputElement).value)" />
-              </label>
+              <div v-show="isCountryPanelVisible(country)" class="country-block__body">
+                <div v-if="seriesOptionsLoading" class="tag-hint">正在加载卫星系列...</div>
+                <template v-else>
+                  <div v-for="series in seriesForCountry(country)" :key="`${country}-${series}`" class="series-block">
+                    <div class="series-block__head">
+                      <el-checkbox :model-value="isSeriesSelected(series)"
+                        @change="(checked) => handleSeriesCheckboxChange(series, checked)" />
+                      <button type="button" class="series-block__name" @click="handleSeriesFocus(series)">
+                        {{ series }}
+                      </button>
+                    </div>
+                    <div v-if="isSeriesSelected(series)" class="satellite-table-wrap">
+                      <div v-if="isSatelliteListLoading(series)" class="tag-hint">正在加载卫星...</div>
+                      <div v-else-if="satelliteLoadErrorBySeries[series]" class="combat-area-api-error" role="alert">
+                        {{ satelliteLoadErrorBySeries[series] }}
+                      </div>
+                      <table v-else-if="satellitesForSeries(series).length" class="satellite-table">
+                        <thead>
+                          <tr>
+                            <th>卫星名称</th>
+                            <th>类型</th>
+                            <th>系列</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="row in satellitesForSeries(series)" :key="row.key" class="satellite-table__row"
+                            @click="handleSatelliteRowClick(row)">
+                            <td>{{ row.name }}</td>
+                            <td>{{ row.satType }}</td>
+                            <td>{{ row.series }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div v-else class="tag-hint">该系列暂无卫星数据</div>
+                    </div>
+                  </div>
+                  <div v-if="!seriesForCountry(country).length" class="tag-hint">任务未选择该国卫星系列</div>
+                </template>
+              </div>
             </div>
-            <div class="task-metric-rows">
-              <div class="metric-row metric-row--readonly">
-                <span class="metric-label">国家/组织</span>
-                <span class="metric-value" :title="enemyCountryDisplayText">{{ enemyCountryDisplayText }}</span>
-              </div>
-              <div v-if="editorDraft.taskApiError" class="combat-area-api-error" role="alert">
-                {{ editorDraft.taskApiError }}
-              </div>
-              <div v-if="scheduleDurationError" class="combat-area-api-error" role="alert">
-                {{ scheduleDurationError }}
-              </div>
-              <div v-if="showTaskDurationDelayCoverageInUi" class="metric-row">
-                <span class="metric-label">任务时长</span>
-                <el-input-number v-model="durationHours" class="metric-input-number" size="small" :min="1" :max="8760"
-                  :step="1" controls-position="right"
-                  :disabled="Boolean(editorDraft.taskApiError || scheduleDurationError)"
-                  @change="handleDurationHoursChange" />
-                <span class="metric-unit">小时</span>
-              </div>
-              <div v-if="showTaskDurationDelayCoverageInUi && editorDraft.delayMin != null" class="metric-row">
-                <span class="metric-label">链路时延</span>
-                <el-input-number v-model="editorDraft.delayMin" class="metric-input-number" size="small" :min="1"
-                  :max="4320" :step="1" controls-position="right" />
-                <span class="metric-unit">分钟</span>
-              </div>
-              <div v-if="showTaskDurationDelayCoverageInUi && editorDraft.coverage != null" class="metric-row">
-                <span class="metric-label">覆盖率</span>
-                <el-input-number v-model="editorDraft.coverage" class="metric-input-number" size="small" :min="0"
-                  :max="100" :step="1" controls-position="right" />
-                <span class="metric-unit">%</span>
-              </div>
-              <div class="metric-row metric-row--types">
-                <span class="metric-label">卫星类型</span>
-                <div class="tag-cloud metric-type-tags">
-                  <el-tag v-for="typeName in TASK_PANEL_SATELLITE_TYPES" :key="typeName" class="task-config-tag"
-                    :class="{ 'is-selected': isTargetTypeSelected(typeName) }"
-                    :closable="isTargetTypeSelected(typeName)" disable-transitions @close="removeTargetType(typeName)"
-                    @click="toggleTargetType(typeName)">
-                    {{ typeName }}
-                  </el-tag>
+            <div v-if="unmatchedSelectedSeries.length" class="country-block">
+              <div v-for="series in unmatchedSelectedSeries" :key="`unmatched-${series}`" class="series-block">
+                <div class="series-block__head">
+                  <el-checkbox :model-value="isSeriesSelected(series)"
+                    @change="(checked) => handleSeriesCheckboxChange(series, checked)" />
+                  <button type="button" class="series-block__name" @click="handleSeriesFocus(series)">
+                    {{ series }}
+                  </button>
+                </div>
+                <div v-if="isSeriesSelected(series)" class="satellite-table-wrap">
+                  <div v-if="isSatelliteListLoading(series)" class="tag-hint">正在加载卫星...</div>
+                  <div v-else-if="satelliteLoadErrorBySeries[series]" class="combat-area-api-error" role="alert">
+                    {{ satelliteLoadErrorBySeries[series] }}
+                  </div>
+                  <table v-else-if="satellitesForSeries(series).length" class="satellite-table">
+                    <thead>
+                      <tr>
+                        <th>卫星名称</th>
+                        <th>类型</th>
+                        <th>系列</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in satellitesForSeries(series)" :key="row.key" class="satellite-table__row"
+                        @click="handleSatelliteRowClick(row)">
+                        <td>{{ row.name }}</td>
+                        <td>{{ row.satType }}</td>
+                        <td>{{ row.series }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div v-else class="tag-hint">该系列暂无卫星数据</div>
                 </div>
               </div>
-              <div class="metric-row metric-row--combat-head">
-                <span class="metric-label">作战区域</span>
-                <label v-if="editorDraft.combatArea" class="combat-area-enable">
-                  <el-checkbox v-model="editorDraft.combatArea.enabled">启用</el-checkbox>
-                </label>
-              </div>
-              <template v-if="editorDraft.combatArea">
-                <div class="metric-row">
-                  <span class="metric-label">经度</span>
-                  <el-input-number v-model="editorDraft.combatArea.centerLon" class="metric-input-number" size="small"
-                    :controls="false" :precision="4" :step="0.0001" :min="-180" :max="180" />
-                  <span class="metric-unit metric-unit--empty" aria-hidden="true" />
+            </div>
+            <div class="tag-section">
+              <div class="tag-section-head">地面站</div>
+              <div v-if="receiveOptionsLoading" class="tag-hint">正在加载地面站...</div>
+              <template v-else>
+                <div v-for="group in receiveGroupsByCountry" :key="`recv-${group.country}`"
+                  v-show="isCountryPanelVisible(group.country) && group.rows.length" class="country-resource-list">
+                  <div class="ground-station-table-wrap">
+                    <table class="satellite-table ground-station-table">
+                      <thead>
+                        <tr>
+                          <th>基站名称</th>
+                          <th>所属国家/地区</th>
+                          <th>地理位置</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in group.rows" :key="row.id" class="satellite-table__row"
+                          @click="handleGroundStationRowClick('receive', row)">
+                          <td>{{ row.name }}</td>
+                          <td>{{ row.country }}</td>
+                          <td>{{ row.location }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div class="metric-row">
-                  <span class="metric-label">纬度</span>
-                  <el-input-number v-model="editorDraft.combatArea.centerLat" class="metric-input-number" size="small"
-                    :controls="false" :precision="4" :step="0.0001" :min="-90" :max="90" />
-                  <span class="metric-unit metric-unit--empty" aria-hidden="true" />
-                </div>
-                <div class="metric-row">
-                  <span class="metric-label">半径</span>
-                  <el-input-number v-model="editorDraft.combatArea.radiusKm" class="metric-input-number" size="small"
-                    :controls="false" :precision="0" :step="10" :min="0" :max="20000" />
-                  <span class="metric-unit">km</span>
-                </div>
+                <div v-if="!receiveGroupsByCountry.some((g) => g.rows.length)" class="tag-hint">任务未选择地面站</div>
               </template>
             </div>
-          </div>
-          <div class="tag-section">
-            <div class="tag-section-head">任务卫星</div>
-            <div v-if="seriesOptionsLoading" class="tag-hint">正在加载系列...</div>
-            <div v-else-if="!seriesTagOptions.length" class="tag-hint">暂无系列候选项</div>
-            <div v-else class="resource-pick-block">
-              <div class="resource-pick-group">
-                <div class="resource-pick-group__title">已选择（{{ seriesTagOptionGroups.selected.length }}）</div>
-                <div v-if="!seriesTagOptionGroups.selected.length" class="tag-hint">暂无已选系列</div>
-                <div v-else class="tag-cloud task-config-checkbox-list">
-                  <TaskPanelResourceCheckbox v-for="item in seriesTagOptionGroups.selected" :key="`sel-${item.id}`"
-                    :item="item" :selected="true" resource-kind="series"
-                    @change="(checked) => handleSeriesCheckboxChange(item.id, checked)"
-                    @detail="handleTaskResourceDetail" />
+            <div class="tag-section">
+              <div class="tag-section-head">数据中心</div>
+              <div v-if="centerOptionsLoading" class="tag-hint">正在加载数据中心...</div>
+              <template v-else>
+                <div v-for="group in centerGroupsByCountry" :key="`center-${group.country}`"
+                  v-show="isCountryPanelVisible(group.country) && group.rows.length" class="country-resource-list">
+                  <div class="ground-station-table-wrap">
+                    <table class="satellite-table ground-station-table">
+                      <thead>
+                        <tr>
+                          <th>基站名称</th>
+                          <th>所属国家/地区</th>
+                          <th>地理位置</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in group.rows" :key="row.id" class="satellite-table__row"
+                          @click="handleGroundStationRowClick('center', row)">
+                          <td>{{ row.name }}</td>
+                          <td>{{ row.country }}</td>
+                          <td>{{ row.location }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-              <div v-if="seriesTagOptionGroups.unselected.length" class="resource-pick-group resource-pick-group--pool">
-                <button type="button" class="resource-pick-group__toggle"
-                  :aria-expanded="resourcePoolExpanded.series"
-                  @click="resourcePoolExpanded.series = !resourcePoolExpanded.series">
-                  <span>未选择（{{ seriesTagOptionGroups.unselected.length }}）</span>
-                  <span class="resource-pick-group__chevron" :class="{ 'is-open': resourcePoolExpanded.series }"
-                    aria-hidden="true">▸</span>
-                </button>
-                <div v-show="resourcePoolExpanded.series" class="tag-cloud task-config-checkbox-list">
-                  <TaskPanelResourceCheckbox v-for="item in seriesTagOptionGroups.unselected" :key="`pool-${item.id}`"
-                    :item="item" :selected="false" resource-kind="series"
-                    @change="(checked) => handleSeriesCheckboxChange(item.id, checked)"
-                    @detail="handleTaskResourceDetail" />
-                </div>
-              </div>
+                <div v-if="!centerGroupsByCountry.some((g) => g.rows.length)" class="tag-hint">任务未选择数据中心</div>
+              </template>
             </div>
-          </div>
+          </template>
           <div class="tag-section">
-            <div class="tag-section-head">任务武器</div>
+            <div class="tag-section-head">武器</div>
+            <div v-if="weaponOptionsLoading" class="tag-hint">正在加载武器...</div>
+            <div v-else-if="weaponTableRows.length" class="weapon-table-wrap">
+              <table class="satellite-table weapon-table">
+                <thead>
+                  <tr>
+                    <th>武器名称</th>
+                    <th>所属国家/地区</th>
+                    <th>武器类型</th>
+                    <th>适用卫星类型</th>
+                    <th>纬度</th>
+                    <th>经度</th>
+                    <th>打击高度(km)</th>
+                    <th>打击间隔(分钟)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in weaponTableRows" :key="row.id" class="satellite-table__row"
+                    @click="handleWeaponRowClick(row)">
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.country }}</td>
+                    <td>{{ row.type }}</td>
+                    <td>{{ row.satelliteType }}</td>
+                    <td>{{ row.latitude }}</td>
+                    <td>{{ row.longitude }}</td>
+                    <td>{{ row.strikeHeightKm }}</td>
+                    <td>{{ row.strikeIntervalMinutes }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="tag-hint">任务未选择武器</div>
             <div class="weapon-use-item">
               <span class="weapon-use-item-label">使用武器</span>
               <el-switch v-model="useWeaponsEnabled" size="small" @change="handleUseWeaponsChange" />
             </div>
-            <template v-if="useWeaponsEnabled">
-              <div v-if="weaponOptionsLoading" class="tag-hint">正在加载武器...</div>
-              <div v-else-if="!weaponTagOptions.length" class="tag-hint">暂无武器候选项</div>
-              <div v-else class="resource-pick-block">
-                <div class="resource-pick-group">
-                  <div class="resource-pick-group__title">已选择（{{ weaponTagOptionGroups.selected.length }}）</div>
-                  <div v-if="!weaponTagOptionGroups.selected.length" class="tag-hint">暂无已选武器</div>
-                  <div v-else class="tag-cloud task-config-checkbox-list">
-                    <TaskPanelResourceCheckbox v-for="item in weaponTagOptionGroups.selected" :key="`sel-${item.id}`"
-                      :item="item" :selected="true" resource-kind="weapon"
-                      @change="(checked) => handleWeaponCheckboxChange(item.id, checked)"
-                      @detail="handleTaskResourceDetail" />
-                  </div>
-                </div>
-                <div v-if="weaponTagOptionGroups.unselected.length" class="resource-pick-group resource-pick-group--pool">
-                  <button type="button" class="resource-pick-group__toggle"
-                    :aria-expanded="resourcePoolExpanded.weapon"
-                    @click="resourcePoolExpanded.weapon = !resourcePoolExpanded.weapon">
-                    <span>未选择（{{ weaponTagOptionGroups.unselected.length }}）</span>
-                    <span class="resource-pick-group__chevron" :class="{ 'is-open': resourcePoolExpanded.weapon }"
-                      aria-hidden="true">▸</span>
-                  </button>
-                  <div v-show="resourcePoolExpanded.weapon" class="tag-cloud task-config-checkbox-list">
-                    <TaskPanelResourceCheckbox v-for="item in weaponTagOptionGroups.unselected" :key="`pool-${item.id}`"
-                      :item="item" :selected="false" resource-kind="weapon"
-                      @change="(checked) => handleWeaponCheckboxChange(item.id, checked)"
-                      @detail="handleTaskResourceDetail" />
-                  </div>
-                </div>
-              </div>
-            </template>
-            <div v-else class="tag-hint">已关闭「使用武器」，武器选择已暂存；重新打开可恢复</div>
-          </div>
-          <div class="tag-section">
-            <div class="tag-section-head">任务地面站</div>
-            <div v-if="receiveOptionsLoading" class="tag-hint">正在加载地面站...</div>
-            <div v-else-if="!receiveTagOptions.length" class="tag-hint">暂无地面站候选项</div>
-            <div v-else class="resource-pick-block">
-              <div class="resource-pick-group">
-                <div class="resource-pick-group__title">已选择（{{ receiveTagOptionGroups.selected.length }}）</div>
-                <div v-if="!receiveTagOptionGroups.selected.length" class="tag-hint">暂无已选地面站</div>
-                <div v-else class="tag-cloud task-config-checkbox-list">
-                  <TaskPanelResourceCheckbox v-for="item in receiveTagOptionGroups.selected" :key="`sel-${item.id}`"
-                    :item="item" :selected="true" resource-kind="receive"
-                    @change="(checked) => handleReceiveCheckboxChange(item.id, checked)"
-                    @detail="handleTaskResourceDetail" />
-                </div>
-              </div>
-              <div v-if="receiveTagOptionGroups.unselected.length" class="resource-pick-group resource-pick-group--pool">
-                <button type="button" class="resource-pick-group__toggle"
-                  :aria-expanded="resourcePoolExpanded.receive"
-                  @click="resourcePoolExpanded.receive = !resourcePoolExpanded.receive">
-                  <span>未选择（{{ receiveTagOptionGroups.unselected.length }}）</span>
-                  <span class="resource-pick-group__chevron" :class="{ 'is-open': resourcePoolExpanded.receive }"
-                    aria-hidden="true">▸</span>
-                </button>
-                <div v-show="resourcePoolExpanded.receive" class="tag-cloud task-config-checkbox-list">
-                  <TaskPanelResourceCheckbox v-for="item in receiveTagOptionGroups.unselected" :key="`pool-${item.id}`"
-                    :item="item" :selected="false" resource-kind="receive"
-                    @change="(checked) => handleReceiveCheckboxChange(item.id, checked)"
-                    @detail="handleTaskResourceDetail" />
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="tag-section">
-            <div class="tag-section-head">任务数据中心</div>
-            <div v-if="centerOptionsLoading" class="tag-hint">正在加载数据中心...</div>
-            <div v-else-if="!centerTagOptions.length" class="tag-hint">暂无数据中心候选项</div>
-            <div v-else class="resource-pick-block">
-              <div class="resource-pick-group">
-                <div class="resource-pick-group__title">已选择（{{ centerTagOptionGroups.selected.length }}）</div>
-                <div v-if="!centerTagOptionGroups.selected.length" class="tag-hint">暂无已选数据中心</div>
-                <div v-else class="tag-cloud task-config-checkbox-list">
-                  <TaskPanelResourceCheckbox v-for="item in centerTagOptionGroups.selected" :key="`sel-${item.id}`"
-                    :item="item" :selected="true" resource-kind="center"
-                    @change="(checked) => handleCenterCheckboxChange(item.id, checked)"
-                    @detail="handleTaskResourceDetail" />
-                </div>
-              </div>
-              <div v-if="centerTagOptionGroups.unselected.length" class="resource-pick-group resource-pick-group--pool">
-                <button type="button" class="resource-pick-group__toggle"
-                  :aria-expanded="resourcePoolExpanded.center"
-                  @click="resourcePoolExpanded.center = !resourcePoolExpanded.center">
-                  <span>未选择（{{ centerTagOptionGroups.unselected.length }}）</span>
-                  <span class="resource-pick-group__chevron" :class="{ 'is-open': resourcePoolExpanded.center }"
-                    aria-hidden="true">▸</span>
-                </button>
-                <div v-show="resourcePoolExpanded.center" class="tag-cloud task-config-checkbox-list">
-                  <TaskPanelResourceCheckbox v-for="item in centerTagOptionGroups.unselected" :key="`pool-${item.id}`"
-                    :item="item" :selected="false" resource-kind="center"
-                    @change="(checked) => handleCenterCheckboxChange(item.id, checked)"
-                    @detail="handleTaskResourceDetail" />
-                </div>
-              </div>
-            </div>
+            <div v-if="!useWeaponsEnabled" class="tag-hint">已关闭「使用武器」，武器选择已暂存；重新打开可恢复</div>
           </div>
         </div>
       </section>
-      <!-- 下：保存并重算 -->
       <footer class="panel-zone panel-zone--bottom">
         <el-button type="primary" class="save-recalc-btn" :loading="savingRecalc"
           :disabled="!editorDraft || taskSwitching || isActiveTaskCalculating || Boolean(editorDraft?.taskApiError || scheduleDurationError)"
@@ -284,37 +250,41 @@
 </template>
 <script setup lang="ts">
 /**
- * 战场态势 - C2 左侧场景任务面板（上：任务进度列表，中：任务配置，下：保存并重算）。
+ * 战场态势 - C2 左侧场景任务面板（上：任务列表，中：资源树，下：保存并重算）。
  */
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getTaskList, updateTask, getAllWeapons } from '@/api/dashboard'
-import { getSatelliteSeries } from '@/api/task/task'
+import { getTaskList, getAllWeapons, updateTask } from '@/api/dashboard'
+import { getSatelliteBySeries } from '@/api/task/task'
 import { getGroundStationList, type BaseStationInfo } from '@/api/system/satellite-system-api'
 import type { TaskForm, Weapon } from '@/types/dashboard'
 import type { MatrixResult } from '@/api/electronic'
 import { taskProgressMap, useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskEditDialog, { type TaskEditDialogMode } from '@/components/BattleSituation/TaskEditDialog.vue'
-import TaskPanelResourceCheckbox from '@/components/BattleSituation/TaskPanelResourceCheckbox.vue'
 import {
-  applyDurationHoursToDraft,
-  buildSeriesOptionsFromApiData,
   calcTaskDurationHours,
   createDraftFromTask,
-  fromTaskDatetimeLocalValue,
   isDataCenterStationType,
   mergeTaskFormWithDraft,
   notifyTaskListValidationErrors,
   normalizeTaskWeaponIds,
   parseTaskPanelTimeMs,
-  SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI,
-  TASK_PANEL_SATELLITE_TYPES,
-  toTaskDatetimeLocalValue,
   type C2TaskEditorDraft,
   type TaskPanelResourceDetailPayload,
   type TaskPanelTagOption,
 } from '@/utils/c2TaskPanelEditor'
+import {
+  buildWeaponTableRow,
+  fetchSeriesNamesByCountry,
+  formatC2LeftPanelTaskTimeRange,
+  groupGroundStationRowsByCountry,
+  mapSatellitePreviewToTableRows,
+  type C2LeftPanelSatellitePreviewItem,
+  type C2LeftPanelGroundStationTableRow,
+  type C2LeftPanelSatelliteTableRow,
+  type C2LeftPanelWeaponTableRow,
+} from '@/utils/c2LeftPanelResourceTree'
 defineProps<{
   /** 算法矩阵（与父组件兼容） */
   matrixData?: MatrixResult | null
@@ -328,9 +298,6 @@ const emit = defineEmits<{
   /** 资源详情：地图定位并在 Label 展示当前已有字段 */
   (e: 'focus-resource-detail', payload: TaskPanelResourceDetailPayload): void
 }>()
-/** 是否展示任务时长 / 链路时延 / 覆盖率表单项（仅 UI） */
-const showTaskDurationDelayCoverageInUi = SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI
-
 const store = useLayoutStore()
 const {
   getTaskProgress,
@@ -435,7 +402,16 @@ const stashedWeaponIds = ref<string[]>([])
 const durationHours = ref(8)
 /** 起止时间无效时的说明（不默认 1 小时） */
 const scheduleDurationError = ref('')
-const seriesTagOptions = ref<TaskPanelTagOption[]>([])
+/** 国家 → 卫星系列名（按国单独拉取） */
+const countrySeriesMap = ref<Map<string, string[]>>(new Map())
+/** 面板国家勾选（仅控制展示，与系列勾选独立） */
+const countryPanelChecked = ref<Record<string, boolean>>({})
+/** 系列 → 卫星表格行 */
+const satellitesBySeries = ref<Map<string, C2LeftPanelSatelliteTableRow[]>>(new Map())
+/** 系列 → 加载中 */
+const satelliteLoadingSeries = ref<Set<string>>(new Set())
+/** 系列 → 加载失败说明 */
+const satelliteLoadErrorBySeries = reactive<Record<string, string>>({})
 const weaponTagOptions = ref<TaskPanelTagOption[]>([])
 const receiveTagOptions = ref<TaskPanelTagOption[]>([])
 const centerTagOptions = ref<TaskPanelTagOption[]>([])
@@ -446,13 +422,6 @@ const weaponRecordById = ref<Map<string, Weapon>>(new Map())
 /** 基站/数据中心 ID → 接口记录（详情展示用） */
 const groundStationRecordById = ref<Map<string, BaseStationInfo>>(new Map())
 
-/** 候选项「未选择」分区是否展开（默认折叠） */
-const resourcePoolExpanded = ref({
-  series: false,
-  weapon: false,
-  receive: false,
-  center: false,
-})
 const seriesOptionsLoading = ref(false)
 const weaponOptionsLoading = ref(false)
 const receiveOptionsLoading = ref(false)
@@ -492,88 +461,219 @@ const resolveEnemyCountries = (task: TaskForm | null | undefined): string[] => {
     .filter(Boolean)
 }
 
-/**
- * 当前编辑任务蓝方（敌方）国家/组织展示文案。
- */
-const enemyCountryDisplayText = computed(() => {
-  const countries = resolveEnemyCountries(store.activedTask)
-  return countries.length ? countries.join('、') : '--'
-})
-/** 进行中的 getSatelliteSeries 请求（同参数合并，避免刷新时重复调用） */
-let seriesOptionsInflight: { queryKey: string; promise: Promise<void> } | null = null
+/** 当前任务敌方国家列表 */
+const enemyCountriesList = computed(() => resolveEnemyCountries(store.activedTask))
+
+/** 只读任务时间行 */
+const taskTimeRangeText = computed(() =>
+  formatC2LeftPanelTaskTimeRange(editorDraft.value?.beginDate, editorDraft.value?.endDate),
+)
 
 /**
- * 生成系列候选项接口查询键（国家 + 卫星类型）。
+ * 同步面板国家勾选（新国家默认勾选）。
  *
- * @param task 当前任务
- * @returns 用于去重的键
+ * @param countries 敌方国家
  */
-const buildSeriesOptionsQueryKey = (task: TaskForm | null | undefined): string => {
-  const countries = resolveEnemyCountries(task)
-  const types = editorDraft.value?.targetTypeShow?.length
-    ? [...editorDraft.value.targetTypeShow]
-    : resolveTaskTargetTypes(task)
-  return `${[...countries].sort().join('\u0001')}|${[...types].sort().join('\u0001')}`
+const syncCountryPanelChecked = (countries: string[]) => {
+  const next: Record<string, boolean> = {}
+  for (const country of countries) {
+    next[country] = countryPanelChecked.value[country] ?? true
+  }
+  countryPanelChecked.value = next
 }
 
 /**
- * 加载卫星系列候选项。
+ * @param country 国家名
+ * @returns 面板是否展示该国资源
+ */
+const isCountryPanelVisible = (country: string): boolean => countryPanelChecked.value[country] !== false
+
+/**
+ * @param country 国家名
+ * @returns 该国中、任务 resources 已选择的系列
+ */
+const seriesForCountry = (country: string): string[] => {
+  const selected = new Set(editorDraft.value?.selectedSeries ?? [])
+  return (countrySeriesMap.value.get(country) ?? []).filter((series) => selected.has(series))
+}
+
+/**
+ * 任务已选、但系列接口未归入任一敌方国家的系列。
+ * 加载完成前返回空，避免把全部已选系列短暂当成未匹配项。
+ */
+const unmatchedSelectedSeries = computed(() => {
+  if (seriesOptionsLoading.value) return []
+  const known = new Set<string>()
+  for (const list of countrySeriesMap.value.values()) {
+    for (const series of list) known.add(series)
+  }
+  return (editorDraft.value?.selectedSeries ?? []).filter((series) => !known.has(series))
+})
+
+/** 进行中的按国系列请求键 */
+let countrySeriesInflightKey = ''
+let countrySeriesInflight: Promise<void> | null = null
+
+/**
+ * 按国加载卫星系列，仅用于把任务已选系列归到对应国家下展示。
+ * 不把接口返回的全部系列写入草稿。
  *
  * @param task 当前任务
  */
-const loadSeriesTagOptions = async (task: TaskForm | null | undefined) => {
+const loadCountrySeriesMap = async (task: TaskForm | null | undefined) => {
   const countries = resolveEnemyCountries(task)
   const types = editorDraft.value?.targetTypeShow?.length
     ? [...editorDraft.value.targetTypeShow]
     : resolveTaskTargetTypes(task)
-  if (!countries.length || !types.length) {
-    seriesTagOptions.value = (editorDraft.value?.selectedSeries || []).map((series) => ({
-      id: series,
-      label: series,
-    }))
+  syncCountryPanelChecked(countries)
+  satellitesBySeries.value = new Map()
+  for (const key of Object.keys(satelliteLoadErrorBySeries)) {
+    delete satelliteLoadErrorBySeries[key]
+  }
+  if (!countries.length) {
+    countrySeriesMap.value = new Map()
+    ensureSatellitesForVisibleSeries()
     return
   }
-  const queryKey = buildSeriesOptionsQueryKey(task)
-  if (seriesOptionsInflight?.queryKey === queryKey) {
-    await seriesOptionsInflight.promise
+  const inflightKey = `${[...countries].sort().join('\u0001')}|${[...types].sort().join('\u0001')}`
+  if (countrySeriesInflightKey === inflightKey && countrySeriesInflight) {
+    await countrySeriesInflight
+    ensureSatellitesForVisibleSeries()
     return
   }
+  countrySeriesInflightKey = inflightKey
 
   const loadPromise = (async () => {
     seriesOptionsLoading.value = true
     try {
-      const res = await getSatelliteSeries(countries)
-      if (res.code === 200 && res.data) {
-        const options = buildSeriesOptionsFromApiData(res.data, types)
-        const merged = new Set([...options, ...(editorDraft.value?.selectedSeries || [])])
-        seriesTagOptions.value = [...merged]
-          .sort((a, b) => a.localeCompare(b, 'zh-CN'))
-          .map((series) => ({ id: series, label: series }))
-      } else {
-        seriesTagOptions.value = (editorDraft.value?.selectedSeries || []).map((series) => ({
-          id: series,
-          label: series,
-        }))
-      }
-    } catch {
-      seriesTagOptions.value = (editorDraft.value?.selectedSeries || []).map((series) => ({
-        id: series,
-        label: series,
-      }))
+      const map = await fetchSeriesNamesByCountry(countries, types)
+      countrySeriesMap.value = map
+    } catch (error) {
+      console.error('加载国家卫星系列失败:', error)
+      const msg = error instanceof Error ? error.message : '加载卫星系列失败'
+      ElMessage.error(msg)
+      countrySeriesMap.value = new Map()
     } finally {
       seriesOptionsLoading.value = false
+      ensureSatellitesForVisibleSeries()
     }
   })()
 
-  seriesOptionsInflight = { queryKey, promise: loadPromise }
+  countrySeriesInflight = loadPromise
   try {
     await loadPromise
   } finally {
-    if (seriesOptionsInflight?.promise === loadPromise) {
-      seriesOptionsInflight = null
+    if (countrySeriesInflight === loadPromise) {
+      countrySeriesInflight = null
     }
   }
 }
+
+/** 系列 → 进行中的卫星列表请求 */
+const satelliteLoadInflight = new Map<string, Promise<void>>()
+
+/**
+ * 拉取系列下卫星列表。
+ *
+ * @param series 系列名
+ */
+const loadSatellitesForSeries = async (series: string): Promise<void> => {
+  if (satellitesBySeries.value.has(series)) return
+  const existing = satelliteLoadInflight.get(series)
+  if (existing) {
+    await existing
+    return
+  }
+  const promise = (async () => {
+    satelliteLoadingSeries.value = new Set(satelliteLoadingSeries.value).add(series)
+    delete satelliteLoadErrorBySeries[series]
+    try {
+      const res = await getSatelliteBySeries(series)
+      if (res.code !== 200 || !Array.isArray(res.data)) {
+        satelliteLoadErrorBySeries[series] = res.msg || `加载系列「${series}」卫星失败`
+        return
+      }
+      const rows = mapSatellitePreviewToTableRows(res.data as C2LeftPanelSatellitePreviewItem[], series)
+      satellitesBySeries.value = new Map(satellitesBySeries.value).set(series, rows)
+    } catch (error) {
+      console.error(`加载系列 ${series} 卫星失败:`, error)
+      satelliteLoadErrorBySeries[series] =
+        error instanceof Error ? error.message : `加载系列「${series}」卫星失败`
+    } finally {
+      const next = new Set(satelliteLoadingSeries.value)
+      next.delete(series)
+      satelliteLoadingSeries.value = next
+      satelliteLoadInflight.delete(series)
+    }
+  })()
+  satelliteLoadInflight.set(series, promise)
+  await promise
+}
+
+/**
+ * 为当前可见、且属于任务已选系列的卫星加载表格。
+ * 任务只保存系列名，该系列下的卫星即任务卫星，不展示其他系列。
+ */
+const ensureSatellitesForVisibleSeries = (): void => {
+  for (const country of enemyCountriesList.value) {
+    if (!isCountryPanelVisible(country)) continue
+    for (const series of seriesForCountry(country)) {
+      void loadSatellitesForSeries(series)
+    }
+  }
+  for (const series of unmatchedSelectedSeries.value) {
+    void loadSatellitesForSeries(series)
+  }
+}
+
+/**
+ * @param series 系列名
+ * @returns 是否正在加载卫星
+ */
+const isSatelliteListLoading = (series: string): boolean => satelliteLoadingSeries.value.has(series)
+
+/**
+ * @param series 系列名
+ * @returns 已加载的卫星行
+ */
+const satellitesForSeries = (series: string): C2LeftPanelSatelliteTableRow[] =>
+  satellitesBySeries.value.get(series) ?? []
+
+const receiveGroupsByCountry = computed(() => {
+  const selected = new Set(editorDraft.value?.selectedReceiveIds ?? [])
+  const options = receiveTagOptions.value.filter((item) => selected.has(item.id))
+  return groupGroundStationRowsByCountry(
+    options,
+    groundStationRecordById.value,
+    enemyCountriesList.value,
+  )
+})
+const centerGroupsByCountry = computed(() => {
+  const selected = new Set(editorDraft.value?.stationIds ?? [])
+  const options = centerTagOptions.value.filter((item) => selected.has(item.id))
+  return groupGroundStationRowsByCountry(
+    options,
+    groundStationRecordById.value,
+    enemyCountriesList.value,
+  )
+})
+
+/**
+ * 任务已选武器 ID。关闭「使用武器」时草稿被清空，展示仍用暂存的任务选择，而不是武器库全量。
+ */
+const taskSelectedWeaponIds = computed(() => {
+  const selected = editorDraft.value?.selectedWeaponIds ?? []
+  if (selected.length) return selected
+  return stashedWeaponIds.value
+})
+
+/** 任务已选武器的只读表格行 */
+const weaponTableRows = computed(() => {
+  const optionById = new Map(weaponTagOptions.value.map((item) => [item.id, item]))
+  return taskSelectedWeaponIds.value.map((id) =>
+    buildWeaponTableRow(optionById.get(id) ?? { id, label: id }, weaponRecordById.value),
+  )
+})
 /**
  * 加载武器候选项。
  */
@@ -718,7 +818,7 @@ const syncEditorForTask = async (
   if (!task) return
   if (!reloadTagOptions) return
   await Promise.all([
-    loadSeriesTagOptions(task),
+    loadCountrySeriesMap(task),
     loadWeaponTagOptions(),
     loadReceiveTagOptions(),
     loadCenterTagOptions(),
@@ -897,86 +997,13 @@ watch(
     }
   }
 )
-const isTargetTypeSelected = (typeName: string) =>
-  editorDraft.value?.targetTypeShow.includes(typeName) ?? false
-/**
- * 选中卫星类型并刷新系列候选项。
- *
- * @param typeName 类型名
- */
-const toggleTargetType = (typeName: string) => {
-  if (!editorDraft.value || editorDraft.value.targetTypeShow.includes(typeName)) return
-  editorDraft.value.targetTypeShow = [...editorDraft.value.targetTypeShow, typeName]
-  void loadSeriesTagOptions(store.activedTask)
-}
-/**
- * 取消卫星类型；至少保留一种。
- *
- * @param typeName 类型名
- */
-const removeTargetType = (typeName: string) => {
-  if (!editorDraft.value) return
-  if (editorDraft.value.targetTypeShow.length <= 1) {
-    ElMessage.warning('请至少保留一种卫星类型')
-    return
-  }
-  editorDraft.value.targetTypeShow = editorDraft.value.targetTypeShow.filter((item) => item !== typeName)
-  void loadSeriesTagOptions(store.activedTask)
-}
-/**
- * 修改任务时长时联动结束时间。
- *
- * @param value 小时数
- */
-const handleDurationHoursChange = (value: number | undefined) => {
-  if (!editorDraft.value || value == null || Number.isNaN(value)) return
-  applyDurationHoursToDraft(editorDraft.value, value)
-  durationHours.value = Math.max(1, Math.round(value))
-}
 const isSeriesSelected = (series: string) => editorDraft.value?.selectedSeries.includes(series) ?? false
-const isWeaponSelected = (id: string) => editorDraft.value?.selectedWeaponIds.includes(id) ?? false
-const isReceiveSelected = (id: string) => editorDraft.value?.selectedReceiveIds.includes(id) ?? false
-const isCenterSelected = (id: string) => editorDraft.value?.stationIds.includes(id) ?? false
 
-/** 按是否已选拆分候选项（上：已选，下：未选） */
-interface TaskPanelTagOptionGroups {
-  /** 已勾选项 */
-  selected: TaskPanelTagOption[]
-  /** 未勾选项 */
-  unselected: TaskPanelTagOption[]
-}
-
-/**
- * 将候选项拆成已选 / 未选两组。
- *
- * @param options 全部候选项
- * @param isSelected 是否已选
- * @returns 分组结果
- */
-const splitTaskPanelTagOptions = (
-  options: TaskPanelTagOption[],
-  isSelected: (id: string) => boolean,
-): TaskPanelTagOptionGroups => {
-  const selected: TaskPanelTagOption[] = []
-  const unselected: TaskPanelTagOption[] = []
-  for (const item of options) {
-    if (isSelected(item.id)) selected.push(item)
-    else unselected.push(item)
-  }
-  return { selected, unselected }
-}
-
-const seriesTagOptionGroups = computed(() =>
-  splitTaskPanelTagOptions(seriesTagOptions.value, isSeriesSelected),
-)
-const weaponTagOptionGroups = computed(() =>
-  splitTaskPanelTagOptions(weaponTagOptions.value, isWeaponSelected),
-)
-const receiveTagOptionGroups = computed(() =>
-  splitTaskPanelTagOptions(receiveTagOptions.value, isReceiveSelected),
-)
-const centerTagOptionGroups = computed(() =>
-  splitTaskPanelTagOptions(centerTagOptions.value, isCenterSelected),
+watch(
+  () => editorDraft.value?.selectedSeries.join('\u0001') ?? '',
+  () => {
+    ensureSatellitesForVisibleSeries()
+  },
 )
 /**
  * 切换系列选中状态。
@@ -1013,40 +1040,6 @@ const handleUseWeaponsChange = (enabled: boolean) => {
   editorDraft.value.selectedWeaponIds = normalizeTaskWeaponIds(stashedWeaponIds.value)
 }
 
-const toggleWeapon = (id: string) => {
-  if (!useWeaponsEnabled.value || !editorDraft.value || !id) return
-  const current = normalizeTaskWeaponIds(editorDraft.value.selectedWeaponIds)
-  if (current.includes(id)) return
-  editorDraft.value.selectedWeaponIds = normalizeTaskWeaponIds([...current, id])
-  stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
-}
-const removeWeapon = (id: string) => {
-  if (!useWeaponsEnabled.value || !editorDraft.value) return
-  editorDraft.value.selectedWeaponIds = normalizeTaskWeaponIds(
-    editorDraft.value.selectedWeaponIds.filter((item) => item !== id),
-  )
-  stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
-  if (!editorDraft.value.selectedWeaponIds.length) {
-    useWeaponsEnabled.value = false
-  }
-}
-const toggleReceive = (id: string) => {
-  if (!editorDraft.value || editorDraft.value.selectedReceiveIds.includes(id)) return
-  editorDraft.value.selectedReceiveIds = [...editorDraft.value.selectedReceiveIds, id]
-}
-const removeReceive = (id: string) => {
-  if (!editorDraft.value) return
-  editorDraft.value.selectedReceiveIds = editorDraft.value.selectedReceiveIds.filter((item) => item !== id)
-}
-const toggleCenter = (id: string) => {
-  if (!editorDraft.value || editorDraft.value.stationIds.includes(id)) return
-  editorDraft.value.stationIds = [...editorDraft.value.stationIds, id]
-}
-const removeCenter = (id: string) => {
-  if (!editorDraft.value) return
-  editorDraft.value.stationIds = editorDraft.value.stationIds.filter((item) => item !== id)
-}
-
 /**
  * 卫星系列 checkbox 变更。
  *
@@ -1056,28 +1049,69 @@ const removeCenter = (id: string) => {
 const handleSeriesCheckboxChange = (series: string, checked: boolean | string | number) => {
   if (checked) toggleSeries(series)
   else removeSeries(series)
+  ensureSatellitesForVisibleSeries()
 }
 
 /**
- * 武器 checkbox 变更。
+ * 国家面板勾选：仅控制该国分组展示。
  *
- * @param id 武器 ID
- * @param checked 是否勾选
+ * @param country 国家名
+ * @param checked 是否展示
  */
-const handleWeaponCheckboxChange = (id: string, checked: boolean | string | number) => {
-  if (checked) toggleWeapon(id)
-  else removeWeapon(id)
+const handleCountryPanelChange = (country: string, checked: boolean | string | number) => {
+  countryPanelChecked.value = {
+    ...countryPanelChecked.value,
+    [country]: Boolean(checked),
+  }
+  ensureSatellitesForVisibleSeries()
 }
 
 /**
- * 地面站 checkbox 变更。
+ * 点击系列名称：同步分析页系列选择并高亮系列卫星。
  *
- * @param id 地面站 ID
- * @param checked 是否勾选
+ * @param series 系列名
  */
-const handleReceiveCheckboxChange = (id: string, checked: boolean | string | number) => {
-  if (checked) toggleReceive(id)
-  else removeReceive(id)
+const handleSeriesFocus = (series: string) => {
+  store.setSelectedSatSeries(series)
+  handleTaskResourceDetail({ kind: 'series', item: { id: series, label: series } })
+}
+
+/**
+ * 点击卫星表格行：单星定位与高亮。
+ *
+ * @param row 卫星行
+ */
+const handleSatelliteRowClick = (row: C2LeftPanelSatelliteTableRow) => {
+  emit('focus-resource-detail', {
+    kind: 'satellite',
+    item: { id: String(row.norad), label: row.name },
+    norad: row.norad,
+  })
+}
+
+/**
+ * 点击地面站或数据中心表格行。
+ *
+ * @param kind 资源类型
+ * @param row 表格行
+ */
+const handleGroundStationRowClick = (kind: 'receive' | 'center', row: C2LeftPanelGroundStationTableRow) => {
+  handleTaskResourceDetail({
+    kind,
+    item: { id: row.id, label: row.name },
+  })
+}
+
+/**
+ * 点击武器表格行：在地球上定位该武器并展示已有字段。不改变任务武器勾选。
+ *
+ * @param row 武器表格行
+ */
+const handleWeaponRowClick = (row: C2LeftPanelWeaponTableRow) => {
+  handleTaskResourceDetail({
+    kind: 'weapon',
+    item: { id: row.id, label: row.name },
+  })
 }
 
 /**
@@ -1102,29 +1136,6 @@ const handleTaskResourceDetail = (payload: {
   emit('focus-resource-detail', detailPayload)
 }
 
-const handleCenterCheckboxChange = (id: string, checked: boolean | string | number) => {
-  if (checked) toggleCenter(id)
-  else removeCenter(id)
-}
-
-/**
- * 更新开始时间。
- *
- * @param value datetime-local 值
- */
-const handleBeginInput = (value: string) => {
-  if (!editorDraft.value) return
-  editorDraft.value.beginDate = fromTaskDatetimeLocalValue(value)
-}
-/**
- * 更新结束时间。
- *
- * @param value datetime-local 值
- */
-const handleEndInput = (value: string) => {
-  if (!editorDraft.value) return
-  editorDraft.value.endDate = fromTaskDatetimeLocalValue(value)
-}
 /**
  * 打开任务编辑弹窗（新建或修改）。
  *
@@ -1218,45 +1229,37 @@ const selectTask = async (task: TaskForm) => {
     taskSwitching.value = false
   }
 }
+
 /**
  * 校验并提交任务修改，触发后台重算。
  */
 const handleSaveAndRecalculate = async () => {
-  /** 1. 校验任务基本信息 */
   const baseTask = store.activedTask
-  /** 2. 校验任务编辑器数据 */
   const draft = editorDraft.value
-  /** 3. 校验任务编辑器数据与任务基本信息一致 */
   if (!baseTask?.id || !draft || draft.taskId !== baseTask.id) {
     ElMessage.warning('请先选择任务')
     return
   }
-  /** 4. 校验任务是否正在计算 */
   if (isTaskCalculating(baseTask)) {
     ElMessage.warning('任务计算中，请完成后再保存并重算')
     return
   }
-  /** 5. 校验任务开始与结束时间 */
   if (!draft.beginDate || !draft.endDate) {
     ElMessage.warning('请填写开始与结束时间')
     return
   }
-  /** 6. 校验任务开始与结束时间 */
   if (parseTaskPanelTimeMs(draft.endDate) <= parseTaskPanelTimeMs(draft.beginDate)) {
     ElMessage.warning('结束时间必须晚于开始时间')
     return
   }
-  /** 7. 校验任务卫星系列 */
   if (!draft.selectedSeries.length) {
     ElMessage.warning('请至少保留一个卫星系列')
     return
   }
-  /** 8. 校验任务卫星类型 */
   if (!draft.targetTypeShow.length) {
     ElMessage.warning('请至少选择一种卫星类型')
     return
   }
-  /** 9. 合并任务编辑器数据与任务基本信息 */
   let payload: TaskForm
   try {
     payload = mergeTaskFormWithDraft(baseTask, draft)
@@ -1265,7 +1268,6 @@ const handleSaveAndRecalculate = async () => {
     ElMessage.error(msg)
     return
   }
-  /** 10. 保存并重算任务 */
   savingRecalc.value = true
   try {
     const res = await updateTask(payload)
@@ -1275,19 +1277,14 @@ const handleSaveAndRecalculate = async () => {
     }
     ElMessage.success('已保存，任务重新计算中')
     taskProgressCompleteNotified.delete(baseTask.id)
-    /** 11. 先订阅 WS，避免 loadBattleTasks 期间完成推送被后续 start 重置 */
     await startTaskProgressPolling(baseTask.id)
-    /** 12. 刷新任务列表 */
     await loadBattleTasks()
     const latest = requireTaskFromList(baseTask.id)
     if (!latest) return
     store.setActivedTask(latest)
-    /** 13. 清除任务分析数据 */
     store.setSelectedSatSeries('')
     store.clearTaskAnalysisData()
-    /** 15. 同步任务编辑器数据 */
     await syncEditorForTask(latest)
-    /** 16. 触发任务重算事件 */
     emit('task-recalculated', baseTask.id)
   } catch (error) {
     console.error('保存并重算失败:', error)
@@ -1296,6 +1293,7 @@ const handleSaveAndRecalculate = async () => {
     savingRecalc.value = false
   }
 }
+
 onUnmounted(() => {
   stopAllTaskProgressPolling()
 })
@@ -1580,8 +1578,127 @@ onUnmounted(() => {
   }
 }
 
-.task-time-section .task-editor-times {
-  margin-bottom: 0;
+.task-time-readonly {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #e2efff;
+  word-break: break-word;
+}
+
+.country-block {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid rgba(79, 147, 221, 0.22);
+  border-radius: 6px;
+  background: rgba(14, 28, 48, 0.45);
+}
+
+.country-block__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.country-block__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #7dd3fc;
+}
+
+.series-block {
+  margin-left: 4px;
+  padding-left: 8px;
+  border-left: 2px solid rgba(0, 225, 255, 0.15);
+  margin-bottom: 10px;
+}
+
+.series-block__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.series-block__name {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #e2efff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover {
+    color: #40f2ff;
+    text-decoration: underline;
+  }
+}
+
+.satellite-table-wrap {
+  margin: 0 0 4px 22px;
+}
+
+.satellite-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+
+  th,
+  td {
+    padding: 4px 6px;
+    border: 1px solid rgba(79, 147, 221, 0.25);
+    text-align: left;
+  }
+
+  th {
+    color: #94a3b8;
+    font-weight: 600;
+    background: rgba(8, 18, 32, 0.6);
+  }
+
+  td {
+    color: #e2efff;
+  }
+}
+
+.satellite-table__row {
+  cursor: pointer;
+
+  &:hover td {
+    background: rgba(0, 225, 255, 0.08);
+  }
+}
+
+.ground-station-table-wrap {
+  overflow-x: auto;
+}
+
+.ground-station-table {
+  min-width: 520px;
+
+  td:nth-child(3) {
+    max-width: 120px;
+    word-break: break-word;
+  }
+}
+
+.weapon-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 10px;
+}
+
+.weapon-table {
+  min-width: 880px;
+  white-space: nowrap;
+}
+
+.country-resource-list {
+  margin-bottom: 10px;
 }
 
 .task-metric-rows {

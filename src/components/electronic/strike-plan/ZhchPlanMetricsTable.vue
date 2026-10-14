@@ -190,7 +190,7 @@ const rowVariantClass = (variant?: ZhchPlanMetricsTableRowView['rowVariant']): s
 
   &--vertical {
     .zhch-metrics-table__head {
-      font-size: 14px;
+      font-size: 17px;
       padding: 8px 10px;
     }
 
@@ -199,7 +199,7 @@ const rowVariantClass = (variant?: ZhchPlanMetricsTableRowView['rowVariant']): s
     }
 
     .zhch-metrics-table__grid--vertical {
-      font-size: 11px;
+      font-size: 16px;
       table-layout: fixed;
       width: 100%;
     }
@@ -278,7 +278,7 @@ const rowVariantClass = (variant?: ZhchPlanMetricsTableRowView['rowVariant']): s
     width: 100%;
     border-collapse: collapse;
     table-layout: auto;
-    font-size: 13px;
+    font-size: 16px;
   }
 
   &__th {

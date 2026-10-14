@@ -40,19 +40,6 @@
                   <span class="metric-input-unit">小时</span>
                 </div>
               </el-form-item>
-              <div v-if="taskForm.combatArea" class="task-edit-metrics-grid__right-cell">
-                <div class="task-edit-area-slot">
-                  <span class="task-edit-area-slot__label">任务区域</span>
-                  <el-checkbox v-model="taskForm.combatArea.enabled" :disabled="!canSave">启用</el-checkbox>
-                </div>
-                <el-form-item label="经度" class="task-edit-coord-item">
-                  <div class="metric-input-row">
-                    <el-input-number v-model="taskForm.combatArea.centerLon" class="metric-input-number" :min="-180"
-                      :max="180" :step="0.0001" :precision="4" controls-position="right" :disabled="!canSave" />
-                    <span class="metric-input-unit metric-input-unit--reserve" aria-hidden="true">°</span>
-                  </div>
-                </el-form-item>
-              </div>
 
               <el-form-item v-if="showTaskMetricsInputs" label="链路时延" class="task-edit-metrics-grid__left-cell">
                 <div class="metric-input-row">
@@ -61,19 +48,6 @@
                   <span class="metric-input-unit">分钟</span>
                 </div>
               </el-form-item>
-              <div v-if="taskForm.combatArea" class="task-edit-metrics-grid__right-cell">
-                <div class="task-edit-area-slot task-edit-area-slot--ghost" aria-hidden="true">
-                  <span class="task-edit-area-slot__label">任务区域</span>
-                  <span>启用</span>
-                </div>
-                <el-form-item label="纬度" class="task-edit-coord-item">
-                  <div class="metric-input-row">
-                    <el-input-number v-model="taskForm.combatArea.centerLat" class="metric-input-number" :min="-90"
-                      :max="90" :step="0.0001" :precision="4" controls-position="right" :disabled="!canSave" />
-                    <span class="metric-input-unit metric-input-unit--reserve" aria-hidden="true">°</span>
-                  </div>
-                </el-form-item>
-              </div>
 
               <el-form-item v-if="showTaskMetricsInputs" label="覆盖率" class="task-edit-metrics-grid__left-cell">
                 <div class="metric-input-row">
@@ -82,54 +56,7 @@
                   <span class="metric-input-unit">%</span>
                 </div>
               </el-form-item>
-              <div v-if="taskForm.combatArea" class="task-edit-metrics-grid__right-cell">
-                <div class="task-edit-area-slot task-edit-area-slot--ghost" aria-hidden="true">
-                  <span class="task-edit-area-slot__label">任务区域</span>
-                  <span>启用</span>
-                </div>
-                <el-form-item label="半径" class="task-edit-coord-item">
-                  <div class="metric-input-row">
-                    <el-input-number v-model="taskForm.combatArea.radiusKm" class="metric-input-number" :min="0"
-                      :max="20000" :step="10" :precision="0" controls-position="right" :disabled="!canSave" />
-                    <span class="metric-input-unit">km</span>
-                  </div>
-                </el-form-item>
-              </div>
             </div>
-            <el-form-item v-else-if="taskForm.combatArea" label="任务区域" class="task-edit-combat-area-form-item">
-              <div class="task-edit-combat-area-inline">
-                <el-checkbox v-model="taskForm.combatArea.enabled" class="task-edit-combat-area-enable"
-                  :disabled="!canSave">
-                  启用
-                </el-checkbox>
-                <div class="task-edit-combat-area-coords-stack">
-                  <div class="task-edit-combat-area-coord-row">
-                    <span class="task-edit-combat-area-coord-label">经度</span>
-                    <div class="task-edit-combat-area-coord-input">
-                      <el-input-number v-model="taskForm.combatArea.centerLon" class="metric-input-number" :min="-180"
-                        :max="180" :step="0.0001" :precision="4" controls-position="right" :disabled="!canSave" />
-                      <span class="task-edit-combat-area-coord-unit" aria-hidden="true" />
-                    </div>
-                  </div>
-                  <div class="task-edit-combat-area-coord-row">
-                    <span class="task-edit-combat-area-coord-label">纬度</span>
-                    <div class="task-edit-combat-area-coord-input">
-                      <el-input-number v-model="taskForm.combatArea.centerLat" class="metric-input-number" :min="-90"
-                        :max="90" :step="0.0001" :precision="4" controls-position="right" :disabled="!canSave" />
-                      <span class="task-edit-combat-area-coord-unit" aria-hidden="true" />
-                    </div>
-                  </div>
-                  <div class="task-edit-combat-area-coord-row">
-                    <span class="task-edit-combat-area-coord-label">半径</span>
-                    <div class="task-edit-combat-area-coord-input">
-                      <el-input-number v-model="taskForm.combatArea.radiusKm" class="metric-input-number" :min="0"
-                        :max="20000" :step="10" :precision="0" controls-position="right" :disabled="!canSave" />
-                      <span class="task-edit-combat-area-coord-unit">km</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </el-form-item>
             <el-form-item label="卫星类型" prop="targetTypeShow">
               <el-select v-model="taskForm.targetTypeShow" multiple placeholder="请选择卫星类型"
                 popper-class="task-edit-select-popper" style="width: 100%" @change="handleTargetTypeShowChange">
@@ -1182,15 +1109,10 @@ const handleSubmit = async () => {
     }
   }
 
-  /**
-   * 左右各占 50% 宽；每行左指标与右（任务区域槽 + 坐标）同行对齐。
-   */
+  /** 任务时长 / 链路时延 / 覆盖率纵向排列。 */
   .task-edit-metrics-grid {
-    --task-area-slot-width: 118px;
-    --task-coord-label-width: 48px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    column-gap: 32px;
+    grid-template-columns: minmax(0, 1fr);
     row-gap: 16px;
     width: 100%;
     margin-bottom: 16px;
@@ -1224,159 +1146,8 @@ const handleSubmit = async () => {
       text-align: left;
     }
 
-    .metric-input-unit--reserve {
-      visibility: hidden;
-      user-select: none;
-    }
-
     .atlas-app-form-item__content {
       line-height: 32px;
-    }
-  }
-
-  .task-edit-metrics-grid__right-cell {
-    display: grid;
-    grid-template-columns: var(--task-area-slot-width) minmax(0, 1fr);
-    column-gap: 8px;
-    align-items: center;
-    min-width: 0;
-  }
-
-  .task-edit-area-slot {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
-    min-height: 32px;
-    white-space: nowrap;
-  }
-
-  .task-edit-area-slot--ghost {
-    visibility: hidden;
-    user-select: none;
-    pointer-events: none;
-  }
-
-  .task-edit-area-slot__label {
-    font-size: 13px;
-    color: #7dd3fc;
-  }
-
-  .task-edit-coord-item.atlas-app-form-item {
-    margin-bottom: 0;
-    min-width: 0;
-  }
-
-  .task-edit-coord-item.atlas-app-form-item .atlas-app-form-item__label {
-    width: var(--task-coord-label-width) !important;
-    padding-right: 8px !important;
-    justify-content: flex-end;
-  }
-
-  .task-edit-coord-item.atlas-app-form-item .atlas-app-form-item__content {
-    flex: 1;
-    min-width: 0;
-  }
-
-  /** 隐藏时长/时延/覆盖率时：任务区域与开始/结束时间 label 对齐，启用与经纬半径横向+纵向排版 */
-  .task-edit-combat-area-form-item.atlas-app-form-item {
-    margin-bottom: 16px;
-  }
-
-  .task-edit-combat-area-inline {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 20px;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .task-edit-combat-area-enable.atlas-app-checkbox {
-    flex-shrink: 0;
-    margin: 0;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-  }
-
-  .task-edit-combat-area-coords-stack {
-    --task-combat-area-unit-width: 40px;
-    flex: 1;
-    min-width: 0;
-    max-width: 360px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .task-edit-combat-area-coord-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-  }
-
-  .task-edit-combat-area-coord-label {
-    flex-shrink: 0;
-    width: 48px;
-    font-size: 13px;
-    color: #7dd3fc;
-    text-align: right;
-    white-space: nowrap;
-  }
-
-  .task-edit-combat-area-coord-input {
-    flex: 1;
-    min-width: 0;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--task-combat-area-unit-width);
-    align-items: center;
-    column-gap: 8px;
-
-    .metric-input-number,
-    .metric-input-number.atlas-app-input-number,
-    .atlas-app-input-number.metric-input-number {
-      width: 100% !important;
-      max-width: none;
-    }
-  }
-
-  .task-edit-combat-area-coord-unit {
-    flex-shrink: 0;
-    width: var(--task-combat-area-unit-width);
-    font-size: 13px;
-    color: #9ecfe8;
-    text-align: left;
-    white-space: nowrap;
-  }
-
-  @media (max-width: 860px) {
-    .task-edit-combat-area-inline {
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .task-edit-combat-area-coords-stack {
-      max-width: none;
-      width: 100%;
-    }
-
-    .task-edit-metrics-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .task-edit-area-slot--ghost {
-      display: none;
-    }
-
-    .task-edit-metrics-grid__right-cell {
-      grid-template-columns: 1fr;
-    }
-
-    .task-edit-area-slot {
-      justify-content: flex-start;
-      margin-bottom: 4px;
     }
   }
 

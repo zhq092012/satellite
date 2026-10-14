@@ -14,6 +14,10 @@ export interface SatelliteStrikeRecommendItem {
   staticThreat: number
   /** 动态威胁度 */
   dynamicThreat: number
+  /** 链路闭环耗时（接口原值，未声明单位） */
+  linkClosedLoopTime: number
+  /** 覆盖率 */
+  coverPercent: number
 }
 
 /**
@@ -36,6 +40,8 @@ export const mapTargetThreatLevelListToStrikeRecommend = (
         compositeThreat: Number(item.compositeThreat),
         staticThreat: Number(item.staticThreat),
         dynamicThreat: Number(item.dynamicThreat),
+        linkClosedLoopTime: Number(item.linkClosedLoopTime),
+        coverPercent: Number(item.coverPercent),
       }
     })
     .filter((row): row is SatelliteStrikeRecommendItem => row != null)

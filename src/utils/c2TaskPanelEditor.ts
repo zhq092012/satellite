@@ -1,8 +1,8 @@
 import type { BaseStationInfo } from '@/api/system/satellite-system-api'
 import type { TaskCombatArea, TaskForm, TaskResourceItem, Weapon } from '@/types/dashboard'
 
-/** 左侧面板资源类型（卫星系列 / 武器 / 地面站 / 数据中心） */
-export type TaskPanelResourceKind = 'series' | 'weapon' | 'receive' | 'center'
+/** 左侧面板资源类型（卫星系列 / 单星 / 武器 / 地面站 / 数据中心） */
+export type TaskPanelResourceKind = 'series' | 'satellite' | 'weapon' | 'receive' | 'center'
 
 /**
  * 任务新建/编辑界面是否展示「任务时长、链路时延、覆盖率」表单项。
@@ -28,6 +28,8 @@ export interface TaskPanelResourceDetailPayload {
   weapon?: Weapon
   /** 基站/数据中心库记录（kind=receive|center 时可选） */
   groundStation?: BaseStationInfo
+  /** NORAD 编号（kind=satellite 时必填） */
+  norad?: number
 }
 
 /** 左侧面板内联编辑草稿 */
