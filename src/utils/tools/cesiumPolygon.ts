@@ -19,6 +19,12 @@ class DrawClosedPolygon {
   _dynamicPositions: any
   positions: number[] | null
 
+  /**
+   * 绑定 Viewer，并可用 options 覆盖填充色、边框色和线宽。
+   *
+   * @param viewer 绘制所在的 Cesium Viewer
+   * @param options 可选样式，字段与类上的 fillColor、outColor、outWidth 同名
+   */
   constructor(viewer: Cesium.Viewer, options = {}) {
     this.viewer = viewer
     this.fillColor = Cesium.Color.YELLOW.withAlpha(0.5)
@@ -34,6 +40,10 @@ class DrawClosedPolygon {
     this.positions = []
   }
 
+  /**
+   * 开始选点。左键落点，鼠标移动预览，右键结束并闭合。
+   * 若上一次绘制未停止，会先拆掉旧的事件处理器。
+   */
   start() {
     this.stop() // 如果上次没关，先清掉
     this.handler = new Cesium.ScreenSpaceEventHandler(this.viewer.canvas)
@@ -44,6 +54,9 @@ class DrawClosedPolygon {
     this.viewer.canvas.style.cursor = 'crosshair'
   }
 
+  /**
+   * 销毁屏幕事件处理器，并把鼠标恢复为默认样式。未开始绘制时不做事。
+   */
   stop() {
     if (!this.handler) return
     this.handler.destroy()
@@ -51,7 +64,11 @@ class DrawClosedPolygon {
     this.viewer.canvas.style.cursor = 'default'
   }
 
-  /* ---------- 内部 ---------- */
+  /**
+   * 左键在地形上落一个顶点，并记下经纬度。第一个点会创建跟随鼠标的临时线和面。
+   *
+   * @param e 屏幕点击位置
+   */
   _leftClick(e: { position: Cesium.Cartesian2 }) {
     const ray = this.viewer.camera.getPickRay(e.position)
     if (!ray) return
@@ -69,6 +86,11 @@ class DrawClosedPolygon {
     }
   }
 
+  /**
+   * 鼠标移动时更新预览点，让临时折线始终连回起点。还没有顶点时忽略。
+   *
+   * @param e 屏幕上的鼠标位置
+   */
   _mouseMove(e: { endPosition: Cesium.Cartesian2 }) {
     if (this.points.length === 0) return
     const ray = this.viewer.camera.getPickRay(e.endPosition)
@@ -82,6 +104,9 @@ class DrawClosedPolygon {
     this._dynamicPositions.push(pos, this.points[0]) // 保证首尾相连
   }
 
+  /**
+   * 右键结束绘制。不足 3 个点时清掉临时图形；否则生成闭合多边形和边线，并写入布局 store。
+   */
   _finish() {
     if (this.points.length < 3) {
       this._clear()
@@ -129,6 +154,9 @@ class DrawClosedPolygon {
     this.stop()
   }
 
+  /**
+   * 创建跟随鼠标的临时折线和临时面。位置由 CallbackProperty 每帧重算。
+   */
   _createTempShape() {
     this._dynamicPositions = [...this.points] // 会实时被 _mouseMove 改
     this.tempLine = this.viewer.entities.add({
@@ -154,6 +182,9 @@ class DrawClosedPolygon {
     })
   }
 
+  /**
+   * 丢掉已选点和临时实体，不生成正式多边形。点数不够闭合时由 {@link DrawClosedPolygon._finish} 调用。
+   */
   _clear() {
     this.points = []
     this.positions = []

@@ -75,6 +75,13 @@ export const getStrikeTypeStyle = (
   const normalizedType = weaponType.trim()
   const runtimeAlpha = phase === 'fading' ? Math.max(0.08, fadeRatio) : phase === 'active' ? 1 : 0.8
 
+  /**
+   * 由 CSS 颜色生成带透明度的 Cesium 颜色，供线条、落点和卫星着色复用。
+   *
+   * @param hex CSS 颜色
+   * @param alpha 不透明度，默认 1
+   * @returns Cesium 颜色
+   */
   const createColor = (hex: string, alpha = 1) => Cesium.Color.fromCssColorString(hex).withAlpha(alpha)
   const linkAlpha = phase === 'fading' ? Math.max(0.05, 0.95 * fadeRatio) : phase === 'active' ? 0.95 : 0.55
   const activeBlinkAlpha = phase === 'active' ? 0.7 + 0.3 * blinkRatio : 1

@@ -4,12 +4,22 @@
 
 import type { RouteRecordRaw } from 'vue-router'
 
-/** 过滤空角色字符串 */
+/**
+ * 去掉空角色，避免空串被当成一种合法角色参与匹配。
+ *
+ * @param roles 原始角色列表
+ * @returns 非空角色
+ */
 function normalizeRoles(roles: Array<string | null | undefined> = []) {
   return roles.filter((role): role is string => !!role)
 }
 
-/** 过滤空权限字符串 */
+/**
+ * 去掉空权限码。
+ *
+ * @param permissions 原始权限列表
+ * @returns 非空权限码
+ */
 function normalizePermissions(permissions: Array<string | null | undefined> = []) {
   return permissions.filter((permission): permission is string => !!permission)
 }

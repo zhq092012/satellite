@@ -1,6 +1,9 @@
 
 /**
- * 解析经纬度字符串 "lat,lng" (例如 "68.350,133.500")
+ * 解析 `纬度,经度` 字符串。
+ *
+ * @param latLonStr 如 `68.350,133.500`；空串或格式不对时纬度和经度都为 0
+ * @returns 十进制度坐标
  */
 export const parseLatLon = (latLonStr?: string): { lat: number; lng: number } => {
   if (!latLonStr) return { lat: 0, lng: 0 };
@@ -17,7 +20,11 @@ export const parseLatLon = (latLonStr?: string): { lat: number; lng: number } =>
 };
 
 /**
- * 解析时间窗字符串 (例: "10:00:00" 或 "2026-07-28 10:00:00") 为秒级 Unix 时间戳
+ * 把时间窗解析为秒级 Unix 时间戳。完整日期直接解析；只有 `HH:mm` 或 `HH:mm:ss` 时，日期取 `defaultTs` 当天。
+ *
+ * @param winStr 时间窗原文
+ * @param defaultTs 解析失败或只有时分时使用的秒级时间戳
+ * @returns 秒级时间戳
  */
 export const parseWindowTimestamp = (winStr: string, defaultTs: number): number => {
   if (!winStr) return defaultTs;

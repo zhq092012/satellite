@@ -465,6 +465,7 @@ export const normalizeTaskDateTime = (value?: string): string => {
   const ts = new Date(trimmed.replace(/-/g, '/')).getTime()
   if (!Number.isFinite(ts) || Number.isNaN(ts)) return trimmed
   const d = new Date(ts)
+  /** 数字补成两位。 @param n 非负整数 @returns 至少两位的字符串 */
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
@@ -514,6 +515,7 @@ export const TASK_PANEL_SATELLITE_TYPES = ['侦察', '通信'] as const
  * @returns `YYYY-MM-DD HH:mm`
  */
 export const formatDateToTaskPanelTime = (date: Date): string => {
+  /** 数字补成两位。 @param n 非负整数 @returns 至少两位的字符串 */
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }

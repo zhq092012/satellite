@@ -32,8 +32,11 @@ export const useBattleGlobeTimelineSelectedOrbit = (
   taskStartMsRef: Ref<number> | ComputedRef<number>,
   taskEndMsRef: Ref<number> | ComputedRef<number>
 ) => {
+  /** NORAD → satrec，卫星列表变化时清空 */
   const satrecCache = new Map<number, satellitejs.SatRec>()
+  /** 传播结果写入的临时坐标，clone 为 true 时再复制出去 */
   const scratchPosition = new Cesium.Cartesian3()
+  /** 当前已绘制轨迹的 NORAD；相同选中星跳过重建 */
   let activePathNorad: number | null = null
 
   /**
@@ -74,9 +77,12 @@ export const useBattleGlobeTimelineSelectedOrbit = (
     const satrec = getSatrec(norad)
     if (!satrec) return null
     try {
+      /** SGP4 传播得到的 ECI 位置与速度（千米） */
       const posVel = satellitejs.propagate(satrec, date)
       if (!posVel?.position) return null
+      /** 该时刻的格林尼治恒星时，用于 ECI 转 ECF */
       const gmst = satellitejs.gstime(date)
+      /** 地固坐标（千米） */
       const posEcf = satellitejs.eciToEcf(posVel.position, gmst)
       if (!posEcf) return null
       const cartesian = Cesium.Cartesian3.fromElements(
@@ -106,14 +112,18 @@ export const useBattleGlobeTimelineSelectedOrbit = (
     stop: Cesium.JulianDate,
     orbitPeriodSec: number
   ): Cesium.SampledPositionProperty | null => {
+    /** 任务时段内的采样位置，供 Entity.path 随时钟插值 */
     const property = new Cesium.SampledPositionProperty()
     property.setInterpolationOptions({
       interpolationDegree: 2,
       interpolationAlgorithm: Cesium.HermitePolynomialApproximation,
     })
 
+    /** 采样步长：约每圈 48 点，限制在 30–180 秒 */
     const stepSec = Math.max(30, Math.min(180, Math.round(orbitPeriodSec / 48)))
+    /** 成功写入的采样点数，少于 2 个无法插值 */
     let sampleCount = 0
+    /** 当前采样时刻，从任务开始步进到结束 */
     let time = start.clone()
 
     while (Cesium.JulianDate.lessThanOrEquals(time, stop)) {
@@ -134,6 +144,7 @@ export const useBattleGlobeTimelineSelectedOrbit = (
    * @param viewer Viewer
    */
   const clearSelectedPathEntities = (viewer: Cesium.Viewer) => {
+    /** 本模块创建的选中星轨迹实体 */
     const toRemove = viewer.entities.values.filter((entity) =>
       String(entity.id ?? '').startsWith(SELECTED_ORBIT_ENTITY_PREFIX)
     )
@@ -145,9 +156,11 @@ export const useBattleGlobeTimelineSelectedOrbit = (
    * 同步选中卫星 Entity.path 轨迹。
    */
   const syncSelectedSatelliteOrbit = () => {
+    /** 当前 Viewer；销毁后不再改实体 */
     const viewer = viewerRef.value
     if (!viewer || viewer.isDestroyed()) return
 
+    /** 选中星、是否单星推演，以及任务起止；推演中由推演模块自行画轨迹 */
     const norad = selectedNoradRef.value
     const deductionPlaying = isDeductionPlayingRef.value
     const startMs = taskStartMsRef.value
@@ -160,6 +173,7 @@ export const useBattleGlobeTimelineSelectedOrbit = (
     }
 
     if (activePathNorad === norad) {
+      /** 已存在的轨迹实体，只恢复显示，不重新采样 */
       const entity = viewer.entities.getById(`${SELECTED_ORBIT_ENTITY_PREFIX}${norad}`)
       if (entity?.path) {
         entity.path.show = new Cesium.ConstantProperty(true)
@@ -171,9 +185,11 @@ export const useBattleGlobeTimelineSelectedOrbit = (
 
     clearSelectedPathEntities(viewer)
 
+    /** 选中星数据，用于取 TLE 与轨道周期 */
     const sat = satellitesRef.value.find((item) => item.norad === norad)
     if (!sat) return
 
+    /** 轨道周期（秒）；TLE 无效时无法绘制 path */
     const orbitPeriodSec = resolveBattleGlobeOrbitPeriodSec(sat)
     if (orbitPeriodSec == null) {
       void import('element-plus').then(({ ElMessage }) => {
@@ -183,11 +199,14 @@ export const useBattleGlobeTimelineSelectedOrbit = (
       })
       return
     }
+    /** 任务起止的 JulianDate，同时作为实体 availability */
     const start = Cesium.JulianDate.fromDate(new Date(startMs))
     const stop = Cesium.JulianDate.fromDate(new Date(endMs))
+    /** 任务时段采样位置，驱动 Entity.path */
     const positionProperty = buildTaskSampledPosition(norad, start, stop, orbitPeriodSec)
     if (!positionProperty) return
 
+    /** 选中星轨迹实体 ID */
     const entityId = `${SELECTED_ORBIT_ENTITY_PREFIX}${norad}`
     viewer.entities.add({
       id: entityId,

@@ -39,6 +39,14 @@ export interface SatelliteTimelineModel {
   allBlocked: boolean
 }
 
+/**
+ * 把毫秒夹到任务时间轴范围内，避免标记画出时间条两端。
+ *
+ * @param ms 待夹紧的时刻
+ * @param min 任务开始毫秒
+ * @param max 任务结束毫秒
+ * @returns 落在 `[min, max]` 内的时刻
+ */
 const clampMs = (ms: number, min: number, max: number): number => Math.min(max, Math.max(min, ms))
 
 /**
@@ -158,14 +166,29 @@ export const buildSatelliteTimelineModel = (
   }
 }
 
+/**
+ * 把绝对时刻换成时间轴上的 0~1 比例，供标记定位。
+ *
+ * @param ms 标记时刻
+ * @param startMs 时间轴起点
+ * @param endMs 时间轴终点
+ * @returns 比例；时长非正时为 0，超出两端时夹到 0 或 1
+ */
 export const msToRatio = (ms: number, startMs: number, endMs: number): number => {
   const span = endMs - startMs
   if (span <= 0) return 0
   return Math.min(1, Math.max(0, (ms - startMs) / span))
 }
 
+/**
+ * 把时间轴时刻格式化为本地时区的 `YYYY-MM-DD HH:mm:ss`。
+ *
+ * @param ms 毫秒时间戳
+ * @returns 格式化时间
+ */
 export const formatTimelineTime = (ms: number): string => {
   const d = new Date(ms)
+  /** 数字补成两位。 @param n 非负整数 @returns 至少两位的字符串 */
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }

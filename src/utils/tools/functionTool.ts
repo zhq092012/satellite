@@ -60,6 +60,12 @@ export function getCircumCircle(lonlats: number[]): { center: [number, number]; 
 // const result = getCircumCircle(pts)
 // console.log('外接圆中心', result.center) // [lon, lat]
 // console.log('外接圆半径', result.radiusKm, 'km')
+/**
+ * 监听地球左键点击，把拾取点打印为经纬度和高程，并在该处放一个红点。
+ * 会打开地形深度检测，以便射线能打到地形而不是椭球面。
+ *
+ * @param viewer 要监听的 Cesium Viewer
+ */
 export function listenMousePoint(viewer: Cesium.Viewer) {
   // 开启深度检测，保证拾取准确
   viewer.scene.globe.depthTestAgainstTerrain = true
@@ -96,7 +102,15 @@ export interface SegmentedTrackResult {
   segments: Cesium.Cartesian3[][]
   segmentRanges: { start: Cesium.JulianDate; end: Cesium.JulianDate }[]
 }
-// 将多段轨迹均匀切分到总时长内并返回插值轨迹与分段坐标
+/**
+ * 把一段或多段经纬高轨迹均匀铺到 `[start, stop]` 上。
+ * 对象形式的路径会按键名排序后依次拼接；每段内部用 Hermite 插值。
+ *
+ * @param paths 单段点列，或键为分段名、值为点列的字典
+ * @param start 整段轨迹开始时刻
+ * @param stop 整段轨迹结束时刻
+ * @returns 采样位置属性、各段笛卡尔坐标和各段起止时间；没有有效点时为 null
+ */
 export function buildSegmentedTrack(
   paths: TrackSegment | Record<string, TrackSegment>,
   start: Cesium.JulianDate,

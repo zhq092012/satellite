@@ -104,12 +104,15 @@ export const useBattleGlobeDeductionEffects = (
     if (!satrec) return null
     try {
       // 传播卫星位置
+      /** SGP4 传播得到的 ECI 位置与速度（千米） */
       const posVel = satellitejs.propagate(satrec, date)
       // 如果传播位置为空，则返回 null
       if (!posVel?.position) return null
       // 获取格林尼治平恒星时
+      /** 该时刻的格林尼治恒星时，用于 ECI 转 ECF */
       const gmst = satellitejs.gstime(date)
       // 从地心惯性坐标系转换为地心地固坐标系
+      /** 地固坐标（千米），写入 Cesium 前需乘 1000 转为米 */
       const posEcf = satellitejs.eciToEcf(posVel.position, gmst)
       // 如果地心地固坐标系为空，则返回 null
       if (!posEcf) return null

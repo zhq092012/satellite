@@ -122,6 +122,14 @@ export const formatSatelliteMetaInline = (
   return lines.replace(/\n/g, '  ')
 }
 
+/**
+ * 把系列、系统类型、用途格式化成多行文案。空值和占位符 `EMPTY_TEXT` 不输出。
+ *
+ * @param series 系列名称
+ * @param sysType 系统类型，如侦察、通信
+ * @param usage 用途，如军用、商用；可省略
+ * @returns 以换行分隔的文案；三项都空时为占位符
+ */
 export const formatSatelliteSeriesTypeMeta = (
   series: string,
   sysType: string,

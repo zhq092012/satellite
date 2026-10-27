@@ -13,11 +13,21 @@ import { ref } from 'vue'
  * - 保持轻量全局状态或单例 Hook
  */
 
+/** 多视图共享的当前推演时刻 */
 const currentSimulationTime = ref<Date>(new Date())
+/** 当前聚焦的卫星 NORAD；null 表示未选中，会触发 Cesium 相机飞赴 */
 const activeNoradId = ref<number | null>(null)
+/** 当前聚焦的地面设施 ID；null 表示未选中 */
 const activeInfrastructureId = ref<string | null>(null)
+/** 时间轴是否处于播放中 */
 const isTimelinePlaying = ref<boolean>(false)
 
+/**
+ * 统一时间轴与 3D / 拓扑 / 甘特图的时钟、选中项和播放状态。
+ * 状态为模块级单例，各页面调用得到同一组 ref。
+ *
+ * @returns 共享时钟、选中项及更新方法
+ */
 export function useTimelineSync() {
   /**
    * 更新全局推演时间

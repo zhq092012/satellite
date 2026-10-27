@@ -10,11 +10,16 @@ interface ViewerConfig {
 class CesiumViewer {
   private viewer: Cesium.Viewer | null = null
   private tiandituProvider: TiandituImagercyProvider | null = null
+  /**
+   * @param config 容器、版权容器和天地图密钥
+   */
   constructor(private config: ViewerConfig) {
 
   }
   /**
-   * 初始化Cesium Viewer
+   * 创建带世界地形和天地图底图的 Viewer。地形会请求法向量和水掩膜。
+   *
+   * @returns 已挂到容器上的 Viewer
    */
   async initViewer(): Promise<Cesium.Viewer> {
     //等待世界地形就绪
@@ -54,14 +59,10 @@ const cesiumViewer = new CesiumViewer({
   tiandituKey: import.meta.env.VITE_TDT_KEY,
 })
 /**
- * 创建单位
- * @param type 'our' 我方 'enemy' 敌方
- * @param id 唯一标识
- * @param name 名称
- * @param longitude 经度
- * @param latitude 纬度
- * @param pointData  单位数据
- * @param addEntity 是否添加实体
+ * 把点位图片画进带白色描边的圆形画布，生成 Cesium billboard 用的 Data URL。
+ *
+ * @param pointData 点位数据，使用其中的图片地址
+ * @returns 图片加载完成后解析为 PNG Data URL
  */
 export function createBillboard(pointData: PointData): Promise<string> {
   // 生成一个圆形带白色边框的画布图标并把点位图片绘制在中央，最终返回 DataURL
@@ -99,7 +100,13 @@ export function createBillboard(pointData: PointData): Promise<string> {
     iconImg.src = pointData.img
   })
 }
-// 创建支持 emoji 的 billboard 函数
+/**
+ * 把彩色 emoji 画到透明画布上，生成 Cesium billboard 用的 Data URL。
+ * 不铺背景，按设备像素比放大画布，避免高分屏发糊。
+ *
+ * @param pointData 点位数据，需额外带 `emoji` 字符
+ * @returns 解析为 PNG Data URL 的 Promise
+ */
 export function createEmojiBillboard(pointData: PointData & { emoji: string }): Promise<string> {
   // 不绘制背景和边框，直接使用彩色 emoji 原始颜色与合适大小
   const size = 32
@@ -126,17 +133,18 @@ export function createEmojiBillboard(pointData: PointData & { emoji: string }): 
   return Promise.resolve(canvas.toDataURL())
 }
 /**
- *  添加粒子系统
- * @param viewer
- * @param img
- * @param longitude 经度
- * @param latitude 纬度
- * @param altitude 高度
- * @param isLoop 是否循环
- * @param lifetime 生命周期
- * @param burstsTime 集中爆发事件
- * @param emissionRate 每秒发射的粒子数量
- * @param sizeInMeters 是否透视（使用真实近大远小）
+ * 在指定经纬高添加一次爆炸粒子。默认不循环，靠 burst 在短时间内集中发射。
+ *
+ * @param viewer 承载粒子系统的 Viewer
+ * @param img 火光贴图地址；以 `/public/` 开头时会去掉该前缀
+ * @param longitude 经度（度）
+ * @param latitude 纬度（度）
+ * @param altitude 高度（米）
+ * @param isLoop 粒子系统是否循环，默认 false
+ * @param lifetime 系统存活秒数，默认 10
+ * @param burstsTime 集中爆发发生的秒数，默认 0.1
+ * @param emissionRate 每秒持续发射数量，默认 0，避免 burst 之外还在喷
+ * @param sizeInMeters 为 true 时粒子大小按米计算，近大远小；默认 false，按像素绘制
  */
 export const explosion = (
   viewer: Cesium.Viewer,
@@ -198,7 +206,14 @@ export const explosion = (
   )
 }
 
-// 转换惯性参考系
+/**
+ * 在三维场景下把相机锁定到 ICRF（惯性）参考系，并按春分方向设置定向光以显示晨昏线。
+ * 非 `SCENE3D` 或当前时刻算不出转换矩阵时不改相机。
+ *
+ * @param viewer 提供相机的 Viewer
+ * @param scene 当前场景，用于判断模式并写入光照
+ * @param time 当前仿真时刻
+ */
 function icrf(viewer: Cesium.Viewer, scene: Cesium.Scene, time: Cesium.JulianDate) {
   if (scene.mode !== Cesium.SceneMode.SCENE3D) {
     return

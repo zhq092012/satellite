@@ -63,16 +63,26 @@ export const useBattleGlobeSatellites = (
   selectedLabelDetailTextRef: Ref<string | null> | ComputedRef<string | null> = ref(null),
   highlightedSeriesRef: Ref<string | null> | ComputedRef<string | null> = ref(null)
 ) => {
+  /** NORAD → 已解析 satrec，避免每帧重复解析 TLE */
   const satrecCache = new Map<number, satellitejs.SatRec>()
+  /** NORAD → Point / Label 可视化对象 */
   const visualMap = new Map<number, SatellitePointVisual>()
+  /** 卫星点图元集合 */
   let pointCollection: Cesium.PointPrimitiveCollection | null = null
+  /** 卫星名称标签集合 */
   let labelCollection: Cesium.LabelCollection | null = null
+  /** 场景 postUpdate 监听的移除函数 */
   let postUpdateRemover: (() => void) | null = null
+  /** 重建代际；列表变化时丢弃尚未完成的旧重建 */
   let rebuildToken = 0
 
+  /** 背面剔除用的相机方向临时向量，避免每帧分配 */
   const scratchCameraDir = new Cesium.Cartesian3()
+  /** 背面剔除用的卫星方向临时向量 */
   const scratchSatelliteDir = new Cesium.Cartesian3()
+  /** TLE 传播结果写入的临时坐标 */
   const scratchPosition = new Cesium.Cartesian3()
+  /** 视锥剔除用的包围球 */
   const scratchFrustumSphere = new Cesium.BoundingSphere()
 
    /**
@@ -84,6 +94,7 @@ export const useBattleGlobeSatellites = (
    */
   const buildSatelliteLabelText = (visual: SatellitePointVisual, withMeta: boolean): string => {
     if (!withMeta) return visual.name
+    /** 系列、类型、用途拼成的第二行；为空时只显示名称 */
     const meta = formatSatelliteMetaInline(visual.series, visual.sysType, visual.usage)
     return meta ? `${visual.name}\n${meta}` : visual.name
   }
@@ -104,9 +115,11 @@ export const useBattleGlobeSatellites = (
    * @returns satrec 或 null
    */
   const getOrCreateSatrec = (sat: BattleGlobeSatellite): satellitejs.SatRec | null => {
+    /** 已缓存的 satrec */
     const cached = satrecCache.get(sat.norad)
     if (cached) return cached
     try {
+      /** 由两行根数解析出的轨道记录 */
       const satrec = satellitejs.twoline2satrec(sat.line1, sat.line2)
       if (satrec) {
         satrecCache.set(sat.norad, satrec)
@@ -126,12 +139,16 @@ export const useBattleGlobeSatellites = (
    * @returns 世界坐标或 null
    */
   const propagatePosition = (norad: number, date: Date): Cesium.Cartesian3 | null => {
+    /** 已缓存的 satrec；未建图元前可能不存在 */
     const satrec = satrecCache.get(norad)
     if (!satrec) return null
     try {
+      /** SGP4 传播得到的 ECI 位置与速度（千米） */
       const posVel = satellitejs.propagate(satrec, date)
       if (!posVel?.position) return null
+      /** 该时刻的格林尼治恒星时，用于 ECI 转 ECF */
       const gmst = satellitejs.gstime(date)
+      /** 地固坐标（千米） */
       const posEcf = satellitejs.eciToEcf(posVel.position, gmst)
       if (!posEcf) return null
       return Cesium.Cartesian3.fromElements(
@@ -180,6 +197,7 @@ export const useBattleGlobeSatellites = (
     viewer: Cesium.Viewer,
     position: Cesium.Cartesian3
   ): boolean => {
+    /** 当前相机及其视锥，用于剔除画面外的卫星点 */
     const camera = viewer.camera
     const cullingVolume = camera.frustum.computeCullingVolume(
       camera.positionWC,
@@ -465,13 +483,21 @@ export const useBattleGlobeSatellites = (
     })
   }
 
+  /**
+   * 相机飞到指定卫星当前位置。
+   *
+   * @param norad 卫星 NORAD；为空或图元尚未创建时不飞行
+   */
   const flyToSatellite = (norad: number | null) => {
+    /** 当前 Viewer；已销毁时不操作相机 */
     const viewer = viewerRef.value
     if (!viewer || viewer.isDestroyed() || !norad) return
 
+    /** 该星的点与标签；列表重建完成前可能还不存在 */
     const visual = visualMap.get(norad)
     if (!visual) return
 
+    /** 按当前推演时刻传播位置，避免飞到过期坐标 */
     const date = new Date(currentTimeMsRef.value || Date.now())
     const position = propagatePosition(norad, date)
     if (!position || !isFiniteCartesian(position)) return

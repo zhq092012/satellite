@@ -85,12 +85,14 @@ export function useStrikePlan(
 
   /** 当前方案是否为低/中烈度（影响链路与图标的渲染方式） */
   const isCurrentPlanLowOrMid = computed(() => {
+    /** 已加载杀伤链的烈度；低/中烈度走同一套链路样式 */
     const intensity = loadedKillChainPlan.value?.intensityLevel
     return intensity === '低烈度' || intensity === '中烈度'
   })
 
   /** 当前方案是否走 2D 模式（仅低烈度保持二维） */
   const isCurrentPlan2D = computed(() => {
+    /** 仅低烈度保持二维地图 */
     const intensity = loadedKillChainPlan.value?.intensityLevel
     return intensity === '低烈度'
   })
@@ -109,7 +111,9 @@ export function useStrikePlan(
     mode: 'threat_first' | 'max_targets' = selectedHistoricalPlanMode.value
   ): StrikePlanV2PlanDetail | null => {
     if (!plan?.plans) return null
+    /** 方案自身烈度对应的分档；不跨烈度查找 */
     const intensityKey = plan.intensityLevel as keyof typeof plan.plans
+    /** 该烈度下按排序模式存放的详情 */
     const levelPlans = plan.plans[intensityKey]
     if (!levelPlans) return null
     return levelPlans[mode] ?? null
@@ -138,6 +142,7 @@ export function useStrikePlan(
    * 切换方案或模式后需手动调用，保证详情与选中项一致。
    */
   const syncSelectedHistoricalPlanDetail = () => {
+    /** 当前选中方案、模式，以及二者严格匹配到的详情 */
     const plan = selectedHistoricalPlan.value
     const mode = selectedHistoricalPlanMode.value
     const detail = getHistoricalPlanLevelDetail(plan, mode)
@@ -159,6 +164,7 @@ export function useStrikePlan(
    * @returns 归一化烈度标识；入参为空时返回空串
    */
   const normalizeHistoricalPlanIntensity = (value?: string): string => {
+    /** 去空白并小写后的烈度原文，兼容中英文与历史拼写 */
     const normalized = String(value ?? '')
       .trim()
       .toLowerCase()
@@ -176,6 +182,7 @@ export function useStrikePlan(
    * @returns 「高」「中」「低」；无法识别时返回原值或 `--`
    */
   const formatHistoricalPlanIntensity = (value?: string): string => {
+    /** 归一化后的 high / medium / low */
     const normalized = normalizeHistoricalPlanIntensity(value)
     if (normalized === 'high') return '高'
     if (normalized === 'medium') return '中'
@@ -198,9 +205,11 @@ export function useStrikePlan(
    */
   const allHistoricalPlanCards = computed<HistoricalPlanCard[]>(() =>
     historicalPlans.value.flatMap((plan) => {
+      /** 每个方案按威胁优先、数量优先各展开一张卡片 */
       const modes: Array<'threat_first' | 'max_targets'> = ['threat_first', 'max_targets']
       return modes
         .map((mode) => {
+          /** 该模式缺少详情时丢弃这张卡片 */
           const detail = getHistoricalPlanLevelDetail(plan, mode)
           if (!detail) return null
           return {
@@ -216,6 +225,7 @@ export function useStrikePlan(
 
   /** 对比模式下已勾选的方案卡片（按勾选顺序，最多 4 个） */
   const selectedComparePlanCards = computed<HistoricalPlanCard[]>(() => {
+    /** 卡片 key → 卡片，按勾选顺序回查 */
     const cardMap = new Map(allHistoricalPlanCards.value.map((card) => [card.key, card]))
     return selectedHistoricalPlanKeys.value
       .map((key) => cardMap.get(key) ?? null)
@@ -228,6 +238,7 @@ export function useStrikePlan(
 
   /** 应用名称、烈度、卫星类型、排序模式四项筛选后的方案卡片 */
   const filteredHistoricalPlanCards = computed<HistoricalPlanCard[]>(() => {
+    /** 名称、烈度、卫星类型、排序模式四项筛选条件 */
     const keyword = historicalPlanNameQuery.value.trim().toLowerCase()
     const intensityFilter = historicalPlanIntensityFilter.value
     const satelliteTypeFilter = historicalPlanSatelliteTypeFilter.value
@@ -235,6 +246,7 @@ export function useStrikePlan(
 
     return allHistoricalPlanCards.value.filter((card) => {
       const { plan, mode } = card
+      /** 名称、烈度、卫星类型、模式是否分别命中；空筛选视为通过 */
       const matchesKeyword = !keyword || plan.name?.toLowerCase().includes(keyword)
       const matchesIntensity =
         !intensityFilter ||
@@ -255,6 +267,7 @@ export function useStrikePlan(
 
   /** 当前选中方案的输入目标数量 */
   const selectedPlanInputCount = computed(() => {
+    /** 方案输入目标数；非有限数时视为未提供 */
     const count = selectedHistoricalPlanDetail.value?.plan_summary.overview.input_count
     return Number.isFinite(Number(count)) ? Number(count) : null
   })
@@ -342,6 +355,7 @@ export function useStrikePlan(
   const loadAllKillChainPlan = async () => {
     if (allKillChainPlans.value.length > 0 || !store.activedTask?.id) return
 
+    /** 当前任务的杀伤链方案列表 */
     const res = await getKillChainStrikePlanList(store.activedTask?.id)
     if (res.code !== 200) {
       ElMessage.error(res.msg || '获取杀伤链方案列表失败')
@@ -350,6 +364,7 @@ export function useStrikePlan(
     if (res.data) {
       allKillChainPlans.value = res.data
 
+      /** 按烈度拆成低 / 中 / 高三组，无法识别的烈度不进入任一列表 */
       const groupedPlans = allKillChainPlans.value.reduce(
         (result, item) => {
           if (item.intensityLevel === '低烈度') {
@@ -389,6 +404,7 @@ export function useStrikePlan(
     mode: 'threat_first' | 'max_targets' = 'threat_first',
     onPlanSelect: (plan: StrikePlanV2Extended, mode: 'threat_first' | 'max_targets') => void
   ) => {
+    /** 转成历史方案结构后交给页面加载；结构不完整时为 null */
     const mappedPlan = buildHistoricalPlanFromKillChainPlan(plan)
     if (!mappedPlan) {
       ElMessage.error('杀伤链方案数据结构不完整，无法加载（缺少 plan 明细）')

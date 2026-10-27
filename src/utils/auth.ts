@@ -164,7 +164,10 @@ export function setStoredMenus<T>(value: T) {
   localStorage.setItem(MENUS_KEY, toJson(value))
 }
 
-/** 清除全部鉴权相关 localStorage 项（退出登录时调用） */
+/**
+ * 清除 Token、用户、角色、权限和菜单五类本地缓存。退出登录时调用。
+ * 无 localStorage 时不做事。
+ */
 export function clearAuthStorage() {
   if (!canUseStorage()) {
     return
@@ -191,12 +194,16 @@ export function isRequestLocked() {
   return requestLocked
 }
 
-/** 锁定非登录请求（通常在 401 拦截器中调用） */
+/**
+ * 锁定除登录接口以外的请求。通常由 401 拦截器调用，避免失效 Token 继续打业务接口。
+ */
 export function lockRequests() {
   requestLocked = true
 }
 
-/** 登录成功后重置锁定与重定向标记 */
+/**
+ * 登录成功后解除请求锁定，并允许下一次 401 再次跳转登录页。
+ */
 export function resetRequestGuard() {
   requestLocked = false
   loginRedirectTriggered = false
@@ -207,7 +214,9 @@ export function shouldRedirectToLogin() {
   return !loginRedirectTriggered
 }
 
-/** 标记已触发登录页重定向，避免多个 401 并发跳转 */
+/**
+ * 记录已经发起过登录页跳转。并发的多个 401 里只有第一次会真正跳转。
+ */
 export function markLoginRedirectTriggered() {
   loginRedirectTriggered = true
 }

@@ -67,6 +67,7 @@ export const getCoverageBracket = (coverage: number): string => {
  */
 export const formatHeatmapTimeLabel = (timestamp: number): string => {
   const date = new Date(timestamp)
+  /** 数字补成两位。 @param value 非负整数 @returns 至少两位的字符串 */
   const pad = (value: number) => String(value).padStart(2, '0')
   return `${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }

@@ -197,6 +197,14 @@ export const mergeDeductionPassGroundTargets = (
     targetMap.set(buildGroundTargetKey(item.kind, item.id), item)
   })
 
+  /**
+   * 判断推演过站坐标是否已经落在某个地面目标附近，避免同一站重复落点。
+   * 经纬度差不超过 {@link DEDUCTION_PASS_COORD_MATCH_DEG} 度即视为同一位置。
+   *
+   * @param latitude 过站纬度
+   * @param longitude 过站经度
+   * @returns 附近已有目标时为 true
+   */
   const isNearExisting = (latitude: number, longitude: number): boolean =>
     base.some(
       (item) =>

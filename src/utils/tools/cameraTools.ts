@@ -7,9 +7,10 @@ interface CameraPos {
   pitch: number
 }
 /**
- * 获取相机当前位置的经纬度
- * @param viewer
- * @returns
+ * 读取相机在椭球面上的位置，以及由视线方向算出的航向和俯仰。
+ *
+ * @param viewer 提供相机的 Cesium Viewer
+ * @returns 经度、纬度、高度（米）、航向和俯仰（度）
  */
 function getCameraLocation(viewer: Cesium.Viewer): CameraPos {
   const position = viewer.camera.position
@@ -37,8 +38,9 @@ function getCameraLocation(viewer: Cesium.Viewer): CameraPos {
   }
 }
 /**
- * 添加监听器，输出当前视图的相机信息
- * @param viewer
+ * 监听相机开始移动和位置变化，把当前位置打印到控制台。
+ *
+ * @param viewer 要监听的 Cesium Viewer
  */
 export function listenCameraLocaion(viewer: Cesium.Viewer) {
   //监听相机移动事件
@@ -56,9 +58,12 @@ export function listenCameraLocaion(viewer: Cesium.Viewer) {
   })
 }
 /**
- * 获取点击位置经纬度
- * @param event
- * @param viewer
+ * 把一次屏幕点击换成地理坐标：优先取地形高度，取不到时退回椭球面。
+ * 同时计算相机姿态，以及从点击点看向相机的航向和仰角，并在该处放一个红点。
+ *
+ * @param event 屏幕点击事件
+ * @param viewer 发生点击的 Viewer
+ * @returns 经纬度、高度和角度；点击未落到地球上时为 undefined
  */
 export function listenClickPositionCartesian(
   event: Cesium.ScreenSpaceEventHandler.PositionedEvent,

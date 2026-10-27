@@ -42,7 +42,10 @@ class HttpRequest {
   }
 
   /**
-   * 创建axios实例并配置拦截器
+   * 创建带超时和默认 JSON 头的 Axios 实例，并挂上鉴权与错误拦截器。
+   *
+   * @param headers 额外请求头，会覆盖同名默认头
+   * @returns 已配置拦截器的实例
    */
   private createAxiosInstance(headers: Record<string, unknown> = {}): AxiosInstance {
     const instance = axios.create({
@@ -59,7 +62,10 @@ class HttpRequest {
   }
 
   /**
-   * 配置拦截器
+   * 注册请求和响应拦截器：锁定状态下拒绝非登录请求、附带 Token，
+   * 2xx 直接返回响应体，401 时锁定请求并跳转登录页。
+   *
+   * @param instance 要挂拦截器的 Axios 实例
    */
   private setupInterceptors(instance: AxiosInstance): void {
     // 请求拦截器
@@ -152,7 +158,14 @@ class HttpRequest {
   }
 
   /**
-   * 创建请求配置
+   * 组装 Axios 配置。GET 把 data 放到 params，其余方法放到请求体。
+   *
+   * @param method HTTP 方法
+   * @param url 相对 baseURL 的路径
+   * @param data 查询参数或请求体
+   * @param headers 本次请求额外头
+   * @param options 是否显示 Loading 等附加项
+   * @returns 可交给 {@link HttpRequest.request} 的配置
    */
   private createRequestConfig(
     method: RequestMethods,

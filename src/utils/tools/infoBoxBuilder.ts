@@ -7,7 +7,12 @@ import type { BlueSatelliteRecord } from '@/types/strike'
 import { createInfoBoxActionButton } from '@/utils/tools/infoBox'
 
 
-/** HTML 转义，防止 XSS */
+/**
+ * 转义 HTML 特殊字符，避免卫星名称等外部文本被当成标记插入 InfoBox。
+ *
+ * @param value 任意展示值；null / undefined 显示为 `--`
+ * @returns 可安全插入 HTML 的字符串
+ */
 export const escapeHtml = (value: unknown): string =>
   String(value ?? '--')
     .replace(/&/g, '&amp;')
@@ -16,7 +21,14 @@ export const escapeHtml = (value: unknown): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 
-/** 格式化数字为指定小数位，附带可选后缀 */
+/**
+ * 把详情字段格式化为固定小数位，并拼上单位后缀。
+ *
+ * @param value 原始数值或数字字符串
+ * @param digits 保留小数位数，默认 3
+ * @param suffix 单位等后缀，默认空串
+ * @returns 格式化文本；空值为 `--`，非数字时原样转字符串
+ */
 export const formatDetailNumber = (value: unknown, digits = 3, suffix = ''): string => {
   if (value === null || value === undefined || value === '') return '--'
   const numericValue = Number(value)
@@ -24,13 +36,23 @@ export const formatDetailNumber = (value: unknown, digits = 3, suffix = ''): str
   return `${numericValue.toFixed(digits)}${suffix}`
 }
 
-/** 格式化可能为空的文本 */
+/**
+ * 把可能为空的详情字段转成展示文本。
+ *
+ * @param value 原始字段
+ * @returns 字符串；null、undefined、空串时为 `--`
+ */
 export const formatNullableText = (value: unknown): string => {
   if (value === null || value === undefined || value === '') return '--'
   return String(value)
 }
 
-/** 将卫星打击阶段转换为中文展示文本 */
+/**
+ * 把卫星打击阶段枚举转成 InfoBox 上的中文状态。
+ *
+ * @param phase 阶段：`active` 打击中，`fading` / `done` 已打击，其余为正常运行
+ * @returns 中文状态文案
+ */
 export const formatSatelliteState = (phase: string): string => {
   if (phase === 'active') return '打击中'
   if (phase === 'fading' || phase === 'done') return '已打击'

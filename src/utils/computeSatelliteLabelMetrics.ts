@@ -167,6 +167,11 @@ export const collectSatelliteLabelMetricTimestamps = (params: {
   const { norad, entity, taskStartMs, taskEndMs, anchorMs } = params
   const bucket = new Set<number>()
 
+  /**
+   * 把有效毫秒时间放进采样桶，并四舍五入到整数毫秒。
+   *
+   * @param ms 候选时刻；空值、非数字或非正数会被忽略
+   */
   const add = (ms: number | null | undefined) => {
     if (ms == null || !Number.isFinite(ms) || ms <= 0) return
     bucket.add(Math.round(ms))
@@ -178,6 +183,12 @@ export const collectSatelliteLabelMetricTimestamps = (params: {
 
   if (entity) {
     const { initSat, postSat } = findSatelliteMatrixRowsForNorad(entity, norad)
+    /**
+     * 把一个过境窗口的开始和结束时间加入采样桶。
+     *
+     * @param peak 窗口开始时间原文
+     * @param end 窗口结束时间原文
+     */
     const pushWindowTimes = (peak?: string | null, end?: string | null) => {
       add(parseMatrixTimeMs(peak))
       add(parseMatrixTimeMs(end))

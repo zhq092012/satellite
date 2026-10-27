@@ -107,6 +107,7 @@ export function useSatelliteDeductionPlayback(currentTimeMs: Ref<number>) {
         return
       }
 
+      /** 当前要停留展示的推演事件 */
       const event = events[index]
       if (!event) {
         resolve()
@@ -143,8 +144,14 @@ export function useSatelliteDeductionPlayback(currentTimeMs: Ref<number>) {
       }
 
       phase.value = 'jumpingToNext'
+      /** 插值起点的墙钟时间，与仿真时刻无关 */
       const startWall = performance.now()
 
+      /**
+       * 按墙钟进度线性推进 currentTimeMs。
+       *
+       * @param now `requestAnimationFrame` 传入的墙钟毫秒
+       */
       const tick = (now: number) => {
         if (token !== playToken || !isDeductionPlaying.value) {
           jumpRafId = null
@@ -152,6 +159,7 @@ export function useSatelliteDeductionPlayback(currentTimeMs: Ref<number>) {
           return
         }
 
+        /** 插值进度，限制在 0–1 */
         const ratio = Math.min(1, (now - startWall) / DEDUCTION_JUMP_DURATION_MS)
         currentTimeMs.value = fromMs + (toMs - fromMs) * ratio
 
@@ -206,16 +214,19 @@ export function useSatelliteDeductionPlayback(currentTimeMs: Ref<number>) {
   ): boolean => {
     if (!norad) return false
 
+    /** 任务矩阵中该 NORAD 对应的系列实体，缺失则无法建事件 */
     const entity = resolveLevelSeriesEntityForNorad(norad, analysisData)
     if (!entity) {
       ElMessage.error('未在任务分析结果中找到该卫星的系列实体，无法推演。请确认 getTaskMatrix 已返回完整数据。')
       return false
     }
 
+    /** 事件序列与 Cesium 视觉计划；构建失败时不启动播放 */
     let bundle: ReturnType<typeof buildSatelliteDeductionBundle>
     try {
       bundle = buildSatelliteDeductionBundle(entity, norad)
     } catch (error) {
+      /** 构建失败时展示给用户的原因 */
       const message = error instanceof Error ? error.message : '构建推演数据失败'
       ElMessage.error(message)
       return false
@@ -228,6 +239,7 @@ export function useSatelliteDeductionPlayback(currentTimeMs: Ref<number>) {
     stopDeduction()
     events = bundle.events
     deductionVisualPlan.value = bundle.visualPlan
+    /** 本次播放代际，停止或重入后旧循环会自行退出 */
     const token = ++playToken
     isDeductionPlaying.value = true
     currentTimeMs.value = bundle.events[0].atMs

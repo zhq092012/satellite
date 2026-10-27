@@ -86,6 +86,12 @@ interface ChainCandidate {
   nodes: ChainNode[]
 }
 
+/**
+ * 把矩阵时间字符串解析为毫秒。横线日期会先换成斜线，以兼容部分浏览器对 `YYYY-MM-DD` 的解析。
+ *
+ * @param timeStr 时间字符串；空串视为无效
+ * @returns 毫秒时间戳；空串或无法解析时为 0
+ */
 export const parseTimeToMs = (timeStr: string): number => {
   if (!timeStr) return 0
   const normalized = timeStr.replace(/-/g, '/')
@@ -100,6 +106,12 @@ export type WindowTimeLike = {
   endWindow?: string
 }
 
+/**
+ * 读取过境窗口的开始时间。优先 `peakWindow`，其次 `startWindow`、`beginWindow`。
+ *
+ * @param win 过境窗口；空对象返回空串
+ * @returns 开始时间原文
+ */
 const getWindowStartStr = (win?: WindowTimeLike | Record<string, any> | null): string =>
   win
     ? (win as WindowTimeLike).peakWindow ||
@@ -108,6 +120,12 @@ const getWindowStartStr = (win?: WindowTimeLike | Record<string, any> | null): s
       ''
     : ''
 
+/**
+ * 读取过境窗口的结束时间。
+ *
+ * @param win 过境窗口
+ * @returns `endWindow`；缺失时为空串
+ */
 const getWindowEndStr = (win?: WindowTimeLike | Record<string, any> | null): string =>
   (win as WindowTimeLike)?.endWindow || ''
 
@@ -273,12 +291,28 @@ export const buildSatellitePassDelayMap = (
   return map
 }
 
+/**
+ * 把毫秒时间戳格式化为本地时区的 `YYYY-MM-DD HH:mm:ss`。
+ *
+ * @param ts 毫秒时间戳
+ * @returns 格式化时间
+ */
 const formatTimestampMs = (ts: number): string => {
   const d = new Date(ts)
+  /** 数字补成两位，用于月日时分秒。 @param n 非负整数 @returns 至少两位的字符串 */
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
+/**
+ * 判断两段时间是否有交集。结束时间缺失时用开始时间代替，退化为时间点。
+ *
+ * @param startA 区间 A 开始
+ * @param endA 区间 A 结束
+ * @param startB 区间 B 开始
+ * @param endB 区间 B 结束
+ * @returns 任一端无法解析时为 false，否则为是否重叠
+ */
 const windowsOverlapMs = (startA: string, endA: string, startB: string, endB: string): boolean => {
   const aStart = parseTimeToMs(startA)
   const aEnd = parseTimeToMs(endA || startA)
@@ -288,6 +322,12 @@ const windowsOverlapMs = (startA: string, endA: string, startB: string, endB: st
   return aStart <= bEnd && bStart <= aEnd
 }
 
+/**
+ * 汇总打击前、打击后矩阵里的卫星名称。同 NORAD 以后出现的打击后名称为准。
+ *
+ * @param matrix 算法矩阵
+ * @returns NORAD → 卫星名称
+ */
 const buildSatNameMap = (matrix: MatrixResult): Map<number, string> => {
   const map = new Map<number, string>()
   ;(matrix.initMatrixList || []).forEach((s) => map.set(s.norad, s.name))
@@ -295,6 +335,13 @@ const buildSatNameMap = (matrix: MatrixResult): Map<number, string> => {
   return map
 }
 
+/**
+ * 选择地面站关系表。打击后分析优先用 `stationRelationList`，没有关系时回退打击前的 `initRelationList`。
+ *
+ * @param matrix 算法矩阵
+ * @param usePostStrike 是否按打击后关系过滤
+ * @returns 地面站与接收站关系
+ */
 const getRelationData = (matrix: MatrixResult, usePostStrike: boolean): StationRelationList => {
   if (usePostStrike && matrix.stationRelationList?.relations?.length) {
     return matrix.stationRelationList
@@ -302,6 +349,13 @@ const getRelationData = (matrix: MatrixResult, usePostStrike: boolean): StationR
   return matrix.initRelationList || { receiveObjList: [], stationObjList: [], relations: [] }
 }
 
+/**
+ * 建立「接收站 → 可达数据中心」索引。打击后分析会丢掉状态为已打击的接收站和数据中心。
+ *
+ * @param relationData 地面站关系
+ * @param usePostStrike 为 true 时排除 `receiveStatus` / `stationStatus` 为 1 的节点
+ * @returns 接收站 ID → 仍可用的数据中心列表
+ */
 const buildReceiveToStations = (
   relationData: StationRelationList,
   usePostStrike: boolean
@@ -329,6 +383,14 @@ const buildReceiveToStations = (
   return map
 }
 
+/**
+ * 合并打击前 init 窗口与打击后 station 窗口。同一接收站、同一起止时间只保留一条；
+ * 若新窗口标记了打击而旧窗口没有，用新窗口覆盖。
+ *
+ * @param initWindows 打击前过境窗口
+ * @param stationWindows 打击后过境窗口
+ * @returns 去重后的窗口列表
+ */
 const mergeSatelliteTransitWindows = (
   initWindows: Record<string, any>[] = [],
   stationWindows: Record<string, any>[] = []
@@ -502,6 +564,14 @@ const getMergedWindowsForNorad = (matrix: MatrixResult, norad: number): Record<s
   )
 }
 
+/**
+ * 解析过境窗口对应的接收站。窗口自身没有站名时，用该星时延效果里的接收站名回查关系表。
+ *
+ * @param matrix 算法矩阵
+ * @param norad 卫星 NORAD
+ * @param win 过境窗口
+ * @returns 接收站 ID 与名称；两边都对不上时为 null
+ */
 const resolveWindowReceive = (
   matrix: MatrixResult,
   norad: number,
@@ -525,6 +595,12 @@ const resolveWindowReceive = (
   return null
 }
 
+/**
+ * 用节点层和 ID 拼出链路唯一键，用于候选链路去重。
+ *
+ * @param nodes 有序链路节点
+ * @returns 如 `SAT:123>RELAY:456>RECEIVE:a>STATION:b`
+ */
 const chainPathKey = (nodes: ChainNode[]): string => nodes.map((n) => `${n.layer}:${n.id}`).join('>')
 
 /**
@@ -588,6 +664,16 @@ const appendRelayDownlinkCandidates = (
   })
 }
 
+/**
+ * 枚举一颗观测星在打击前或打击后仍能走通的全链路。
+ * 包含直连（卫星 → 地面站 → 数据中心）和中继（再插入中继星），并补上中继星自身下传的窗口。
+ * 打击后会跳过卫星已毁、窗口已打击、接收站已毁的路径。
+ *
+ * @param matrix 算法矩阵
+ * @param norad 观测卫星 NORAD
+ * @param usePostStrike 是否只保留打击后仍可用的路径
+ * @returns 候选链路，未排序
+ */
 const enumerateChainCandidates = (matrix: MatrixResult, norad: number, usePostStrike: boolean): ChainCandidate[] => {
   const index = getMatrixLookupIndex(matrix)
   const satNameMap = index.satNameMap
@@ -679,12 +765,24 @@ const enumerateChainCandidates = (matrix: MatrixResult, norad: number, usePostSt
   return candidates
 }
 
+/**
+ * 在候选链路中取完成时刻最早的一条。
+ *
+ * @param candidates 候选链路
+ * @returns 最早完成的链路；空列表为 null
+ */
 const pickEarliestChain = (candidates: ChainCandidate[]): ChainCandidate | null => {
   if (!candidates.length) return null
   return candidates.reduce((best, cur) => (cur.finishTs < best.finishTs ? cur : best))
 }
 
-/** 将全链路节点序列映射为 G6 边 ID 集合 */
+/**
+ * 把全链路节点序列映射成拓扑图使用的边 ID。
+ * 卫星到中继、卫星到地面站、地面站到数据中心使用不同前缀，便于和 G6 边数据对齐。
+ *
+ * @param chain 一条全链路分析结果
+ * @returns 边 ID 集合；节点不足两个时为空集
+ */
 export const chainToEdgeIds = (chain: FullChainResult): Set<string> => {
   const ids = new Set<string>()
   const nodes = chain.nodes
@@ -710,7 +808,13 @@ export const chainToEdgeIds = (chain: FullChainResult): Set<string> => {
   return ids
 }
 
-/** 获取某颗卫星相关的全部拓扑边 ID */
+/**
+ * 收集某颗卫星在拓扑图上相关的全部边：卫星到各接收站、接收站到数据中心，以及到中继星的边。
+ *
+ * @param matrix 算法矩阵
+ * @param norad 卫星 NORAD
+ * @returns 边 ID 集合
+ */
 export const getSatelliteRelatedEdgeIds = (matrix: MatrixResult, norad: number): Set<string> => {
   const ids = new Set<string>()
   const satId = `sat-${norad}`
@@ -773,10 +877,20 @@ export const listSourceSatelliteNoradsForRelay = (matrix: MatrixResult, relayNor
     .filter((norad) => Number.isFinite(norad) && norad > 0)
 }
 
-/** 普通侦察卫星 NORAD 列表（不含中继） */
+/**
+ * 列出矩阵中的普通侦察卫星 NORAD，中继卫星不包含在内。
+ *
+ * @param matrix 算法矩阵
+ * @returns 去重后的 NORAD 列表
+ */
 export const listNormalSatelliteNorads = (matrix: MatrixResult): number[] => {
   const index = getMatrixLookupIndex(matrix)
   const norads = new Set<number>()
+  /**
+   * 非中继卫星才写入集合。
+   *
+   * @param sat 矩阵中的卫星行
+   */
   const addIfNormal = (sat: { norad: number; satType?: string }) => {
     if (!isRelaySatellite(matrix, sat.norad, sat.satType)) norads.add(sat.norad)
   }
@@ -785,7 +899,12 @@ export const listNormalSatelliteNorads = (matrix: MatrixResult): number[] => {
   return Array.from(norads)
 }
 
-/** 全部卫星打击后最早可用链路边 ID 并集 */
+/**
+ * 汇总全部普通卫星在打击后仍能走通的最早链路，并收集这些链路上的边 ID。
+ *
+ * @param matrix 算法矩阵
+ * @returns 打击后主用链路边 ID 并集
+ */
 export const collectPostStrikePrimaryEdgeIds = (matrix: MatrixResult): Set<string> => {
   const ids = new Set<string>()
   listNormalSatelliteNorads(matrix).forEach((norad) => {
@@ -797,7 +916,15 @@ export const collectPostStrikePrimaryEdgeIds = (matrix: MatrixResult): Set<strin
   return ids
 }
 
-/** 指定时刻被干扰的链路边 ID（用于时间轴打击点标红） */
+/**
+ * 找出指定时刻正在被干扰的链路边，供时间轴打击点把对应拓扑边标红。
+ * 只统计该时刻落在已打击过境窗口内的接收站，并带上这些站到数据中心、以及该星到中继的边。
+ *
+ * @param matrix 算法矩阵
+ * @param norad 卫星 NORAD
+ * @param atMs 查询时刻毫秒
+ * @returns 需标红的边 ID
+ */
 export const collectJamStrikeEdgeIdsAtTime = (matrix: MatrixResult, norad: number, atMs: number): Set<string> => {
   const ids = new Set<string>()
   const satId = `sat-${norad}`
@@ -833,13 +960,28 @@ export const collectJamStrikeEdgeIdsAtTime = (matrix: MatrixResult, norad: numbe
   return ids
 }
 
+/**
+ * 判断候选链路在指定时刻是否处于过境中，或完成时刻与该时刻相差不超过 1 秒。
+ *
+ * @param candidate 候选链路
+ * @param atMs 查询时刻毫秒；0 视为不活跃
+ * @returns 该时刻是否应展示这条链路
+ */
 const isChainActiveAtMs = (candidate: ChainCandidate, atMs: number): boolean => {
   if (!atMs) return false
   if (atMs >= candidate.groundStartTs && atMs <= candidate.groundEndTs) return true
   return Math.abs(candidate.finishTs - atMs) <= 1000
 }
 
-/** 解析指定时刻的活跃全链路 */
+/**
+ * 解析指定时刻正在过境的全链路，取完成最早的一条。
+ *
+ * @param matrix 算法矩阵
+ * @param norad 卫星 NORAD
+ * @param atMs 查询时刻毫秒
+ * @param usePostStrike 为 true 时只在打击后仍可用的路径里找
+ * @returns 该时刻的链路；没有活跃路径时 `blocked` 为 true
+ */
 export const analyzeSatelliteChainAtTime = (
   matrix: MatrixResult | null,
   norad: number,
@@ -875,7 +1017,16 @@ export type TimelineChainMarkerType =
   | 'all_blocked'
   | 'task_end'
 
-/** 根据时间轴关键点类型解析应展示的链路 */
+/**
+ * 按时间轴标记类型决定展示打击前还是打击后链路。
+ * 任务结束和打击后链路完成点看打击后结果；首次传输看打击前；干扰点优先看打击后，中断时回退打击前。
+ *
+ * @param matrix 算法矩阵
+ * @param norad 卫星 NORAD
+ * @param markerType 时间轴标记类型
+ * @param atMs 标记时刻毫秒
+ * @returns 应高亮的全链路
+ */
 export const resolveChainForTimelineMarker = (
   matrix: MatrixResult | null,
   norad: number,
@@ -959,6 +1110,13 @@ export const analyzeSatelliteFullChain = (
   }
 }
 
+/**
+ * 把过站延迟分钟数转成界面文案。
+ *
+ * @param delayMin 延迟分钟，大于 0 才显示增量
+ * @param struck 该站或卫星是否被干扰
+ * @returns 延迟说明；被干扰但延迟为 0 时说明链路中断
+ */
 const formatDelayText = (delayMin: number, struck: boolean): string => {
   if (delayMin > 0) return `造成延迟 +${delayMin} 分钟`
   if (struck) return '该站被干扰，链路中断'
@@ -999,7 +1157,16 @@ const applyStationPassDelaysToLinks = (
   })
 }
 
-/** 按当前过境站解析打击前全链路：卫星 → (中继) → 地面站 → 数据中心 */
+/**
+ * 按当前过境站拼出打击前全链路：卫星 → 可选中继 → 地面站 → 数据中心，并计算该站的过站延迟。
+ *
+ * @param matrix 算法矩阵
+ * @param norad 卫星 NORAD
+ * @param receiveKey 接收站 ID 或名称
+ * @param atMs 当前时刻毫秒，用于展示时间
+ * @param taskEndMs 任务结束毫秒，末站没有下一窗口时用它计算延迟
+ * @returns 链路、延迟分钟和是否被打击；找不到站时链路为阻断状态
+ */
 export const resolveStationPassChain = (
   matrix: MatrixResult | null,
   norad: number,
@@ -1183,6 +1350,16 @@ const isTransmissionLinkStruck = (
   relayPostSat?: MatrixResult['satelliteMatrixList'][number] | undefined
 ): boolean => resolveLinkStrikeTarget(win, postSat, relayPostSat).struck
 
+/**
+ * 汇总某个过境窗口关联的武器名称。窗口被打、卫星被打或中继被打时，
+ * 分别从窗口武器、卫星武器和打击计划里匹配，去重后拼接。
+ *
+ * @param matrix 算法矩阵，用于读取打击计划
+ * @param postSat 打击后的观测卫星行
+ * @param win 过境窗口
+ * @param relayPostSat 中继卫星打击后的矩阵行
+ * @returns 顿号拼接的武器名；未打击时名称为「未打击」。类型仅在全部武器同类型时返回
+ */
 const resolveWeaponsForWindow = (
   matrix: MatrixResult,
   postSat: MatrixResult['satelliteMatrixList'][number] | undefined,
@@ -1561,7 +1738,13 @@ export const findTransmissionLinkById = (
   return collectSeriesTransmissionLinks(matrix, taskEndMs).find((item) => item.id === linkId) ?? null
 }
 
-/** 统计全网打击前通信链路数，以及打击后仍可完成的全链路 */
+/**
+ * 统计全网普通卫星的打击前通信路径数，以及打击后仍能完成的路径。
+ * 同一节点序列只计一次。
+ *
+ * @param matrix 算法矩阵
+ * @returns 总数、剩余数和剩余链路；无矩阵时各项为 0
+ */
 export const collectNetworkChainStats = (matrix: MatrixResult | null): NetworkChainStats => {
   if (!matrix) return { totalCount: 0, remainingCount: 0, remainingChains: [] }
 
@@ -1628,6 +1811,12 @@ export const mergeMatrixResults = (matrices: MatrixResult[]): MatrixResult | nul
   if (!valid.length) return null
   if (valid.length === 1) return valid[0]
 
+  /**
+   * 合并多份地面站关系：接收站、数据中心按 ID 去重，关系边按 `from->to` 去重。
+   *
+   * @param lists 各系列的地面站关系
+   * @returns 合并后的关系表
+   */
   const mergeRelationList = (lists: StationRelationList[]): StationRelationList => {
     const receiveObjList = mergeUniqueBy(
       lists.flatMap((list) => list.receiveObjList || []),
@@ -1750,6 +1939,12 @@ export const collectMatrixOverviewStats = (matrix: MatrixResult | null, scopeLab
   }
 }
 
+/**
+ * 把打击计划里的目标类型文案归到干扰武器记录使用的四类之一。
+ *
+ * @param targetType 计划中的目标类型原文
+ * @returns `中继卫星`、`接收站`、`数据中心` 或默认的 `卫星`
+ */
 const mapTargetType = (targetType: string): JamWeaponRecord['targetType'] => {
   if (targetType.includes('中继')) return '中继卫星'
   if (targetType.includes('接收') || targetType.includes('地面')) return '接收站'
@@ -1764,6 +1959,15 @@ interface AggregatedWeapon {
   targets: Map<string, JamWeaponRecord['targetType']>
 }
 
+/**
+ * 收集某颗卫星相关的干扰武器，按武器名和类型聚合目标。
+ * 可按接收站过滤，只保留打到该站的窗口；未指定时同时包含打卫星本身的武器。
+ *
+ * @param matrix 算法矩阵
+ * @param norad 卫星 NORAD
+ * @param receiveKey 接收站 ID 或名称；传入后不再统计打卫星本身的武器
+ * @returns 聚合后的干扰武器记录；无矩阵或无 NORAD 时为空数组
+ */
 export const collectSatelliteJamWeapons = (
   matrix: MatrixResult | null,
   norad: number,
@@ -1784,6 +1988,15 @@ export const collectSatelliteJamWeapons = (
 
   const aggs = new Map<string, AggregatedWeapon>()
 
+  /**
+   * 把一次命中累加到武器聚合表。同名同类型合并目标，空名称或空目标被忽略。
+   *
+   * @param name 武器名称
+   * @param type 武器类型
+   * @param targetName 被打目标名称
+   * @param targetType 目标类别
+   * @param source 记录来自窗口、卫星行还是打击计划
+   */
   const addWeapon = (
     name: string,
     type: string | undefined,

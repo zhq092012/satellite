@@ -43,14 +43,22 @@ export const useBattleGlobeWeapons = (
   selectedWeaponIdRef: Ref<string | null> | ComputedRef<string | null>,
   selectedLabelDetailTextRef: Ref<string | null> | ComputedRef<string | null> = ref(null)
 ) => {
+  /** 武器 ID → Point / Label 可视化对象 */
   const visualMap = new Map<string, WeaponPointVisual>()
+  /** 武器点图元集合 */
   let pointCollection: Cesium.PointPrimitiveCollection | null = null
+  /** 武器名称标签集合，仅近距离或选中时显示 */
   let labelCollection: Cesium.LabelCollection | null = null
+  /** 场景 postUpdate 监听的移除函数 */
   let postUpdateRemover: (() => void) | null = null
+  /** 重建代际；武器列表变化时丢弃尚未完成的旧重建 */
   let rebuildToken = 0
 
+  /** 背面剔除用的相机方向临时向量 */
   const scratchCameraDir = new Cesium.Cartesian3()
+  /** 背面剔除用的目标方向临时向量 */
   const scratchTargetDir = new Cesium.Cartesian3()
+  /** 视锥剔除用的包围球 */
   const scratchFrustumSphere = new Cesium.BoundingSphere()
 
   /**
@@ -112,6 +120,7 @@ export const useBattleGlobeWeapons = (
     viewer: Cesium.Viewer,
     position: Cesium.Cartesian3
   ): boolean => {
+    /** 当前相机及其视锥，用于判断武器点是否在画面内 */
     const camera = viewer.camera
     const cullingVolume = camera.frustum.computeCullingVolume(
       camera.positionWC,

@@ -19,6 +19,17 @@ import type {
 export const buildHistoricalPlanFromKillChainPlan = (
   plan: RespKillChainPlanLow | RespKillChainPlanMiddle | RespKillChainPlanHigh
 ): StrikePlanV2Extended | null => {
+  /**
+   * 组装历史方案详情壳。指标里的总分和威胁削减量固定为 0，目标数取自概览。
+   *
+   * @param planName 方案名称
+   * @param intensity 烈度文案
+   * @param overview 方案概览
+   * @param assetConfig 资产配置
+   * @param missionWindows 任务窗口
+   * @param timeWindow 方案时间范围
+   * @returns 可交给打击视图渲染的方案详情
+   */
   const createPlanDetail = (
     planName: string,
     intensity: string,

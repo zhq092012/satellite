@@ -40,6 +40,7 @@ export interface LinkChainTableRow {
 const formatTimestampMs = (ms: number): string => {
   if (!ms) return '--'
   const date = new Date(ms)
+  /** 数字补成两位。 @param value 非负整数 @returns 至少两位的字符串 */
   const pad = (value: number) => String(value).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }

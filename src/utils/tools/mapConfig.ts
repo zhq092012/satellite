@@ -8,6 +8,11 @@ interface MapConfig {
  */
 export class TiandituImagercyProvider {
   private tk: string
+  /**
+   * 保存密钥，并把 Cesium Ion Token 设为配置中的 accessToken。
+   *
+   * @param config Ion Token 与天地图密钥
+   */
   constructor(config: MapConfig) {
     //设置Cesium Ion 的默认访问令牌
     Cesium.Ion.defaultAccessToken = config.accessToken

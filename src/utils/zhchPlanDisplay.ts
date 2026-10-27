@@ -205,6 +205,13 @@ export function formatCoverageReduction(beforeCoverage?: number | null, afterCov
   return `${reduction.toFixed(2)}%`
 }
 
+/**
+ * 计算干扰造成的时延：打击后反馈时刻减去打击前反馈时刻。
+ *
+ * @param beforeTime 打击前反馈时间
+ * @param afterTime 打击后反馈时间
+ * @returns `时/分/秒` 文案；任一时间缺失或无法解析时为 `--`，差值为负时为 `0秒`
+ */
 export function formatInterferenceDelay(beforeTime?: string | null, afterTime?: string | null): string {
   if (!beforeTime || !afterTime) return '--'
   const beforeMs = parseFeedbackTimestamp(beforeTime)

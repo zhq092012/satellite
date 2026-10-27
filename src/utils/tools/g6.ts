@@ -1,7 +1,9 @@
 import G6, { type EdgeConfig } from '@antv/g6'
 /**
- * 对g6图的边做处理
- * @param edges
+ * 把平行边、自环边改成可区分的曲线，避免多条边叠在同一条直线上。
+ * 直接改传入的边配置，供 G6 布局前调用。
+ *
+ * @param edges G6 边配置，会被就地写入 type 与 curveOffset
  */
 export function processParallelEdges(edges: EdgeConfig[]) {
   const offsetDiff = 30
@@ -24,18 +26,33 @@ const colors = [
   'hsla(79, 94.60%, 36.10%, 0.80)',
   'hsla(267, 67.60%, 60.00%, 0.80)',
 ]
-// 随机颜色
+/**
+ * 从预设色板里随机取一种半透明颜色，用于区分图上的系列或分组。
+ *
+ * @returns `hsla(...)` 颜色字符串
+ */
 export function getRandomColors() {
   const index = Math.floor(Math.random() * colors.length)
   return colors[index]
 }
-// 按顺序获取颜色
+/**
+ * 按序号循环取色板中的颜色，同一序号始终得到同一颜色。
+ *
+ * @param index 从 0 开始的序号，超出色板长度后取模
+ * @returns `hsla(...)` 颜色字符串
+ */
 export function getColors(index: number): string {
   const color = colors[index % colors.length]
   return color
 }
 
-// 选择布局
+/**
+ * 按布局名返回 G6 布局配置。
+ * 支持力导向（force / gForce / force2 / fruchterman）、环形、网格、同心圆、辐射和 MDS。
+ *
+ * @param layout 布局类型名
+ * @returns G6 layout 配置对象；未知类型时为 undefined，调用方应回退默认布局
+ */
 export function getG6Layout(layout: string) {
   switch (layout) {
     case 'force':
@@ -129,7 +146,13 @@ export function getG6Layout(layout: string) {
 //   }),
 // })
 
-/* ================== 2. 视口裁剪工具 ================== */
+/**
+ * 判断节点包围盒是否与当前画布视口相交。
+ *
+ * @param nodeBBox 节点包围盒，需含 minX/maxX/minY/maxY
+ * @param viewBBox 画布视口包围盒，字段同上
+ * @returns 相交（含贴边）时为 true
+ */
 function isInViewport(nodeBBox: any, viewBBox: any) {
   return !(
     nodeBBox.minX > viewBBox.maxX ||
@@ -138,6 +161,12 @@ function isInViewport(nodeBBox: any, viewBBox: any) {
     nodeBBox.maxY < viewBBox.minY
   )
 }
+/**
+ * 按当前画布视口隐藏看不见的节点，并同步隐藏两端都不可见的边。
+ * 大图拖拽、缩放时调用，减少离屏绘制。
+ *
+ * @param graph G6 Graph 实例
+ */
 export function viewportCulling(graph: any) {
   const viewBBox = graph.getGroup().getCanvasBBox()
   graph.getNodes().forEach((node: any) => {
@@ -150,9 +179,20 @@ export function viewportCulling(graph: any) {
   })
 }
 
-/* ================== 3. 分批加载 ================== */
+/**
+ * 分帧把节点和边加入图中，避免一次 add 阻塞主线程。
+ * 节点与边按下标对齐，每帧各取 `batch` 条；节点耗尽后停止，剩余边不再加入。
+ *
+ * @param graph G6 Graph 实例
+ * @param nodes 待添加节点
+ * @param edges 与节点下标对齐的边
+ * @param batch 每帧添加的数量，默认 500
+ */
 export function loadInBatches(graph: any, nodes: any[], edges: any[], batch = 500) {
   let i = 0
+  /**
+   * 取下一批节点和边加入图中。节点还没加完时用 `requestAnimationFrame` 预约下一次。
+   */
   const next = () => {
     const nodeSlice = nodes.slice(i, i + batch)
     const edgeSlice = edges.slice(i, i + batch)

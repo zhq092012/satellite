@@ -75,6 +75,11 @@ export const collectGroundObserversForSatellitePass = (
 ): GroundObserverSite[] => {
   const byId = new Map<string, GroundObserverSite>()
 
+  /**
+   * 按站点 ID 写入观测站，已存在的不覆盖，避免后到的缺名字段冲掉关系表里的名称。
+   *
+   * @param site 观测站
+   */
   const upsert = (site: GroundObserverSite) => {
     if (!site.id.trim()) return
     if (!byId.has(site.id)) {

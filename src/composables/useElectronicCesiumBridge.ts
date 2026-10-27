@@ -76,6 +76,7 @@ export function useElectronicCesiumBridge(matrixData: Ref<MatrixResult | null | 
    */
   const parseLatLon = (latLonStr: string): [number, number] => {
     if (!latLonStr) return [0, 0]
+    /** 按逗号拆出的纬度、经度数值 */
     const parts = latLonStr.split(',').map((val) => parseFloat(val.trim()))
     if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
       return [parts[0], parts[1]]
@@ -89,7 +90,9 @@ export function useElectronicCesiumBridge(matrixData: Ref<MatrixResult | null | 
   const infrastructureNodes = computed<InfrastructureLocation[]>(() => {
     if (!matrixData.value) return []
 
+    /** 接收站与中心云站合并后的点位 */
     const nodes: InfrastructureLocation[] = []
+    /** 优先使用初始关系；初始列表为空时回退到当前站网关系 */
     const relationData =
       matrixData.value.initRelationList?.receiveObjList?.length || matrixData.value.initRelationList?.stationObjList?.length
         ? matrixData.value.initRelationList
@@ -132,6 +135,7 @@ export function useElectronicCesiumBridge(matrixData: Ref<MatrixResult | null | 
    * 解析中继卫星 NORAD 列表集合
    */
   const relayNoradSet = computed<Set<number>>(() => {
+    /** 中继卫星 NORAD 去重集合 */
     const set = new Set<number>()
     if (matrixData.value?.relayRelation?.relayList) {
       matrixData.value.relayRelation.relayList.forEach((norad) => set.add(norad))
@@ -148,6 +152,7 @@ export function useElectronicCesiumBridge(matrixData: Ref<MatrixResult | null | 
    */
   const isTimeInWindow = (currentTime: Date, windowStart: string, windowEnd: string): boolean => {
     if (!windowStart || !windowEnd) return false
+    /** 窗口起止与当前时刻的毫秒时间戳，闭区间判断 */
     const start = new Date(windowStart).getTime()
     const end = new Date(windowEnd).getTime()
     const cur = currentTime.getTime()

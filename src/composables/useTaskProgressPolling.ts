@@ -81,7 +81,9 @@ declare global {
  * @returns 可直接传入 `WebSocket` 的地址
  */
 const resolveTaskProgressWsUrl = (taskId: number): string => {
+  /** 运行时覆盖优先，其次打包地址，最后走当前站点的 `/ws` */
   const configured = window.__APP_RUNTIME__?.wsUrl || import.meta.env.VITE_WS_URL || '/ws'
+  /** 绝对地址直接解析；相对地址基于当前页面 origin，便于 nginx 反代 */
   const url = /^wss?:\/\//i.test(configured)
     ? new URL(configured)
     : new URL(configured, window.location.origin)
@@ -115,6 +117,7 @@ export const isTaskProgressComplete = (progress?: TaskProgressInfo | null): bool
  */
 export const getTaskProgressPercent = (progress?: TaskProgressInfo | null): number => {
   if (!progress) return 0
+  /** 三项状态中已完成的个数，每项约占 33% */
   const finishedCount = [progress.totalStatus, progress.transitStatus, progress.threatAndStrikeStatus].filter(
     (status) => status === '完成'
   ).length
@@ -127,6 +130,7 @@ export const getTaskProgressPercent = (progress?: TaskProgressInfo | null): numb
  * @param taskId 任务 ID
  */
 const clearTaskProgressReconnectTimer = (taskId: number): void => {
+  /** 该任务尚未触发的重连定时器 */
   const timer = taskProgressReconnectTimerMap.get(taskId)
   if (!timer) return
   clearTimeout(timer)
@@ -140,6 +144,7 @@ const clearTaskProgressReconnectTimer = (taskId: number): void => {
  * @returns 已连接或连接中时为 true
  */
 export const hasActiveTaskProgressSocket = (taskId: number): boolean => {
+  /** 该任务已登记的 WebSocket */
   const socket = taskProgressSocketMap.get(taskId)
   return !!socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)
 }
@@ -152,6 +157,7 @@ export const hasActiveTaskProgressSocket = (taskId: number): boolean => {
 export const stopTaskProgressPolling = (taskId: number): void => {
   taskProgressStopSet.add(taskId)
   clearTaskProgressReconnectTimer(taskId)
+  /** 要主动关闭的连接；不存在时只保留停止标记 */
   const socket = taskProgressSocketMap.get(taskId)
   if (!socket) return
   socket.onopen = null
@@ -168,6 +174,7 @@ export const stopTaskProgressPolling = (taskId: number): void => {
  * 关闭全部任务进度 WebSocket。
  */
 export const stopAllTaskProgressPolling = (): void => {
+  /** 当前已登记连接的任务 ID 快照，避免关闭过程中改 Map */
   const taskIds = [...taskProgressSocketMap.keys()]
   taskIds.forEach((taskId) => stopTaskProgressPolling(taskId))
 }
@@ -180,16 +187,19 @@ export const stopAllTaskProgressPolling = (): void => {
  * @returns 含 taskId / totalStatus / transitStatus / threatAndStrikeStatus 的载荷；无法识别时返回 null
  */
 const parseTaskProgressWsMessage = (raw: string): TaskProgressWsPayload | null => {
+  /** 去掉空白后的报文；空串无法解析 */
   const text = raw.trim()
   if (!text) return null
 
   try {
+    /** 第一次解析结果；若仍是字符串则再解析一层 */
     let parsed: unknown = JSON.parse(text)
     if (typeof parsed === 'string') {
       parsed = JSON.parse(parsed)
     }
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
 
+    /** 与后端进度报文字段对齐的对象 */
     const payload = parsed as TaskProgressWsPayload
     if (
       payload.taskId == null &&
@@ -212,14 +222,17 @@ const parseTaskProgressWsMessage = (raw: string): TaskProgressWsPayload | null =
  * @param payload 解析后的进度载荷
  */
 const applyTaskProgressPayload = (fallbackTaskId: number, payload: TaskProgressWsPayload): void => {
+  /** 本次推送携带的三项状态；都缺失且没有描述时忽略 */
   const totalStatus = payload.totalStatus
   const transitStatus = payload.transitStatus
   const threatAndStrikeStatus = payload.threatAndStrikeStatus
   if (!totalStatus && !transitStatus && !threatAndStrikeStatus && payload.mes == null) return
 
+  /** 报文任务 ID，缺失时用建连时绑定的任务 */
   const taskId = Number(payload.taskId ?? fallbackTaskId)
   if (!Number.isFinite(taskId)) return
 
+  /** 上一帧快照，用于补齐本次报文未带的字段 */
   const previous = taskProgressMap[taskId]
   taskProgressMap[taskId] = {
     totalStatus: totalStatus ?? previous?.totalStatus ?? '进行中',
@@ -241,11 +254,13 @@ const applyTaskProgressPayload = (fallbackTaskId: number, payload: TaskProgressW
 const connectTaskProgressSocket = (taskId: number): void => {
   if (taskProgressStopSet.has(taskId)) return
 
+  /** 已有连接；OPEN 或 CONNECTING 时不重复建连 */
   const existing = taskProgressSocketMap.get(taskId)
   if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
     return
   }
 
+  /** 按任务 ID 建立的进度 WebSocket */
   const socket = new WebSocket(resolveTaskProgressWsUrl(taskId))
   taskProgressSocketMap.set(taskId, socket)
 
@@ -258,6 +273,7 @@ const connectTaskProgressSocket = (taskId: number): void => {
   }
 
   socket.onmessage = (event) => {
+    /** 解析后的进度载荷；无法识别时保持上一帧快照 */
     const payload = parseTaskProgressWsMessage(String(event.data ?? ''))
     if (!payload) return
     applyTaskProgressPayload(taskId, payload)
@@ -276,6 +292,7 @@ const connectTaskProgressSocket = (taskId: number): void => {
     if (taskProgressStopSet.has(taskId) || isTaskProgressComplete(taskProgressMap[taskId])) return
 
     clearTaskProgressReconnectTimer(taskId)
+    /** 异常断开后的重连定时器；主动停止或已完成时不会走到这里 */
     const timer = setTimeout(() => {
       taskProgressReconnectTimerMap.delete(taskId)
       connectTaskProgressSocket(taskId)
@@ -312,10 +329,12 @@ export const resumeTaskProgressPollingForTasks = async (tasks: TaskForm[]): Prom
 
     if (hasActiveTaskProgressSocket(task.id)) continue
 
+    /** 内存快照与任务列表自带的进度，二者任一已完成则不再订阅 */
     const cached = taskProgressMap[task.id]
     const entity = task.algorithmProgressEntity
     if (isTaskProgressComplete(cached) || isTaskProgressComplete(entity as unknown as TaskProgressInfo)) continue
 
+    /** 内存里已有进度，或列表进度尚未三项完成时需要恢复订阅 */
     const shouldWatch =
       !!cached ||
       (entity &&

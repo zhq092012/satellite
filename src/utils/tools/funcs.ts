@@ -24,14 +24,18 @@ export function duduplicateByKey<T, K extends string | number>(arr: T[], getKey:
   ).result //最终返回结果数组
 }
 /**
- * 模拟进度条
- * @param start
- * @param end
- * @param duration
- * @param percentage
+ * 用 requestAnimationFrame 把进度从 start 线性涨到 end。
+ *
+ * @param start 起始百分比
+ * @param end 结束百分比
+ * @param duration 计划耗时，毫秒
+ * @param percentage 接收当前整数进度的 ref
  */
 export function simulateProgress(start: number, end: number, duration: number, percentage: Ref<number>) {
   let startTime: any = null
+  /**
+   * 按已过时间线性插值进度，未到终点时继续请求下一帧。
+   */
   function updateProgress() {
     if (!startTime) startTime = Date.now()
     const elasped = Date.now() - startTime
@@ -44,10 +48,12 @@ export function simulateProgress(start: number, end: number, duration: number, p
   requestAnimationFrame(updateProgress)
 }
 /**
- * 圆环进度条
- * @param finishdCount
- * @param sumCount
- * @param percentage
+ * 按已完成数量推算圆环进度，并在两分钟内动画过渡到下一项。
+ * 若算出的起点低于当前进度，则不回退。
+ *
+ * @param finishdCount 已经完成的数量
+ * @param sumCount 总数量，为 0 时进度无意义
+ * @param percentage 接收当前整数进度的 ref
  */
 export function simulateExtractProgress(finishdCount: number, sumCount: number, percentage: Ref<number>) {
   const start = Math.floor((finishdCount / sumCount) * 100)
@@ -66,9 +72,10 @@ export function getPageData<T>(data: T[], _page: number, _page_size: number): T[
   return data.slice((_page - 1) * _page_size, _page * _page_size)
 }
 /**
- * 获取服务器图谱地址
- * @param imgUrl 图谱路径
- * @returns
+ * 拼接图谱服务根地址和相对路径。
+ *
+ * @param imgUrl 图谱相对路径
+ * @returns `VITE_PICTURE_URL` 与路径直接相接的完整地址
  */
 export function getImgServerPath(imgUrl: string) {
   return import.meta.env.VITE_PICTURE_URL + imgUrl
@@ -108,6 +115,12 @@ export function syncSharedDeep(tar: Record<string, any>, src: Record<string, any
   }
 }
 
+/**
+ * 判断值是否为可递归同步的普通对象。数组不算，避免把列表下标当成字段去合并。
+ *
+ * @param v 任意值
+ * @returns 非 null 的普通对象时为 true
+ */
 const isPlainObject = (v: any): v is Record<string, any> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
 /**
@@ -142,7 +155,12 @@ export function elConfirm(func: () => void) {
 function getDaysAgo(days = 7, fromDate = new Date()) {
   return new Date(fromDate.getTime() - days * 24 * 60 * 60 * 1000)
 }
-// 自定义格式 YYYY-MM-DD
+/**
+ * 将日期格式化为 `YYYY-MM-DD`。
+ *
+ * @param date 日期对象
+ * @returns 本地时区的日期字符串
+ */
 function formatDate(date: Date): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')

@@ -32,12 +32,19 @@ import type { SatelliteDetail } from '@/types/cesium/satellite'
 
 
 /**
+ * 按当前图层在 Cesium 中绘制卫星、武器、打击链路与关系连线。
+ *
  * @param viewer Cesium 视图实例
  * @param activeLayerOption 当前图层（对比视图 / 关系卫星 / 杀伤链等）
  * @param selectedPlanMissionWindows 当前方案的任务窗口列表
+ * @param selectedSatelliteRecord 关系视图中选中的卫星
+ * @param blueSatellites 蓝方卫星（地面站也适配进该集合）
+ * @param redWeapons 红方武器
  * @param completedStrikeWindowIds 已完成打击的窗口 ID 集合
- * @param isCurrentPlanLowOrMid 是否为低/中轨道方案（影响链路与图标样式）
- * @param dependencies 位置计算、轨道构建、场景跳转等外部依赖
+ * @param selectedSatelliteNoradId 当前选中卫星 NORAD
+ * @param selectedSatelliteDetail 选中卫星档案，用于信息框与轨道
+ * @param dependencies 位置计算、轨道构建、场景跳转与窗口运行时状态
+ * @returns 战场实体渲染与显隐方法
  */
 export function useBattleEntities(
   viewer: ShallowRef<Cesium.Viewer | null>,
@@ -50,14 +57,19 @@ export function useBattleEntities(
   selectedSatelliteNoradId: Ref<string>,
   selectedSatelliteDetail: Ref<SatelliteDetail | null>,
   dependencies: {
+    /** 选中卫星的关系项列表 */
     getSelectedSatelliteRelations: () => SatelliteRelationItem[]
+    /** 按时钟传播卫星世界坐标 */
     getSatellitePositionAtTime: (satellite: BlueSatelliteRecord, currentTime?: Cesium.JulianDate) => Cesium.Cartesian3
+    /** 构建选中卫星一圈轨道折线 */
     buildSatelliteOrbitPositions: (
       satellite: BlueSatelliteRecord,
       currentTime: Cesium.JulianDate,
       detail?: SatelliteDetail | null
     ) => Cesium.Cartesian3[]
+    /** 相机飞到场景总览 */
     flyToScene: () => void
+    /** 判断任务窗口相对当前时刻是进行中还是已完成 */
     getMissionRuntimeState: (
       mission: StrikePlanV2MissionWindowItem,
       currentDate: Date
@@ -71,10 +83,17 @@ export function useBattleEntities(
 
   // ─── 实体工具函数 ───
 
-  /** 按 ID 复用已有实体，不存在则创建并设为可见 */
+  /**
+   * 按 ID 复用已有实体，不存在则创建并设为可见。
+   *
+   * @param id 实体 ID
+   * @param createOptions 首次创建时的实体配置
+   * @returns 实体；Viewer 未就绪时为 null
+   */
   const getOrCreateBattleEntity = (id: string, createOptions: Record<string, unknown>) => {
     if (!viewer.value) return null
 
+    /** 同 ID 已存在的实体，复用以避免每帧重建 */
     const existing = viewer.value.entities.getById(id)
     if (existing) {
       existing.show = true
@@ -94,6 +113,7 @@ export function useBattleEntities(
 
     for (const entityId of renderedBattleEntityIds) {
       if (nextEntityIds.has(entityId)) continue
+      /** 本轮不再使用的实体，隐藏而不是删除，供下轮复用 */
       const entity = viewer.value.entities.getById(entityId)
       if (entity) {
         entity.show = false
@@ -103,10 +123,16 @@ export function useBattleEntities(
     renderedBattleEntityIds = nextEntityIds
   }
 
-  /** 判断目标点是否位于相机朝向的可见半球（用于隐藏背对地球的武器覆盖圈） */
+  /**
+   * 判断目标点是否位于相机朝向的可见半球（用于隐藏背对地球的武器覆盖圈）。
+   *
+   * @param position 目标世界坐标
+   * @returns 相机与目标方向夹角为锐角时可见
+   */
   const isVisibleFromCamera = (position: Cesium.Cartesian3) => {
     if (!viewer.value) return true
 
+    /** 相机位置与目标位置相对地心的单位方向 */
     const cameraDirection = Cesium.Cartesian3.normalize(viewer.value.camera.positionWC, new Cesium.Cartesian3())
     const targetDirection = Cesium.Cartesian3.normalize(position, new Cesium.Cartesian3())
     return Cesium.Cartesian3.dot(cameraDirection, targetDirection) >= 0
@@ -114,6 +140,7 @@ export function useBattleEntities(
 
   // ─── 主渲染逻辑 ───
 
+  /** 时钟 tick 上的相机跟随监听，卸载或重绑前需移除 */
   let clockFollowListener: Cesium.Event.RemoveCallback | null = null
 
   /**
@@ -131,25 +158,30 @@ export function useBattleEntities(
       return
     }
 
+    /** 当前 Viewer 的实体集合 */
     const entityCollection = viewer.value.entities
     if (resetEntities) {
       entityCollection.removeAll()
       renderedBattleEntityIds = new Set<string>()
     }
 
+    /** 当前方案窗口与图层模式 */
     const missionWindows = selectedPlanMissionWindows.value
     const layerMode = activeLayerOption.value
+    /** 对比视图隐藏已完成目标；关系视图只画选中星及其关联星 */
     const compareMode = layerMode === '对比视图'
     const relationMode = layerMode === '关系卫星'
     const selectedSatellite = relationMode ? selectedSatelliteRecord.value : null
 
     // ─── 任务窗口索引 ───
 
+    /** 关系视图：对端 NORAD → 关系项；其他图层为 null */
     const relationItems =
       relationMode && selectedSatellite
         ? new Map(dependencies.getSelectedSatelliteRelations().map((item) => [item.satellite.noradId, item]))
         : null
 
+    /** 卫星 NORAD、武器 ID → 关联任务窗口，以及武器 ID → 类型 */
     const missionWindowsBySatellite = new Map<string, StrikePlanV2MissionWindowItem[]>()
     const missionWindowsByWeapon = new Map<string, StrikePlanV2MissionWindowItem[]>()
     const weaponTypeById = new Map<string, string>()
@@ -164,6 +196,7 @@ export function useBattleEntities(
     })
 
     for (const mission of missionWindows) {
+      /** 窗口归属的卫星与武器键 */
       const satelliteKey = String(mission.satellite_id)
       const weaponKey = String(mission.weapon_id)
 
@@ -174,6 +207,13 @@ export function useBattleEntities(
       missionWindowsByWeapon.get(weaponKey)!.push(mission)
     }
 
+    /**
+     * 在一组窗口中选取当前应展示的任务：优先进行中，其次已完成，否则取第一条。
+     *
+     * @param windows 同一卫星或武器的任务窗口
+     * @param currentDate 当前时钟时刻
+     * @returns 命中的窗口；列表为空时为 undefined
+     */
     const getActiveMission = (windows: StrikePlanV2MissionWindowItem[], currentDate: Date) => {
       return (
         windows.find((mission) => dependencies.getMissionRuntimeState(mission, currentDate).active) ??
@@ -202,13 +242,16 @@ export function useBattleEntities(
         return
       }
 
+      /** 打向该卫星的任务窗口 */
       const relatedWindows = missionWindowsBySatellite.get(satellite.noradId) ?? []
+      /** 是否已有完成的打击，对比视图中不再绘制 */
       const isCompletedSatellite = relatedWindows.some((mission) =>
         completedStrikeWindowIds.value.has(`${mission.weapon_id}-${mission.satellite_id}`)
       )
 
       if (compareMode && isCompletedSatellite) return
 
+      /** 卫星实体 ID，跨帧复用 */
       const satelliteEntityId = `satellite-${satellite.noradId}`
       nextEntityIds.add(satelliteEntityId)
       const satelliteEntity = getOrCreateBattleEntity(satelliteEntityId, {
@@ -229,17 +272,30 @@ export function useBattleEntities(
           false
         ) as unknown as Cesium.PositionProperty
 
+        /**
+         * 计算该卫星在指定时刻的打击阶段、闪烁系数和样式。
+         *
+         * @param time Cesium 时钟时刻
+         * @returns 阶段、闪烁、颜色样式及关联武器类型
+         */
         const getSatState = (time: Cesium.JulianDate) => {
+          /** 时钟对应的绝对时间 */
           const currentDate = Cesium.JulianDate.toDate(time)
+          /** 当前应展示的打击窗口及其武器类型 */
           const relatedMission = getActiveMission(relatedWindows, currentDate)
           const relatedWeaponType = relatedMission ? (weaponTypeById.get(String(relatedMission.weapon_id)) ?? '') : ''
+          /** 打击阶段：idle / active / fading / done */
           const phase = relatedMission ? getStrikePhase(relatedMission, currentDate) : 'idle'
+          /** 打击中的闪烁系数，0–1 */
           const blink = phase === 'active' ? (Math.sin(currentDate.getTime() / STRIKE_SATELLITE_BLINK_MS) + 1) / 2 : 1
+          /** 按武器类型与阶段混合出的颜色样式 */
           const style = getStrikeTypeStyle(relatedWeaponType, phase, blink)
           return { currentDate, relatedMission, phase, blink, style, relatedWeaponType }
         }
 
+        /** 关系视图中该星的关系标签与颜色；非关系星为 undefined */
         const relationMeta = relationItems?.get(satellite.noradId)
+        /** 未进入打击阶段时的默认卫星颜色 */
         const baseSatelliteColor = Cesium.Color.fromCssColorString('#4ea6ff')
 
         satelliteEntity.description = new Cesium.CallbackProperty((time = new Cesium.JulianDate()) => {
@@ -297,6 +353,7 @@ export function useBattleEntities(
         })
 
         if (!satelliteEntity.billboard) satelliteEntity.billboard = new Cesium.BillboardGraphics()
+        /** 打击完成图标缩放；关系星略大以便区分 */
         const starScale = relationMode && relationMeta ? 0.95 : 0.88
         // Pre-create images to avoid canvas generation in callback
         const staticStyle = getStrikeTypeStyle(
@@ -304,15 +361,19 @@ export function useBattleEntities(
           'done',
           1
         )
+        /** 完成后图标颜色：关系星用关系色，否则用打击完成色 */
         const staticColor =
           relationMode && relationMeta
             ? Cesium.Color.fromCssColorString(relationMeta.color).withAlpha(0.95)
             : staticStyle.satelliteColor
+        /** 地面站用菱形爆炸标，卫星用星标，避免在回调里重复画布生成 */
         const lowMidImage = createStationExplosionDiamondDataUri(staticColor, starScale)
         const highImage = createSatelliteStrikeStarDataUri(staticColor, starScale)
 
+        /** 地面站/雷达站或近地高度目标使用地面图标 */
         const isStation = satellite.satType === '基站' || satellite.satType === '雷达站' || satellite.altitude <= 100
         const staticImage = isStation ? lowMidImage : highImage
+        /** 图标像素边长 */
         const staticSize = isStation ? 32 : 28
 
         Object.assign(satelliteEntity.billboard, {
@@ -336,12 +397,14 @@ export function useBattleEntities(
           selectedOrbitSatellite &&
           satellite.noradId === selectedSatelliteNoradId.value
         ) {
+          /** 选中卫星一圈轨道折线点 */
           const orbitPositions = dependencies.buildSatelliteOrbitPositions(
             selectedOrbitSatellite,
             viewer.value!.clock.currentTime,
             selectedSatelliteDetail.value
           )
           if (orbitPositions.length > 1) {
+            /** 选中卫星轨道实体 ID */
             const orbitEntityId = `selected-satellite-orbit-${selectedOrbitSatellite.noradId}`
             nextEntityIds.add(orbitEntityId)
             const orbitEntity = getOrCreateBattleEntity(orbitEntityId, {
@@ -367,8 +430,10 @@ export function useBattleEntities(
 
         // 关系视图：目标卫星独立高亮线
         if (relationMode && relationMeta) {
+          /** 选中星实体 ID，避免给自己画关系线 */
           const selectedSatelliteEntityId = `satellite-${selectedSatellite?.noradId}`
           if (selectedSatellite && selectedSatelliteEntityId !== satelliteEntityId) {
+            /** 选中星到当前关联星的连线实体 ID */
             const relationLinkId = `relation-link-${selectedSatellite.noradId}-${satellite.noradId}`
             nextEntityIds.add(relationLinkId)
             const relationLinkEntity = getOrCreateBattleEntity(relationLinkId, {
@@ -399,26 +464,37 @@ export function useBattleEntities(
     // ─── 关系视图：目标卫星独立高亮 ───
 
     if (relationMode && selectedSatellite) {
+      /** 关系视图目标星实体，单独放大并标成「目标卫星」 */
       const selectedSatelliteEntityId = `satellite-${selectedSatellite.noradId}`
       nextEntityIds.add(selectedSatelliteEntityId)
       const selectedSatelliteEntity = entityCollection.getById(selectedSatelliteEntityId)
       if (selectedSatelliteEntity) {
         selectedSatelliteEntity.show = true
 
+        /**
+         * 目标星在指定时刻的打击阶段。
+         *
+         * @param time Cesium 时钟时刻
+         * @returns 打击阶段；没有对应窗口时为 idle
+         */
         const getTargetState = (time: Cesium.JulianDate) => {
+          /** 时钟对应的绝对时间 */
           const currentDate = Cesium.JulianDate.toDate(time)
+          /** 打向目标星的任务窗口 */
           const mission = selectedPlanMissionWindows.value.find(
             (m) => String(m.satellite_id) === selectedSatellite.noradId
           )
           return mission ? getStrikePhase(mission, currentDate) : 'idle'
         }
 
+        /** 目标星高亮色与完成后的星标 */
         const selectedSatelliteColor = Cesium.Color.fromCssColorString('#f0b35b')
         const targetImage = createSatelliteStrikeStarDataUri(selectedSatelliteColor, 0.92)
 
         if (!selectedSatelliteEntity.billboard) selectedSatelliteEntity.billboard = new Cesium.BillboardGraphics()
         Object.assign(selectedSatelliteEntity.billboard, {
           show: new Cesium.CallbackProperty((time = new Cesium.JulianDate()) => {
+            /** 仅在打击收尾或完成后显示星标 */
             const phase = getTargetState(time)
             return phase === 'fading' || phase === 'done'
           }, false),
@@ -434,6 +510,7 @@ export function useBattleEntities(
         if (!selectedSatelliteEntity.point) selectedSatelliteEntity.point = new Cesium.PointGraphics()
         Object.assign(selectedSatelliteEntity.point, {
           show: new Cesium.CallbackProperty((time = new Cesium.JulianDate()) => {
+            /** 未完成时显示点，完成后改由星标接管 */
             const phase = getTargetState(time)
             return phase !== 'fading' && phase !== 'done'
           }, false),
@@ -478,12 +555,17 @@ export function useBattleEntities(
       nextEntityIds.add(weaponEntityId)//添加武器的ID
 
       /**
-       * 获取武器当前状态（激活/完成）
+       * 汇总该武器全部窗口的运行状态：任一窗口进行中即为激活，任一窗口已结束即为完成。
+       *
+       * @param time Cesium 时钟时刻
+       * @returns 是否执行中、是否已执行
        */
       const getWepState = (time: Cesium.JulianDate) => {
+        /** 时钟对应的绝对时间 */
         const currentDate = Cesium.JulianDate.toDate(time)
         return relatedWindows.reduce(
           (state, mission) => {
+            /** 单个窗口相对当前时刻的进行中 / 已完成 */
             const missionState = dependencies.getMissionRuntimeState(mission, currentDate)
             return {
               active: state.active || missionState.active,
@@ -528,6 +610,7 @@ export function useBattleEntities(
          * 更新武器的图标
          */
         if (!weaponEntity.billboard) weaponEntity.billboard = new Cesium.BillboardGraphics()
+        /** 按武器类型取图标缩放，避免不同武器视觉大小不一致 */
         const weaponIconScale = getWeaponIconScale(weapon.type)
         Object.assign(weaponEntity.billboard, {
           image: createWeaponIconDataUri(weapon.type, weaponStyle.pointColor, weaponIconScale),
@@ -578,6 +661,7 @@ export function useBattleEntities(
        * 更新红方武器对应的打击链路
        */
       relatedWindows.forEach((mission) => {
+        /** 链路终点卫星或地面站；场景中找不到则不画线 */
         const target = blueSatellites.value.find((satellite) => satellite.noradId === String(mission.satellite_id))
         if (!target) return
 
@@ -629,6 +713,7 @@ export function useBattleEntities(
                 if (isTargetStation) {
                   // 用真实挂钟时间做闪烁基准，避免仿真倍速影响闪烁节奏导致链路近乎不可见
                   const linkBlink = phase === 'active' ? (Math.sin(performance.now() / 600) + 1) / 2 : 1
+                    /** 地面目标链路透明度：打击中随闪烁变化，收尾后保持较高不透明度 */
                   const linkAlpha = phase === 'active' ? 0.55 + 0.45 * linkBlink : 0.95
                   return Cesium.Color.fromCssColorString('#00f5ff').withAlpha(0.85 * linkAlpha)
                 } else {
@@ -781,14 +866,18 @@ export function useBattleEntities(
      */
     if (missionWindows.length > 0 && viewer.value) {
       clockFollowListener = viewer.value.clock.onTick.addEventListener((clock) => {
+        /** 时钟对应的绝对时间 */
         const currentDate = Cesium.JulianDate.toDate(clock.currentTime)
+        /** 当前应跟随的武器、目标，以及它们窗口的开始时间（取最晚开始的进行中窗口） */
         let followWeaponId: string | null = null
         let followSatelliteId: string | null = null
         let followMissionStartTime = Number.NEGATIVE_INFINITY
 
         for (const mission of missionWindows) {
+          /** 仅跟随正在打击的窗口 */
           const phase = getStrikePhase(mission, currentDate)
           if (phase === 'active') {
+            /** 窗口开始时间，用于在多个同时进行的窗口中选最新一条 */
             const missionStartTime = parseMissionWindowDate(mission.window_start).getTime()
             if (Number.isFinite(missionStartTime) && missionStartTime >= followMissionStartTime) {
               followMissionStartTime = missionStartTime
@@ -799,14 +888,17 @@ export function useBattleEntities(
         }
 
         if (followWeaponId && followSatelliteId && viewer.value) {
+          /** 武器与目标组合键，同一对只飞一次相机 */
           const followKey = `${followWeaponId}-${followSatelliteId}`
           if (lastStrikeFollowKey !== followKey) {
             lastStrikeFollowKey = followKey
+            /** 跟随目标与武器的当前坐标，用于包住双方的包围球 */
             const target = blueSatellites.value.find((satellite) => satellite.noradId === followSatelliteId)
             const weapon = redWeapons.value.find((item, index) => String(item.id ?? index) === followWeaponId)
             if (target && weapon) {
               const targetPosition = dependencies.getSatellitePositionAtTime(target, clock.currentTime)
               const weaponPosition = Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 1500)
+              /** 同时框住武器与目标的包围球 */
               const sphere = Cesium.BoundingSphere.fromPoints([weaponPosition, targetPosition])
               viewer.value.camera.flyToBoundingSphere(sphere, {
                 duration: 1.8,

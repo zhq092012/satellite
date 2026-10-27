@@ -38,6 +38,12 @@ export const createWeaponIconDataUri = (weaponType: string, color: Cesium.Color,
   const fillColor = solidColor.toCssColorString()
   const strokeColor = '#ffffff'
 
+  /**
+   * 用统一视口把武器图形包成 SVG 文本。尺寸随 `iconScale` 放大。
+   *
+   * @param body SVG 内部图形
+   * @returns 去掉首尾空白的 SVG 字符串
+   */
   const wrap = (body: string) =>
     `
     <svg xmlns="http://www.w3.org/2000/svg" width="${28 * iconScale}" height="${28 * iconScale}" viewBox="0 0 28 28">
