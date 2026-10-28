@@ -116,6 +116,7 @@ export interface InitMatrix {
   initWindows: InitWindow[]
 }
 
+/** 接收站与数据中心的拓扑关系。没有关系数据时，列表字段可能被省略。 */
 export interface StationRelationList {
   receiveObjList?: ReceiveObj[] // 接收站列表；无关系数据时接口可能省略
   stationObjList?: StationObj[] // 中心站列表；无关系数据时接口可能省略
@@ -483,8 +484,11 @@ export interface InitMatrixItem {
 
 // satelliteMatrixList 数组项类型
 export interface SatelliteMatrixItem {
+  /** 卫星 NORAD 编号 */
   norad: number
+  /** 卫星名称 */
   name: string
+  /** 卫星类型 */
   satType: string
   /**
    * 服务时长(分钟)
@@ -600,6 +604,7 @@ export const getSatelliteTypeSerials = (taskId: number) => {
  * 卫星威胁度等相关信息数据结构
  */
 export interface SatelliteThreatInfo {
+  /** 卫星基础模型，含轨道、国别和可见性等指标 */
   satelliteBaseModelResp: {
     /** 卫星 NORAD 编号 */
     norad: number

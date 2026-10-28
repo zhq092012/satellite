@@ -5,8 +5,11 @@ import type { TaskForm } from '@/types/dashboard'
 import { requestAPI } from '@/utils/tools/request'
 import type { Satellite } from '@/types/cesium/satellite'
 
+/** 按系统类型分组的卫星系列名称。侦察、通信各一组。 */
 interface SatelliteSeriesData {
+    /** 侦察类卫星系列名称 */
     侦察: string[]
+    /** 通信类卫星系列名称 */
     通信: string[]
 }
 
@@ -257,6 +260,7 @@ export interface StationObject {
 export interface StationRelation {
     from: string;//接收站ID
     to: string;//数据中心ID
+    /** 接收站到数据中心的可见时间窗口。没有窗口时为 null */
     visibilityWindows: VisibilityWindow[] | null;
 }
 

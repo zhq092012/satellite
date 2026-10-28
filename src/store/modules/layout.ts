@@ -14,35 +14,64 @@ import type { BattleForm, SatelliteData, TaskCombatArea, TaskForm } from '@/type
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import type { SatelliteDetail } from '@/types/cesium/satellite'
 
+/** 布局 Store 的全部状态。 */
 interface State {
-  activetab: string //当前激活的Tab页
+  /** 当前激活的态势子 Tab */
+  activetab: string
+  /** 侧栏是否收起 */
   isCollapse: boolean
+  /** 当前激活任务；未选择时为 null */
   activedTask: TaskForm | null
+  /** 当前战场；未选择时为 null */
   battle: BattleForm | null
-  battleCircleMap: Map<number, { name: string; center: [number, number]; radiusKm: number }>
+  /** 战场圆形区域：序号 → 名称、圆心和半径 */
+  battleCircleMap: Map<number, {
+    /** 圆形区域名称 */
+    name: string
+    /** 圆心，[经度, 纬度] */
+    center: [number, number]
+    /** 半径（千米） */
+    radiusKm: number
+  }>
+  /** 当前正在编辑的圆形区域序号 */
   currentCircleIdx: number
-  battlePolygonMap: Map<number, { name: string; lonlats: { lon: number; lat: number }[] }>
+  /** 战场多边形区域：序号 → 名称和顶点 */
+  battlePolygonMap: Map<number, {
+    /** 多边形区域名称 */
+    name: string
+    /** 顶点经纬度，按绘制顺序排列 */
+    lonlats: { lon: number; lat: number }[]
+  }>
+  /** 当前正在编辑的多边形区域序号 */
   currentPolygonIdx: number
-  showSatelliteList: boolean //卫星列表面板
-  showAnalysisPanel: boolean //分析面板
+  /** 是否显示卫星列表面板 */
+  showSatelliteList: boolean
+  /** 是否显示分析面板；与卫星列表互斥 */
+  showAnalysisPanel: boolean
+  /** 是否显示卫星信息弹层 */
   showSatelliteMsgBox: boolean
+  /** 当前选中卫星的档案详情 */
   selectedSatellite: SatelliteDetail | null
 
   /** 当前选中的 3D 敌方地面基础设施节点 (地面接收站 / 中心云数据中心) */
   selectedInfrastructureNode: InfrastructureLocation | null
-  /** 当前任务下所有过境卫星数据*/
+  /** 当前任务下所有过境卫星数据 */
   allSatelliteOfTask: SatelliteData[]
   /** 当前选中的卫星类型 */
   selectedSatType: string
   /** 当前选中的卫星系列 */
   selectedSatSeries: string
-  effectModel: boolean // 是否惯性参考系
+  /** 是否使用惯性参考系展示 */
+  effectModel: boolean
+  /** 是否显示网络拓扑视图 */
   showNetView: boolean
 
-  // 地球自转相关状态
-  battleCenterCartensian: Cesium.Cartesian3 | null // 战场中心位置（笛卡尔坐标）
-  battleCenterOritentation: Cesium.HeadingPitchRoll | null // 战场中心朝向（航向、俯仰、滚转）
-  satelliteTotal: number // 卫星总数
+  /** 战场中心位置（笛卡尔坐标），用于恢复俯视相机 */
+  battleCenterCartensian: Cesium.Cartesian3 | null
+  /** 战场中心朝向（航向、俯仰、滚转） */
+  battleCenterOritentation: Cesium.HeadingPitchRoll | null
+  /** 卫星总数 */
+  satelliteTotal: number
 
   /** [全局共享] 四个 Tab 页共用的算法侦察/打击矩阵查询结果 */
   matrixData: MatrixResult | null
@@ -83,7 +112,18 @@ interface State {
   /** 整体态势地图上是否显示我方武器图层 */
   showOurWeapons: boolean
   /** 右侧面板选中的我方武器（用于地图定位） */
-  selectedOurWeapon: { id?: string; name: string; latitude: number; longitude: number; range?: number } | null
+  selectedOurWeapon: {
+    /** 武器 ID；旧数据可能缺失 */
+    id?: string
+    /** 武器名称 */
+    name: string
+    /** 纬度（度） */
+    latitude: number
+    /** 经度（度） */
+    longitude: number
+    /** 射程（千米） */
+    range?: number
+  } | null
   /**
    * 从整体态势链路跳转到打击窗口分析时携带的当前链路快照。
    * 为空表示未聚焦具体链路，打击窗口页展示全部窗口卡片。
@@ -124,8 +164,10 @@ export const ZHCH_USAGE_TYPE_LABELS: Record<(typeof ZHCH_USAGE_TYPE_OPTIONS)[num
 }
 
 /**
- * 获取综合打击方案用途类型的展示名称
+ * 获取综合打击方案用途类型的展示名称。
+ *
  * @param type 用途类型（军用 / 民用 / 军用民用）
+ * @returns 对应中文标签；未知类型原样返回
  */
 export function getZhchUsageTypeLabel(type: string): string {
   return ZHCH_USAGE_TYPE_LABELS[type as (typeof ZHCH_USAGE_TYPE_OPTIONS)[number]] ?? type
@@ -135,16 +177,18 @@ export function getZhchUsageTypeLabel(type: string): string {
 export const ZHCH_SYS_TYPE_OPTIONS = ['侦察', '通信'] as const
 
 /**
- * 切换综合打击方案卫星系统类型（单选；再次点击同一项则取消选择）。
+ * 判断字符串是否为可选的卫星系统类型。
  *
- * @param type 侦察或通信
+ * @param type 待校验文案
+ * @returns 是「侦察」或「通信」时为 true，并收窄类型
  */
 export function isZhchSysTypeOption(type: string): type is (typeof ZHCH_SYS_TYPE_OPTIONS)[number] {
   return (ZHCH_SYS_TYPE_OPTIONS as readonly string[]).includes(type)
 }
 
-/** 同一 scope 的矩阵拉取 in-flight 去重，避免多组件并发请求互相覆盖 */
+/** 同一查询条件正在进行的矩阵请求；并发调用复用这个 Promise */
 let matrixScopeInflight: Promise<MatrixResult | null> | null = null
+/** 与 `matrixScopeInflight` 对应的查询键；条件变化后不再复用旧请求 */
 let matrixScopeInflightKey = ''
 
 export const useLayoutStore = defineStore('layout-store', {
@@ -199,10 +243,12 @@ export const useLayoutStore = defineStore('layout-store', {
   getters: {
     /** 当前激活用途类型对应的综合打击方案 */
     activeZhchPlan(state): ZhchPlanResp | null {
+      /** 当前激活用途在缓存中的方案；尚未拉取时为 null */
       return state.zhchPlanMap[state.activeZhchUsageType] ?? null
     },
     /** 可选卫星系列：优先生成页缓存的方案系列，否则回退当前矩阵系列 */
     zhchPlanSeriesList(state): string[] {
+      /** 当前方案里的系列名；没有方案时再回退矩阵系列 */
       const fromPlan = (state.zhchPlanMap[state.activeZhchUsageType]?.levelSeriesEntities || []).map(
         (entity) => entity.series
       )
@@ -215,10 +261,13 @@ export const useLayoutStore = defineStore('layout-store', {
      * 态势拓扑 / 甘特图系列下拉与整体态势左侧面板共用此列表。
      */
     taskSelectedSeriesList(state): string[] {
+      /** 任务已装配资源；从中提取系列并去重 */
       const resources = state.activedTask?.resources ?? []
+      /** 已写入结果的系列，用于保持接口顺序下去重 */
       const seen = new Set<string>()
       const result: string[] = []
       for (const item of resources) {
+        /** 去掉空白后的系列名；非字符串或空串不进入下拉 */
         const series = typeof item.series === 'string' ? item.series.trim() : ''
         if (!series || seen.has(series)) continue
         seen.add(series)
@@ -228,17 +277,24 @@ export const useLayoutStore = defineStore('layout-store', {
     },
     // 从 battle.area 中解析 lonlats 并计算战场区域边界包围盒
     battleAreaBounds(state): {
+      /** 区域最南纬度（度） */
       min_lat: number
+      /** 区域最北纬度（度） */
       max_lat: number
+      /** 区域最西经度（度） */
       min_lng: number
+      /** 区域最东经度（度） */
       max_lng: number
+      /** 解析后的多边形顶点 */
       lonlats: { lon: number; lat: number }[]
     } | null {
       if (!state.battle?.area) return null
       try {
+        /** 接口可能给 JSON 字符串或对象；统一成区域数组 */
         let areaData = typeof state.battle.area === 'string' ? JSON.parse(state.battle.area) : state.battle.area
         if (!Array.isArray(areaData)) areaData = [areaData]
 
+        /** 全部区域顶点，用于计算包围盒 */
         const lonlats: { lon: number; lat: number }[] = []
         areaData.forEach((item: any) => {
           const raw = item?.lonlats
@@ -259,6 +315,7 @@ export const useLayoutStore = defineStore('layout-store', {
 
         if (lonlats.length === 0) return null
 
+        /** 顶点经度、纬度，分别取最小最大得到包围盒 */
         const lons = lonlats.map((p) => p.lon)
         const lats = lonlats.map((p) => p.lat)
 
@@ -276,9 +333,19 @@ export const useLayoutStore = defineStore('layout-store', {
     },
   },
   actions: {
+    /**
+     * 设置侧栏收起状态。
+     *
+     * @param isCollapse 为 true 时收起
+     */
     toggleCollapse(isCollapse: boolean) {
       this.isCollapse = isCollapse
     },
+    /**
+     * 设置当前激活任务。
+     *
+     * @param activedTask 任务对象；传 null 表示取消选择
+     */
     setActivedTask(activedTask: TaskForm | null) {
       this.activedTask = activedTask
     },
@@ -289,21 +356,46 @@ export const useLayoutStore = defineStore('layout-store', {
     setTaskCombatArea(area: TaskCombatArea | null) {
       this.taskCombatArea = area ? { ...area } : null
     },
+    /**
+     * 设置当前战场。
+     *
+     * @param battle 战场对象
+     */
     setActivedBattle(battle: BattleForm) {
       this.battle = battle
     },
 
+    /**
+     * 切换是否使用惯性参考系。
+     *
+     * @param show 为 true 时启用惯性参考系
+     */
     toggleEffectModel(show: boolean) {
       this.effectModel = show
     },
+    /**
+     * 显示或隐藏卫星列表面板，并关闭分析面板。
+     *
+     * @param show 是否显示卫星列表
+     */
     toggleShowSatelliteList(show: boolean) {
       this.showSatelliteList = show
       this.showAnalysisPanel = !show
     },
+    /**
+     * 显示或隐藏分析面板，并关闭卫星列表。
+     *
+     * @param show 是否显示分析面板
+     */
     toggleShowAnalysisList(show: boolean) {
       this.showAnalysisPanel = show
       this.showSatelliteList = !show
     },
+    /**
+     * 设置当前选中卫星档案。
+     *
+     * @param satellite 卫星详情；传 null 表示取消
+     */
     setSelectedSatellite(satellite: SatelliteDetail | null) {
       this.selectedSatellite = satellite
     },
@@ -316,15 +408,25 @@ export const useLayoutStore = defineStore('layout-store', {
     setSelectedInfrastructureNode(node: InfrastructureLocation | null) {
       this.selectedInfrastructureNode = node
     },
-    /* 关闭面板 */
+    /** 关闭卫星信息弹层和卫星列表面板。 */
     closeSatPanel() {
       this.showSatelliteMsgBox = false
       this.showSatelliteList = false
     },
-    // 保存任务下的所有卫星
+    /**
+     * 保存当前任务下的过境卫星列表。
+     *
+     * @param satellites 过境卫星数据
+     */
     saveTaskSatellite(satellites: SatelliteData[]) {
       this.allSatelliteOfTask = satellites
     },
+    /**
+     * 写入一个战场圆形区域。地图为空时忽略传入序号，从 0 开始。
+     *
+     * @param idx 圆形序号
+     * @param circle 名称、圆心和半径
+     */
     setCircle(idx: number, circle: { name: string; center: [number, number]; radiusKm: number }) {
       if (this.battleCircleMap.size === 0) {
         this.currentCircleIdx = 0
@@ -334,6 +436,12 @@ export const useLayoutStore = defineStore('layout-store', {
         this.battleCircleMap.set(this.currentCircleIdx, circle)
       }
     },
+    /**
+     * 写入一个战场多边形区域。地图为空时忽略传入序号，从 0 开始。
+     *
+     * @param idx 多边形序号
+     * @param polygon 名称和顶点
+     */
     setPolygon(idx: number, polygon: { name: string; lonlats: { lon: number; lat: number }[] }) {
       if (this.battlePolygonMap.size === 0) {
         this.currentPolygonIdx = 0
@@ -343,13 +451,28 @@ export const useLayoutStore = defineStore('layout-store', {
         this.battlePolygonMap.set(this.currentCircleIdx, polygon)
       }
     },
+    /**
+     * 删除指定序号的圆形区域。
+     *
+     * @param idx 圆形序号
+     */
     removeCircle(idx: number) {
       this.battleCircleMap.delete(idx)
     },
+    /**
+     * 删除指定序号的多边形区域。
+     *
+     * @param idx 多边形序号
+     */
     removePolygon(idx: number) {
       this.battlePolygonMap.delete(idx)
     },
-    // 设置战场中心位置和朝向
+    /**
+     * 记录战场中心的相机位置和朝向，供态势地球恢复俯视。
+     *
+     * @param cartesian 战场中心笛卡尔坐标
+     * @param orientation 航向、俯仰、滚转
+     */
     setBattleCenter(cartesian: Cesium.Cartesian3, orientation: Cesium.HeadingPitchRoll) {
       this.battleCenterCartensian = cartesian
       this.battleCenterOritentation = orientation
@@ -383,6 +506,7 @@ export const useLayoutStore = defineStore('layout-store', {
      * @param options 可选系列名列表；默认使用 taskSelectedSeriesList
      */
     resolveSelectedSatSeriesForTaskOptions(options?: string[]) {
+      /** 调用方传入的系列优先，否则用任务已装配系列 */
       const list = options ?? this.taskSelectedSeriesList
       if (!list.length) {
         if (this.selectedSatSeries) {
@@ -423,6 +547,7 @@ export const useLayoutStore = defineStore('layout-store', {
      */
     isTaskAlgorithmComplete(task?: TaskForm | null): boolean {
       if (!task?.id) return false
+      /** 内存进度快照优先，否则用任务上自带的算法进度 */
       const progress = taskProgressMap[task.id] ?? task.algorithmProgressEntity
       return isTaskProgressComplete(progress as Parameters<typeof isTaskProgressComplete>[0])
     },
@@ -439,6 +564,7 @@ export const useLayoutStore = defineStore('layout-store', {
      * @param force 是否强制重新请求
      */
     async fetchTaskAnalysis(force = false): Promise<SatelliteAnalysisData | null> {
+      /** 当前任务；没有 ID 或算法未完成时清空分析缓存 */
       const task = this.activedTask
       const taskId = task?.id
       if (!taskId) {
@@ -457,6 +583,7 @@ export const useLayoutStore = defineStore('layout-store', {
 
       this.taskAnalysisLoading = true
       try {
+        /** 任务矩阵分析结果；非 200 或没有 data 时清空缓存并提示 */
         const res = await getTaskMatrix({ taskId: String(taskId) })
         if (res.code === 200 && res.data) {
           this.taskAnalysisData = res.data
@@ -484,8 +611,10 @@ export const useLayoutStore = defineStore('layout-store', {
      * @param taskId 任务 ID
      */
     buildMatrixScopeKey(taskId?: number): string {
+      /** 显式任务优先，否则用当前激活任务；都没有时返回空键 */
       const id = taskId ?? this.activedTask?.id ?? 0
       if (!id) return ''
+      /** 当前激活用途，系列变化和用途变化都要让缓存失效 */
       const usage = this.activeZhchUsageType
       if (this.selectedSatSeries) return `${id}::${usage}::series::${this.selectedSatSeries}`
       return `${id}::${usage}::all`
@@ -493,11 +622,25 @@ export const useLayoutStore = defineStore('layout-store', {
     /**
      * 开始一次矩阵拉取，返回用于校验响应是否仍有效的上下文
      */
-    beginMatrixFetch(): { token: number; scopeKey: string; queryKey: string; taskId: number } {
+    beginMatrixFetch(): {
+      /** 本次请求代际，返回时用于丢弃过期响应 */
+      token: number
+      /** 任务、用途和系列组成的范围键 */
+      scopeKey: string
+      /** 写入缓存时使用的查询键 */
+      queryKey: string
+      /** 发起请求时的任务 ID */
+      taskId: number
+    } {
+      /** 发起请求时的任务；没有任务时 ID 为 0 */
       const taskId = this.activedTask?.id ?? 0
+      /** 自增后的请求代际 */
       const token = ++this.matrixFetchToken
+      /** 当前范围键，供调用方校验响应是否仍匹配 */
       const scopeKey = this.buildMatrixScopeKey(taskId)
+      /** 激活用途类型 */
       const usageType = this.activeZhchUsageType
+      /** 有系列时按系列缓存，否则标记为全部系列 */
       const queryKey = this.selectedSatSeries
         ? `${taskId}_${usageType}_${this.selectedSatSeries}`
         : `${taskId}_${usageType}__ALL_SERIES__`
@@ -543,17 +686,20 @@ export const useLayoutStore = defineStore('layout-store', {
      * @param force 是否强制重新请求
      */
     async fetchMatrixForCurrentScope(force = false): Promise<MatrixResult | null> {
+      /** 当前任务；没有任务时清空矩阵 */
       const taskId = this.activedTask?.id ?? 0
       if (!taskId) {
         this.clearMatrixData()
         return null
       }
 
+      /** 当前分析系列；未选系列时不发请求，保留已有矩阵 */
       const series = this.selectedSatSeries
       if (!series) {
         return this.matrixData
       }
 
+      /** 任务、用途和系列组成的缓存键 */
       const usageType = this.activeZhchUsageType
       const queryKey = `${taskId}_${usageType}_${series}`
 
@@ -561,6 +707,7 @@ export const useLayoutStore = defineStore('layout-store', {
         return this.matrixData
       }
 
+      /** 进行中的请求键；相同键复用同一个 Promise */
       const inflightKey = queryKey
       if (matrixScopeInflight && matrixScopeInflightKey === inflightKey) {
         return matrixScopeInflight
@@ -569,12 +716,14 @@ export const useLayoutStore = defineStore('layout-store', {
       matrixScopeInflightKey = inflightKey
       matrixScopeInflight = (async () => {
         try {
+          /** 本次请求代际和查询键；系列在等待期间被换掉后不再写入 */
           const { token, scopeKey, queryKey: activeQueryKey, taskId: activeTaskId } = this.beginMatrixFetch()
           try {
             if (!this.isMatrixFetchCurrent(token)) {
               return this.matrixData
             }
 
+            /** 侦察/打击矩阵响应；非 200 不覆盖已有矩阵 */
             const res = await getReconnaissanceAttackMatrix({ taskId, series })
             const matrix = res.code === 200 ? res.data : null
             if (matrix) {
@@ -692,6 +841,7 @@ export const useLayoutStore = defineStore('layout-store', {
      * @returns 待聚焦 NORAD 或 null
      */
     consumeTopoFocusNorad(): number | null {
+      /** 待聚焦 NORAD，读出后立即清空，避免页面重复飞相机 */
       const norad = this.topoFocusNorad
       this.topoFocusNorad = null
       return norad
@@ -700,6 +850,7 @@ export const useLayoutStore = defineStore('layout-store', {
      * 过滤掉旧版用途类型（如「军用」），仅保留当前 UI 支持的选项
      */
     sanitizeZhchUsageTypes() {
+      /** 当前 UI 仍支持的用途类型 */
       const valid = new Set<string>(ZHCH_USAGE_TYPE_OPTIONS)
       this.selectedZhchUsageTypes = this.selectedZhchUsageTypes.filter((t) => valid.has(t))
       if (!this.selectedZhchUsageTypes.length) {
@@ -712,6 +863,7 @@ export const useLayoutStore = defineStore('layout-store', {
      */
     toggleZhchUsageType(type: string) {
       this.sanitizeZhchUsageTypes()
+      /** 已选项下标；存在则取消，且至少保留一项 */
       const idx = this.selectedZhchUsageTypes.indexOf(type)
       if (idx >= 0) {
         if (this.selectedZhchUsageTypes.length <= 1) return
@@ -744,16 +896,19 @@ export const useLayoutStore = defineStore('layout-store', {
      * @param force 是否强制重新请求
      */
     async fetchZhchPlans(types?: string[], force = false): Promise<boolean> {
+      /** 当前任务；没有任务时清空方案缓存 */
       const taskId = this.activedTask?.id
       if (!taskId) {
         this.clearZhchPlans()
         return false
       }
 
+      /** 显式用途优先，否则用当前多选 */
       const targetTypes = types?.length ? types : [...this.selectedZhchUsageTypes]
       if (!targetTypes.length) return false
 
       this.sanitizeZhchUsageTypes()
+      /** 去掉 UI 不支持的旧用途类型 */
       const validTypes = targetTypes.filter((t) => (ZHCH_USAGE_TYPE_OPTIONS as readonly string[]).includes(t))
       if (!validTypes.length) return false
 
@@ -761,6 +916,7 @@ export const useLayoutStore = defineStore('layout-store', {
         this.clearZhchPlans()
       }
 
+      /** 本次请求的卫星系统类型；与上次不同则整表重拉 */
       const sysType = this.selectedZhchSysType
       if (this.zhchPlanFetchSysType !== (sysType ?? null)) {
         this.zhchPlanMap = {}
@@ -770,11 +926,13 @@ export const useLayoutStore = defineStore('layout-store', {
 
       this.zhchPlanLoading = true
       try {
+        /** 各用途的方案结果；已缓存且非强制时直接复用 */
         const results = await Promise.all(
           validTypes.map(async (type) => {
             if (!force && this.zhchPlanMap[type]) {
               return { type, data: this.zhchPlanMap[type] }
             }
+            /** 该用途的综合打击方案响应 */
             const res = await getSatelliteThreatInfoByType({
               type,
               taskId,
@@ -795,6 +953,7 @@ export const useLayoutStore = defineStore('layout-store', {
           })
         )
 
+        /** 是否至少写入了一份方案 */
         let hasData = false
         results.forEach(({ type, data }) => {
           if (data) {
@@ -812,6 +971,7 @@ export const useLayoutStore = defineStore('layout-store', {
       }
     },
   },
+  /** 刷新后仍保留任务、战场、系列和激活用途，其余状态按默认值重建 */
   persist: {
     storage: localStorage,
     pick: [

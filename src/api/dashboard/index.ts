@@ -19,52 +19,96 @@ export const getHomeSatellite = (pageNum: number, pageSize: number) => {
 
   return requestAPI.get<AxiosResponsePage<SatelliteInfo[]>>(url)
 }
-// 星座数据
+/** 星座资料中的时间，按年、月、日、时、分、秒及可选的后续分量排列 */
 type SatelliteConstellationTimestamp = [number, number, number, number, number, number, ...number[]]
 
+/** 星座资料，含轨道配置、运营方和爬虫来源。 */
 export interface SatelliteConstellation {
+  /** 文档 ID */
   _id: string
+  /** 星座业务 ID */
   id: string
+  /** 星座资料来源地址 */
   url: string
+  /** 星座名称 */
   name: string
+  /** 星座类型 */
   type: string
+  /** 星座描述 */
   description: string
+  /** 中文名称 */
   chineseName: string
+  /** 英文名称 */
   englishName: string
+  /** 星座构型 */
   constellationConfig: string
+  /** 星座功能 */
   constellationFunction: string
+  /** 轨道类型 */
   orbitType: string
+  /** 运营方 */
   operator: string
+  /** 建设状态 */
   constructionStatus: string
+  /** 国家或地区 */
   country: string
+  /** 技术能力 */
   technicalCapability: string
+  /** 相似星座 */
   similarConstellations: string[]
+  /** 经济社会价值 */
   economicSocialValue: string
+  /** 星座包含的卫星 NORAD 编号 */
   noradIds: number[]
+  /** 解析时间，按年、月、日、时、分、秒及可选分量排列 */
   parseTime: SatelliteConstellationTimestamp
+  /** 解析器名称 */
   parser: string
+  /** 解析器版本 */
   parserVersion: string
+  /** 国家分类编码 */
   nationCategory: number
+  /** 爬取时间，按年、月、日、时、分、秒及可选分量排列 */
   crawlerTime: SatelliteConstellationTimestamp
+  /** 来源网页地址 */
   netUrl: string
+  /** 来源站点名称 */
   netName: string
+  /** 来源站点中文名 */
   netNameZh: string
+  /** 来源站点国家 */
   netNation: string
+  /** 来源站点语言 */
   netLanguage: string
+  /** 来源频道名称 */
   channelName: string
+  /** 来源频道地址 */
   channelUrl: string
+  /** 来源频道描述 */
   channelDesc: string
+  /** 数据来源标识 */
   dataSource: string
+  /** 数据源 IP */
   dataSourceIp: string
+  /** 数据源主机名 */
   dataSourceHostname: string
+  /** 原始描述文本 */
   descriptionOrigin: string
+  /** 采集蜘蛛标记 */
   dataSourceJdSpider: number
+  /** 主机分区编号 */
   ziHost: number
+  /** 区域分区编号 */
   ziZone: number
+  /** 记录创建时间，按年、月、日、时、分、秒及可选分量排列 */
   createTime: SatelliteConstellationTimestamp
+  /** 记录更新时间，按年、月、日、时、分、秒及可选分量排列 */
   updateTime: SatelliteConstellationTimestamp
+  /** 数据变更类型 */
   dataChangeType: string
+  /** 更新次数 */
   updateCounts: number
+  /** 同步状态 */
   synStatus: null
 }
 /** 查询所有星座 */
@@ -209,17 +253,19 @@ export const getBattleList = () => {
   const url = `/api/battle/list`
   return requestAPI.get<AxiosResponseType<BattleForm[]>>(url)
 }
-/**
- * 任务列表
- * @param battle
- */
 /** getTaskList 附加：接口字段校验失败列表（不会写入默认数据） */
 export type TaskListApiResponse = AxiosResponseType<TaskForm[]> & {
+  /** 任务列表字段校验失败项。出现时表示对应任务数据不合法，不会写入默认值 */
   taskListValidationErrors?: TaskListItemFromApiError[]
   /** @deprecated 使用 taskListValidationErrors */
   combatAreaErrors?: TaskListItemFromApiError[]
 }
 
+/**
+ * 查询战场下的任务列表，并校验接口返回的任务字段。
+ * @param battleId 战场 ID
+ * @returns 任务列表。字段不合法时附带 taskListValidationErrors，不会用默认值补齐
+ */
 export const getTaskList = async (battleId: number): Promise<TaskListApiResponse> => {
   const url = `/api/battle/taskList?battleId=${battleId}`
   const res = await requestAPI.get<TaskListApiResponse>(url)
@@ -803,28 +849,47 @@ export const getSatelliteTlePages = (data: { norads: number[]; pageNum: number; 
   return requestAPI.post<AxiosResponsePage<SatelliteTle[]>>(url, data)
 }
 
+/** 卫星按五大类型、国家、轨道、在轨状态和载荷状态的分布统计。 */
 export type SatelliteDistribution = {
+  /** 按五大卫星类型统计的数量 */
   typeMap: {
+    /** 侦察类卫星数量 */
     侦察: number
+    /** 导航类卫星数量 */
     导航: number
+    /** 通信类卫星数量 */
     通信: number
+    /** 导弹预警类卫星数量 */
     导弹预警: number
+    /** 太空目标监视与攻防类卫星数量 */
     太空目标监视与攻防: number
   }
+  /** 按国家统计的卫星数量 */
   countryList: {
+    /** 分组键：国家名称。空值表示未标注国家 */
     _id: string | null
+    /** 该分组的卫星数量 */
     count: number
   }[]
+  /** 按轨道类型统计的卫星数量 */
   orbitTypeList: {
+    /** 分组键：轨道类型。空值表示未标注 */
     _id: string | null
+    /** 该分组的卫星数量 */
     count: number
   }[]
+  /** 按在轨状态统计的卫星数量 */
   orbitStatusList: {
+    /** 分组键：在轨状态。空值表示未标注 */
     _id: string | null
+    /** 该分组的卫星数量 */
     count: number
   }[]
+  /** 按载荷状态统计的卫星数量 */
   payloadStatusList: {
+    /** 分组键：载荷状态。空值表示未标注 */
     _id: string | null
+    /** 该分组的卫星数量 */
     count: number
   }[]
 }
@@ -834,9 +899,7 @@ export const getSatelliteDistribution = () => {
   const url = `/api/satellite/situation`
   return requestAPI.get<AxiosResponseType<SatelliteDistribution>>(url)
 }
-/**
- * 获取卫星的打击窗口
- */
+/** 卫星打击窗口。键为窗口标识，值为该窗口的时间字符串列表 */
 export type StrikeWindow = Record<string, string[]>
 // 获取卫星的打击窗口
 export const getStrikeWindowOfSatellite = (taskId: number, noradId: number) => {
@@ -852,36 +915,64 @@ export const checkDefaultBattleAndTask = () => {
 }
 // 态势数据
 export type SituationData = {
+  /** 红方态势：过境卫星、时长和武器阵地 */
   红方: {
+    /** 任务时段内红方过境的卫星数量 */
     红方过境卫星总数: number
+    /** 红方卫星过境时长合计 */
     红方卫星过境总时长: number
+    /** 红方武器阵地 */
     红方武器阵地列表: {
+      /** 阵地 ID */
       id: string
+      /** 阵地名称 */
       name: string
+      /** 阵地所属国家 */
       country: string
+      /** 阵地类型 */
       type: string
+      /** 纬度 */
       latitude: number
+      /** 经度 */
       longitude: number
+      /** 覆盖半径 */
       range: number
+      /** 该阵地可作用的卫星类型 */
       satellite_type?: string
     }[]
+    /** 按地区统计的红方过境卫星数量 */
     红方各地区过境卫星数量: Record<string, number>
+    /** 按卫星类型统计的红方过境卫星数量 */
     红方过境卫星分类数量: Record<string, number>
   }
+  /** 蓝方态势：过境卫星、时长和武器阵地 */
   蓝方: {
+    /** 任务时段内蓝方过境的卫星数量 */
     蓝方过境卫星总数: number
+    /** 蓝方卫星过境时长合计 */
     蓝方卫星过境总时长: number
+    /** 蓝方武器阵地 */
     蓝方武器阵地列表: {
+      /** 阵地 ID */
       id: string
+      /** 阵地名称 */
       name: string
+      /** 阵地所属国家 */
       country: string
+      /** 阵地类型 */
       type: string
+      /** 纬度 */
       latitude: number
+      /** 经度 */
       longitude: number
+      /** 覆盖半径 */
       range: number
+      /** 该阵地可作用的卫星类型 */
       satellite_type?: string
     }[]
+    /** 按地区统计的蓝方过境卫星数量 */
     蓝方各地区过境卫星数量: Record<string, number>
+    /** 按卫星类型统计的蓝方过境卫星数量 */
     蓝方过境卫星分类数量: Record<string, number>
   }
 }
@@ -891,12 +982,19 @@ export const getSituationDataOfTask = (taskId: number) => {
   const url = `/api/battle/taskSituation?taskId=${taskId}`
   return requestAPI.get<AxiosResponseType<SituationData>>(url)
 }
+/** 红蓝对抗统计：武器、卫星数量和平均威胁度。 */
 export type RedBlueStatistics = {
+  /** 武器数量 */
   weaponNum: number
+  /** 按武器类型统计的数量 */
   weaponTypeMap: Record<string, number>
+  /** 按地区统计的武器数量 */
   weaponAreaMap: Record<string, number>
+  /** 卫星数量 */
   satelliteNum: number
+  /** 卫星类型数量 */
   satelliteTypeNum: number
+  /** 平均威胁度 */
   avgThreat: number
 }
 // 查询红蓝对抗统计数据
@@ -906,48 +1004,88 @@ export const getRedBlueStatistics = (data: { model: string; taskId: number }) =>
 }
 // 乘积模型威胁度
 export type ProductThreatModelRow = {
+  /** 在全部目标中的排名 */
   全局排名: number
+  /** 轨道类型 */
   orbit_type: string
+  /** 卫星 NORAD 编号 */
   norad: string
+  /** 内部编号 */
   int_id: string
+  /** 卫星英文名称 */
   name_en: string
+  /** 目标类型 */
   target_type: string
+  /** 在轨状态 */
   orbit_status: string
+  /** 载荷状态 */
   payload_status: string
+  /** 卫星载荷类型 */
   sat_type: string
+  /** 国家或地区 */
   country: string
+  /** 国别对威胁分的影响因子 */
   国别因子: number
+  /** 过境频次 */
   'Pass frequency': number
+  /** 星下点经度（度）。无数据时为空 */
   'Subpoint longitude (deg)': number | null
+  /** 可见性对威胁分的影响因子 */
   可见性因子: number
+  /** 卫星发射年份 */
   发射年份: number
+  /** 发射时间对威胁分的影响因子 */
   发射时间因子: number
+  /** 综合威胁分数 */
   综合威胁分数: number
+  /** 威胁指数，范围 0 到 100 */
   '威胁指数(0-100)': number
+  /** 威胁等级 */
   威胁等级: string
 }
 
+/** 某一卫星类型下的乘积模型威胁度结果。 */
 export type ProductThreatModelDataset = {
+  /** 数量 */
   count: number
+  /** 威胁度明细 */
   rows: ProductThreatModelRow[]
 }
 
+/** 乘积模型威胁度排名的完整响应。 */
 export type ProductThreatModelResponse = {
+  /** 威胁模型名称 */
   model: string
+  /** 计算使用的当前年份 */
   current_year: number
+  /** 目标经度（度） */
   target_longitude_deg: number
+  /** 重点国家 */
   key_countries: string[]
+  /** 重点国家因子 */
   key_country_factor: number
+  /** 其他国家因子 */
   other_country_factor: number
+  /** 按卫星类型分组的威胁度结果 */
   results: {
+    /** 导航类威胁数据集 */
     navigation: ProductThreatModelDataset
+    /** 通信类威胁数据集 */
     communication: ProductThreatModelDataset
+    /** 导弹预警类威胁数据集 */
     missile_early_warning: ProductThreatModelDataset
+    /** 侦察类威胁数据集 */
     reconnaissance: ProductThreatModelDataset
   }
+  /** 警告信息 */
   warnings: string[]
 }
 
+/**
+ * 按乘积模型计算卫星威胁度排名。
+ * @param data 任务、重点国家及因子、目标经度
+ * @returns 按导航、通信、导弹预警、侦察分类的威胁度排名
+ */
 export const getThreatByProductModel = (data: {
   taskId: number
   key_countries: string[]
@@ -966,11 +1104,17 @@ export const getTaskStageTargetOptions = () => {
   return requestAPI.get<AxiosResponseType<string[]>>(url)
 }
 
+/** 作战阶段及其对应的方案烈度。 */
 export interface PhaseIntensity {
+  /** 作战阶段名称 */
   stepName: string
+  /** 阶段目标 */
   stepTarget: string
+  /** 阶段开始时间 */
   startTime: string
+  /** 阶段结束时间 */
   endTime: string
+  /** 打击烈度 */
   intensityLevel: string
 }
 

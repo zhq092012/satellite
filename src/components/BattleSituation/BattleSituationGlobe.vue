@@ -155,6 +155,7 @@ const hasSatelliteGridLabel = computed(() => Boolean(satelliteDetailView.value?.
 
 /** 地面站 / 武器通用 Grid 面板（卫星单独模板） */
 const resourceGridPanelView = computed((): GlobeResourceGridDetailViewModel | null => {
+  /** 地面目标优先于武器；两者都没有格子时不使用通用面板 */
   const ground = groundDetailView.value
   if (ground?.metricCells.length) return ground
   const weapon = weaponDetailView.value
@@ -162,6 +163,7 @@ const resourceGridPanelView = computed((): GlobeResourceGridDetailViewModel | nu
   return null
 })
 
+/** 地面站或武器是否已有可渲染的 Grid 面板 */
 const hasResourceGridPanel = computed(() => resourceGridPanelView.value != null)
 
 /** 卫星 / 地面 / 武器 Grid 浮层（加宽样式） */
@@ -172,6 +174,7 @@ const hasResourceGridLabel = computed(
 /** 无 Grid 时的纯文本详情（系列等；完整展示、不截断） */
 const plainDetailLabelText = computed(() => {
   if (hasResourceGridLabel.value) return null
+  /** 去掉首尾空白后的多行文案；空串不显示纯文本浮层 */
   const full = selectedResourceDetailText.value?.trim()
   return full || null
 })
@@ -181,8 +184,16 @@ const showEntityDetailLabel = computed(
   () => hasResourceGridLabel.value || Boolean(plainDetailLabelText.value),
 )
 
-/** 详情 HTML Label 屏幕坐标（跟随选中目标） */
-const detailLabelScreen = ref<{ left: number; top: number } | null>(null)
+/**
+ * 详情 HTML Label 相对容器的屏幕坐标。
+ * 每帧由世界坐标投影得到，目标在地球背面或投影失败时为 null。
+ */
+const detailLabelScreen = ref<{
+  /** 相对容器左侧的像素 */
+  left: number
+  /** 相对容器顶部的像素 */
+  top: number
+} | null>(null)
 
 /** postRender：更新详情 Label 屏幕位置 */
 let detailLabelPostRenderRemover: (() => void) | null = null
@@ -199,10 +210,14 @@ const propagateSatelliteWorldPosition = (
   timeMs: number,
 ): Cesium.Cartesian3 | null => {
   try {
+    /** 由两行根数解析出的轨道记录 */
     const satrec = satellitejs.twoline2satrec(sat.line1, sat.line2)
+    /** SGP4 传播得到的 ECI 位置与速度（千米） */
     const pv = satellitejs.propagate(satrec, new Date(timeMs))
     if (!pv?.position) return null
+    /** 该时刻的格林尼治恒星时，用于 ECI 转 ECF */
     const gmst = satellitejs.gstime(new Date(timeMs))
+    /** 地固坐标（千米），返回前乘 1000 转为米 */
     const ecef = satellitejs.eciToEcf(pv.position, gmst)
     return new Cesium.Cartesian3(ecef.x * 1000, ecef.y * 1000, ecef.z * 1000)
   } catch {
@@ -217,12 +232,15 @@ const propagateSatelliteWorldPosition = (
  */
 const resolveSelectedDetailWorldPosition = (): Cesium.Cartesian3 | null => {
   if (props.selectedWeaponId) {
+    /** 选中武器的经纬度，贴地作为浮层锚点 */
     const weapon = props.weapons.find((item) => item.id === props.selectedWeaponId)
     if (weapon) return Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 0)
   }
   if (props.selectedGroundTargetKey) {
+    /** receive: / station: 键解析出的类型与资源 ID */
     const parsed = parseGroundTargetKey(props.selectedGroundTargetKey)
     if (parsed) {
+      /** 地球地面目标列表中的对应点 */
       const target = props.groundTargets.find(
         (item) => item.kind === parsed.kind && item.id === parsed.id,
       )
@@ -230,8 +248,10 @@ const resolveSelectedDetailWorldPosition = (): Cesium.Cartesian3 | null => {
     }
   }
   if (props.selectedNorad) {
+    /** 选中卫星；锚点随当前推演时刻传播，而不是用静态经纬度 */
     const sat = props.satellites.find((item) => item.norad === props.selectedNorad)
     if (sat) {
+      /** 播放头毫秒；尚未写入时用当前墙钟 */
       const timeMs = props.currentTimeMs > 0 ? props.currentTimeMs : Date.now()
       return propagateSatelliteWorldPosition(sat, timeMs)
     }
@@ -241,16 +261,19 @@ const resolveSelectedDetailWorldPosition = (): Cesium.Cartesian3 | null => {
 
 /** 将详情 Label 同步到屏幕坐标（地球旋转/缩放后跟随目标） */
 const syncDetailLabelScreenPosition = () => {
+  /** 当前 Viewer；未创建、已销毁或不显示浮层时清空屏幕坐标 */
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed() || !showEntityDetailLabel.value) {
     detailLabelScreen.value = null
     return
   }
+  /** 选中目标的世界坐标 */
   const world = resolveSelectedDetailWorldPosition()
   if (!world) {
     detailLabelScreen.value = null
     return
   }
+  /** 投影到画布像素；目标在视锥外时为 undefined */
   const windowPos = Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, world)
   if (!windowPos) {
     detailLabelScreen.value = null
@@ -263,6 +286,7 @@ const syncDetailLabelScreenPosition = () => {
 const syncDetailLabelPostRenderListener = () => {
   detailLabelPostRenderRemover?.()
   detailLabelPostRenderRemover = null
+  /** 需要跟随的 Viewer；浮层关闭时不再注册 postRender */
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed() || !showEntityDetailLabel.value) {
     detailLabelScreen.value = null
@@ -300,6 +324,7 @@ const deductionGlobeVisualState = computed(() => {
       struckSatelliteNorad: null as number | null,
     }
   }
+  /** 当前时刻的推演视觉状态：被打击接收站、过站高亮和爆炸 */
   const state = resolveDeductionVisualState(
     props.deductionVisualPlan,
     props.currentTimeMs || 0,
@@ -310,6 +335,7 @@ const deductionGlobeVisualState = computed(() => {
     activePassReceiveKeys: state.activePassReceiveKeys,
     passHighlightReceiveKeys: state.passHighlightReceiveKeys,
     passHighlightPasses: state.passHighlightPasses,
+    /** 爆炸阶段把当前选中星标成已打击；未爆炸时不改点颜色 */
     struckSatelliteNorad:
       state.showExplosion && props.selectedNorad != null ? props.selectedNorad : null,
   }
@@ -347,19 +373,22 @@ useBattleGlobeWeapons(
   selectedResourceDetailText
 )
 
-/** 推演地面站视觉状态（打击变红、过站高亮） */
+/** 推演中已被打击的接收站 ID/名称，用于把点画成红色 */
 const deductionStruckReceiveKeys = computed(
   () => deductionGlobeVisualState.value.struckReceiveKeys
 )
+/** 当前过站窗口内需要高亮的接收站 ID/名称 */
 const deductionPassHighlightReceiveKeys = computed(
   () => deductionGlobeVisualState.value.passHighlightReceiveKeys
 )
+/** 当前高亮过站窗口，含坐标，供地面点补位和连线使用 */
 const deductionPassHighlightPasses = computed(
   () => deductionGlobeVisualState.value.passHighlightPasses
 )
 
 /** 推演时补全过站接收站坐标，保证地球上有可高亮点位 */
 const globeGroundTargetsForRender = computed((): BattleGlobeGroundTarget[] => {
+  /** 父组件传入的地面目标；非推演时原样渲染 */
   const base = props.groundTargets
   if (!props.isDeductionPlaying || !props.deductionVisualPlan?.stationPasses.length) {
     return base
@@ -371,6 +400,7 @@ const globeGroundTargetsForRender = computed((): BattleGlobeGroundTarget[] => {
  * 飞到默认地球视角（无场景区域或区域无效时使用）。
  */
 const flyToDefaultEarthView = () => {
+  /** 当前 Viewer；未就绪时不操作相机 */
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed()) return
   viewer.camera.flyTo({
@@ -383,10 +413,12 @@ const flyToDefaultEarthView = () => {
  * 恢复战场初始俯视视角（清除卫星选中、推演不跟随时使用）。
  */
 const restoreOverviewView = () => {
+  /** 当前 Viewer；销毁后不再改相机 */
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed()) return
 
   viewer.camera.cancelFlight()
+  /** 进入战场时记下的相机位置与姿态；有位置时优先飞回该俯视 */
   const destination = store.battleCenterCartensian
   const orientation = store.battleCenterOritentation
 
@@ -457,8 +489,10 @@ const hasValidContainerSize = (el: HTMLElement | null): boolean => {
  * 同步 Viewer 渲染循环与容器尺寸。
  */
 const syncViewerRenderLoop = () => {
+  /** 当前 Viewer；容器尚未挂载时不改渲染循环 */
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed() || !cesiumContainer.value) return
+  /** 容器宽高都大于 0 才恢复默认渲染循环，避免 0 尺寸画布空转 */
   const canRender = hasValidContainerSize(cesiumContainer.value)
   viewer.useDefaultRenderLoop = canRender
   if (canRender) {
@@ -471,13 +505,16 @@ const syncViewerRenderLoop = () => {
  * 同步 Cesium 时钟到任务时间范围与当前推演时刻。
  */
 const syncViewerClock = () => {
+  /** 当前 Viewer；时钟由父组件的播放头驱动，不自行动画 */
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed()) return
 
+  /** 任务起止毫秒；区间无效时保持时钟原值 */
   const startMs = props.taskStartMs || 0
   const endMs = props.taskEndMs || 0
   if (!startMs || !endMs || endMs <= startMs) return
 
+  /** 任务开始、结束和当前播放头对应的 JulianDate */
   const start = Cesium.JulianDate.fromDate(new Date(startMs))
   const stop = Cesium.JulianDate.fromDate(new Date(endMs))
   const current = Cesium.JulianDate.fromDate(new Date(props.currentTimeMs || startMs))
@@ -490,6 +527,7 @@ const syncViewerClock = () => {
   viewer.clock.multiplier = 1
 }
 
+/** 暴露给父组件：恢复战场俯视、飞到某一卫星系列 */
 defineExpose({
   restoreOverviewView,
   flyToSatelliteSeries,
@@ -502,16 +540,20 @@ let battleLabelAnchor: Cesium.Cartesian3 | null = null
  * 根据相机位置更新战场名称标签可见性，避免地球背面仍显示。
  */
 const updateBattleLabelOcclusion = () => {
+  /** 当前 Viewer；没有名称锚点时不判断遮挡 */
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed() || !battleLabelAnchor) return
 
+  /** 战场名称实体；尚未创建时跳过 */
   const entity = viewer.entities.getById('battle-area-label')
   if (!entity) return
 
+  /** 以 WGS84 椭球和相机位置判断锚点是否在可见半球 */
   const occluder = new Cesium.EllipsoidalOccluder(
     Cesium.Ellipsoid.WGS84,
     viewer.camera.positionWC
   )
+  /** 锚点未被地球挡住时显示名称 */
   const visible = occluder.isPointVisible(battleLabelAnchor)
   if (entity.show !== visible) {
     entity.show = visible
@@ -523,6 +565,7 @@ const updateBattleLabelOcclusion = () => {
  * 注册战场名称标签遮挡更新监听。
  */
 const ensureBattleLabelOcclusionListener = () => {
+  /** 当前 Viewer；已注册 postUpdate 时不重复监听 */
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed() || battleLabelAnimRemover) return
   battleLabelAnimRemover = viewer.scene.postUpdate.addEventListener(updateBattleLabelOcclusion)
@@ -536,8 +579,10 @@ const clearBattleLabel = () => {
   battleLabelAnimRemover = null
   battleLabelAnchor = null
 
+  /** 当前 Viewer；销毁后实体已随场景释放 */
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed()) return
+  /** 战场名称实体 */
   const labelEntity = viewer.entities.getById('battle-area-label')
   if (labelEntity) {
     viewer.entities.remove(labelEntity)
@@ -551,6 +596,7 @@ let battleLabelAnimRemover: (() => void) | null = null
  * 在战场区域北侧外部添加贴地名称标注（如「台湾战场2」）。
  */
 const renderBattleLabel = () => {
+  /** 当前 Viewer；没有战场名称时不创建标签 */
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed() || !store.battle?.name) return
 
@@ -605,11 +651,13 @@ const renderBattleLabel = () => {
  * 根据当前场景绘制区域并调整视角。
  */
 const renderBattleArea = () => {
+  /** 当前 Viewer；未就绪时不绘制区域 */
   const viewer = viewerRef.value
   if (!viewer || viewer.isDestroyed()) return
 
   try {
     if (store.battle) {
+      /** 按战场多边形贴地标绘，并飞到约 2400 万米高度 */
       markBattleArea(viewer, store.battle, 24000000, { clampToGround: true })
       renderBattleLabel()
       if (!store.battleCenterCartensian && !resolveBattleSpaceLabelPosition(store.battle)) {
@@ -621,6 +669,7 @@ const renderBattleArea = () => {
     }
     markTaskCombatArea(viewer, store.taskCombatArea)
   } catch (error) {
+    /** 区域数据非法时回退默认视角，并保留错误以便定位 */
     console.error('渲染战场区域失败:', error)
     flyToDefaultEarthView()
   }
@@ -637,6 +686,7 @@ const initViewer = async () => {
 
   viewerInitializing = true
   try {
+    /** 只保留地球与实体图层，关闭地理编码、时间轴等默认控件 */
     const viewer = new Cesium.Viewer(cesiumContainer.value, {
       scene3DOnly: true,
       geocoder: false,
@@ -671,6 +721,7 @@ const initViewer = async () => {
 
     viewerRef.value = viewer
 
+    /** 容器尺寸变化时恢复渲染；首次获得非零尺寸时补做初始化 */
     resizeObserver = new ResizeObserver(() => {
       syncViewerRenderLoop()
       if (!viewerRef.value && cesiumContainer.value && hasValidContainerSize(cesiumContainer.value)) {
@@ -700,14 +751,17 @@ const refreshAfterActivate = () => {
   renderBattleArea()
 }
 
+/** 容器挂载后创建 Viewer */
 onMounted(() => {
   void initViewer()
 })
 
+/** keep-alive 再次进入时恢复渲染循环和战场标记 */
 onActivated(() => {
   refreshAfterActivate()
 })
 
+/** 切换战场后重绘区域和名称 */
 watch(
   () => store.battle?.id,
   () => {
@@ -715,6 +769,7 @@ watch(
   }
 )
 
+/** 战场多边形变化后重绘区域 */
 watch(
   () => store.battle?.area,
   () => {
@@ -722,6 +777,7 @@ watch(
   }
 )
 
+/** 战场名称变化后只更新名称标签 */
 watch(
   () => store.battle?.name,
   () => {
@@ -729,6 +785,7 @@ watch(
   }
 )
 
+/** 战场中心变化后重算名称锚点 */
 watch(
   () => store.battleCenterCartensian,
   () => {
@@ -736,9 +793,11 @@ watch(
   }
 )
 
+/** 任务作战区域变化后重绘作战区，不重置相机 */
 watch(
   () => store.taskCombatArea,
   () => {
+    /** 当前 Viewer；未就绪时等下次初始化再绘制 */
     const viewer = viewerRef.value
     if (!viewer || viewer.isDestroyed()) return
     markTaskCombatArea(viewer, store.taskCombatArea)
@@ -747,6 +806,7 @@ watch(
   { deep: true }
 )
 
+/** 播放头或任务时段变化后，把 Cesium 时钟对齐到父组件时刻 */
 watch(
   () => [props.currentTimeMs, props.taskStartMs, props.taskEndMs] as const,
   () => {
@@ -755,6 +815,7 @@ watch(
   }
 )
 
+/** 选中目标、详情文案或播放头变化后，重新挂上浮层跟随 */
 watch(
   () =>
     [
@@ -774,6 +835,7 @@ watch(
   { immediate: true },
 )
 
+/** 卸载时移除浮层跟随、战场名称、尺寸监听，并销毁 Viewer */
 onBeforeUnmount(() => {
   detailLabelPostRenderRemover?.()
   detailLabelPostRenderRemover = null

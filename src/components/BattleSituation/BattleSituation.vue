@@ -160,12 +160,14 @@ const store = useLayoutStore()
 /** 卫星档案弹窗 */
 useSatelliteProfileDialog()
 
-/** 左右面板及时间轴折叠状态 */
+/** 左侧控制面板是否收起 */
 const isLeftCollapsed = ref(false)
+/** 右侧分析面板是否收起 */
 const isRightCollapsed = ref(false)
+/** 底部任务时间轴是否收起 */
 const isTimelineCollapsed = ref(false)
 
-/** 当前选中的卫星 NORAD（仅用于右侧面板高亮） */
+/** 当前选中卫星 NORAD；同时驱动地球高亮、顶部选中条和右侧面板 */
 const selectedNorad = ref<number | null>(null)
 /**
  * 地图黄色高亮的系列。仅在用户点击系列后写入，且不显示名称/系列/类型/用途标签。
@@ -250,6 +252,7 @@ const algorithmComplete = computed(() => store.isTaskAlgorithmComplete(store.act
 
 /** 当前任务时间范围 */
 const taskTimeRange = computed(() => {
+  /** 当前激活任务；缺少起止时间时不渲染时间轴 */
   const task = store.activedTask
   if (!task?.beginDate || !task?.endDate) return null
   return { start: task.beginDate, end: task.endDate }
@@ -293,6 +296,7 @@ const {
 /** 已提示过的卫星 TLE 校验错误签名，避免 watch 重复弹窗 */
 let lastGlobeSatelliteValidationKey = ''
 
+/** 任务分析卫星 TLE/名称校验失败时弹出错误，同一批错误只提示一次 */
 watch(
   () =>
     [
@@ -302,6 +306,7 @@ watch(
       globeSatellitesBuild.value.errors.map((err) => err.message).join('\n'),
     ] as const,
   ([taskId, complete, loading, errorKey]) => {
+    /** 无任务、算法未完成、仍在加载或没有校验错误时不弹窗 */
     if (!taskId || !complete || loading || !errorKey) return
     if (errorKey === lastGlobeSatelliteValidationKey) return
     lastGlobeSatelliteValidationKey = errorKey
@@ -311,19 +316,27 @@ watch(
   },
 )
 
-/** 地球组件引用 */
+/**
+ * 地球组件实例。
+ * 父组件通过它恢复战场俯视，以及把相机飞到某一卫星系列。
+ */
 const globeRef = ref<{
+  /** 相机回到战场初始俯视 */
   restoreOverviewView: () => void
+  /** 飞到指定系列全部在轨卫星的包围球；系列为空时不飞行 */
   flyToSatelliteSeries?: (series: string | null) => void
 } | null>(null)
 
 /** 当前选中卫星名称 */
 const selectedSatelliteName = computed(() => {
   if (!selectedNorad.value) return ''
+  /** 分析结果中的展示名，优先于地球列表和矩阵名 */
   const meta = resolveSatelliteDisplayMetaFromAnalysis(taskAnalysisData.value, selectedNorad.value)
   if (meta?.name) return meta.name
+  /** 地球渲染列表中的名称 */
   const fromGlobe = globeSatellites.value.find((sat) => sat.norad === selectedNorad.value)
   if (fromGlobe?.name) return fromGlobe.name
+  /** 矩阵初始列表中的名称；都没有时用 NORAD 占位 */
   const fromMatrix = matrixData.value?.initMatrixList?.find((sat) => sat.norad === selectedNorad.value)
   return fromMatrix?.name || `Sat-${selectedNorad.value}`
 })
@@ -331,8 +344,10 @@ const selectedSatelliteName = computed(() => {
 /** 选中卫星的类型、用途等单行摘要（地球顶部条） */
 const selectedSatelliteMetaInline = computed(() => {
   if (!selectedNorad.value) return ''
+  /** 地球列表与分析结果，分析结果优先 */
   const fromGlobe = globeSatellites.value.find((sat) => sat.norad === selectedNorad.value)
   const fromAnalysis = resolveSatelliteDisplayMetaFromAnalysis(taskAnalysisData.value, selectedNorad.value)
+  /** 系列、系统类型、用途，拼成顶部条的一行摘要 */
   const series = fromAnalysis?.series || fromGlobe?.series || ''
   const sysType = fromAnalysis?.sysType || fromGlobe?.sysType || ''
   const usage = fromAnalysis?.usage || fromGlobe?.usage || ''
@@ -343,6 +358,7 @@ const selectedSatelliteMetaInline = computed(() => {
  * 开始选中卫星 Cesium 推演（暂停底部时间轴播放）。
  */
 const handleStartSatelliteDeduction = () => {
+  /** 没有选中星时不启动推演 */
   const norad = selectedNorad.value
   if (!norad) return
   stopTimelinePlayback()
@@ -357,6 +373,7 @@ const handleStopSatelliteDeduction = () => {
 /** 当前选中武器名称 */
 const selectedWeaponName = computed(() => {
   if (!selectedWeaponId.value) return ''
+  /** 地球武器列表中的名称；列表尚未包含该 ID 时回退显示 ID */
   const fromGlobe = globeWeapons.value.find((weapon) => weapon.id === selectedWeaponId.value)
   return fromGlobe?.name || selectedWeaponId.value
 })
@@ -364,8 +381,10 @@ const selectedWeaponName = computed(() => {
 /** 当前选中地面目标名称 */
 const selectedGroundTargetName = computed(() => {
   if (!selectedGroundTargetKey.value) return ''
+  /** 从 receive: / station: 键中拆出类型与资源 ID */
   const parsed = parseGroundTargetKey(selectedGroundTargetKey.value)
   if (!parsed) return selectedGroundTargetKey.value
+  /** 地球地面目标列表中的展示名 */
   const fromGlobe = globeGroundTargets.value.find(
     (target) => target.kind === parsed.kind && target.id === parsed.id
   )
@@ -374,6 +393,7 @@ const selectedGroundTargetName = computed(() => {
 
 /** 地图顶部选中条标签（接收站/数据中心） */
 const selectedGroundTargetBarLabel = computed(() => {
+  /** 数据中心与接收站使用不同的顶部条文案 */
   const parsed = parseGroundTargetKey(selectedGroundTargetKey.value)
   if (parsed?.kind === 'station') return '选中数据中心'
   return '选中接收站'
@@ -397,6 +417,7 @@ const hasGlobeSelection = (): boolean =>
  */
 const parseTaskTimeMs = (value?: string): number => {
   if (!value) return 0
+  /** 把 `YYYY-MM-DD` 换成斜杠，避免部分环境把连字符日期解析成 Invalid Date */
   const ts = new Date(value.replace(/-/g, '/')).getTime()
   return Number.isFinite(ts) ? ts : 0
 }
@@ -426,6 +447,7 @@ const stopTimelinePlayback = () => {
  * 启动时间轴播放循环，并将地球相机恢复到战场初始俯视视角。
  */
 const startTimelinePlayback = () => {
+  /** 任务起止毫秒；无效区间不启动播放 */
   const start = taskStartMs.value
   const end = taskEndMs.value
   if (!start || !end || end <= start) return
@@ -439,11 +461,18 @@ const startTimelinePlayback = () => {
   isTimelinePlaying.value = true
   lastPlaybackFrameMs = performance.now()
 
+  /**
+   * 按墙钟间隔和倍速推进仿真时刻。
+   *
+   * @param now `requestAnimationFrame` 传入的墙钟毫秒
+   */
   const tick = (now: number) => {
     if (!isTimelinePlaying.value) return
 
+    /** 距上一帧的墙钟毫秒，乘倍速后加到仿真时刻上 */
     const delta = now - lastPlaybackFrameMs
     lastPlaybackFrameMs = now
+    /** 下一帧仿真时刻；到达任务结束即停止 */
     const next = currentTimeMs.value + delta * playbackSpeed.value
 
     if (next >= end) {
@@ -483,12 +512,14 @@ const handlePlaybackSpeedChange = (speed: number) => {
  * 任务算法与态势数据就绪后，以 10 倍速自动播放 Cesium 时间轴（每任务仅一次，重算或换任务后重置）。
  */
 const tryStartAutoTimelinePlayback = () => {
+  /** 当前任务；无任务、算法未完成或本任务已自动播过则跳过 */
   const taskId = store.activedTask?.id
   if (!taskId || !algorithmComplete.value) return
   if (autoTimelinePlaybackTaskId === taskId) return
   if (taskAnalysisLoading.value) return
   if (hasGlobeSelection()) return
 
+  /** 至少有分析数据、卫星、武器、地面目标或矩阵之一，才自动开播 */
   const hasGlobeData =
     Boolean(taskAnalysisData.value) ||
     globeSatellites.value.length > 0 ||
@@ -497,6 +528,7 @@ const tryStartAutoTimelinePlayback = () => {
     Boolean(matrixData.value)
   if (!hasGlobeData) return
 
+  /** 任务起止必须构成正时长区间 */
   const start = taskStartMs.value
   const end = taskEndMs.value
   if (!start || !end || end <= start) return
@@ -528,9 +560,8 @@ const handleSelectionPlayback = (hadSelection: boolean, hasNewSelection: boolean
 }
 
 /**
- * 选中/取消选中卫星（仅同步面板状态）。
- *
- * @param norad 卫星 NORAD；null 表示取消
+ * 清空地球 HTML 详情浮层的文案和 Grid 视图。
+ * 切换选中目标或取消选中时调用，避免上一目标的 Label 残留。
  */
 const clearGlobeResourceDetail = () => {
   selectedResourceDetailText.value = null
@@ -560,8 +591,10 @@ const buildGlobeResourceDetailContext = () => ({
  * @param request 资源类型与标识
  */
 const applyGlobeResourceDetail = (request: GlobeResourceDetailRequest) => {
+  /** 地球列表、库记录和当前播放头轨道指标 */
   const ctx = buildGlobeResourceDetailContext()
   if (request.kind === 'satellite') {
+    /** 地球上的目标卫星；不在列表中则清空浮层，不使用矩阵坐标兜底 */
     const sat = ctx.satellites.find((item) => item.norad === request.norad)
     if (!sat) {
       selectedResourceDetailText.value = null
@@ -570,6 +603,7 @@ const applyGlobeResourceDetail = (request: GlobeResourceDetailRequest) => {
       selectedWeaponDetailView.value = null
       return
     }
+    /** 卫星 Grid 视图；指标尚未预计算完成时退回纯文本行 */
     const viewModel = buildSatelliteGlobeDetailViewModel(sat, ctx.satelliteLabelMetrics)
     selectedSatelliteDetailView.value = viewModel
     selectedGroundDetailView.value = null
@@ -582,6 +616,7 @@ const applyGlobeResourceDetail = (request: GlobeResourceDetailRequest) => {
   if (request.kind === 'weapon') {
     selectedSatelliteDetailView.value = null
     selectedGroundDetailView.value = null
+    /** 地球坐标记录；库记录用于补齐左侧面板已有、地球列表没有的字段 */
     const fromGlobe = ctx.weapons.find((item) => item.id === request.weaponId)
     const fallback = request.weaponFallback ?? ctx.weaponRecords.get(request.weaponId) ?? null
     if (!fromGlobe && !fallback) {
@@ -589,6 +624,7 @@ const applyGlobeResourceDetail = (request: GlobeResourceDetailRequest) => {
       selectedWeaponDetailView.value = null
       return
     }
+    /** 武器 Grid 视图，同时生成浮层纯文本 */
     const weaponView = buildWeaponGlobeDetailViewModel(fromGlobe ?? null, fallback)
     selectedWeaponDetailView.value = weaponView
     selectedResourceDetailText.value = formatResourceGridDetailTooltipText(weaponView)
@@ -597,12 +633,14 @@ const applyGlobeResourceDetail = (request: GlobeResourceDetailRequest) => {
   if (request.kind === 'ground') {
     selectedSatelliteDetailView.value = null
     selectedWeaponDetailView.value = null
+    /** 地面目标键解析结果；格式非法时清空浮层 */
     const parsed = parseGroundTargetKey(request.targetKey)
     if (!parsed) {
       selectedResourceDetailText.value = null
       selectedGroundDetailView.value = null
       return
     }
+    /** 地球上的地面目标；库记录补齐右侧面板点击时缺失的字段 */
     const fromGlobe = ctx.groundTargets.find(
       (target) => target.kind === parsed.kind && target.id === parsed.id,
     )
@@ -613,6 +651,7 @@ const applyGlobeResourceDetail = (request: GlobeResourceDetailRequest) => {
       selectedGroundDetailView.value = null
       return
     }
+    /** 接收站或数据中心的 Grid 视图 */
     const groundView = buildGroundStationGlobeDetailViewModel(
       parsed.kind,
       fromGlobe ?? null,
@@ -630,6 +669,7 @@ const applyGlobeResourceDetail = (request: GlobeResourceDetailRequest) => {
 
 /** 播放头或预计算完成后，刷新当前选中卫星的 Label（仅查表，不传播 TLE） */
 const refreshSelectedSatelliteGlobeDetail = () => {
+  /** 当前选中星；已改选武器或地面目标时不覆盖它们的浮层 */
   const norad = selectedNorad.value
   if (norad == null || selectedWeaponId.value || selectedGroundTargetKey.value) return
   applyGlobeResourceDetail({ kind: 'satellite', norad })
@@ -637,6 +677,7 @@ const refreshSelectedSatelliteGlobeDetail = () => {
 
 /** 调度选中卫星的关键节点指标预计算 */
 const scheduleSelectedSatelliteLabelMetrics = () => {
+  /** 要预计算的 NORAD；返回时若用户已换星则丢弃这次刷新 */
   const norad = selectedNorad.value
   if (norad == null) return
   void schedulePrecomputeForNorad(norad, currentTimeMs.value).then(() => {
@@ -661,8 +702,10 @@ watch([weaponRecordById, groundStationRecordById], () => {
  * @param series 系列名
  */
 const handleFocusTaskSeries = (series: string) => {
+  /** 去掉首尾空白后的系列名 */
   const trimmed = series.trim()
   if (!trimmed) return
+  /** 地球上属于该系列的卫星；一颗都没有则不能高亮或飞行 */
   const inSeries = globeSatellites.value.filter((sat) => sat.series === trimmed)
   if (!inSeries.length) {
     ElMessage.warning(`地图上暂无系列「${trimmed}」的卫星，请等待任务算法完成并拉取分析结果`)
@@ -686,6 +729,7 @@ const handleFocusTaskSeries = (series: string) => {
  * @param payload 资源类型、候选项及已加载的接口记录
  */
 const handleFocusResourceDetail = (payload: TaskPanelResourceDetailPayload) => {
+  /** 资源种类、候选项，以及面板已加载的武器/地面站库记录 */
   const { kind, item, weapon: weaponRecord, groundStation } = payload
   clearGlobeResourceDetail()
 
@@ -695,11 +739,13 @@ const handleFocusResourceDetail = (payload: TaskPanelResourceDetailPayload) => {
   }
 
   if (kind === 'satellite') {
+    /** 面板传入的 NORAD；非有限数不能定位 */
     const norad = payload.norad
     if (norad == null || !Number.isFinite(norad)) {
       ElMessage.warning('卫星 NORAD 无效，无法定位')
       return
     }
+    /** 地球渲染列表中的卫星；分析未完成时列表里没有，不能飞过去 */
     const onGlobe = globeSatellites.value.find((sat) => sat.norad === norad)
     if (!onGlobe) {
       ElMessage.warning(
@@ -712,6 +758,7 @@ const handleFocusResourceDetail = (payload: TaskPanelResourceDetailPayload) => {
   }
 
   if (kind === 'weapon') {
+    /** 地球上的武器点；没有坐标则无法定位 */
     const fromGlobe = globeWeapons.value.find((w) => w.id === item.id)
     if (!fromGlobe) {
       ElMessage.warning(
@@ -724,7 +771,9 @@ const handleFocusResourceDetail = (payload: TaskPanelResourceDetailPayload) => {
   }
 
   if (kind === 'receive' || kind === 'center') {
+    /** 面板的 center 对应地球上的 station 键 */
     const targetKind = kind === 'center' ? 'station' : 'receive'
+    /** 地球上的接收站或数据中心 */
     const fromGlobe = globeGroundTargets.value.find((t) => t.kind === targetKind && t.id === item.id)
     if (!fromGlobe) {
       ElMessage.warning(
@@ -738,11 +787,20 @@ const handleFocusResourceDetail = (payload: TaskPanelResourceDetailPayload) => {
   }
 }
 
+/**
+ * 选中或取消选中卫星，并同步 Store 与地球详情浮层。
+ * 再次点中同一颗星时先清空再写回，迫使地球的选中监听重新飞相机。
+ *
+ * @param norad 卫星 NORAD；null 表示取消选中
+ * @param options 可选的详情请求；缺省时按该 NORAD 生成卫星浮层
+ */
 const handleSelectSatellite = async (
   norad: number | null,
   options?: { detailRequest?: GlobeResourceDetailRequest },
 ) => {
+  /** 写入前的选中星，用于判断是重复点击还是换星 */
   const previousNorad = selectedNorad.value
+  /** 选中前地图上是否已有卫星、武器或地面目标，用于决定是否暂停时间轴 */
   const hadSelection = hasGlobeSelection()
 
   if (norad != null && previousNorad === norad) {
@@ -788,6 +846,7 @@ const handleSelectWeapon = (
 ) => {
   if (!weaponId) return
 
+  /** 选中前是否已有地图目标，用于暂停正在播放的时间轴 */
   const hadSelection = hasGlobeSelection()
   if (selectedWeaponId.value === weaponId) return
 
@@ -814,6 +873,7 @@ const handleSelectGroundTarget = (
 ) => {
   if (!targetKey) return
 
+  /** 选中前是否已有地图目标，用于暂停正在播放的时间轴 */
   const hadSelection = hasGlobeSelection()
   if (selectedGroundTargetKey.value === targetKey) return
 
@@ -893,6 +953,7 @@ let taskAnalysisLoadToken = 0
  * 按当前任务算法进度拉取分析结果。
  */
 const loadTaskAnalysis = async () => {
+  /** 本次请求代际；返回时若已发起更新的请求则丢弃结果 */
   const loadToken = ++taskAnalysisLoadToken
   try {
     await store.fetchTaskAnalysis()
@@ -906,6 +967,7 @@ const loadTaskAnalysis = async () => {
  * 按当前系列筛选范围加载矩阵数据。
  */
 const loadMatrixForCurrentScope = async () => {
+  /** 当前任务；没有任务时清空矩阵和地图选中 */
   const taskId = store.activedTask?.id
   if (!taskId) {
     store.clearMatrixData()
@@ -916,8 +978,10 @@ const loadMatrixForCurrentScope = async () => {
     return
   }
 
+  /** 本次矩阵请求代际，换系列或换任务后旧响应不再写选中态 */
   const loadToken = ++matrixLoadToken
   try {
+    /** 按当前系列、类型和用途拉到的矩阵；失败时为假值 */
     const data = await store.fetchMatrixForCurrentScope()
     if (loadToken !== matrixLoadToken) return
     selectedNorad.value = null
@@ -946,6 +1010,7 @@ watch(
   { immediate: true }
 )
 
+/** 换星时清掉上一次推演，并为新选中星调度 Label 指标预计算 */
 watch(selectedNorad, (norad, prevNorad) => {
   if (norad !== prevNorad) {
     resetDeductionUi()
@@ -955,10 +1020,12 @@ watch(selectedNorad, (norad, prevNorad) => {
   }
 })
 
+/** 播放头移动后，用已预计算的采样刷新选中卫星浮层，不在这里传播 TLE */
 watch(currentTimeMs, () => {
   refreshSelectedSatelliteGlobeDetail()
 })
 
+/** 分析数据、卫星数量或任务时段变化后，重新预计算当前选中星的 Label 指标 */
 watch(
   () =>
     [
@@ -972,6 +1039,7 @@ watch(
   },
 )
 
+/** 离开页面时停掉时间轴和推演，避免卸载后仍推进时钟 */
 onBeforeUnmount(() => {
   stopTimelinePlayback()
   resetDeductionUi()
@@ -981,6 +1049,7 @@ onBeforeUnmount(() => {
 watch(
   () => store.taskSelectedSeriesList,
   (options) => {
+    /** 装配系列变化后，保留仍在列表中的分析系列，否则回到第一项 */
     store.resolveSelectedSatSeriesForTaskOptions(options)
   },
   { immediate: true },
@@ -993,6 +1062,7 @@ watch(
 watch(
   () => store.selectedSatSeries,
   (series) => {
+    /** Store 系列已不是用户点过的地图高亮系列时，去掉黄点 */
     if (globeSeriesHighlight.value && globeSeriesHighlight.value !== series) {
       globeSeriesHighlight.value = null
     }
@@ -1008,6 +1078,7 @@ watch(
   { immediate: true }
 )
 
+/** 切换任务时作废自动播放标记和 Label 缓存，并重新加载矩阵与分析结果 */
 watch(
   () => store.activedTask?.id,
   (taskId, prevTaskId) => {
@@ -1048,8 +1119,10 @@ watch(
 /** 算法进度完成后自动拉取分析结果 */
 watch(
   () => {
+    /** 当前任务 ID；无任务时不监听进度 */
     const taskId = store.activedTask?.id
     if (!taskId) return ''
+    /** 内存进度优先，否则用任务上自带的算法进度 */
     const progress = taskProgressMap[taskId] ?? store.activedTask?.algorithmProgressEntity
     return `${taskId}:${progress?.totalStatus}:${progress?.transitStatus}:${progress?.threatAndStrikeStatus}`
   },
@@ -1059,6 +1132,9 @@ watch(
   }
 )
 
+/**
+ * 从缓存页回到态势页时，对齐 Store 里的选中星，并补拉缺失的矩阵或分析结果。
+ */
 onActivated(() => {
   if (store.selectedAnalysisNorad && selectedNorad.value !== store.selectedAnalysisNorad) {
     selectedNorad.value = store.selectedAnalysisNorad

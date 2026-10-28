@@ -1,101 +1,183 @@
 import { requestAPI } from '@/utils/tools/request'
 import type { AxiosResponseType } from '@/types/http'
 
+/** 菜单节点。树形接口里 children 挂子菜单。 */
 export interface MenuItem {
+  /** 菜单 ID */
   id: number
+  /** 菜单名称 */
   menuName: string
+  /** 路由路径 */
   path: string
+  /** 前端组件路径 */
   component: string
+  /** 菜单图标 */
   icon: string
+  /** 菜单类型 */
   type: number
+  /** 父级菜单 ID */
   parentId: number
+  /** 排序号 */
   sort: number
+  /** 权限标识 */
   permission: string
+  /** 子菜单 */
   children: MenuItem[]
 }
+/** 角色详情。 */
 export interface RoleInfo {
+  /** 角色 ID */
   id: number
+  /** 角色名称 */
   roleName: string
+  /** 角色编码 */
   roleCode: string
+  /** 角色说明 */
   description: string
+  /** 角色状态，0 停用、1 启用 */
   status: number
+  /** 创建时间，按年、月、日、时、分、秒等分量组成的数组 */
   createTime: number[]
+  /** 更新时间，按年、月、日、时、分、秒等分量组成的数组 */
   updateTime: number[]
+  /** 逻辑删除标记，0 表示未删除 */
   deleted: number
 }
+/** 用户详情。createTime、updateTime 为时间分量数组。 */
 export interface UserInfo {
+  /** 用户 ID */
   id: number
+  /** 用户名 */
   username: string
+  /** 登录密码 */
   password: string
+  /** 昵称 */
   nickname: string
+  /** 邮箱 */
   email: string
+  /** 手机号 */
   phone: string
+  /** 账号状态，0 停用、1 启用 */
   status: number
+  /** 创建时间，按年、月、日、时、分、秒等分量组成的数组 */
   createTime: number[]
+  /** 更新时间，按年、月、日、时、分、秒等分量组成的数组 */
   updateTime: number[]
+  /** 逻辑删除标记，0 表示未删除 */
   deleted: number
 }
 
+/** 权限菜单。结构与菜单接近，并带状态和审计字段。 */
 export interface PermissionInfo {
+  /** 权限菜单 ID */
   id: number
+  /** 菜单名称 */
   menuName: string
+  /** 路由路径 */
   path: string
+  /** 前端组件路径 */
   component: string
+  /** 菜单图标 */
   icon: string
+  /** 菜单类型 */
   type: number
+  /** 父级菜单 ID */
   parentId: number
+  /** 排序号 */
   sort: number
+  /** 权限标识 */
   permission: string
+  /** 权限状态，0 停用、1 启用 */
   status: number
+  /** 创建时间，按年、月、日、时、分、秒等分量组成的数组 */
   createTime: number[]
+  /** 更新时间，按年、月、日、时、分、秒等分量组成的数组 */
   updateTime: number[]
+  /** 逻辑删除标记，0 表示未删除 */
   deleted: number
 }
+/** 登录成功后返回的用户、角色、权限、菜单和令牌。 */
 export interface LoginResponse {
+  /** 当前登录用户 */
   userInfo: UserInfo
+  /** 用户拥有的角色 */
   role: RoleInfo[]
+  /** 权限菜单列表 */
   permissions: PermissionInfo[]
+  /** 当前用户可见的菜单树 */
   menuTree: MenuItem[]
+  /** 登录令牌 */
   token: string
 }
+/** 分页列表。records 为当前页数据。 */
 interface PageListResponse<T> {
+  /** 当前页数据 */
   records: T[]
+  /** 总条数 */
   total: number
+  /** 总条数。部分分页接口用该字段返回总数 */
   totalElements?: number
+  /** 每页条数 */
   size: number
+  /** 当前页码 */
   current: number
+  /** 总页数 */
   pages: number
 }
 
+/** 用户列表中的一行，含已分配角色。 */
 export interface UserListItem {
+  /** 用户 ID */
   id: number
+  /** 用户名 */
   username: string
+  /** 昵称 */
   nickname: string
+  /** 邮箱 */
   email: string
+  /** 手机号 */
   phone: string
+  /** 账号状态，0 停用、1 启用 */
   status: number
+  /** 创建时间 */
   createTime: string
+  /** 更新时间 */
   updateTime: string
+  /** 已分配的角色 */
   roles: RoleInfo[]
 }
 
+/** 角色列表中的一行。 */
 export interface RoleListItem {
+  /** 角色 ID */
   id: number
+  /** 角色名称 */
   roleName: string
+  /** 角色编码 */
   roleCode: string
+  /** 角色说明 */
   description: string
+  /** 角色状态，0 停用、1 启用 */
   status: number
+  /** 创建时间 */
   createTime: string
+  /** 更新时间 */
   updateTime: string
+  /** 逻辑删除标记，0 表示未删除 */
   deleted: number
 }
 
+/** 创建用户的请求体。不含 id 和审计字段，密码与角色可选。 */
 export type UserUpsertPayload = Omit<UserInfo, 'id' | 'password' | 'createTime' | 'updateTime' | 'deleted'> & {
+  /** 初始密码。不传时由后端决定是否生成 */
   password?: string
+  /** 要分配的角色 ID */
   roleIds?: number[]
 }
 
+/** 创建角色的请求体。不含 id 和审计字段，可同时提交菜单。 */
 export type RoleUpsertPayload = Omit<RoleInfo, 'id' | 'createTime' | 'updateTime' | 'deleted'> & {
+  /** 要分配的菜单 ID */
   menuIds?: number[]
 }
 
@@ -232,12 +314,6 @@ export const getRoleMenus = (id: number) => {
 }
 /**
  * 为角色分配菜单
- * @param id
- * @param menuIds
- * @returns
- */
-/**
- * 为角色分配菜单
  * @param id 角色ID
  * @param menuIds 菜单 ID 数组
  */
@@ -253,6 +329,11 @@ export const getRoleById = (id: number) => {
   return requestAPI.get<AxiosResponseType<RoleInfo>>(`/api/role/${id}`)
 }
 
+/**
+ * 删除角色。
+ * @param id 角色 ID
+ * @returns 删除结果
+ */
 export const deleteRole = (id: number) => {
   return requestAPI.delete<AxiosResponseType<any>>(`/api/role/${id}`)
 }
@@ -266,6 +347,11 @@ export const getRoleList = (params?: Record<string, any>) => {
 }
 
 // ---------- menu ----------
+/**
+ * 更新菜单。
+ * @param data 菜单字段，必须包含 id
+ * @returns 更新结果
+ */
 export const updateMenu = (data: Partial<MenuItem> & { id: number }) => {
   return requestAPI.put<AxiosResponseType<any>>('/api/menu', data)
 }
