@@ -2169,12 +2169,12 @@ const formatEpoch = (epoch: string | number | undefined) => {
 </script>
 <style lang="scss" scoped>
 .satellite-profile-dialog {
-  :deep(.atlas-app-dialog__body) {
+  :deep(.el-dialog__body) {
     height: 100%;
     padding: 0;
   }
 
-  :deep(.atlas-app-dialog) {
+  :deep(.el-dialog) {
     margin: 0;
     height: 100%;
   }
@@ -2373,7 +2373,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             display: flex;
             padding: 5px;
             flex-wrap: wrap;
-            .atlas-app-button {
+            .el-button {
               &.active {
                 background: var(--sp-accent);
               }
@@ -2906,7 +2906,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             color: var(--sp-text-main);
           }
 
-          :deep(.atlas-app-table) {
+          :deep(.el-table) {
             --el-table-header-bg-color: var(--surface-bg-color);
             --el-table-tr-bg-color: var(--app-bg-color);
             --el-table-row-hover-bg-color: var(--sp-accent-soft-bg);
@@ -2917,22 +2917,22 @@ const formatEpoch = (epoch: string | number | undefined) => {
             overflow: hidden;
           }
 
-          :deep(.atlas-app-table th.el-table__cell) {
+          :deep(.el-table th.el-table__cell) {
             color: var(--sp-accent-strong);
             font-weight: var(--font-weight-bold);
           }
 
-          :deep(.atlas-app-table td.el-table__cell),
-          :deep(.atlas-app-table__empty-block) {
+          :deep(.el-table td.el-table__cell),
+          :deep(.el-table__empty-block) {
             background: var(--app-bg-color);
             color: var(--sp-text-main);
           }
 
-          :deep(.atlas-app-table__inner-wrapper::before) {
+          :deep(.el-table__inner-wrapper::before) {
             background-color: var(--sp-accent-soft-line);
           }
 
-          :deep(.atlas-app-tag) {
+          :deep(.el-tag) {
             border: none;
           }
         }
@@ -2945,7 +2945,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
           padding: 5px;
           min-height: 40px;
           .tab-1__type__btns {
-            .atlas-app-button {
+            .el-button {
               &.active {
                 background: var(--sp-accent);
               }
@@ -3165,7 +3165,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
           padding-top: 4px;
         }
 
-        :deep(.atlas-app-empty) {
+        :deep(.el-empty) {
           height: 100%;
         }
       }

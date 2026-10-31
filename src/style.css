@@ -42,8 +42,8 @@ body {
   text-align: center;
   overflow: hidden;
 }
-.atlas-app-select,
-.atlas-app-input {
+.el-select,
+.el-input {
   width: 100% !important;
   min-width: 150px;
 }

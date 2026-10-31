@@ -2497,11 +2497,11 @@ defineExpose({
   white-space: nowrap;
 }
 
-.history-plan-dialog :deep(.atlas-app-dialog) {
+.history-plan-dialog :deep(.el-dialog) {
   overflow: hidden;
 }
 
-.history-plan-dialog :deep(.atlas-app-dialog__body) {
+.history-plan-dialog :deep(.el-dialog__body) {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -2551,7 +2551,7 @@ defineExpose({
   word-break: break-word;
 }
 
-:deep(.atlas-app-progress-bar__outer) {
+:deep(.el-progress-bar__outer) {
   background-color: var(--swatch-rgba-116-168-225-0_14);
 }
 
@@ -2611,7 +2611,7 @@ defineExpose({
 }
 
 /* 杀伤链方案对话框样式 */
-.killchain-plan-dialog :deep(.atlas-app-dialog) {
+.killchain-plan-dialog :deep(.el-dialog) {
   background: var(--card-bg-strong);
   border: 1px solid var(--card-border-strong);
   box-shadow: 0 20px 50px var(--mask-color);
@@ -2619,19 +2619,19 @@ defineExpose({
   overflow: hidden;
 }
 
-.killchain-plan-dialog :deep(.atlas-app-dialog__header) {
+.killchain-plan-dialog :deep(.el-dialog__header) {
   border-bottom: 1px solid var(--border-color);
   padding: 20px 24px;
 }
 
-.killchain-plan-dialog :deep(.atlas-app-dialog__title) {
+.killchain-plan-dialog :deep(.el-dialog__title) {
   color: var(--text-color-primary);
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.05em;
 }
 
-.killchain-plan-dialog :deep(.atlas-app-dialog__body) {
+.killchain-plan-dialog :deep(.el-dialog__body) {
   padding: 24px;
   overflow-y: auto;
 }
@@ -2642,7 +2642,7 @@ defineExpose({
   justify-content: center;
 }
 
-.killchain-plan-dialog__radio-group :deep(.atlas-app-radio-button__inner) {
+.killchain-plan-dialog__radio-group :deep(.el-radio-button__inner) {
   background: var(--swatch-rgba-15-42-67-0_88);
   border-color: var(--swatch-rgba-116-168-225-0_28);
   color: var(--text-color-secondary);
@@ -2650,7 +2650,7 @@ defineExpose({
   padding: 10px 24px;
 }
 
-.killchain-plan-dialog__radio-group :deep(.atlas-app-radio-button__original-radio:checked + .el-radio-button__inner) {
+.killchain-plan-dialog__radio-group :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
   background: linear-gradient(180deg, var(--swatch-rgba-26-93-142-0_98), var(--swatch-rgba-14-58-92-0_96));
   border-color: var(--swatch-rgba-98-213-255-0_72);
   color: var(--text-color-strong);

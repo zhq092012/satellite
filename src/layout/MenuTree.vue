@@ -168,8 +168,8 @@ const getIcon = (item: RouteRecordRaw): string => {
     height: 60px;
   }
 
-  :deep(.atlas-app-menu-item),
-  :deep(.atlas-app-sub-menu__title) {
+  :deep(.el-menu-item),
+  :deep(.el-sub-menu__title) {
     height: 60px !important;
     line-height: 60px !important;
     display: flex !important;
@@ -206,8 +206,8 @@ const getIcon = (item: RouteRecordRaw): string => {
     }
   }
 
-  :deep(.atlas-app-menu-item.is-active),
-  :deep(.atlas-app-sub-menu.is-active .atlas-app-sub-menu__title) {
+  :deep(.el-menu-item.is-active),
+  :deep(.el-sub-menu.is-active .el-sub-menu__title) {
     color: var(--accent-cyan) !important;
     background: linear-gradient(180deg, rgba(var(--accent-cyan-rgb), 0.2) 0%, rgba(var(--accent-cyan-rgb), 0.05) 100%) !important;
     border-top: none !important;
@@ -220,15 +220,15 @@ const getIcon = (item: RouteRecordRaw): string => {
     }
   }
 
-  :deep(.atlas-app-sub-menu .el-sub-menu__icon-arrow) {
+  :deep(.el-sub-menu .el-sub-menu__icon-arrow) {
     color: var(--text-color-muted);
     margin-left: 6px;
   }
 }
 
 /* 二级下拉菜单会被 teleport 到 body，无法通过祖先选择器命中，需用 :global 单独定义 */
-:global(.atlas-app-menu--popup-container .atlas-app-menu-item),
-:global(.atlas-app-menu--popup-container .atlas-app-sub-menu__title) {
+:global(.el-menu--popup-container .el-menu-item),
+:global(.el-menu--popup-container .el-sub-menu__title) {
   display: flex !important;
   justify-content: center !important;
   text-align: center !important;

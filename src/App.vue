@@ -19,7 +19,7 @@ onMounted(() => {})
 </script>
 
 <template>
-  <el-config-provider :locale="zhCn" namespace="atlas-app">
+  <el-config-provider :locale="zhCn" namespace="el">
     <router-view></router-view>
     <SatelliteProfile v-model="satelliteProfileVisible" :norad="satelliteProfileNorad" />
   </el-config-provider>

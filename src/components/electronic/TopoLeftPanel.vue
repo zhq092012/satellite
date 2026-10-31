@@ -459,7 +459,7 @@ watch(
   margin-bottom: 10px;
   flex-shrink: 0;
 
-  :deep(.atlas-app-input__wrapper) {
+  :deep(.el-input__wrapper) {
     background-color: var(--surface-slate);
     box-shadow: 0 0 0 1px var(--text-color-disabled) inset;
     border-radius: 4px;

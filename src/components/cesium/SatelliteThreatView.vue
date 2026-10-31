@@ -2354,7 +2354,7 @@ function dispose() {
 }
 </script>
 <style lang="scss" scoped>
-:deep(.atlas-app-switch) {
+:deep(.el-switch) {
   height: 24px;
 }
 
@@ -2658,8 +2658,8 @@ function dispose() {
           letter-spacing: 0.3px;
         }
 
-        :deep(.atlas-app-input__wrapper),
-        :deep(.atlas-app-select__wrapper) {
+        :deep(.el-input__wrapper),
+        :deep(.el-select__wrapper) {
           background: var(--panel-bg);
           border: 1px solid rgba(var(--accent-cyan-rgb), 0.2);
           box-shadow: none !important;
@@ -2673,23 +2673,23 @@ function dispose() {
           }
         }
 
-        :deep(.atlas-app-input__inner) {
+        :deep(.el-input__inner) {
           color: var(--color-white);
         }
 
-        :deep(.atlas-app-input-number) {
+        :deep(.el-input-number) {
           background: var(--panel-bg);
           border: 1px solid rgba(var(--accent-cyan-rgb), 0.2);
           border-radius: 6px;
 
-          .atlas-app-input-number__decrease,
-          .atlas-app-input-number__increase {
+          .el-input-number__decrease,
+          .el-input-number__increase {
             background: rgba(var(--accent-cyan-rgb), 0.1);
             border-color: rgba(var(--accent-cyan-rgb), 0.2);
             color: var(--accent-cyan);
           }
 
-          .atlas-app-input__wrapper {
+          .el-input__wrapper {
             background: transparent;
             border: none;
           }
@@ -2980,14 +2980,14 @@ function dispose() {
           white-space: nowrap;
         }
 
-        :deep(.atlas-app-select),
-        :deep(.atlas-app-input) {
+        :deep(.el-select),
+        :deep(.el-input) {
           width: 100% !important;
           min-width: 150px;
         }
 
-        :deep(.atlas-app-input__wrapper),
-        :deep(.atlas-app-select__wrapper) {
+        :deep(.el-input__wrapper),
+        :deep(.el-select__wrapper) {
           background: var(--panel-bg);
           border: 1px solid rgba(var(--accent-cyan-rgb), 0.2);
           box-shadow: none !important;
@@ -3108,7 +3108,7 @@ function dispose() {
               align-items: center;
               gap: 12px;
 
-              .atlas-app-slider {
+              .el-slider {
                 flex: 1;
               }
 
@@ -3133,23 +3133,23 @@ function dispose() {
       margin-top: 10px;
       overflow: hidden;
 
-      :deep(.atlas-app-table) {
-        --atlas-app-table-border-color: rgba(var(--accent-cyan-rgb), 0.12);
-        --atlas-app-table-header-bg-color: var(--swatch-rgba-13-27-49-0_9);
-        --atlas-app-table-bg-color: transparent;
-        --atlas-app-table-tr-bg-color: transparent;
-        --atlas-app-table-row-hover-bg-color: rgba(var(--accent-cyan-rgb), 0.1);
-        --atlas-app-text-color-regular: var(--text-color-soft);
-        --atlas-app-text-color-primary: var(--color-white);
+      :deep(.el-table) {
+        --el-table-border-color: rgba(var(--accent-cyan-rgb), 0.12);
+        --el-table-header-bg-color: var(--swatch-rgba-13-27-49-0_9);
+        --el-table-bg-color: transparent;
+        --el-table-tr-bg-color: transparent;
+        --el-table-row-hover-bg-color: rgba(var(--accent-cyan-rgb), 0.1);
+        --el-text-color-regular: var(--text-color-soft);
+        --el-text-color-primary: var(--color-white);
 
-        th.atlas-app-table__cell {
+        th.el-table__cell {
           color: var(--accent-cyan);
           font-size: var(--font-size-sm);
           font-weight: var(--font-weight-bold);
           background: var(--swatch-rgba-13-27-49-0_9) !important;
         }
 
-        td.atlas-app-table__cell {
+        td.el-table__cell {
           border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.08);
           font-size: var(--font-size-sm);
         }

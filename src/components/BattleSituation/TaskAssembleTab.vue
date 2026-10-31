@@ -1214,8 +1214,8 @@ defineExpose({
   width: 160px !important;
   max-width: 160px;
 
-  :deep(.atlas-app-input__wrapper),
-  :deep(.atlas-app-select__wrapper) {
+  :deep(.el-input__wrapper),
+  :deep(.el-select__wrapper) {
     width: 160px !important;
   }
 }
@@ -1263,11 +1263,11 @@ defineExpose({
   flex-wrap: wrap;
   gap: 8px 16px;
 
-  :deep(.atlas-app-checkbox) {
+  :deep(.el-checkbox) {
     margin-right: 0;
   }
 
-  :deep(.atlas-app-checkbox__label) {
+  :deep(.el-checkbox__label) {
     color: var(--text-color-soft);
     font-size: var(--font-size-sm);
   }
@@ -1324,14 +1324,14 @@ defineExpose({
   padding: 6px 8px 8px;
   border-top: 1px solid rgba(var(--accent-cyan-rgb), 0.1);
 
-  :deep(.atlas-app-pagination__total),
-  :deep(.atlas-app-pagination button),
-  :deep(.atlas-app-pager li) {
+  :deep(.el-pagination__total),
+  :deep(.el-pagination button),
+  :deep(.el-pager li) {
     color: var(--text-color-muted);
     background: transparent;
   }
 
-  :deep(.atlas-app-pager li.is-active) {
+  :deep(.el-pager li.is-active) {
     color: var(--accent-cyan-hover);
   }
 }
@@ -1346,38 +1346,38 @@ defineExpose({
   min-height: 0;
   height: 100%;
   width: 100%;
-  --atlas-app-table-border-color: rgba(var(--accent-cyan-rgb), 0.12);
-  --atlas-app-table-header-bg-color: var(--panel-bg);
-  --atlas-app-table-bg-color: transparent;
-  --atlas-app-table-tr-bg-color: transparent;
-  --atlas-app-table-row-hover-bg-color: rgba(var(--accent-cyan-rgb), 0.1);
-  --atlas-app-text-color-regular: var(--text-color-soft);
-  --atlas-app-text-color-primary: var(--text-color-bright);
+  --el-table-border-color: rgba(var(--accent-cyan-rgb), 0.12);
+  --el-table-header-bg-color: var(--panel-bg);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(var(--accent-cyan-rgb), 0.1);
+  --el-text-color-regular: var(--text-color-soft);
+  --el-text-color-primary: var(--text-color-bright);
   background: transparent;
 
-  :deep(.atlas-app-table__inner-wrapper::before) {
+  :deep(.el-table__inner-wrapper::before) {
     display: none;
   }
 
-  :deep(.atlas-app-table),
-  :deep(.atlas-app-table__inner-wrapper) {
+  :deep(.el-table),
+  :deep(.el-table__inner-wrapper) {
     height: 100%;
   }
 
-  :deep(th.atlas-app-table__cell) {
+  :deep(th.el-table__cell) {
     color: var(--accent-cyan);
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-bold);
     background: var(--panel-bg) !important;
   }
 
-  :deep(td.atlas-app-table__cell) {
+  :deep(td.el-table__cell) {
     font-size: var(--font-size-sm);
     color: var(--text-color-soft);
     background: transparent !important;
   }
 
-  :deep(.atlas-app-table__empty-block) {
+  :deep(.el-table__empty-block) {
     background: transparent;
     color: var(--text-color-subtle);
   }
@@ -1390,39 +1390,39 @@ defineExpose({
 .full-width-number {
   width: 100%;
 
-  :deep(.atlas-app-input__wrapper) {
+  :deep(.el-input__wrapper) {
     width: 100%;
   }
 }
 </style>
 
 <style lang="scss">
-.assemble-crud-dialog-modal.atlas-app-overlay,
-.atlas-app-overlay.assemble-crud-dialog-modal {
+.assemble-crud-dialog-modal.el-overlay,
+.el-overlay.assemble-crud-dialog-modal {
   background-color: var(--swatch-rgba-2-8-18-0_72) !important;
 }
 
-.atlas-app-dialog.assemble-crud-dialog,
-.assemble-crud-dialog .atlas-app-dialog {
-  --atlas-app-dialog-bg-color: var(--swatch-0a1628);
-  --atlas-app-dialog-border-radius: 10px;
+.el-dialog.assemble-crud-dialog,
+.assemble-crud-dialog .el-dialog {
+  --el-dialog-bg-color: var(--swatch-0a1628);
+  --el-dialog-border-radius: 10px;
   border: 1px solid rgba(var(--accent-cyan-rgb), 0.22);
   background: linear-gradient(180deg, var(--swatch-rgba-10-22-40-0_98) 0%, var(--swatch-rgba-6-14-28-0_98) 100%);
   box-shadow: 0 20px 48px var(--mask-color);
 
-  .atlas-app-dialog__header {
+  .el-dialog__header {
     padding: 14px 18px 10px;
     margin-right: 0;
     border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
   }
 
-  .atlas-app-dialog__title {
+  .el-dialog__title {
     color: var(--accent-cyan-hover);
     font-size: var(--font-size-subtitle);
     font-weight: var(--font-weight-bold);
   }
 
-  .atlas-app-dialog__headerbtn .atlas-app-dialog__close {
+  .el-dialog__headerbtn .el-dialog__close {
     color: var(--color-info-soft);
 
     &:hover {
@@ -1430,28 +1430,28 @@ defineExpose({
     }
   }
 
-  .atlas-app-dialog__body {
+  .el-dialog__body {
     padding: 16px 18px 8px;
     color: var(--text-color-soft);
   }
 
-  .atlas-app-dialog__footer {
+  .el-dialog__footer {
     padding: 10px 18px 16px;
     border-top: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
   }
 
-  .atlas-app-form-item__label {
+  .el-form-item__label {
     color: var(--text-color-muted);
   }
 
-  .atlas-app-input__wrapper,
-  .atlas-app-textarea__inner {
+  .el-input__wrapper,
+  .el-textarea__inner {
     background: var(--swatch-rgba-8-20-36-0_85);
     box-shadow: 0 0 0 1px rgba(var(--accent-cyan-rgb), 0.18) inset;
   }
 
-  .atlas-app-input__inner,
-  .atlas-app-textarea__inner {
+  .el-input__inner,
+  .el-textarea__inner {
     color: var(--text-color-bright);
   }
 }

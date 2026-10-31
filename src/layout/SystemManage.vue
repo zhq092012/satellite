@@ -65,7 +65,7 @@ const handleTabChange = (tabName: string) => {
   border: 1px solid var(--surface-border-color);
   color: var(--text-color-strong);
 
-  :deep(.atlas-app-tabs__item) {
+  :deep(.el-tabs__item) {
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-semibold);
   }

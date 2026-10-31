@@ -1,5 +1,5 @@
 <template>
-  <el-container class="atlas-app-layout-container">
+  <el-container class="el-layout-container">
     <el-container>
       <!-- 头部 -->
       <el-header class="header-wrapper">
@@ -428,7 +428,7 @@ onMounted(async () => {
 </script>
 
 <style lang="scss" scoped>
-.atlas-app-layout-container {
+.el-layout-container {
   .header-wrapper {
     display: flex;
     align-items: stretch;
@@ -582,7 +582,7 @@ onMounted(async () => {
         }
       }
 
-      :deep(.atlas-app-dropdown),
+      :deep(.el-dropdown),
       :deep(.el-dropdown) {
         display: flex;
         align-items: stretch;
@@ -669,13 +669,13 @@ onMounted(async () => {
   padding: 4px 0 !important;
 
   .el-popper__arrow::before,
-  .atlas-app-popper__arrow::before {
+  .el-popper__arrow::before {
     background: var(--swatch-rgba-8-24-48-0_98) !important;
     border: 1px solid rgba(var(--accent-cyan-rgb), 0.3) !important;
   }
 
   .el-dropdown-menu,
-  .atlas-app-dropdown-menu {
+  .el-dropdown-menu {
     background: transparent !important;
     padding: 4px 6px !important;
     border: none !important;
@@ -694,7 +694,7 @@ onMounted(async () => {
     transition: all 0.2s ease;
 
     .el-icon,
-    .atlas-app-icon {
+    .el-icon {
       font-size: var(--font-size-subtitle);
       color: var(--accent-cyan);
       transition: color 0.2s ease;
@@ -707,12 +707,12 @@ onMounted(async () => {
       box-shadow: 0 0 10px rgba(var(--accent-cyan-rgb), 0.2);
 
       .el-icon,
-      .atlas-app-icon {
+      .el-icon {
         color: var(--accent-cyan);
       }
     }
 
-    &.atlas-app-dropdown-menu__item--divided,
+    &.el-dropdown-menu__item--divided,
     &.el-dropdown-menu__item--divided {
       margin-top: 4px;
       border-top: 1px solid rgba(var(--accent-cyan-rgb), 0.15) !important;
@@ -724,7 +724,7 @@ onMounted(async () => {
     color: var(--color-danger-soft) !important;
 
     .el-icon,
-    .atlas-app-icon {
+    .el-icon {
       font-size: var(--font-size-subtitle);
       color: var(--color-danger-strong);
       transition: color 0.2s ease;
@@ -737,7 +737,7 @@ onMounted(async () => {
       box-shadow: 0 0 10px var(--swatch-rgba-239-68-68-0_3);
 
       .el-icon,
-      .atlas-app-icon {
+      .el-icon {
         color: var(--color-white);
       }
     }
@@ -758,20 +758,20 @@ onMounted(async () => {
   overflow-y: auto;
 
   .el-popper__arrow::before,
-  .atlas-app-popper__arrow::before {
+  .el-popper__arrow::before {
     background: var(--swatch-rgba-8-24-48-0_98) !important;
     border: 1px solid rgba(var(--accent-cyan-rgb), 0.3) !important;
   }
 
   .el-dropdown-menu,
-  .atlas-app-dropdown-menu {
+  .el-dropdown-menu {
     background: transparent !important;
     padding: 4px 6px !important;
     border: none !important;
   }
 
   .el-dropdown-menu__item,
-  .atlas-app-dropdown-menu__item {
+  .el-dropdown-menu__item {
     color: var(--swatch-dbeafe) !important;
     border-radius: 4px;
     margin: 2px 0;

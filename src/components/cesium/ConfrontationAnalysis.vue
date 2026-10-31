@@ -1559,7 +1559,7 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
   }
 
   #cesiumContainer {
-    :deep(.atlas-app-splitter-bar__dragger::before, .atlas-app-splitter-bar__dragger::after) {
+    :deep(.el-splitter-bar__dragger::before, .el-splitter-bar__dragger::after) {
       background-color: transparent;
     }
 
@@ -1691,7 +1691,7 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
         background: var(--swatch-rgba-247-94-97-0_15);
       }
 
-      :deep(.atlas-app-tree) {
+      :deep(.el-tree) {
         background-color: transparent;
       }
     }

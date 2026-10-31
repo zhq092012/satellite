@@ -2572,7 +2572,7 @@ watch(playheadLeftPx, () => {
           width: 92px;
           flex: none;
 
-          :deep(.atlas-app-select__wrapper) {
+          :deep(.el-select__wrapper) {
             min-width: 92px;
             width: 92px;
           }
@@ -2664,7 +2664,7 @@ watch(playheadLeftPx, () => {
       gap: 12px;
 
       .sidebar-search-box {
-        :deep(.atlas-app-input__wrapper) {
+        :deep(.el-input__wrapper) {
           background-color: var(--surface-slate);
           box-shadow: 0 0 0 1px var(--text-color-disabled) inset;
 

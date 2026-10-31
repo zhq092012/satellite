@@ -1796,7 +1796,7 @@ onUnmounted(() => {
   justify-self: start;
 }
 
-.combat-area-enable :deep(.atlas-app-checkbox) {
+.combat-area-enable :deep(.el-checkbox) {
   height: auto;
   align-items: center;
 }
@@ -1829,17 +1829,17 @@ onUnmounted(() => {
   max-width: none;
 }
 
-.metric-input-number :deep(.atlas-app-input-number) {
+.metric-input-number :deep(.el-input-number) {
   width: 100%;
 }
 
-.metric-input-number :deep(.atlas-app-input-number .atlas-app-input__wrapper) {
+.metric-input-number :deep(.el-input-number .el-input__wrapper) {
   min-height: 28px;
   padding-top: 0;
   padding-bottom: 0;
 }
 
-.metric-input-number :deep(.atlas-app-input-number .atlas-app-input__inner) {
+.metric-input-number :deep(.el-input-number .el-input__inner) {
   height: 26px;
   line-height: 26px;
 }

@@ -1,2 +1,2 @@
-//覆盖 Element 默认变量
-@forward 'element-plus/theme-chalk/src/mixins/config.scss' with($namespace: 'atlas-app');
+// Element Plus 类名前缀使用默认的 el
+@forward 'element-plus/theme-chalk/src/mixins/config.scss' with($namespace: 'el');

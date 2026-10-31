@@ -85,7 +85,7 @@ const handleTabChange = (tabName: string) => {
   border: 1px solid var(--surface-border-color);
   color: var(--text-color-strong);
 
-  :deep(.atlas-app-card__body) {
+  :deep(.el-card__body) {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -94,19 +94,19 @@ const handleTabChange = (tabName: string) => {
     box-sizing: border-box;
   }
 
-  :deep(.atlas-app-tabs) {
+  :deep(.el-tabs) {
     flex-shrink: 0;
   }
 
-  :deep(.atlas-app-tabs__content) {
+  :deep(.el-tabs__content) {
     display: none;
   }
 
-  :deep(.atlas-app-tabs__header) {
+  :deep(.el-tabs__header) {
     margin-bottom: 8px;
   }
 
-  :deep(.atlas-app-tabs__item) {
+  :deep(.el-tabs__item) {
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-semibold);
   }

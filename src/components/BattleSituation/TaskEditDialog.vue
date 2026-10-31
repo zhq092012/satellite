@@ -840,14 +840,14 @@ const handleSubmit = async () => {
 </script>
 
 <style lang="scss">
-/** 项目 Element Plus 命名空间为 atlas-app，选择器必须用 atlas-app-* 才能生效。 */
-.task-edit-dialog-modal.atlas-app-overlay,
-.atlas-app-overlay.task-edit-dialog-modal {
+/** Element Plus 使用默认 el 前缀，选择器写 el-*。 */
+.task-edit-dialog-modal.el-overlay,
+.el-overlay.task-edit-dialog-modal {
   background-color: var(--swatch-rgba-4-10-20-0_72) !important;
 }
 
-.atlas-app-dialog.task-edit-dialog,
-.task-edit-dialog .atlas-app-dialog {
+.el-dialog.task-edit-dialog,
+.task-edit-dialog .el-dialog {
   --el-dialog-bg-color: var(--dialog-bg);
   --el-color-primary: var(--accent-cyan);
   --el-color-primary-light-3: var(--accent-cyan-hover);
@@ -877,7 +877,7 @@ const handleSubmit = async () => {
   border-radius: 0 !important;
   overflow: hidden;
 
-  .atlas-app-dialog__header {
+  .el-dialog__header {
     flex-shrink: 0;
     margin-right: 0;
     padding: 10px 20px;
@@ -885,14 +885,14 @@ const handleSubmit = async () => {
     border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
   }
 
-  .atlas-app-dialog__title {
+  .el-dialog__title {
     color: var(--accent-cyan-hover) !important;
     font-size: var(--font-size-subtitle);
     font-weight: var(--font-weight-bold);
     text-shadow: 0 0 8px var(--swatch-rgba-64-242-255-0_4);
   }
 
-  .atlas-app-dialog__headerbtn .atlas-app-dialog__close {
+  .el-dialog__headerbtn .el-dialog__close {
     color: var(--text-color-muted) !important;
 
     &:hover {
@@ -900,7 +900,7 @@ const handleSubmit = async () => {
     }
   }
 
-  .atlas-app-dialog__body {
+  .el-dialog__body {
     flex: 1;
     min-height: 0;
     padding: 0 !important;
@@ -983,7 +983,7 @@ const handleSubmit = async () => {
     overflow: hidden;
   }
 
-  .atlas-app-dialog__footer {
+  .el-dialog__footer {
     flex-shrink: 0;
     padding: 0 !important;
     margin: 0 !important;
@@ -1001,7 +1001,7 @@ const handleSubmit = async () => {
     padding: 6px 20px;
     box-sizing: border-box;
 
-    .atlas-app-button {
+    .el-button {
       height: 32px;
       padding: 0 16px;
       margin: 0 !important;
@@ -1024,11 +1024,11 @@ const handleSubmit = async () => {
   .task-edit-form {
     --el-form-item-margin-bottom: 16px;
 
-    .atlas-app-form-item {
+    .el-form-item {
       margin-bottom: 16px;
     }
 
-    .atlas-app-form-item:last-child {
+    .el-form-item:last-child {
       margin-bottom: 0;
     }
   }
@@ -1042,7 +1042,7 @@ const handleSubmit = async () => {
     margin-bottom: 16px;
     align-items: center;
 
-    .task-edit-metrics-grid__left-cell.atlas-app-form-item {
+    .task-edit-metrics-grid__left-cell.el-form-item {
       margin-bottom: 0;
     }
 
@@ -1060,8 +1060,8 @@ const handleSubmit = async () => {
       max-width: 100%;
     }
 
-    .metric-input-number.atlas-app-input-number,
-    .atlas-app-input-number.metric-input-number {
+    .metric-input-number.el-input-number,
+    .el-input-number.metric-input-number {
       width: 100% !important;
     }
 
@@ -1070,25 +1070,25 @@ const handleSubmit = async () => {
       text-align: left;
     }
 
-    .atlas-app-form-item__content {
+    .el-form-item__content {
       line-height: 32px;
     }
   }
 
-  .atlas-app-form-item__label {
+  .el-form-item__label {
     color: var(--color-info-soft) !important;
     font-size: var(--font-size-md);
   }
 
-  .atlas-app-form-item.is-required:not(.is-no-asterisk)>.atlas-app-form-item__label::before {
+  .el-form-item.is-required:not(.is-no-asterisk)>.el-form-item__label::before {
     color: var(--color-danger-soft) !important;
   }
 
-  .atlas-app-input__wrapper,
-  .atlas-app-textarea__wrapper,
-  .atlas-app-select__wrapper,
-  .atlas-app-date-editor.atlas-app-input__wrapper,
-  .atlas-app-date-editor {
+  .el-input__wrapper,
+  .el-textarea__wrapper,
+  .el-select__wrapper,
+  .el-date-editor.el-input__wrapper,
+  .el-date-editor {
     background-color: var(--swatch-rgba-8-20-36-0_9) !important;
     box-shadow: 0 0 0 1px rgba(var(--accent-cyan-rgb), 0.32) inset !important;
     border-radius: 6px;
@@ -1108,7 +1108,7 @@ const handleSubmit = async () => {
   /**
    * Element Plus 多行输入没有 wrapper，边框画在 textarea.inner 上。
    */
-  .atlas-app-textarea__inner {
+  .el-textarea__inner {
     color: var(--text-color-bright) !important;
     background-color: var(--swatch-rgba-8-20-36-0_9) !important;
     border: none !important;
@@ -1130,35 +1130,35 @@ const handleSubmit = async () => {
     }
   }
 
-  .atlas-app-input__count,
-  .atlas-app-input__count-inner {
+  .el-input__count,
+  .el-input__count-inner {
     color: var(--text-color-subtle) !important;
     background: transparent !important;
   }
 
-  .atlas-app-select__placeholder,
-  .atlas-app-range-separator {
+  .el-select__placeholder,
+  .el-range-separator {
     color: var(--text-color-muted) !important;
   }
 
-  .atlas-app-range-input {
+  .el-range-input {
     color: var(--text-color-bright) !important;
     background: transparent !important;
   }
 
-  .atlas-app-select__selected-item,
-  .atlas-app-select__caret,
-  .atlas-app-select__suffix {
+  .el-select__selected-item,
+  .el-select__caret,
+  .el-select__suffix {
     color: var(--text-color-bright) !important;
   }
 
-  .atlas-app-tag {
+  .el-tag {
     background: rgba(var(--accent-cyan-rgb), 0.14) !important;
     border-color: rgba(var(--accent-cyan-rgb), 0.35) !important;
     color: var(--color-info-soft) !important;
   }
 
-  .atlas-app-tag .atlas-app-tag__close {
+  .el-tag .el-tag__close {
     color: var(--color-info-soft) !important;
 
     &:hover {
@@ -1167,12 +1167,12 @@ const handleSubmit = async () => {
     }
   }
 
-  .atlas-app-switch.is-checked .atlas-app-switch__core {
+  .el-switch.is-checked .el-switch__core {
     background-color: var(--accent-cyan) !important;
     border-color: var(--accent-cyan) !important;
   }
 
-  .atlas-app-switch__core {
+  .el-switch__core {
     background-color: var(--swatch-rgba-100-116-139-0_55) !important;
     border-color: var(--swatch-rgba-148-163-184-0_4) !important;
   }
@@ -1211,32 +1211,32 @@ const handleSubmit = async () => {
     background: var(--swatch-rgba-8-20-36-0_9);
     box-shadow: 0 0 0 1px rgba(var(--accent-cyan-rgb), 0.32) inset;
 
-    .atlas-app-checkbox {
+    .el-checkbox {
       margin-right: 0;
       height: auto;
     }
 
-    .atlas-app-checkbox__label {
+    .el-checkbox__label {
       color: var(--text-color-bright);
       font-size: var(--font-size-md);
       padding-left: 8px;
     }
 
-    .atlas-app-checkbox__input.is-checked+.atlas-app-checkbox__label {
+    .el-checkbox__input.is-checked+.el-checkbox__label {
       color: var(--color-info-soft);
     }
 
-    .atlas-app-checkbox__inner {
+    .el-checkbox__inner {
       background-color: var(--swatch-rgba-8-20-36-0_9);
       border-color: rgba(var(--accent-cyan-rgb), 0.45);
     }
 
-    .atlas-app-checkbox__input.is-checked .atlas-app-checkbox__inner {
+    .el-checkbox__input.is-checked .el-checkbox__inner {
       background-color: var(--accent-cyan);
       border-color: var(--accent-cyan);
     }
 
-    .atlas-app-checkbox__input.is-checked .atlas-app-checkbox__inner::after {
+    .el-checkbox__input.is-checked .el-checkbox__inner::after {
       border-color: var(--on-accent-cyan);
     }
   }
@@ -1268,8 +1268,8 @@ const handleSubmit = async () => {
     white-space: nowrap;
   }
 
-  .task-edit-btn--ghost.atlas-app-button,
-  .atlas-app-button.task-edit-btn--ghost {
+  .task-edit-btn--ghost.el-button,
+  .el-button.task-edit-btn--ghost {
     --el-button-bg-color: rgba(var(--accent-cyan-rgb), 0.08);
     --el-button-text-color: var(--color-info-soft);
     --el-button-border-color: rgba(var(--accent-cyan-rgb), 0.4);
@@ -1287,9 +1287,9 @@ const handleSubmit = async () => {
     }
   }
 
-  .task-edit-btn--primary.atlas-app-button,
-  .atlas-app-button.task-edit-btn--primary,
-  .atlas-app-button--primary.task-edit-btn--primary {
+  .task-edit-btn--primary.el-button,
+  .el-button.task-edit-btn--primary,
+  .el-button--primary.task-edit-btn--primary {
     --el-button-bg-color: var(--accent-cyan);
     --el-button-text-color: var(--on-accent-cyan);
     --el-button-border-color: var(--accent-cyan);
@@ -1308,15 +1308,15 @@ const handleSubmit = async () => {
   }
 }
 
-.task-edit-select-popper.atlas-app-popper,
-.task-edit-date-popper.atlas-app-popper,
-.atlas-app-popper.task-edit-select-popper,
-.atlas-app-popper.task-edit-date-popper {
+.task-edit-select-popper.el-popper,
+.task-edit-date-popper.el-popper,
+.el-popper.task-edit-select-popper,
+.el-popper.task-edit-date-popper {
   background: var(--swatch-rgba-8-15-26-0_98) !important;
   border: 1px solid rgba(var(--accent-cyan-rgb), 0.28) !important;
   box-shadow: 0 12px 28px var(--mask-color) !important;
 
-  .atlas-app-select-dropdown__item {
+  .el-select-dropdown__item {
     color: var(--text-color-soft) !important;
 
     &:hover,
@@ -1331,44 +1331,44 @@ const handleSubmit = async () => {
     }
   }
 
-  .atlas-app-picker-panel,
-  .atlas-app-date-range-picker {
+  .el-picker-panel,
+  .el-date-range-picker {
     background: transparent !important;
     color: var(--text-color-bright) !important;
     border: none !important;
   }
 
-  .atlas-app-date-range-picker__header,
-  .atlas-app-date-picker__header-label,
-  .atlas-app-picker-panel__icon-btn {
+  .el-date-range-picker__header,
+  .el-date-picker__header-label,
+  .el-picker-panel__icon-btn {
     color: var(--color-info-soft) !important;
   }
 
-  .atlas-app-date-table th {
+  .el-date-table th {
     color: var(--text-color-subtle) !important;
     border-bottom-color: rgba(var(--accent-cyan-rgb), 0.15) !important;
   }
 
-  .atlas-app-date-table td .atlas-app-date-table-cell__text {
+  .el-date-table td .el-date-table-cell__text {
     color: var(--text-color-bright) !important;
   }
 
-  .atlas-app-date-table td.available:hover .atlas-app-date-table-cell__text,
-  .atlas-app-date-table td.current:not(.disabled) .atlas-app-date-table-cell__text {
+  .el-date-table td.available:hover .el-date-table-cell__text,
+  .el-date-table td.current:not(.disabled) .el-date-table-cell__text {
     background: rgba(var(--accent-cyan-rgb), 0.22) !important;
     color: var(--accent-cyan-hover) !important;
   }
 
-  .atlas-app-date-table td.in-range .atlas-app-date-table-cell {
+  .el-date-table td.in-range .el-date-table-cell {
     background: rgba(var(--accent-cyan-rgb), 0.1) !important;
   }
 
-  .atlas-app-time-panel {
+  .el-time-panel {
     background: var(--swatch-rgba-8-15-26-0_98) !important;
     border-color: rgba(var(--accent-cyan-rgb), 0.22) !important;
   }
 
-  .atlas-app-time-spinner__item {
+  .el-time-spinner__item {
     color: var(--text-color-soft) !important;
 
     &:hover:not(.is-disabled):not(.is-active) {
@@ -1380,7 +1380,7 @@ const handleSubmit = async () => {
     }
   }
 
-  .atlas-app-picker-panel__footer {
+  .el-picker-panel__footer {
     background: var(--dialog-bg) !important;
     border-top: 1px solid rgba(var(--accent-cyan-rgb), 0.15) !important;
   }

@@ -464,31 +464,31 @@ watch(
 .sat-metric-table {
   width: 100%;
   table-layout: fixed;
-  --atlas-app-table-border-color: rgba(var(--accent-cyan-rgb), 0.12);
-  --atlas-app-table-header-bg-color: var(--panel-bg);
-  --atlas-app-table-bg-color: transparent;
-  --atlas-app-table-tr-bg-color: transparent;
-  --atlas-app-table-row-hover-bg-color: rgba(var(--accent-cyan-rgb), 0.08);
-  --atlas-app-text-color-regular: var(--text-color-soft);
-  --atlas-app-text-color-primary: var(--text-color-bright);
+  --el-table-border-color: rgba(var(--accent-cyan-rgb), 0.12);
+  --el-table-header-bg-color: var(--panel-bg);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(var(--accent-cyan-rgb), 0.08);
+  --el-text-color-regular: var(--text-color-soft);
+  --el-text-color-primary: var(--text-color-bright);
   background: transparent;
 
-  :deep(.atlas-app-table__inner-wrapper::before) {
+  :deep(.el-table__inner-wrapper::before) {
     display: none;
   }
 
-  :deep(.atlas-app-table__header-wrapper),
-  :deep(.atlas-app-table__body-wrapper) {
+  :deep(.el-table__header-wrapper),
+  :deep(.el-table__body-wrapper) {
     overflow-x: hidden;
   }
 
-  :deep(.atlas-app-table__body),
-  :deep(.atlas-app-table__header) {
+  :deep(.el-table__body),
+  :deep(.el-table__header) {
     width: 100% !important;
     table-layout: fixed;
   }
 
-  :deep(th.atlas-app-table__cell) {
+  :deep(th.el-table__cell) {
     color: var(--accent-cyan);
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-bold);
@@ -496,7 +496,7 @@ watch(
     border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
   }
 
-  :deep(td.atlas-app-table__cell) {
+  :deep(td.el-table__cell) {
     font-size: var(--font-size-sm);
     color: var(--text-color-soft);
     background: transparent !important;
@@ -509,14 +509,14 @@ watch(
     overflow: hidden;
   }
 
-  :deep(th.atlas-app-table__cell .cell),
-  :deep(td.atlas-app-table__cell .cell) {
+  :deep(th.el-table__cell .cell),
+  :deep(td.el-table__cell .cell) {
     padding-left: 0;
     padding-right: 0;
     overflow: hidden;
   }
 
-  :deep(.atlas-app-table__empty-block) {
+  :deep(.el-table__empty-block) {
     background: transparent;
     color: var(--text-color-subtle);
   }

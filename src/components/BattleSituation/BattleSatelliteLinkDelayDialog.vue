@@ -271,27 +271,27 @@ onUnmounted(() => {
 
 .battle-sat-threat-table {
   width: 100%;
-  --atlas-app-table-border-color: rgba(var(--accent-cyan-rgb), 0.12);
-  --atlas-app-table-header-bg-color: var(--panel-bg);
-  --atlas-app-table-bg-color: transparent;
-  --atlas-app-table-tr-bg-color: transparent;
-  --atlas-app-table-row-hover-bg-color: rgba(var(--accent-cyan-rgb), 0.08);
-  --atlas-app-text-color-regular: var(--text-color-soft);
-  --atlas-app-text-color-primary: var(--text-color-bright);
+  --el-table-border-color: rgba(var(--accent-cyan-rgb), 0.12);
+  --el-table-header-bg-color: var(--panel-bg);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(var(--accent-cyan-rgb), 0.08);
+  --el-text-color-regular: var(--text-color-soft);
+  --el-text-color-primary: var(--text-color-bright);
   background: transparent;
 
-  :deep(.atlas-app-table__inner-wrapper::before) {
+  :deep(.el-table__inner-wrapper::before) {
     display: none;
   }
 
-  :deep(th.atlas-app-table__cell) {
+  :deep(th.el-table__cell) {
     color: var(--accent-cyan);
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-bold);
     background: var(--panel-bg) !important;
   }
 
-  :deep(td.atlas-app-table__cell) {
+  :deep(td.el-table__cell) {
     font-size: var(--font-size-sm);
     color: var(--text-color-bright);
     background: transparent !important;
@@ -358,14 +358,14 @@ onUnmounted(() => {
 </style>
 
 <style lang="scss">
-.atlas-app-dialog.battle-sat-link-dialog,
-.battle-sat-link-dialog .atlas-app-dialog {
+.el-dialog.battle-sat-link-dialog,
+.battle-sat-link-dialog .el-dialog {
   --el-dialog-bg-color: var(--dialog-bg);
   border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
   box-shadow: 0 16px 48px var(--mask-color);
 }
 
-.battle-sat-link-dialog .atlas-app-dialog__title {
+.battle-sat-link-dialog .el-dialog__title {
   color: var(--text-color-soft);
   font-weight: var(--font-weight-bold);
 }

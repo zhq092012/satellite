@@ -1450,12 +1450,12 @@ onBeforeUnmount(() => {
         table-layout: fixed;
       }
 
-      :deep(.atlas-app-descriptions__title) {
+      :deep(.el-descriptions__title) {
         color: var(--text-color-bright);
         font-size: var(--font-size-md);
       }
 
-      :deep(.atlas-app-descriptions__label) {
+      :deep(.el-descriptions__label) {
         color: var(--swatch-cde4ff);
         background: var(--swatch-rgba-19-67-98-0_9);
         width: auto !important;
@@ -1465,7 +1465,7 @@ onBeforeUnmount(() => {
         vertical-align: middle;
       }
 
-      :deep(.atlas-app-descriptions__content) {
+      :deep(.el-descriptions__content) {
         color: var(--swatch-eef7ff);
         background: var(--swatch-rgba-14-52-79-0_85);
         width: auto !important;
@@ -1474,7 +1474,7 @@ onBeforeUnmount(() => {
         padding-right: 8px !important;
       }
 
-      :deep(.atlas-app-descriptions__cell) {
+      :deep(.el-descriptions__cell) {
         word-break: break-word;
       }
     }
@@ -1577,22 +1577,22 @@ onBeforeUnmount(() => {
     flex-shrink: 0;
   }
 
-  .net-toolbar :deep(.atlas-app-radio__label),
-  .net-toolbar :deep(.atlas-app-switch__label),
-  .net-toolbar :deep(.atlas-app-select__placeholder),
-  .net-toolbar :deep(.atlas-app-input__inner) {
+  .net-toolbar :deep(.el-radio__label),
+  .net-toolbar :deep(.el-switch__label),
+  .net-toolbar :deep(.el-select__placeholder),
+  .net-toolbar :deep(.el-input__inner) {
     color: var(--text-color-bright);
   }
 
-  .net-toolbar :deep(.atlas-app-radio__inner) {
+  .net-toolbar :deep(.el-radio__inner) {
     border-color: var(--swatch-rgba-115-243-255-0_45);
   }
 
-  .net-toolbar :deep(.atlas-app-switch) {
+  .net-toolbar :deep(.el-switch) {
     white-space: nowrap;
   }
 
-  .net-toolbar :deep(.net-toolbar__select.atlas-app-select) {
+  .net-toolbar :deep(.net-toolbar__select.el-select) {
     width: 168px;
   }
 }

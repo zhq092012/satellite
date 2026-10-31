@@ -1392,7 +1392,7 @@ const saveStationPlan = async () => {
 
   /* Element Plus 内部样式覆盖 */
   :deep(.custom-radio-group) {
-    .atlas-app-radio {
+    .el-radio {
       background: var(--swatch-rgba-8-18-33-0_6);
       border-color: rgba(var(--accent-cyan-rgb), 0.2);
       color: var(--text-color-muted);
@@ -1402,7 +1402,7 @@ const saveStationPlan = async () => {
       &.is-checked {
         background: rgba(var(--accent-cyan-rgb), 0.15);
         border-color: var(--accent-cyan);
-        .atlas-app-radio__label {
+        .el-radio__label {
           color: var(--accent-cyan);
           font-weight: var(--font-weight-semibold);
         }
@@ -1411,52 +1411,52 @@ const saveStationPlan = async () => {
   }
 
   :deep(.custom-checkbox-group) {
-    .atlas-app-checkbox {
+    .el-checkbox {
       color: var(--text-color-muted);
       margin-right: 12px;
-      &.is-checked .atlas-app-checkbox__label {
+      &.is-checked .el-checkbox__label {
         color: var(--accent-cyan);
         font-weight: var(--font-weight-semibold);
       }
     }
   }
 
-  :deep(.atlas-app-checkbox) {
+  :deep(.el-checkbox) {
     color: var(--text-color-soft);
-    .atlas-app-checkbox__inner {
+    .el-checkbox__inner {
       background-color: var(--swatch-rgba-15-30-52-0_8);
       border-color: rgba(var(--accent-cyan-rgb), 0.3);
     }
-    &.is-checked .atlas-app-checkbox__inner {
+    &.is-checked .el-checkbox__inner {
       background-color: var(--accent-cyan);
       border-color: var(--accent-cyan);
     }
-    &.is-checked .atlas-app-checkbox__label {
+    &.is-checked .el-checkbox__label {
       color: var(--color-info);
     }
   }
 
-  :deep(.atlas-app-collapse) {
+  :deep(.el-collapse) {
     border: none;
     background: transparent;
-    .atlas-app-collapse-item__header {
+    .el-collapse-item__header {
       background: var(--swatch-rgba-8-18-33-0_7);
       color: var(--color-info);
       border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.15);
       padding: 0 12px;
       font-weight: var(--font-weight-semibold);
     }
-    .atlas-app-collapse-item__wrap {
+    .el-collapse-item__wrap {
       background: transparent;
       border: none;
     }
-    .atlas-app-collapse-item__content {
+    .el-collapse-item__content {
       padding: 10px 0;
       color: var(--text-color-soft);
     }
   }
 
-  :deep(.atlas-app-descriptions) {
+  :deep(.el-descriptions) {
     --el-descriptions-table-border: 1px solid rgba(var(--accent-cyan-rgb), 0.15);
     --el-descriptions-item-bordered-label-background: var(--swatch-rgba-8-18-33-0_8);
     .el-descriptions__cell {

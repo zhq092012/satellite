@@ -118,36 +118,36 @@ const fieldRows = computed(() => buildSatelliteThreatInfoFieldRows(props.threatI
 </style>
 
 <style lang="scss">
-.satellite-threat-info-dialog-modal.atlas-app-overlay,
-.atlas-app-overlay.satellite-threat-info-dialog-modal {
+.satellite-threat-info-dialog-modal.el-overlay,
+.el-overlay.satellite-threat-info-dialog-modal {
   backdrop-filter: blur(4px);
 }
 
-.atlas-app-dialog.satellite-threat-info-dialog,
-.satellite-threat-info-dialog .atlas-app-dialog {
+.el-dialog.satellite-threat-info-dialog,
+.satellite-threat-info-dialog .el-dialog {
   --el-dialog-bg-color: var(--dialog-bg);
   --el-dialog-title-font-size: var(--font-size-lg);
   border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
   box-shadow: 0 16px 48px var(--mask-color);
 }
 
-.satellite-threat-info-dialog .atlas-app-dialog__header {
+.satellite-threat-info-dialog .el-dialog__header {
   border-bottom: 1px solid var(--swatch-rgba-148-163-184-0_15);
   margin-right: 0;
   padding-bottom: 12px;
 }
 
-.satellite-threat-info-dialog .atlas-app-dialog__title {
+.satellite-threat-info-dialog .el-dialog__title {
   color: var(--text-color-soft);
   font-weight: var(--font-weight-bold);
 }
 
-.satellite-threat-info-dialog .atlas-app-dialog__body {
+.satellite-threat-info-dialog .el-dialog__body {
   padding-top: 16px;
   color: var(--text-color-soft);
 }
 
-.satellite-threat-info-dialog .atlas-app-dialog__footer {
+.satellite-threat-info-dialog .el-dialog__footer {
   border-top: 1px solid var(--swatch-rgba-148-163-184-0_12);
   padding-top: 12px;
 }

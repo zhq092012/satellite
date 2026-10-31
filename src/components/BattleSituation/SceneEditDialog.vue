@@ -385,13 +385,13 @@ watch(
 </script>
 
 <style lang="scss">
-.scene-edit-dialog-modal.atlas-app-overlay,
-.atlas-app-overlay.scene-edit-dialog-modal {
+.scene-edit-dialog-modal.el-overlay,
+.el-overlay.scene-edit-dialog-modal {
   background-color: var(--swatch-rgba-4-10-20-0_72) !important;
 }
 
-.atlas-app-dialog.scene-edit-dialog,
-.scene-edit-dialog .atlas-app-dialog {
+.el-dialog.scene-edit-dialog,
+.scene-edit-dialog .el-dialog {
   --el-dialog-bg-color: var(--dialog-bg);
   --el-color-primary: var(--accent-cyan);
   background: var(--dialog-bg) !important;
@@ -401,21 +401,21 @@ watch(
     0 16px 40px var(--mask-color),
     0 0 18px rgba(var(--accent-cyan-rgb), 0.12) !important;
 
-  .atlas-app-dialog__header {
+  .el-dialog__header {
     margin-right: 0;
     padding: 14px 20px 12px;
     background: linear-gradient(90deg, rgba(var(--accent-cyan-rgb), 0.12) 0%, var(--swatch-rgba-8-15-26-0) 100%);
     border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
   }
 
-  .atlas-app-dialog__title {
+  .el-dialog__title {
     color: var(--accent-cyan-hover) !important;
     font-size: var(--font-size-subtitle);
     font-weight: var(--font-weight-bold);
     text-shadow: 0 0 8px var(--swatch-rgba-64-242-255-0_4);
   }
 
-  .atlas-app-dialog__headerbtn .atlas-app-dialog__close {
+  .el-dialog__headerbtn .el-dialog__close {
     color: var(--text-color-muted) !important;
 
     &:hover {
@@ -423,7 +423,7 @@ watch(
     }
   }
 
-  .atlas-app-dialog__body {
+  .el-dialog__body {
     padding: 16px 20px 8px;
     background: var(--swatch-rgba-12-22-38-0_72);
     color: var(--text-color-bright);
@@ -431,36 +431,36 @@ watch(
     overflow-y: auto;
   }
 
-  .atlas-app-dialog__footer {
+  .el-dialog__footer {
     padding: 12px 20px 16px;
     background: var(--swatch-rgba-8-15-26-0_92);
     border-top: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
   }
 
-  .atlas-app-form-item__label {
+  .el-form-item__label {
     color: var(--color-info-soft) !important;
     font-size: var(--font-size-md);
   }
 
-  .atlas-app-input__wrapper,
-  .atlas-app-textarea__wrapper {
+  .el-input__wrapper,
+  .el-textarea__wrapper {
     background-color: var(--swatch-rgba-8-20-36-0_9) !important;
     box-shadow: 0 0 0 1px rgba(var(--accent-cyan-rgb), 0.32) inset !important;
   }
 
-  .atlas-app-textarea__inner,
-  .atlas-app-input__inner {
+  .el-textarea__inner,
+  .el-input__inner {
     color: var(--text-color-bright) !important;
     background-color: transparent !important;
   }
 
-  .scene-edit-btn--ghost.atlas-app-button {
+  .scene-edit-btn--ghost.el-button {
     color: var(--text-color-soft) !important;
     background: var(--swatch-rgba-15-23-42-0_85) !important;
     border: 1px solid var(--swatch-rgba-148-163-184-0_4) !important;
   }
 
-  .scene-edit-btn--primary.atlas-app-button {
+  .scene-edit-btn--primary.el-button {
     color: var(--on-accent-cyan) !important;
     background: linear-gradient(135deg, var(--accent-cyan-hover), var(--swatch-00b8d4)) !important;
     border: 1px solid var(--accent-cyan) !important;

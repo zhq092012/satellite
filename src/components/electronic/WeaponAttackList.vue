@@ -848,7 +848,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   .search-input {
     width: 240px;
 
-    :deep(.atlas-app-input__wrapper) {
+    :deep(.el-input__wrapper) {
       background-color: var(--swatch-rgba-8-14-26-0_8);
       box-shadow: 0 0 0 1px rgba(var(--accent-cyan-rgb), 0.25) inset;
       color: var(--text-color-soft);
@@ -858,7 +858,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
       }
     }
 
-    :deep(.atlas-app-input__inner) {
+    :deep(.el-input__inner) {
       color: var(--text-color-soft);
       font-size: var(--font-size-base);
     }
@@ -889,14 +889,14 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   .filter-select {
     width: 160px;
 
-    :deep(.atlas-app-select__wrapper) {
+    :deep(.el-select__wrapper) {
       background-color: var(--swatch-rgba-8-14-26-0_8);
       box-shadow: 0 0 0 1px rgba(var(--accent-cyan-rgb), 0.2) inset;
     }
 
-    :deep(.atlas-app-select__placeholder),
-    :deep(.atlas-app-select__selected-item),
-    :deep(.atlas-app-tag) {
+    :deep(.el-select__placeholder),
+    :deep(.el-select__selected-item),
+    :deep(.el-tag) {
       font-size: var(--font-size-base);
     }
   }
@@ -908,13 +908,13 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
       width: 100px;
     }
 
-    :deep(.atlas-app-select__wrapper) {
+    :deep(.el-select__wrapper) {
       background-color: var(--swatch-rgba-8-14-26-0_8);
       box-shadow: 0 0 0 1px rgba(var(--accent-cyan-rgb), 0.2) inset;
     }
 
-    :deep(.atlas-app-select__placeholder),
-    :deep(.atlas-app-select__selected-item) {
+    :deep(.el-select__placeholder),
+    :deep(.el-select__selected-item) {
       font-size: var(--font-size-base);
     }
   }

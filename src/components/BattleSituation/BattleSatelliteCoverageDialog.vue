@@ -274,19 +274,19 @@ onUnmounted(() => {
 </style>
 
 <style lang="scss">
-.battle-sat-chart-dialog-modal.atlas-app-overlay,
-.atlas-app-overlay.battle-sat-chart-dialog-modal {
+.battle-sat-chart-dialog-modal.el-overlay,
+.el-overlay.battle-sat-chart-dialog-modal {
   backdrop-filter: blur(4px);
 }
 
-.atlas-app-dialog.battle-sat-coverage-dialog,
-.battle-sat-coverage-dialog .atlas-app-dialog {
+.el-dialog.battle-sat-coverage-dialog,
+.battle-sat-coverage-dialog .el-dialog {
   --el-dialog-bg-color: var(--dialog-bg);
   border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
   box-shadow: 0 16px 48px var(--mask-color);
 }
 
-.battle-sat-coverage-dialog .atlas-app-dialog__title {
+.battle-sat-coverage-dialog .el-dialog__title {
   color: var(--text-color-soft);
   font-weight: var(--font-weight-bold);
 }
