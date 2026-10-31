@@ -359,12 +359,12 @@ onMounted(async () => {
   gap: 10px;
 
   &__name {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
   }
 
   &__path {
     color: var(--text-color-secondary);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
   }
 }
 </style>

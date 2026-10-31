@@ -397,8 +397,8 @@
             </div>
             <div class="stat-box" style="grid-column: span 2;">
               <span>成本消耗</span>
-              <strong style="color: #ff9f43; font-size: 24px;">{{ item.plan.totalPrice }} <small
-                  style="font-size: 13px; color: #ff9f43; font-weight: normal;">万美元</small></strong>
+              <strong style="color: var(--swatch-ff9f43); font-size: var(--font-size-2xl);">{{ item.plan.totalPrice }} <small
+                  style="font-size: var(--font-size-md); color: var(--swatch-ff9f43); font-weight: var(--font-weight-regular);">万美元</small></strong>
               <small>打击成本消耗金额</small>
             </div>
           </div>
@@ -407,8 +407,8 @@
             <div class="asset-list" style="max-height: 150px; overflow-y: auto;">
               <div class="asset-item" v-for="base in item.plan.missileBases" :key="base.missileBaseId"
                 style="padding: 10px;">
-                <strong style="font-size: 14px;">{{ base.missileBaseName }}</strong>
-                <div style="font-size: 12px; color: #97b7d8; margin-top: 4px;">
+                <strong style="font-size: var(--font-size-base);">{{ base.missileBaseName }}</strong>
+                <div style="font-size: var(--font-size-sm); color: var(--text-color-muted); margin-top: 4px;">
                   地区（{{ base.country }}） · 部署导弹（
                   <span v-for="(missile, idx) in base.deployMissiles" :key="idx">
                     {{ missile.missileName }}<template v-if="idx < base.deployMissiles.length - 1">、</template>
@@ -423,8 +423,8 @@
             <div class="asset-list" style="max-height: 150px; overflow-y: auto;">
               <div class="asset-item" v-for="station in item.plan.stationDetails" :key="station.stationId"
                 style="padding: 10px;">
-                <strong style="font-size: 14px;">{{ station.stationName }}</strong>
-                <div style="font-size: 12px; color: #97b7d8; margin-top: 4px;">
+                <strong style="font-size: var(--font-size-base);">{{ station.stationName }}</strong>
+                <div style="font-size: var(--font-size-sm); color: var(--text-color-muted); margin-top: 4px;">
                   地区（{{ station.country }}） · 类型（{{ station.type }}） · 位置（{{ station.location }}）
                 </div>
               </div>
@@ -459,17 +459,17 @@
                 <div v-for="(strike, index) in item.plan.strikeList" :key="strike.id" class="mission-item"
                   style="margin-bottom: 10px; padding: 10px;">
                   <div class="mission-item__header">
-                    <strong style="font-size: 14px;">任务{{ index + 1 }} · {{ strike.missileBaseName }} → {{
+                    <strong style="font-size: var(--font-size-base);">任务{{ index + 1 }} · {{ strike.missileBaseName }} → {{
                       strike.stationName
                     }}</strong>
                   </div>
-                  <div class="mission-item__time" style="font-size: 12px; color: #97b7d8; margin-top: 4px;">
+                  <div class="mission-item__time" style="font-size: var(--font-size-sm); color: var(--text-color-muted); margin-top: 4px;">
                     导弹：{{ strike.missileName }} ({{ strike.missileType }})
                   </div>
-                  <div style="font-size: 12px; color: #8bb8ea; margin-top: 4px;">
+                  <div style="font-size: var(--font-size-sm); color: var(--color-info-soft); margin-top: 4px;">
                     打击度：{{ strike.strike }} · 距离：{{ strike.distance }} · 射程：{{ strike.range }}
                   </div>
-                  <div class="mission-item__meta" style="font-size: 11px; color: #7f9dbd; margin-top: 4px;">
+                  <div class="mission-item__meta" style="font-size: var(--font-size-xs); color: var(--swatch-7f9dbd); margin-top: 4px;">
                     总体窗口：{{ strike.totalWindowStart }} 至 {{ strike.totalWindowEnd }}
                   </div>
                   <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
@@ -491,18 +491,18 @@
                   :key="`${strike.weapon_id}-${strike.satellite_id}-${index}`" class="mission-item"
                   style="margin-bottom: 10px; padding: 10px;">
                   <div class="mission-item__header">
-                    <strong style="font-size: 14px;">任务{{ strike.index || index + 1 }} · {{ strike.weapon_name }} 打击 卫星
+                    <strong style="font-size: var(--font-size-base);">任务{{ strike.index || index + 1 }} · {{ strike.weapon_name }} 打击 卫星
                       {{
                         strike.satellite_id
                       }}</strong>
                   </div>
-                  <div class="mission-item__time" style="font-size: 12px; color: #97b7d8; margin-top: 4px;">
+                  <div class="mission-item__time" style="font-size: var(--font-size-sm); color: var(--text-color-muted); margin-top: 4px;">
                     武器类型：{{ strike.weapon_name }}
                   </div>
-                  <div class="mission-item__time" style="font-size: 12px; color: #97b7d8; margin-top: 4px;">
+                  <div class="mission-item__time" style="font-size: var(--font-size-sm); color: var(--text-color-muted); margin-top: 4px;">
                     卫星类型：{{ strike.satellite_type }} ({{ strike.orbit_type }})
                   </div>
-                  <div style="font-size: 12px; color: #8bb8ea; margin-top: 4px;">
+                  <div style="font-size: var(--font-size-sm); color: var(--color-info-soft); margin-top: 4px;">
                     卫星国籍：{{ strike.satellite_country }} · 威胁度：{{ formatDecimal(strike.threat) }}
                   </div>
                   <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px;">
@@ -1230,12 +1230,12 @@ const saveStationPlan = async () => {
     gap: 16px;
     border-radius: 12px;
     padding: 20px;
-    background: linear-gradient(180deg, rgba(8, 20, 38, 0.85) 0%, rgba(12, 28, 52, 0.9) 100%);
-    border: 1px solid rgba(0, 225, 255, 0.22);
+    background: linear-gradient(180deg, var(--panel-bg-strong) 0%, var(--panel-bg-strong) 100%);
+    border: 1px solid rgba(var(--accent-cyan-rgb), 0.22);
     box-shadow:
-      0 12px 32px rgba(0, 0, 0, 0.4),
-      inset 0 0 20px rgba(0, 225, 255, 0.04);
-    color: #dff6ff;
+      0 12px 32px var(--mask-color),
+      inset 0 0 20px rgba(var(--accent-cyan-rgb), 0.04);
+    color: var(--swatch-dff6ff);
     text-align: left;
     backdrop-filter: blur(12px);
 
@@ -1247,14 +1247,14 @@ const saveStationPlan = async () => {
     }
 
     .config-card {
-      background: rgba(13, 27, 49, 0.7);
-      border: 1px solid rgba(0, 225, 255, 0.18);
+      background: var(--swatch-rgba-13-27-49-0_7);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
       border-radius: 8px;
       padding: 12px 14px;
       display: flex;
       flex-direction: column;
       gap: 10px;
-      box-shadow: inset 0 0 10px rgba(0, 225, 255, 0.03);
+      box-shadow: inset 0 0 10px rgba(var(--accent-cyan-rgb), 0.03);
 
       .config-card-header {
         display: flex;
@@ -1262,13 +1262,13 @@ const saveStationPlan = async () => {
         gap: 8px;
 
         .card-icon {
-          font-size: 14px;
+          font-size: var(--font-size-base);
         }
 
         .card-title {
-          font-size: 13px;
-          font-weight: 700;
-          color: #00e1ff;
+          font-size: var(--font-size-md);
+          font-weight: var(--font-weight-bold);
+          color: var(--accent-cyan);
           letter-spacing: 0.5px;
         }
       }
@@ -1285,16 +1285,16 @@ const saveStationPlan = async () => {
       align-items: center;
       gap: 8px;
       padding-top: 4px;
-      border-top: 1px dashed rgba(0, 225, 255, 0.15);
+      border-top: 1px dashed rgba(var(--accent-cyan-rgb), 0.15);
 
       .section-icon {
-        font-size: 16px;
+        font-size: var(--font-size-lg);
       }
 
       .section-title {
-        font-size: 14px;
-        font-weight: 700;
-        color: #00e1ff;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-bold);
+        color: var(--accent-cyan);
         letter-spacing: 0.5px;
       }
     }
@@ -1307,15 +1307,15 @@ const saveStationPlan = async () => {
       .search-item {
         display: flex;
         flex-direction: column;
-        background: rgba(10, 22, 40, 0.65);
-        border: 1px solid rgba(0, 225, 255, 0.15);
+        background: var(--swatch-rgba-10-22-40-0_65);
+        border: 1px solid rgba(var(--accent-cyan-rgb), 0.15);
         border-radius: 8px;
         padding: 12px 16px;
-        box-shadow: 0 4px 14px rgba(3, 18, 25, 0.4);
+        box-shadow: 0 4px 14px var(--swatch-rgba-3-18-25-0_4);
         transition: border-color 0.25s ease;
 
         &:hover {
-          border-color: rgba(0, 225, 255, 0.35);
+          border-color: rgba(var(--accent-cyan-rgb), 0.35);
         }
 
         .weapon-category-header {
@@ -1324,12 +1324,12 @@ const saveStationPlan = async () => {
           align-items: center;
           padding-bottom: 10px;
           margin-bottom: 10px;
-          border-bottom: 1px solid rgba(0, 225, 255, 0.12);
+          border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
 
           .cat-title {
-            font-size: 13px;
-            font-weight: 700;
-            color: #f1f7ff;
+            font-size: var(--font-size-md);
+            font-weight: var(--font-weight-bold);
+            color: var(--text-color-strong);
           }
         }
 
@@ -1353,15 +1353,15 @@ const saveStationPlan = async () => {
       gap: 12px;
       flex-wrap: wrap;
       padding-top: 10px;
-      border-top: 1px solid rgba(0, 225, 255, 0.15);
+      border-top: 1px solid rgba(var(--accent-cyan-rgb), 0.15);
 
       .sci-btn {
         display: inline-flex;
         align-items: center;
         gap: 6px;
         padding: 8px 18px;
-        font-size: 13px;
-        font-weight: 600;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-semibold);
         border-radius: 6px;
         cursor: pointer;
         transition: all 0.25s ease;
@@ -1369,22 +1369,22 @@ const saveStationPlan = async () => {
         user-select: none;
 
         .btn-icon {
-          font-size: 14px;
+          font-size: var(--font-size-base);
         }
 
         &.btn-primary {
-          background: linear-gradient(135deg, rgba(0, 102, 255, 0.6), rgba(0, 225, 255, 0.4));
-          border-color: rgba(0, 225, 255, 0.5);
-          color: #ffffff;
+          background: linear-gradient(135deg, var(--swatch-rgba-0-102-255-0_6), rgba(var(--accent-cyan-rgb), 0.4));
+          border-color: rgba(var(--accent-cyan-rgb), 0.5);
+          color: var(--color-white);
 
           &:hover {
-            background: linear-gradient(135deg, rgba(0, 102, 255, 0.8), rgba(0, 225, 255, 0.6));
-            box-shadow: 0 0 14px rgba(0, 225, 255, 0.5);
+            background: linear-gradient(135deg, var(--swatch-rgba-0-102-255-0_8), rgba(var(--accent-cyan-rgb), 0.6));
+            box-shadow: 0 0 14px rgba(var(--accent-cyan-rgb), 0.5);
           }
         }
 
         &.btn-glow {
-          box-shadow: 0 0 12px rgba(0, 225, 255, 0.3);
+          box-shadow: 0 0 12px rgba(var(--accent-cyan-rgb), 0.3);
         }
       }
     }
@@ -1393,18 +1393,18 @@ const saveStationPlan = async () => {
   /* Element Plus 内部样式覆盖 */
   :deep(.custom-radio-group) {
     .atlas-app-radio {
-      background: rgba(8, 18, 33, 0.6);
-      border-color: rgba(0, 225, 255, 0.2);
-      color: #94a3b8;
+      background: var(--swatch-rgba-8-18-33-0_6);
+      border-color: rgba(var(--accent-cyan-rgb), 0.2);
+      color: var(--text-color-muted);
       border-radius: 4px;
       margin-right: 8px;
 
       &.is-checked {
-        background: rgba(0, 225, 255, 0.15);
-        border-color: #00e1ff;
+        background: rgba(var(--accent-cyan-rgb), 0.15);
+        border-color: var(--accent-cyan);
         .atlas-app-radio__label {
-          color: #00e1ff;
-          font-weight: 600;
+          color: var(--accent-cyan);
+          font-weight: var(--font-weight-semibold);
         }
       }
     }
@@ -1412,27 +1412,27 @@ const saveStationPlan = async () => {
 
   :deep(.custom-checkbox-group) {
     .atlas-app-checkbox {
-      color: #94a3b8;
+      color: var(--text-color-muted);
       margin-right: 12px;
       &.is-checked .atlas-app-checkbox__label {
-        color: #00e1ff;
-        font-weight: 600;
+        color: var(--accent-cyan);
+        font-weight: var(--font-weight-semibold);
       }
     }
   }
 
   :deep(.atlas-app-checkbox) {
-    color: #cbd5e1;
+    color: var(--text-color-soft);
     .atlas-app-checkbox__inner {
-      background-color: rgba(15, 30, 52, 0.8);
-      border-color: rgba(0, 225, 255, 0.3);
+      background-color: var(--swatch-rgba-15-30-52-0_8);
+      border-color: rgba(var(--accent-cyan-rgb), 0.3);
     }
     &.is-checked .atlas-app-checkbox__inner {
-      background-color: #00e1ff;
-      border-color: #00e1ff;
+      background-color: var(--accent-cyan);
+      border-color: var(--accent-cyan);
     }
     &.is-checked .atlas-app-checkbox__label {
-      color: #38bdf8;
+      color: var(--color-info);
     }
   }
 
@@ -1440,11 +1440,11 @@ const saveStationPlan = async () => {
     border: none;
     background: transparent;
     .atlas-app-collapse-item__header {
-      background: rgba(8, 18, 33, 0.7);
-      color: #38bdf8;
-      border-bottom: 1px solid rgba(0, 225, 255, 0.15);
+      background: var(--swatch-rgba-8-18-33-0_7);
+      color: var(--color-info);
+      border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.15);
       padding: 0 12px;
-      font-weight: 600;
+      font-weight: var(--font-weight-semibold);
     }
     .atlas-app-collapse-item__wrap {
       background: transparent;
@@ -1452,19 +1452,19 @@ const saveStationPlan = async () => {
     }
     .atlas-app-collapse-item__content {
       padding: 10px 0;
-      color: #cbd5e1;
+      color: var(--text-color-soft);
     }
   }
 
   :deep(.atlas-app-descriptions) {
-    --el-descriptions-table-border: 1px solid rgba(0, 225, 255, 0.15);
-    --el-descriptions-item-bordered-label-background: rgba(8, 18, 33, 0.8);
+    --el-descriptions-table-border: 1px solid rgba(var(--accent-cyan-rgb), 0.15);
+    --el-descriptions-item-bordered-label-background: var(--swatch-rgba-8-18-33-0_8);
     .el-descriptions__cell {
-      background: rgba(13, 27, 49, 0.6);
-      color: #cbd5e1;
+      background: var(--swatch-rgba-13-27-49-0_6);
+      color: var(--text-color-soft);
     }
     .el-descriptions__label {
-      color: #38bdf8;
+      color: var(--color-info);
     }
   }
 
@@ -1472,9 +1472,9 @@ const saveStationPlan = async () => {
     margin-top: 20px;
     padding: 22px;
     border-radius: 14px;
-    background: linear-gradient(180deg, rgba(8, 20, 38, 0.9) 0%, rgba(12, 28, 52, 0.95) 100%);
-    border: 1px solid rgba(0, 225, 255, 0.22);
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+    background: linear-gradient(180deg, var(--swatch-rgba-8-20-38-0_9) 0%, var(--swatch-rgba-12-28-52-0_95) 100%);
+    border: 1px solid rgba(var(--accent-cyan-rgb), 0.22);
+    box-shadow: 0 16px 36px var(--mask-color);
     backdrop-filter: blur(12px);
 
     .strike-plan-header {
@@ -1484,21 +1484,21 @@ const saveStationPlan = async () => {
       gap: 18px;
       margin-bottom: 20px;
       text-align: left;
-      border-bottom: 1px dashed rgba(0, 225, 255, 0.15);
+      border-bottom: 1px dashed rgba(var(--accent-cyan-rgb), 0.15);
       padding-bottom: 14px;
 
       h2 {
         margin: 0;
-        font-size: 22px;
-        font-weight: 700;
-        color: #f1f7ff;
+        font-size: var(--font-size-2xl);
+        font-weight: var(--font-weight-bold);
+        color: var(--text-color-strong);
         letter-spacing: 0.5px;
       }
 
       p {
         margin: 6px 0 0;
-        color: #94a3b8;
-        font-size: 13px;
+        color: var(--text-color-muted);
+        font-size: var(--font-size-md);
       }
     }
 
@@ -1514,20 +1514,20 @@ const saveStationPlan = async () => {
       gap: 4px;
       padding: 10px 16px;
       border-radius: 8px;
-      background: rgba(13, 27, 49, 0.8);
-      border: 1px solid rgba(0, 225, 255, 0.25);
-      box-shadow: inset 0 0 10px rgba(0, 225, 255, 0.05);
+      background: var(--panel-bg);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
+      box-shadow: inset 0 0 10px rgba(var(--accent-cyan-rgb), 0.05);
 
       span {
-        color: #94a3b8;
-        font-size: 11px;
+        color: var(--text-color-muted);
+        font-size: var(--font-size-xs);
       }
 
       strong {
-        color: #00e1ff;
-        font-size: 18px;
-        font-weight: 700;
-        text-shadow: 0 0 8px rgba(0, 225, 255, 0.4);
+        color: var(--accent-cyan);
+        font-size: var(--font-size-xl);
+        font-weight: var(--font-weight-bold);
+        text-shadow: 0 0 8px rgba(var(--accent-cyan-rgb), 0.4);
       }
     }
 
@@ -1545,12 +1545,12 @@ const saveStationPlan = async () => {
 
     .result-section {
       position: relative;
-      border: 1px solid rgba(0, 225, 255, 0.2);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.2);
       border-radius: 12px;
       padding: 20px;
       text-align: left;
-      background: linear-gradient(180deg, rgba(10, 24, 46, 0.9) 0%, rgba(7, 18, 36, 0.95) 100%);
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+      background: linear-gradient(180deg, var(--swatch-rgba-10-24-46-0_9) 0%, var(--swatch-rgba-7-18-36-0_95) 100%);
+      box-shadow: 0 12px 28px var(--swatch-rgba-0-0-0-0_35);
 
       &::before {
         content: '';
@@ -1558,23 +1558,23 @@ const saveStationPlan = async () => {
         inset: 0 auto 0 0;
         width: 4px;
         border-radius: 12px 0 0 12px;
-        background: linear-gradient(180deg, #00e1ff 0%, #0066ff 100%);
+        background: linear-gradient(180deg, var(--accent-cyan) 0%, var(--swatch-0066ff) 100%);
       }
 
       &.result-section--count::before {
-        background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+        background: linear-gradient(180deg, var(--color-success-strong) 0%, var(--swatch-059669) 100%);
       }
 
       &.result-section--saturation::before {
-        background: linear-gradient(180deg, #f43f5e 0%, #be123c 100%);
+        background: linear-gradient(180deg, var(--swatch-f43f5e) 0%, var(--swatch-be123c) 100%);
       }
 
       &.result-section--lowest-cost::before {
-        background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+        background: linear-gradient(180deg, var(--color-success-strong) 0%, var(--swatch-059669) 100%);
       }
 
       &.result-section--strongest::before {
-        background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+        background: linear-gradient(180deg, var(--swatch-f59e0b) 0%, var(--swatch-d97706) 100%);
       }
     }
 
@@ -1584,21 +1584,21 @@ const saveStationPlan = async () => {
       align-items: flex-start;
       gap: 14px;
       margin-bottom: 18px;
-      border-bottom: 1px solid rgba(0, 225, 255, 0.12);
+      border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
       padding-bottom: 12px;
 
       h3 {
         margin: 0;
-        font-size: 20px;
-        font-weight: 700;
-        color: #ffffff;
+        font-size: var(--font-size-xl);
+        font-weight: var(--font-weight-bold);
+        color: var(--color-white);
       }
 
       p {
         margin: 4px 0 0;
-        color: #94a3b8;
+        color: var(--text-color-muted);
         line-height: 1.5;
-        font-size: 12px;
+        font-size: var(--font-size-sm);
       }
     }
 
@@ -1606,37 +1606,37 @@ const saveStationPlan = async () => {
       align-self: flex-start;
       padding: 5px 14px;
       border-radius: 6px;
-      color: #ffffff;
-      background: linear-gradient(135deg, rgba(0, 102, 255, 0.4), rgba(0, 225, 255, 0.3));
-      border: 1px solid rgba(0, 225, 255, 0.4);
-      font-size: 12px;
-      font-weight: 600;
+      color: var(--color-white);
+      background: linear-gradient(135deg, var(--swatch-rgba-0-102-255-0_4), rgba(var(--accent-cyan-rgb), 0.3));
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.4);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
       white-space: nowrap;
-      box-shadow: 0 0 10px rgba(0, 225, 255, 0.2);
+      box-shadow: 0 0 10px rgba(var(--accent-cyan-rgb), 0.2);
     }
 
     .result-section--count .result-section__badge {
-      background: linear-gradient(135deg, rgba(16, 185, 129, 0.4), rgba(52, 211, 153, 0.3));
-      border-color: rgba(52, 211, 153, 0.4);
-      box-shadow: 0 0 10px rgba(52, 211, 153, 0.2);
+      background: linear-gradient(135deg, var(--swatch-rgba-16-185-129-0_4), var(--swatch-rgba-52-211-153-0_3));
+      border-color: var(--swatch-rgba-52-211-153-0_4);
+      box-shadow: 0 0 10px var(--swatch-rgba-52-211-153-0_2);
     }
 
     .result-section--saturation .result-section__badge {
-      background: linear-gradient(135deg, rgba(244, 63, 94, 0.4), rgba(251, 113, 133, 0.3));
-      border-color: rgba(251, 113, 133, 0.4);
-      box-shadow: 0 0 10px rgba(244, 63, 94, 0.2);
+      background: linear-gradient(135deg, var(--swatch-rgba-244-63-94-0_4), var(--swatch-rgba-251-113-133-0_3));
+      border-color: var(--swatch-rgba-251-113-133-0_4);
+      box-shadow: 0 0 10px var(--swatch-rgba-244-63-94-0_2);
     }
 
     .result-section--lowest-cost .result-section__badge {
-      background: linear-gradient(135deg, rgba(16, 185, 129, 0.4), rgba(52, 211, 153, 0.3));
-      border-color: rgba(52, 211, 153, 0.4);
-      box-shadow: 0 0 10px rgba(52, 211, 153, 0.2);
+      background: linear-gradient(135deg, var(--swatch-rgba-16-185-129-0_4), var(--swatch-rgba-52-211-153-0_3));
+      border-color: var(--swatch-rgba-52-211-153-0_4);
+      box-shadow: 0 0 10px var(--swatch-rgba-52-211-153-0_2);
     }
 
     .result-section--strongest .result-section__badge {
-      background: linear-gradient(135deg, rgba(245, 158, 11, 0.4), rgba(252, 211, 77, 0.3));
-      border-color: rgba(252, 211, 77, 0.4);
-      box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+      background: linear-gradient(135deg, var(--swatch-rgba-245-158-11-0_4), var(--swatch-rgba-252-211-77-0_3));
+      border-color: var(--swatch-rgba-252-211-77-0_4);
+      box-shadow: 0 0 10px var(--swatch-rgba-245-158-11-0_2);
     }
 
     .result-section__stats {
@@ -1652,25 +1652,25 @@ const saveStationPlan = async () => {
       gap: 6px;
       padding: 14px 16px;
       border-radius: 8px;
-      background: rgba(13, 27, 49, 0.75);
-      border: 1px solid rgba(0, 225, 255, 0.15);
+      background: var(--swatch-rgba-13-27-49-0_75);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.15);
 
       span {
-        color: #94a3b8;
-        font-size: 12px;
+        color: var(--text-color-muted);
+        font-size: var(--font-size-sm);
       }
 
       strong {
-        color: #00e1ff;
-        font-size: 28px;
-        font-weight: 700;
+        color: var(--accent-cyan);
+        font-size: var(--font-size-3xl);
+        font-weight: var(--font-weight-bold);
         line-height: 1;
-        text-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
+        text-shadow: 0 0 8px rgba(var(--accent-cyan-rgb), 0.35);
       }
 
       small {
-        color: #64748b;
-        font-size: 11px;
+        color: var(--text-color-subtle);
+        font-size: var(--font-size-xs);
         line-height: 1.4;
       }
     }
@@ -1679,14 +1679,14 @@ const saveStationPlan = async () => {
       margin-top: 14px;
       padding: 14px 16px;
       border-radius: 8px;
-      background: rgba(10, 22, 40, 0.6);
-      border: 1px solid rgba(0, 225, 255, 0.12);
+      background: var(--swatch-rgba-10-22-40-0_6);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
 
       h4 {
         margin: 0 0 12px;
-        color: #38bdf8;
-        font-size: 14px;
-        font-weight: 700;
+        color: var(--color-info);
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-bold);
         letter-spacing: 0.3px;
       }
     }
@@ -1723,8 +1723,8 @@ const saveStationPlan = async () => {
     .mission-item {
       padding: 12px 14px;
       border-radius: 6px;
-      background: rgba(13, 27, 49, 0.8);
-      border: 1px solid rgba(0, 225, 255, 0.12);
+      background: var(--panel-bg);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
     }
 
     .summary-item {
@@ -1734,14 +1734,14 @@ const saveStationPlan = async () => {
       gap: 6px;
 
       span {
-        color: #94a3b8;
-        font-size: 12px;
+        color: var(--text-color-muted);
+        font-size: var(--font-size-sm);
       }
 
       strong {
-        color: #f1f7ff;
-        font-size: 13px;
-        font-weight: 500;
+        color: var(--text-color-strong);
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-medium);
         line-height: 1.6;
       }
     }
@@ -1755,13 +1755,13 @@ const saveStationPlan = async () => {
     .distribution-card {
       padding: 12px 14px;
       border-radius: 6px;
-      background: rgba(13, 27, 49, 0.8);
-      border: 1px solid rgba(0, 225, 255, 0.12);
+      background: var(--panel-bg);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
 
       strong {
         display: block;
-        color: #f1f7ff;
-        font-size: 13px;
+        color: var(--text-color-strong);
+        font-size: var(--font-size-md);
         margin-bottom: 8px;
       }
     }
@@ -1777,23 +1777,23 @@ const saveStationPlan = async () => {
       align-items: center;
       padding: 4px 8px;
       border-radius: 4px;
-      background: rgba(0, 225, 255, 0.12);
-      color: #7dd3fc;
-      border: 1px solid rgba(0, 225, 255, 0.25);
-      font-size: 12px;
+      background: rgba(var(--accent-cyan-rgb), 0.12);
+      color: var(--color-info-soft);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
+      font-size: var(--font-size-sm);
     }
 
     .empty-placeholder {
-      color: #64748b;
-      font-size: 12px;
+      color: var(--text-color-subtle);
+      font-size: var(--font-size-sm);
     }
 
     .focus-item__title,
     .mission-item__header strong,
     .asset-item strong {
-      color: #f8fafc;
-      font-size: 14px;
-      font-weight: 600;
+      color: var(--text-color-strong);
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
     }
 
     .focus-item__meta,
@@ -1801,9 +1801,9 @@ const saveStationPlan = async () => {
     .mission-item__meta,
     .asset-item span {
       margin-top: 6px;
-      color: #94a3b8;
+      color: var(--text-color-muted);
       line-height: 1.6;
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       display: flex;
     }
 

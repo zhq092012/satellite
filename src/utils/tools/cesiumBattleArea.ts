@@ -1,3 +1,4 @@
+import { readThemeColor } from '@/styles/themeColor'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { BattleForm, TaskCombatArea } from '@/types/dashboard'
 import { EntityCollection } from 'cesium'
@@ -406,9 +407,9 @@ export function markTaskCombatArea(viewer: Cesium.Viewer | null | undefined, are
     ellipse: {
       semiMajorAxis: radiusM,
       semiMinorAxis: radiusM,
-      material: Cesium.Color.fromCssColorString('#00e1ff').withAlpha(0.2),
+      material: Cesium.Color.fromCssColorString(readThemeColor('--accent-cyan')).withAlpha(0.2),
       outline: true,
-      outlineColor: Cesium.Color.fromCssColorString('#00e1ff'),
+      outlineColor: Cesium.Color.fromCssColorString(readThemeColor('--accent-cyan')),
       outlineWidth: 2,
       heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
       distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 150000000),

@@ -1,3 +1,4 @@
+import { readThemeColor } from '@/styles/themeColor'
 import * as Cesium from 'cesium'
 import { onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
@@ -11,7 +12,7 @@ const LOD_FAR_DISTANCE = 50_000_000
 /** 视锥体剔除包围球半径（米） */
 const FRUSTUM_BOUNDING_RADIUS = 30_000
 /** 武器点默认颜色 */
-const WEAPON_POINT_COLOR = Cesium.Color.fromCssColorString('#ff3333')
+const WEAPON_POINT_COLOR = Cesium.Color.fromCssColorString(readThemeColor('--swatch-ff3333'))
 /** 选中武器相机距离（米） */
 const SELECTED_CAMERA_RANGE = 600_000
 

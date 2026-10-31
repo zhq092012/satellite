@@ -1,3 +1,4 @@
+import { readThemeColor } from '@/styles/themeColor'
 /**
  * 战场实体渲染
  * 根据当前图层模式在 Cesium 中绘制蓝方卫星、红方武器、打击链路与关系连线，
@@ -296,7 +297,7 @@ export function useBattleEntities(
         /** 关系视图中该星的关系标签与颜色；非关系星为 undefined */
         const relationMeta = relationItems?.get(satellite.noradId)
         /** 未进入打击阶段时的默认卫星颜色 */
-        const baseSatelliteColor = Cesium.Color.fromCssColorString('#4ea6ff')
+        const baseSatelliteColor = Cesium.Color.fromCssColorString(readThemeColor('--swatch-4ea6ff'))
 
         satelliteEntity.description = new Cesium.CallbackProperty((time = new Cesium.JulianDate()) => {
           const { phase } = getSatState(time)
@@ -419,7 +420,7 @@ export function useBattleEntities(
                 width: 3,
                 material: new Cesium.PolylineGlowMaterialProperty({
                   glowPower: 0.2,
-                  color: Cesium.Color.fromCssColorString('#ffd166').withAlpha(0.95),
+                  color: Cesium.Color.fromCssColorString(readThemeColor('--swatch-ffd166')).withAlpha(0.95),
                 }),
                 arcType: Cesium.ArcType.NONE,//使用直线连接
                 clampToGround: false,
@@ -488,7 +489,7 @@ export function useBattleEntities(
         }
 
         /** 目标星高亮色与完成后的星标 */
-        const selectedSatelliteColor = Cesium.Color.fromCssColorString('#f0b35b')
+        const selectedSatelliteColor = Cesium.Color.fromCssColorString(readThemeColor('--swatch-f0b35b'))
         const targetImage = createSatelliteStrikeStarDataUri(selectedSatelliteColor, 0.92)
 
         if (!selectedSatelliteEntity.billboard) selectedSatelliteEntity.billboard = new Cesium.BillboardGraphics()
@@ -525,7 +526,7 @@ export function useBattleEntities(
         Object.assign(selectedSatelliteEntity.label, {
           text: `${selectedSatellite.name}（目标卫星）`,
           font: '12px sans-serif',
-          fillColor: Cesium.Color.fromCssColorString('#f0b35b'),
+          fillColor: Cesium.Color.fromCssColorString(readThemeColor('--swatch-f0b35b')),
           outlineColor: Cesium.Color.BLACK,
           outlineWidth: 2,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
@@ -597,7 +598,7 @@ export function useBattleEntities(
         weaponEntity.description = new Cesium.CallbackProperty((time = new Cesium.JulianDate()) => {
           const { active, completed } = getWepState(time)
           return `<div style="padding: 10px; font-family: inherit;background-color:white; color: rgba(0, 0, 0, 0.8); border-radius: 8px;">
-            <h3 style="margin: 0 0 8px 0; color: #ef6b73;">红方武器</h3>
+            <h3 style="margin: 0 0 8px 0; color: var(--color-danger);">红方武器</h3>
             <p><strong>名称:</strong> ${weapon.name}</p>
             <p><strong>国家:</strong> ${weapon.country}</p>
             <p><strong>类型:</strong> ${weapon.type}</p>
@@ -715,7 +716,7 @@ export function useBattleEntities(
                   const linkBlink = phase === 'active' ? (Math.sin(performance.now() / 600) + 1) / 2 : 1
                     /** 地面目标链路透明度：打击中随闪烁变化，收尾后保持较高不透明度 */
                   const linkAlpha = phase === 'active' ? 0.55 + 0.45 * linkBlink : 0.95
-                  return Cesium.Color.fromCssColorString('#00f5ff').withAlpha(0.85 * linkAlpha)
+                  return Cesium.Color.fromCssColorString(readThemeColor('--swatch-00f5ff')).withAlpha(0.85 * linkAlpha)
                 } else {
                   // 计算打击链路的淡出比例
                   const fadeRatio =

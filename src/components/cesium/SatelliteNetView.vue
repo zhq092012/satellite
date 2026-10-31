@@ -351,6 +351,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { readThemeColor } from '@/styles/themeColor'
 import { getSatelliteDetail, getSatelliteRelations, getSatelliteRelationsBySatellite } from '@/api/dashboard'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { SatelliteDetail } from '@/types/cesium/satellite'
@@ -447,15 +448,15 @@ async function initGraph() {
       defaultNode: {
         size: 2,
         style: {
-          fill: '#C6E5FF',
-          stroke: '#5B8FF9',
+          fill: readThemeColor('--swatch-c6e5ff'),
+          stroke: readThemeColor('--swatch-5b8ff9'),
           lineWidth: 0.3,
         },
         labelCfg: {
           position: 'bottom',
           offset: 1,
           style: {
-            fill: '#eee',
+            fill: readThemeColor('--swatch-eee'),
           },
         },
       },
@@ -464,7 +465,7 @@ async function initGraph() {
         style: {
           lineWidth: 0.1,
           endArrow: false,
-          stroke: '#ccc',
+          stroke: readThemeColor('--swatch-ccc'),
         },
         type: 'line',
         labelCfg: {
@@ -472,27 +473,27 @@ async function initGraph() {
           refY: 1.5,
           offset: 1,
           style: {
-            fill: '#eee',
+            fill: readThemeColor('--swatch-eee'),
             fontSize: 1.5,
           },
         },
       },
       nodeStateStyles: {
         selected: {
-          fill: '#00ffff',
-          stroke: '#ffff00',
+          fill: readThemeColor('--swatch-00ffff'),
+          stroke: readThemeColor('--swatch-ffff00'),
           lineWidth: 1,
         },
         highlight: {
-          fill: '#ff7043', // 高亮色
+          fill: readThemeColor('--swatch-ff7043'), // 高亮色
           lineWidth: 1,
-          stroke: '#d32f2f',
+          stroke: readThemeColor('--swatch-d32f2f'),
         },
       },
       edgeStateStyles: {
         selected: {
-          fill: '#00ffff',
-          stroke: '#ffff00',
+          fill: readThemeColor('--swatch-00ffff'),
+          stroke: readThemeColor('--swatch-ffff00'),
           lineWidth: 1,
         },
       },
@@ -1155,10 +1156,10 @@ onBeforeUnmount(() => {
 <style lang="scss" scoped>
 .graph-container {
   /* 与中间图谱区域一致的暗色底 */
-  --net-chrome-bg: linear-gradient(180deg, #0a2238 0%, #061525 100%);
-  --net-chrome-border: rgba(79, 147, 221, 0.14);
-  --net-surface-bg: rgba(10, 40, 62, 0.82);
-  --net-surface-border: rgba(79, 147, 221, 0.12);
+  --net-chrome-bg: linear-gradient(180deg, var(--swatch-0a2238) 0%, var(--swatch-061525) 100%);
+  --net-chrome-border: var(--accent-bg);
+  --net-surface-bg: var(--swatch-rgba-10-40-62-0_82);
+  --net-surface-border: var(--swatch-rgba-79-147-221-0_12);
 
   position: relative;
   height: calc(100vh - 120px);
@@ -1171,7 +1172,7 @@ onBeforeUnmount(() => {
     height: 100%;
     min-height: 0;
     border-radius: 12px;
-    border: 1px solid var(--surface-border-color, rgba(79, 147, 221, 0.25));
+    border: 1px solid var(--surface-border-color, var(--accent-border-strong));
     background: var(--net-chrome-bg);
     overflow: hidden;
   }
@@ -1189,17 +1190,17 @@ onBeforeUnmount(() => {
     flex: 1;
     min-width: 0;
     min-height: 200px;
-    background: radial-gradient(ellipse 80% 70% at 50% 45%, #0d3352 0%, #061525 72%);
+    background: radial-gradient(ellipse 80% 70% at 50% 45%, var(--swatch-0d3352) 0%, var(--swatch-061525) 72%);
     border-left: 1px solid var(--net-chrome-border);
     border-right: 1px solid var(--net-chrome-border);
   }
 
   .panel-head {
-    font-size: 13px;
-    font-weight: 800;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-heavy);
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--accent-color-active, #73f3ff);
+    color: var(--accent-color-active, var(--swatch-73f3ff));
     padding: 14px 16px 8px;
     border-bottom: 1px solid var(--net-chrome-border);
     background: var(--net-chrome-bg);
@@ -1210,37 +1211,37 @@ onBeforeUnmount(() => {
     margin: 12px;
     padding: 16px 14px;
     border-radius: 12px;
-    border: 1px dashed rgba(115, 243, 255, 0.25);
-    background: rgba(19, 67, 98, 0.35);
-    color: #a8c8e8;
-    font-size: 13px;
+    border: 1px dashed var(--swatch-rgba-115-243-255-0_25);
+    background: var(--swatch-rgba-19-67-98-0_35);
+    color: var(--swatch-a8c8e8);
+    font-size: var(--font-size-md);
     line-height: 1.55;
     text-align: center;
   }
 
   .panel-empty__icon {
     display: block;
-    font-size: 28px;
+    font-size: var(--font-size-3xl);
     margin-bottom: 8px;
     opacity: 0.85;
   }
 
   .panel-empty__title {
     margin: 0 0 8px;
-    font-weight: 700;
-    color: #d8ecff;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-color-bright);
   }
 
   .panel-empty__hint {
     margin: 0;
-    font-size: 12px;
-    color: #8eb4d4;
+    font-size: var(--font-size-sm);
+    color: var(--swatch-8eb4d4);
   }
 
   .panel-empty--compact {
     margin: 8px 12px;
     padding: 12px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     text-align: left;
   }
 
@@ -1252,13 +1253,13 @@ onBeforeUnmount(() => {
   .right-panel-divider {
     height: 1px;
     margin: 4px 12px 12px;
-    background: rgba(115, 243, 255, 0.22);
+    background: var(--swatch-rgba-115-243-255-0_22);
   }
 
   .section-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: #d8ecff;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-color-bright);
     text-align: center;
     padding: 10px 8px 4px;
   }
@@ -1295,19 +1296,19 @@ onBeforeUnmount(() => {
     border-right: 1px solid var(--net-chrome-border);
 
     .scroll-title {
-      font-size: 12px;
-      color: #8eb4d4;
+      font-size: var(--font-size-sm);
+      color: var(--swatch-8eb4d4);
       padding: 8px 16px 4px;
       text-align: left;
     }
 
     .tag-text {
-      font-size: 13px;
+      font-size: var(--font-size-md);
       text-align: left;
       padding: 10px 12px;
       margin: 8px 12px;
       background: var(--net-surface-bg);
-      color: #e6f1ff;
+      color: var(--swatch-e6f1ff);
       border-radius: 12px;
       border: 1px solid var(--net-surface-border);
     }
@@ -1335,18 +1336,18 @@ onBeforeUnmount(() => {
         border: 1px solid var(--net-surface-border);
         border-radius: 10px;
         padding: 8px 6px;
-        color: #e6f1ff;
+        color: var(--swatch-e6f1ff);
         text-align: center;
 
         &>span:first-child {
-          font-size: 11px;
-          color: #8eb4d4;
+          font-size: var(--font-size-xs);
+          color: var(--swatch-8eb4d4);
         }
 
         &>span:last-child {
-          font-weight: 700;
-          font-size: 15px;
-          color: #73f3ff;
+          font-weight: var(--font-weight-bold);
+          font-size: var(--font-size-subtitle);
+          color: var(--swatch-73f3ff);
         }
       }
 
@@ -1359,8 +1360,8 @@ onBeforeUnmount(() => {
           padding: 8px 10px;
 
           &>span:last-child {
-            font-size: 13px;
-            color: #e6f1ff;
+            font-size: var(--font-size-md);
+            color: var(--swatch-e6f1ff);
             word-break: break-all;
           }
         }
@@ -1394,9 +1395,9 @@ onBeforeUnmount(() => {
     box-sizing: border-box;
 
     .title {
-      font-weight: bold;
+      font-weight: var(--font-weight-bold);
       font-family: inherit;
-      color: #d8ecff;
+      color: var(--text-color-bright);
       text-align: center;
       padding: 5px 8px;
     }
@@ -1411,26 +1412,26 @@ onBeforeUnmount(() => {
       }
 
       .link-label {
-        color: #cde4ff;
+        color: var(--swatch-cde4ff);
         display: block;
         word-break: break-word;
         white-space: normal;
         line-height: 1.35;
-        font-size: 12px;
+        font-size: var(--font-size-sm);
 
         &.active {
-          color: #ffb0b0;
+          color: var(--swatch-ffb0b0);
         }
       }
 
       .link-number {
         cursor: pointer;
-        color: #73f3ff;
+        color: var(--swatch-73f3ff);
         white-space: nowrap;
         flex-shrink: 0;
 
         &.active {
-          color: #ffb0b0;
+          color: var(--swatch-ffb0b0);
         }
       }
 
@@ -1450,13 +1451,13 @@ onBeforeUnmount(() => {
       }
 
       :deep(.atlas-app-descriptions__title) {
-        color: #d8ecff;
-        font-size: 13px;
+        color: var(--text-color-bright);
+        font-size: var(--font-size-md);
       }
 
       :deep(.atlas-app-descriptions__label) {
-        color: #cde4ff;
-        background: rgba(19, 67, 98, 0.9);
+        color: var(--swatch-cde4ff);
+        background: var(--swatch-rgba-19-67-98-0_9);
         width: auto !important;
         max-width: 72%;
         word-break: break-word;
@@ -1465,8 +1466,8 @@ onBeforeUnmount(() => {
       }
 
       :deep(.atlas-app-descriptions__content) {
-        color: #eef7ff;
-        background: rgba(14, 52, 79, 0.85);
+        color: var(--swatch-eef7ff);
+        background: var(--swatch-rgba-14-52-79-0_85);
         width: auto !important;
         text-align: right;
         vertical-align: middle;
@@ -1509,9 +1510,9 @@ onBeforeUnmount(() => {
   }
 
   .net-toolbar__label {
-    font-size: 13px;
-    font-weight: 700;
-    color: #d8ecff;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-color-bright);
     white-space: nowrap;
     flex-shrink: 0;
   }
@@ -1580,11 +1581,11 @@ onBeforeUnmount(() => {
   .net-toolbar :deep(.atlas-app-switch__label),
   .net-toolbar :deep(.atlas-app-select__placeholder),
   .net-toolbar :deep(.atlas-app-input__inner) {
-    color: #d8ecff;
+    color: var(--text-color-bright);
   }
 
   .net-toolbar :deep(.atlas-app-radio__inner) {
-    border-color: rgba(115, 243, 255, 0.45);
+    border-color: var(--swatch-rgba-115-243-255-0_45);
   }
 
   .net-toolbar :deep(.atlas-app-switch) {

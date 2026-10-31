@@ -1,0 +1,11 @@
+// 全系统颜色的唯一数值来源。页面里不要再写这些色值，改用 tokens.scss 暴露的 CSS 变量。
+// Element Plus 的 Sass 主题必须在编译期拿到真实颜色，所以这里同时给出 Sass 变量。
+
+/** 页面底色 */
+$color-bg: #08162a;
+/** 菜单底色，也是 Element 浮层底色 */
+$color-menu-bg: #0d233b;
+/** 主色 */
+$color-primary: #4f93dd;
+/** 主色按下/加深 */
+$color-primary-dark: #3e7fc4;

@@ -1,6 +1,7 @@
 import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
 import { onBeforeUnmount, watch, type ComputedRef, type Ref, ref } from 'vue'
+import { readThemeColor } from '@/styles/themeColor'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import { formatSatelliteMetaInline } from '@/utils/buildSatelliteAnalysisTable'
 
@@ -13,9 +14,9 @@ const LOD_FAR_DISTANCE = 50_000_000
 /** 视锥体剔除包围球半径（米） */
 const FRUSTUM_BOUNDING_RADIUS = 50_000
 /** 卫星点统一颜色（各 LOD 层级一致） */
-const SATELLITE_POINT_COLOR = Cesium.Color.fromCssColorString('#40f2ff')
+const SATELLITE_POINT_COLOR = Cesium.Color.fromCssColorString(readThemeColor('--accent-cyan-hover'))
 /** 推演中卫星被打击后的点/标签颜色 */
-const STRUCK_SATELLITE_COLOR = Cesium.Color.fromCssColorString('#ef4444')
+const STRUCK_SATELLITE_COLOR = Cesium.Color.fromCssColorString(readThemeColor('--color-danger'))
 /** 选中卫星相机距离（米） */
 const SELECTED_CAMERA_RANGE = 900_000
 

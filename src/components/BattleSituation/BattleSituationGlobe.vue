@@ -48,6 +48,7 @@
 </template>
 
 <script setup lang="ts">
+import { readThemeColor } from '@/styles/themeColor'
 import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
 import { markBattleArea, markTaskCombatArea, resolveBattleSpaceLabelPosition } from '@/utils/tools/cesiumBattleArea'
@@ -627,8 +628,8 @@ const renderBattleLabel = () => {
     label: {
       text: store.battle.name,
       font: 'bold 14px "Microsoft YaHei", sans-serif',
-      fillColor: Cesium.Color.fromCssColorString('#ff3333'),
-      outlineColor: Cesium.Color.fromCssColorString('#1a0000'),
+      fillColor: Cesium.Color.fromCssColorString(readThemeColor('--color-danger-strong')),
+      outlineColor: Cesium.Color.fromCssColorString(readThemeColor('--swatch-1a0000')),
       outlineWidth: 2,
       style: Cesium.LabelStyle.FILL_AND_OUTLINE,
       // 水平居中对齐
@@ -878,11 +879,11 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   padding: 6px 8px;
   text-align: left;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.45;
-  color: #facc15;
-  background: rgba(0, 0, 0, 0.58);
+  color: var(--color-warning);
+  background: var(--swatch-rgba-0-0-0-0_58);
   border-radius: 4px;
   cursor: default;
 }
@@ -904,18 +905,18 @@ onBeforeUnmount(() => {
 }
 
 .globe-sat-detail__title {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
   line-height: 1.3;
-  color: #facc15;
+  color: var(--color-warning);
   margin-bottom: 2px;
 }
 
 .globe-sat-detail__meta {
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
   line-height: 1.35;
-  color: rgba(250, 204, 21, 0.82);
+  color: var(--swatch-rgba-250-204-21-0_82);
   margin-bottom: 6px;
 }
 
@@ -942,17 +943,17 @@ onBeforeUnmount(() => {
 }
 
 .globe-sat-detail__cell-label {
-  font-size: 10px;
-  font-weight: 500;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
   line-height: 1.2;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--swatch-rgba-255-255-255-0_55);
 }
 
 .globe-sat-detail__cell-value {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
   line-height: 1.35;
-  color: #f8fafc;
+  color: var(--text-color-strong);
   word-break: break-word;
   overflow-wrap: anywhere;
   max-width: 100%;

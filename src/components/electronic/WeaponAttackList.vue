@@ -765,16 +765,16 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: #060913;
-  color: #e2e8f0;
+  background-color: var(--swatch-060913);
+  color: var(--text-color-soft);
   overflow: hidden;
 }
 
 .attack-header {
   height: 52px;
-  background: rgba(10, 18, 34, 0.9);
+  background: var(--swatch-rgba-10-18-34-0_9);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(0, 225, 255, 0.2);
+  border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.2);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -787,27 +787,27 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     gap: 10px;
 
     .header-icon {
-      font-size: 20px;
+      font-size: var(--font-size-xl);
     }
 
     .header-title {
-      font-size: 16px;
-      font-weight: 700;
-      color: #00e1ff;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--accent-cyan);
       letter-spacing: 0.5px;
     }
 
     .situation-btn {
       margin-left: 12px;
-      background: linear-gradient(135deg, rgba(239, 107, 115, 0.85), rgba(220, 38, 38, 0.75));
-      border: 1px solid rgba(239, 107, 115, 0.6);
-      color: #fff;
-      font-size: 12px;
-      font-weight: 600;
+      background: linear-gradient(135deg, var(--swatch-rgba-239-107-115-0_85), var(--swatch-rgba-220-38-38-0_75));
+      border: 1px solid var(--swatch-rgba-239-107-115-0_6);
+      color: var(--color-white);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
 
       &:hover {
-        background: linear-gradient(135deg, rgba(239, 107, 115, 1), rgba(220, 38, 38, 0.9));
-        border-color: #ef6b73;
+        background: linear-gradient(135deg, var(--swatch-rgba-239-107-115-1), var(--swatch-rgba-220-38-38-0_9));
+        border-color: var(--color-danger);
       }
     }
   }
@@ -821,18 +821,18 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 15px;
-      background: rgba(8, 14, 26, 0.6);
+      font-size: var(--font-size-subtitle);
+      background: var(--swatch-rgba-8-14-26-0_6);
       padding: 4px 12px;
       border-radius: 4px;
-      border: 1px solid rgba(0, 225, 255, 0.15);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.15);
 
       .label {
-        color: #94a3b8;
+        color: var(--text-color-muted);
       }
 
       .value {
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
       }
     }
   }
@@ -849,18 +849,18 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     width: 240px;
 
     :deep(.atlas-app-input__wrapper) {
-      background-color: rgba(8, 14, 26, 0.8);
-      box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.25) inset;
-      color: #e2e8f0;
+      background-color: var(--swatch-rgba-8-14-26-0_8);
+      box-shadow: 0 0 0 1px rgba(var(--accent-cyan-rgb), 0.25) inset;
+      color: var(--text-color-soft);
 
       &.is-focus {
-        box-shadow: 0 0 0 1px #00e1ff inset;
+        box-shadow: 0 0 0 1px var(--accent-cyan) inset;
       }
     }
 
     :deep(.atlas-app-input__inner) {
-      color: #e2e8f0;
-      font-size: 14px;
+      color: var(--text-color-soft);
+      font-size: var(--font-size-base);
     }
   }
 }
@@ -871,8 +871,8 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   flex-wrap: wrap;
   gap: 12px;
   padding: 10px 20px;
-  background: rgba(8, 14, 26, 0.85);
-  border-bottom: 1px solid rgba(0, 225, 255, 0.12);
+  background: var(--swatch-rgba-8-14-26-0_85);
+  border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
 
   .filter-group {
     display: flex;
@@ -881,8 +881,8 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   }
 
   .filter-label {
-    font-size: 14px;
-    color: #94a3b8;
+    font-size: var(--font-size-base);
+    color: var(--text-color-muted);
     white-space: nowrap;
   }
 
@@ -890,14 +890,14 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     width: 160px;
 
     :deep(.atlas-app-select__wrapper) {
-      background-color: rgba(8, 14, 26, 0.8);
-      box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.2) inset;
+      background-color: var(--swatch-rgba-8-14-26-0_8);
+      box-shadow: 0 0 0 1px rgba(var(--accent-cyan-rgb), 0.2) inset;
     }
 
     :deep(.atlas-app-select__placeholder),
     :deep(.atlas-app-select__selected-item),
     :deep(.atlas-app-tag) {
-      font-size: 14px;
+      font-size: var(--font-size-base);
     }
   }
 
@@ -909,26 +909,26 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     }
 
     :deep(.atlas-app-select__wrapper) {
-      background-color: rgba(8, 14, 26, 0.8);
-      box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.2) inset;
+      background-color: var(--swatch-rgba-8-14-26-0_8);
+      box-shadow: 0 0 0 1px rgba(var(--accent-cyan-rgb), 0.2) inset;
     }
 
     :deep(.atlas-app-select__placeholder),
     :deep(.atlas-app-select__selected-item) {
-      font-size: 14px;
+      font-size: var(--font-size-base);
     }
   }
 
   .filter-divider {
     width: 1px;
     height: 24px;
-    background: rgba(0, 225, 255, 0.15);
+    background: rgba(var(--accent-cyan-rgb), 0.15);
     margin: 0 4px;
   }
 
   .clear-filter-btn {
     margin-left: auto;
-    font-size: 14px;
+    font-size: var(--font-size-base);
   }
 }
 
@@ -944,7 +944,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   }
 
   &::-webkit-scrollbar-thumb {
-    background: rgba(0, 225, 255, 0.3);
+    background: rgba(var(--accent-cyan-rgb), 0.3);
     border-radius: 3px;
   }
 }
@@ -953,8 +953,8 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
 .focused-link-panel {
   margin-bottom: 16px;
   padding: 14px 16px;
-  background: rgba(13, 22, 42, 0.9);
-  border: 1px solid rgba(0, 225, 255, 0.28);
+  background: var(--swatch-rgba-13-22-42-0_9);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.28);
   border-radius: 8px;
 }
 
@@ -970,39 +970,39 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 15px;
-  font-weight: 700;
-  color: #00e1ff;
+  font-size: var(--font-size-subtitle);
+  font-weight: var(--font-weight-bold);
+  color: var(--accent-cyan);
 }
 
 .focused-link-icon {
-  font-size: 16px;
+  font-size: var(--font-size-lg);
 }
 
 .focused-link-status {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   padding: 2px 8px;
   border-radius: 4px;
 
   &.is-ok {
-    color: #34d399;
-    background: rgba(16, 185, 129, 0.15);
+    color: var(--color-success);
+    background: var(--swatch-rgba-16-185-129-0_15);
   }
 
   &.is-blocked {
-    color: #f87171;
-    background: rgba(248, 113, 113, 0.15);
+    color: var(--color-danger-soft);
+    background: var(--swatch-rgba-248-113-113-0_15);
   }
 }
 
 .clear-focus-btn {
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 .focused-link-path {
-  font-size: 14px;
-  color: #e2e8f0;
+  font-size: var(--font-size-base);
+  color: var(--text-color-soft);
   line-height: 1.5;
   margin-bottom: 10px;
   word-break: break-all;
@@ -1022,48 +1022,48 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   gap: 2px;
   padding: 6px 10px;
   border-radius: 6px;
-  background: rgba(8, 14, 26, 0.8);
-  border: 1px solid rgba(0, 225, 255, 0.2);
+  background: var(--swatch-rgba-8-14-26-0_8);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.2);
 }
 
 .link-node-chip--SAT {
-  border-color: rgba(56, 189, 248, 0.45);
+  border-color: var(--swatch-rgba-56-189-248-0_45);
 }
 
 .link-node-chip--RELAY {
-  border-color: rgba(167, 139, 250, 0.45);
+  border-color: var(--swatch-rgba-167-139-250-0_45);
 }
 
 .link-node-chip--RECEIVE {
-  border-color: rgba(251, 191, 36, 0.45);
+  border-color: var(--swatch-rgba-251-191-36-0_45);
 }
 
 .link-node-chip--STATION {
-  border-color: rgba(52, 211, 153, 0.45);
+  border-color: var(--swatch-rgba-52-211-153-0_45);
 }
 
 .link-node-layer {
-  font-size: 11px;
-  color: #94a3b8;
+  font-size: var(--font-size-xs);
+  color: var(--text-color-muted);
 }
 
 .link-node-name {
-  font-size: 13px;
-  color: #f8fafc;
-  font-weight: 600;
+  font-size: var(--font-size-md);
+  color: var(--text-color-strong);
+  font-weight: var(--font-weight-semibold);
 }
 
 .link-node-arrow {
-  color: #64748b;
-  font-size: 14px;
+  color: var(--text-color-subtle);
+  font-size: var(--font-size-base);
 }
 
 .focused-link-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  font-size: 13px;
-  color: #94a3b8;
+  font-size: var(--font-size-md);
+  color: var(--text-color-muted);
 }
 
 .related-windows-title {
@@ -1071,15 +1071,15 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   align-items: center;
   gap: 8px;
   margin: 4px 0 12px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #e2e8f0;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-color-soft);
 }
 
 .related-windows-count {
-  font-size: 12px;
-  font-weight: 600;
-  color: #fde047;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-warning);
 }
 
 .empty-container {
@@ -1089,18 +1089,18 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(10, 18, 34, 0.4);
-  border: 1px dashed rgba(0, 225, 255, 0.2);
+  background: var(--swatch-rgba-10-18-34-0_4);
+  border: 1px dashed rgba(var(--accent-cyan-rgb), 0.2);
   border-radius: 8px;
-  color: #64748b;
+  color: var(--text-color-subtle);
 
   .empty-icon {
-    font-size: 48px;
+    font-size: var(--font-size-hero);
     margin-bottom: 12px;
   }
 
   .empty-text {
-    font-size: 14px;
+    font-size: var(--font-size-base);
   }
 }
 
@@ -1115,32 +1115,32 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
 }
 
 .plan-card {
-  background: rgba(13, 22, 42, 0.85);
-  border: 1px solid rgba(0, 225, 255, 0.2);
+  background: var(--swatch-rgba-13-22-42-0_85);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.2);
   border-radius: 8px;
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px var(--mask-color);
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
   min-width: 0;
 
   &:hover {
-    border-color: rgba(0, 225, 255, 0.45);
-    box-shadow: 0 6px 20px rgba(0, 225, 255, 0.12);
+    border-color: rgba(var(--accent-cyan-rgb), 0.45);
+    box-shadow: 0 6px 20px rgba(var(--accent-cyan-rgb), 0.12);
   }
 
   &.card-cyber {
-    border-left: 4px solid #a855f7;
+    border-left: 4px solid var(--color-purple-deep);
   }
 
   &.card-jamming {
-    border-left: 4px solid #eab308;
+    border-left: 4px solid var(--swatch-eab308);
   }
 
   &.card-kinetic {
-    border-left: 4px solid #ef4444;
+    border-left: 4px solid var(--color-danger-strong);
   }
 }
 
@@ -1149,8 +1149,8 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   align-items: stretch;
   gap: 6px;
   padding: 10px 12px;
-  background: rgba(8, 14, 26, 0.65);
-  border: 1px solid rgba(0, 225, 255, 0.12);
+  background: var(--swatch-rgba-8-14-26-0_65);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
   border-radius: 6px;
   overflow-x: auto;
 
@@ -1159,7 +1159,7 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   }
 
   &::-webkit-scrollbar-thumb {
-    background: rgba(0, 225, 255, 0.25);
+    background: rgba(var(--accent-cyan-rgb), 0.25);
     border-radius: 2px;
   }
 }
@@ -1172,8 +1172,8 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   flex-shrink: 0;
 
   .cell-label {
-    font-size: 13px;
-    color: #64748b;
+    font-size: var(--font-size-md);
+    color: var(--text-color-subtle);
     white-space: nowrap;
   }
 
@@ -1185,8 +1185,8 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
   }
 
   .cell-value {
-    font-size: 15px;
-    font-weight: 700;
+    font-size: var(--font-size-subtitle);
+    font-weight: var(--font-weight-bold);
     white-space: nowrap;
   }
 
@@ -1201,9 +1201,9 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     }
 
     .weapon-name {
-      font-size: 16px;
-      font-weight: 700;
-      color: #ffffff;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-white);
     }
   }
 
@@ -1211,9 +1211,9 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     min-width: 110px;
 
     .target-name {
-      font-size: 15px;
-      font-weight: 700;
-      color: #f87171;
+      font-size: var(--font-size-subtitle);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-danger-soft);
       word-break: break-all;
     }
   }
@@ -1230,15 +1230,15 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     }
 
     .time-range {
-      font-size: 13px;
-      color: #38bdf8;
-      font-weight: 600;
+      font-size: var(--font-size-md);
+      color: var(--color-info);
+      font-weight: var(--font-weight-semibold);
       white-space: nowrap;
     }
 
     .time-sep {
-      color: #64748b;
-      font-size: 13px;
+      color: var(--text-color-subtle);
+      font-size: var(--font-size-md);
     }
   }
 
@@ -1254,50 +1254,50 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
 .summary-arrow {
   display: flex;
   align-items: center;
-  color: rgba(0, 225, 255, 0.35);
-  font-size: 16px;
+  color: rgba(var(--accent-cyan-rgb), 0.35);
+  font-size: var(--font-size-lg);
   padding-top: 14px;
   flex-shrink: 0;
 }
 
 .type-badge {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   padding: 1px 6px;
   border-radius: 3px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 
   &.badge-purple {
-    background: rgba(168, 85, 247, 0.2);
-    color: #c084fc;
-    border: 1px solid rgba(168, 85, 247, 0.4);
+    background: var(--swatch-rgba-168-85-247-0_2);
+    color: var(--swatch-c084fc);
+    border: 1px solid var(--swatch-rgba-168-85-247-0_4);
   }
 
   &.badge-yellow {
-    background: rgba(234, 179, 8, 0.2);
-    color: #fde047;
-    border: 1px solid rgba(234, 179, 8, 0.4);
+    background: var(--swatch-rgba-234-179-8-0_2);
+    color: var(--color-warning);
+    border: 1px solid var(--swatch-rgba-234-179-8-0_4);
   }
 
   &.badge-red {
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.4);
+    background: var(--swatch-rgba-239-68-68-0_2);
+    color: var(--color-danger-soft);
+    border: 1px solid var(--swatch-rgba-239-68-68-0_4);
   }
 
   &.badge-cyan {
-    background: rgba(0, 225, 255, 0.2);
-    color: #38bdf8;
-    border: 1px solid rgba(0, 225, 255, 0.4);
+    background: rgba(var(--accent-cyan-rgb), 0.2);
+    color: var(--color-info);
+    border: 1px solid rgba(var(--accent-cyan-rgb), 0.4);
   }
 }
 
 .duration-tag {
-  color: #34d399;
+  color: var(--color-success);
 }
 
 .angle-tag {
-  color: #fbbf24;
+  color: var(--color-warning);
 }
 
 .windows-section {
@@ -1309,21 +1309,21 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 14px;
-    font-weight: 600;
-    color: #94a3b8;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-color-muted);
     padding: 0 2px;
 
     .window-count {
-      font-size: 13px;
-      color: #64748b;
-      font-weight: 500;
+      font-size: var(--font-size-md);
+      color: var(--text-color-subtle);
+      font-weight: var(--font-weight-medium);
     }
   }
 }
 
 .windows-table {
-  border: 1px solid rgba(0, 225, 255, 0.1);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.1);
   border-radius: 4px;
   overflow: hidden;
 
@@ -1334,32 +1334,32 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     align-items: center;
     gap: 8px;
     padding: 6px 10px;
-    font-size: 13px;
+    font-size: var(--font-size-md);
   }
 
   &__head {
-    background: rgba(8, 14, 26, 0.8);
-    color: #64748b;
-    font-weight: 600;
-    border-bottom: 1px solid rgba(0, 225, 255, 0.1);
+    background: var(--swatch-rgba-8-14-26-0_8);
+    color: var(--text-color-subtle);
+    font-weight: var(--font-weight-semibold);
+    border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.1);
   }
 
   &__row {
-    background: rgba(18, 30, 56, 0.45);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    background: var(--swatch-rgba-18-30-56-0_45);
+    border-bottom: 1px solid var(--swatch-rgba-255-255-255-0_04);
 
     &:last-child {
       border-bottom: none;
     }
 
     &:hover {
-      background: rgba(18, 30, 56, 0.75);
+      background: var(--swatch-rgba-18-30-56-0_75);
     }
   }
 
   .col-index {
-    color: #00e1ff;
-    font-weight: 600;
+    color: var(--accent-cyan);
+    font-weight: var(--font-weight-semibold);
   }
 
   .col-time {
@@ -1367,44 +1367,44 @@ const formatTotalWindowsDuration = (plan: AttackPlanItem): string => {
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-    color: #e2e8f0;
+    color: var(--text-color-soft);
     min-width: 0;
 
     .time-arrow {
-      color: #64748b;
+      color: var(--text-color-subtle);
       flex-shrink: 0;
     }
   }
 
   .col-duration {
-    color: #a7f3d0;
+    color: var(--swatch-a7f3d0);
     text-align: right;
     white-space: nowrap;
   }
 }
 
 .no-windows-tip {
-  font-size: 14px;
-  color: #64748b;
+  font-size: var(--font-size-base);
+  color: var(--text-color-subtle);
   font-style: italic;
   padding: 8px 10px;
-  background: rgba(18, 30, 56, 0.4);
+  background: var(--swatch-rgba-18-30-56-0_4);
   border-radius: 4px;
 }
 
 .glow-text-cyan {
-  color: #00e1ff;
-  text-shadow: 0 0 6px rgba(0, 225, 255, 0.4);
+  color: var(--accent-cyan);
+  text-shadow: 0 0 6px rgba(var(--accent-cyan-rgb), 0.4);
 }
 
 .glow-text-yellow {
-  color: #fde047;
-  text-shadow: 0 0 6px rgba(253, 224, 71, 0.4);
+  color: var(--color-warning);
+  text-shadow: 0 0 6px var(--swatch-rgba-253-224-71-0_4);
 }
 
 .glow-text-red {
-  color: #f87171;
-  text-shadow: 0 0 6px rgba(248, 113, 113, 0.4);
+  color: var(--color-danger-soft);
+  text-shadow: 0 0 6px var(--swatch-rgba-248-113-113-0_4);
 }
 
 </style>

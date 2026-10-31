@@ -387,92 +387,92 @@ watch(
 <style lang="scss">
 .scene-edit-dialog-modal.atlas-app-overlay,
 .atlas-app-overlay.scene-edit-dialog-modal {
-  background-color: rgba(4, 10, 20, 0.72) !important;
+  background-color: var(--swatch-rgba-4-10-20-0_72) !important;
 }
 
 .atlas-app-dialog.scene-edit-dialog,
 .scene-edit-dialog .atlas-app-dialog {
-  --el-dialog-bg-color: rgba(8, 15, 26, 0.96);
-  --el-color-primary: #00e1ff;
-  background: rgba(8, 15, 26, 0.96) !important;
-  border: 1px solid rgba(0, 225, 255, 0.28) !important;
+  --el-dialog-bg-color: var(--dialog-bg);
+  --el-color-primary: var(--accent-cyan);
+  background: var(--dialog-bg) !important;
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.28) !important;
   border-radius: 10px !important;
   box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.55),
-    0 0 18px rgba(0, 225, 255, 0.12) !important;
+    0 16px 40px var(--mask-color),
+    0 0 18px rgba(var(--accent-cyan-rgb), 0.12) !important;
 
   .atlas-app-dialog__header {
     margin-right: 0;
     padding: 14px 20px 12px;
-    background: linear-gradient(90deg, rgba(0, 225, 255, 0.12) 0%, rgba(8, 15, 26, 0) 100%);
-    border-bottom: 1px solid rgba(0, 225, 255, 0.18);
+    background: linear-gradient(90deg, rgba(var(--accent-cyan-rgb), 0.12) 0%, var(--swatch-rgba-8-15-26-0) 100%);
+    border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
   }
 
   .atlas-app-dialog__title {
-    color: #40f2ff !important;
-    font-size: 15px;
-    font-weight: 700;
-    text-shadow: 0 0 8px rgba(64, 242, 255, 0.4);
+    color: var(--accent-cyan-hover) !important;
+    font-size: var(--font-size-subtitle);
+    font-weight: var(--font-weight-bold);
+    text-shadow: 0 0 8px var(--swatch-rgba-64-242-255-0_4);
   }
 
   .atlas-app-dialog__headerbtn .atlas-app-dialog__close {
-    color: #94a3b8 !important;
+    color: var(--text-color-muted) !important;
 
     &:hover {
-      color: #00e1ff !important;
+      color: var(--accent-cyan) !important;
     }
   }
 
   .atlas-app-dialog__body {
     padding: 16px 20px 8px;
-    background: rgba(12, 22, 38, 0.72);
-    color: #e2efff;
+    background: var(--swatch-rgba-12-22-38-0_72);
+    color: var(--text-color-bright);
     max-height: 62vh;
     overflow-y: auto;
   }
 
   .atlas-app-dialog__footer {
     padding: 12px 20px 16px;
-    background: rgba(8, 15, 26, 0.92);
-    border-top: 1px solid rgba(0, 225, 255, 0.18);
+    background: var(--swatch-rgba-8-15-26-0_92);
+    border-top: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
   }
 
   .atlas-app-form-item__label {
-    color: #7dd3fc !important;
-    font-size: 13px;
+    color: var(--color-info-soft) !important;
+    font-size: var(--font-size-md);
   }
 
   .atlas-app-input__wrapper,
   .atlas-app-textarea__wrapper {
-    background-color: rgba(8, 20, 36, 0.9) !important;
-    box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.32) inset !important;
+    background-color: var(--swatch-rgba-8-20-36-0_9) !important;
+    box-shadow: 0 0 0 1px rgba(var(--accent-cyan-rgb), 0.32) inset !important;
   }
 
   .atlas-app-textarea__inner,
   .atlas-app-input__inner {
-    color: #e2efff !important;
+    color: var(--text-color-bright) !important;
     background-color: transparent !important;
   }
 
   .scene-edit-btn--ghost.atlas-app-button {
-    color: #cbd5e1 !important;
-    background: rgba(15, 23, 42, 0.85) !important;
-    border: 1px solid rgba(148, 163, 184, 0.4) !important;
+    color: var(--text-color-soft) !important;
+    background: var(--swatch-rgba-15-23-42-0_85) !important;
+    border: 1px solid var(--swatch-rgba-148-163-184-0_4) !important;
   }
 
   .scene-edit-btn--primary.atlas-app-button {
-    color: #08202c !important;
-    background: linear-gradient(135deg, #40f2ff, #00b8d4) !important;
-    border: 1px solid #00e1ff !important;
+    color: var(--on-accent-cyan) !important;
+    background: linear-gradient(135deg, var(--accent-cyan-hover), var(--swatch-00b8d4)) !important;
+    border: 1px solid var(--accent-cyan) !important;
   }
 }
 
 .polygon-area-item {
   margin-bottom: 8px;
   padding: 8px 10px;
-  border: 1px dashed rgba(0, 225, 255, 0.22);
+  border: 1px dashed rgba(var(--accent-cyan-rgb), 0.22);
   border-radius: 6px;
-  background: rgba(8, 20, 36, 0.45);
+  background: var(--swatch-rgba-8-20-36-0_45);
 }
 
 .area-name-row {
@@ -493,12 +493,12 @@ watch(
   align-items: center;
   gap: 6px;
   flex: 1;
-  color: #94a3b8;
-  font-size: 12px;
+  color: var(--text-color-muted);
+  font-size: var(--font-size-sm);
 }
 
 .coord-empty {
-  font-size: 12px;
-  color: #64748b;
+  font-size: var(--font-size-sm);
+  color: var(--text-color-subtle);
 }
 </style>

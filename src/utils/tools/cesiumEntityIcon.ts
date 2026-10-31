@@ -1,3 +1,4 @@
+import { readThemeColor } from '@/styles/themeColor'
 import * as Cesium from 'cesium'
 
 /**
@@ -37,7 +38,7 @@ export const createWeaponIconDataUri = (weaponType: string, color: Cesium.Color,
   const solidColor = Cesium.Color.clone(color, new Cesium.Color())
   solidColor.alpha = 1
   const fillColor = solidColor.toCssColorString()
-  const strokeColor = '#ffffff'
+  const strokeColor = readThemeColor('--swatch-ffffff')
 
   /**
    * 用统一视口把武器图形包成 SVG 文本。尺寸随 `iconScale` 放大。
@@ -120,7 +121,7 @@ export const createSatelliteStrikeStarDataUri = (color: Cesium.Color, iconScale 
   const solidColor = Cesium.Color.clone(color, new Cesium.Color())
   solidColor.alpha = 1
   const fillColor = solidColor.toCssColorString()
-  const strokeColor = '#ffffff'
+  const strokeColor = readThemeColor('--swatch-ffffff')
   const size = 30 * iconScale
   const center = 14
   const outerRadius = 12
@@ -156,12 +157,12 @@ export const createStationExplosionDiamondDataUri = (color: Cesium.Color, iconSc
   const solidColor = Cesium.Color.clone(color, new Cesium.Color())
   solidColor.alpha = 1
   const strokeColor = solidColor.toCssColorString()
-  const fillColor = 'rgba(239, 107, 115, 0.25)'
+  const fillColor = readThemeColor('--swatch-rgba-239-107-115-0_25')
   const size = 32 * iconScale
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 32 32">
       <polygon points="16,2 30,16 16,30 2,16" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2" stroke-linejoin="round"/>
-      <polygon points="16,6 26,16 16,26 6,16" fill="none" stroke="#ffffff" stroke-width="1" stroke-dasharray="2,2"/>
+      <polygon points="16,6 26,16 16,26 6,16" fill="none" stroke=readThemeColor('--swatch-ffffff') stroke-width="1" stroke-dasharray="2,2"/>
     </svg>
   `.trim()
 

@@ -136,6 +136,7 @@
 </template>
 
 <script setup lang="ts">
+import { readThemeColor } from '@/styles/themeColor'
 import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
 import G6 from '@antv/g6'
 import * as echarts from 'echarts'
@@ -871,22 +872,22 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
         : '色块颜色表示该时间片落入该覆盖率梯队的卫星数量；悬停可看打击前后覆盖率',
       left: 16,
       top: 4,
-      textStyle: { color: '#67e8f9', fontSize: 12, fontWeight: 700 },
-      subtextStyle: { color: '#94a3b8', fontSize: 10 },
+      textStyle: { color: readThemeColor('--color-info-bright'), fontSize: 12, fontWeight: 700 },
+      subtextStyle: { color: readThemeColor('--text-color-muted'), fontSize: 10 },
     },
     tooltip: {
       trigger: 'item',
       confine: false,
-      backgroundColor: 'rgba(8, 15, 26, 0.96)',
-      borderColor: 'rgba(234, 179, 8, 0.55)',
+      backgroundColor: readThemeColor('--dialog-bg'),
+      borderColor: readThemeColor('--swatch-rgba-234-179-8-0_55'),
       borderWidth: 1,
       padding: [10, 12],
       textStyle: {
-        color: '#e2e8f0',
+        color: readThemeColor('--text-color-soft'),
         fontSize: 12,
         align: 'left',
       },
-      extraCssText: 'text-align: left; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); overflow: visible;',
+      extraCssText: 'text-align: left; box-shadow: 0 8px 24px var(--mask-color); overflow: visible;',
       formatter: (params: { data?: readonly [string, string, number] }) => {
         const point = params.data
         if (!point) return '暂无覆盖率数据'
@@ -911,21 +912,21 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
     xAxis: {
       type: 'category',
       name: '',
-      nameTextStyle: { color: '#94a3b8' },
+      nameTextStyle: { color: readThemeColor('--text-color-muted') },
       data: timeLabels,
-      axisLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.35)' } },
+      axisLine: { lineStyle: { color: readThemeColor('--swatch-rgba-103-232-249-0_35') } },
       axisLabel: { show: true },
       axisTick: { show: true },
-      splitArea: { show: true, areaStyle: { color: ['rgba(14, 28, 48, 0.46)', 'rgba(8, 15, 26, 0.46)'] } },
+      splitArea: { show: true, areaStyle: { color: [readThemeColor('--swatch-rgba-14-28-48-0_46'), readThemeColor('--swatch-rgba-8-15-26-0_46')] } },
     },
     yAxis: {
       type: 'category',
       name: '',
-      nameTextStyle: { color: '#94a3b8' },
+      nameTextStyle: { color: readThemeColor('--text-color-muted') },
       data: STARLINK_COVERAGE_BRACKETS,
-      axisLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.35)' } },
-      axisLabel: { color: '#94a3b8', fontSize: 9, interval: 0 },
-      splitArea: { show: true, areaStyle: { color: ['rgba(14, 28, 48, 0.46)', 'rgba(8, 15, 26, 0.46)'] } },
+      axisLine: { lineStyle: { color: readThemeColor('--swatch-rgba-103-232-249-0_35') } },
+      axisLabel: { color: readThemeColor('--text-color-muted'), fontSize: 9, interval: 0 },
+      splitArea: { show: true, areaStyle: { color: [readThemeColor('--swatch-rgba-14-28-48-0_46'), readThemeColor('--swatch-rgba-8-15-26-0_46')] } },
     },
     visualMap: {
       show: true,
@@ -939,27 +940,27 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
       itemWidth: 8,
       itemHeight: 88,
       text: ['多', '少'],
-      textStyle: { color: '#94a3b8', fontSize: 10 },
-      inRange: { color: ['#102a43', '#1890ff', '#52c41a', '#faad14', '#ff4d4f'] },
+      textStyle: { color: readThemeColor('--text-color-muted'), fontSize: 10 },
+      inRange: { color: [readThemeColor('--swatch-102a43'), readThemeColor('--color-link'), readThemeColor('--swatch-52c41a'), readThemeColor('--swatch-faad14'), readThemeColor('--color-danger-strong')] },
     },
     graphic: cells.length
       ? []
-      : [{ type: 'text', left: 'center', top: 'middle', style: { text: '暂无带经纬度的卫星链路覆盖率数据', fill: '#94a3b8', fontSize: 14 } }],
+      : [{ type: 'text', left: 'center', top: 'middle', style: { text: '暂无带经纬度的卫星链路覆盖率数据', fill: readThemeColor('--text-color-muted'), fontSize: 14 } }],
     series: [{
       type: 'heatmap',
       data: heatmapData,
       label: { show: false },
-      itemStyle: { borderColor: 'rgba(8, 15, 26, 0.9)', borderWidth: 1 },
-      emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(34, 211, 238, 0.75)' } },
+      itemStyle: { borderColor: readThemeColor('--swatch-rgba-8-15-26-0_9'), borderWidth: 1 },
+      emphasis: { itemStyle: { shadowBlur: 10, shadowColor: readThemeColor('--swatch-rgba-34-211-238-0_75') } },
       markLine: strikeSplitLabel
         ? {
           silent: true,
           symbol: 'none',
           animation: false,
-          lineStyle: { color: '#fb923c', width: 2, type: 'dashed' },
+          lineStyle: { color: readThemeColor('--color-orange'), width: 2, type: 'dashed' },
           label: {
             formatter: '',
-            color: '#fdba74',
+            color: readThemeColor('--color-warning-soft'),
             fontSize: 11,
             fontWeight: 700,
           },
@@ -974,8 +975,8 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
               {
                 name: '',
                 xAxis: firstTimeLabel,
-                itemStyle: { color: 'rgba(34, 197, 94, 0.08)' },
-                label: { color: '#86efac', fontSize: 11, fontWeight: 700, position: 'insideTopLeft' },
+                itemStyle: { color: readThemeColor('--swatch-rgba-34-197-94-0_08') },
+                label: { color: readThemeColor('--color-success-soft'), fontSize: 11, fontWeight: 700, position: 'insideTopLeft' },
               },
               { xAxis: strikeSplitLabel },
             ],
@@ -983,8 +984,8 @@ const renderStarlinkCoverageHeatmap = (): boolean => {
               {
                 name: '',
                 xAxis: strikeSplitLabel,
-                itemStyle: { color: 'rgba(249, 115, 22, 0.10)' },
-                label: { color: '#fdba74', fontSize: 11, fontWeight: 700, position: 'insideTopRight' },
+                itemStyle: { color: readThemeColor('--swatch-rgba-249-115-22-0_10') },
+                label: { color: readThemeColor('--color-warning-soft'), fontSize: 11, fontWeight: 700, position: 'insideTopRight' },
               },
               { xAxis: lastTimeLabel },
             ],
@@ -1134,19 +1135,19 @@ const TOPO_NODE_SIZE: Record<TopoNodeKind, number | [number, number]> = {
 
 const getTopoNodeColors = (kind: TopoNodeKind, struck: boolean) => {
   if (struck) {
-    return { fill: '#2d1215', stroke: '#ff4d4f', shadow: 'rgba(255, 77, 79, 0.45)' }
+    return { fill: readThemeColor('--swatch-2d1215'), stroke: readThemeColor('--color-danger-strong'), shadow: readThemeColor('--swatch-rgba-255-77-79-0_45') }
   }
   switch (kind) {
     case 'sat':
-      return { fill: '#092638', stroke: '#00e1ff', shadow: 'rgba(0, 225, 255, 0.35)' }
+      return { fill: readThemeColor('--swatch-092638'), stroke: readThemeColor('--accent-cyan'), shadow: readThemeColor('--swatch-rgba-0_35') }
     case 'relay':
-      return { fill: '#1e112a', stroke: '#a855f7', shadow: 'rgba(168, 85, 247, 0.4)' }
+      return { fill: readThemeColor('--swatch-1e112a'), stroke: readThemeColor('--color-purple-deep'), shadow: readThemeColor('--swatch-rgba-168-85-247-0_4') }
     case 'receive':
-      return { fill: '#0a2e2b', stroke: '#00f2fe', shadow: 'rgba(0, 242, 254, 0.35)' }
+      return { fill: readThemeColor('--swatch-0a2e2b'), stroke: readThemeColor('--accent-cyan'), shadow: readThemeColor('--swatch-rgba-0-242-254-0_35') }
     case 'station':
-      return { fill: '#10244c', stroke: '#3b82f6', shadow: 'rgba(59, 130, 246, 0.35)' }
+      return { fill: readThemeColor('--swatch-10244c'), stroke: readThemeColor('--accent-color'), shadow: readThemeColor('--swatch-rgba-59-130-246-0_35') }
     case 'target':
-      return { fill: '#0f2742', stroke: '#1890ff', shadow: 'rgba(24, 144, 255, 0.4)' }
+      return { fill: readThemeColor('--swatch-0f2742'), stroke: readThemeColor('--color-link'), shadow: readThemeColor('--swatch-rgba-24-144-255-0_4') }
   }
 }
 
@@ -1218,7 +1219,7 @@ const buildTopoNode = (opts: {
         position: 'bottom',
         offset: hasSubLabel ? 14 : 8,
         style: {
-          fill: '#e2efff',
+          fill: readThemeColor('--text-color-bright'),
           fontSize: hasSubLabel ? 9 : 10,
           fontWeight: 500,
           lineHeight: 14,
@@ -1800,9 +1801,9 @@ const receiveNodeCount = ref(0)
 const stationNodeCount = ref(0)
 
 /** 正常链路颜色（青色实线） */
-const LINK_COLOR_NORMAL = '#00e1ff'
+const LINK_COLOR_NORMAL = readThemeColor('--accent-cyan')
 /** 被打击链路颜色（灰色虚线） */
-const LINK_COLOR_STRUCK = '#94a3b8'
+const LINK_COLOR_STRUCK = readThemeColor('--text-color-muted')
 
 /**
  * 将链路节点映射为 G6 图节点 ID
@@ -2449,8 +2450,8 @@ const initOrUpdateGraph = () => {
       defaultNode: {
         type: 'circle',
         style: {
-          fill: '#092638',
-          stroke: '#00e1ff',
+          fill: readThemeColor('--swatch-092638'),
+          stroke: readThemeColor('--accent-cyan'),
           lineWidth: 2,
         },
       },
@@ -2856,16 +2857,16 @@ onUnmounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background-color: #060913;
-  color: #e2e8f0;
+  background-color: var(--swatch-060913);
+  color: var(--text-color-soft);
   overflow: hidden;
 }
 
 .cema-header {
   height: 52px;
-  background: rgba(10, 18, 34, 0.9);
+  background: var(--swatch-rgba-10-18-34-0_9);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(0, 225, 255, 0.2);
+  border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.2);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2873,9 +2874,9 @@ onUnmounted(() => {
   z-index: 100;
 
   .header-title {
-    font-size: 18px;
-    font-weight: 700;
-    color: #00e1ff;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--accent-cyan);
     letter-spacing: 1px;
   }
 }
@@ -2888,16 +2889,16 @@ onUnmounted(() => {
 
 .all-links-btn,
 .clear-sat-btn {
-  border: 1px solid rgba(0, 225, 255, 0.28);
-  background: rgba(8, 14, 26, 0.7);
-  color: #94eaff;
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.28);
+  background: var(--swatch-rgba-8-14-26-0_7);
+  color: var(--swatch-94eaff);
 }
 
 .clear-sat-btn:hover,
 .clear-sat-btn:focus {
-  border-color: rgba(0, 225, 255, 0.45);
-  background: rgba(0, 225, 255, 0.12);
-  color: #e0faff;
+  border-color: rgba(var(--accent-cyan-rgb), 0.45);
+  background: rgba(var(--accent-cyan-rgb), 0.12);
+  color: var(--swatch-e0faff);
 }
 
 .selection-status {
@@ -2906,8 +2907,8 @@ onUnmounted(() => {
   gap: 14px;
   padding: 4px 10px;
   border-radius: 4px;
-  border: 1px solid rgba(0, 225, 255, 0.18);
-  background: rgba(8, 14, 26, 0.7);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
+  background: var(--swatch-rgba-8-14-26-0_7);
 
   .status-item {
     display: flex;
@@ -2917,14 +2918,14 @@ onUnmounted(() => {
   }
 
   .label-text {
-    font-size: 13px;
-    color: #94a3b8;
+    font-size: var(--font-size-md);
+    color: var(--text-color-muted);
   }
 
   .status-val {
-    font-size: 14px;
-    font-weight: 700;
-    color: #67e8f9;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-info-bright);
     max-width: 160px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2937,8 +2938,8 @@ onUnmounted(() => {
   gap: 8px;
 
   .label-text {
-    font-size: 13px;
-    color: #94a3b8;
+    font-size: var(--font-size-md);
+    color: var(--text-color-muted);
     white-space: nowrap;
   }
 
@@ -2950,23 +2951,23 @@ onUnmounted(() => {
 .v-divider {
   width: 1px;
   height: 22px;
-  background: rgba(0, 225, 255, 0.2);
+  background: rgba(var(--accent-cyan-rgb), 0.2);
 }
 
 .header-right {
   display: flex;
   align-items: center;
   gap: 16px;
-  font-size: 14px;
-  color: #94a3b8;
+  font-size: var(--font-size-base);
+  color: var(--text-color-muted);
 
   .label-text {
     margin-right: 5px;
   }
 
   .time-value {
-    color: #00e1ff;
-    font-weight: 600;
+    color: var(--accent-cyan);
+    font-weight: var(--font-weight-semibold);
   }
 }
 
@@ -2978,7 +2979,7 @@ onUnmounted(() => {
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(circle at 50% 50%, #0a1326 0%, #050811 100%);
+  background: radial-gradient(circle at 50% 50%, var(--swatch-0a1326) 0%, var(--swatch-050811) 100%);
 }
 
 .topo-empty-state {
@@ -2992,36 +2993,36 @@ onUnmounted(() => {
   text-align: center;
 
   .empty-icon {
-    font-size: 42px;
+    font-size: var(--font-size-hero);
     opacity: 0.85;
   }
 
   .empty-title {
     margin: 0;
-    font-size: 18px;
-    font-weight: 700;
-    color: #e2efff;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-color-bright);
   }
 
   .empty-sub {
     margin: 0;
     max-width: 420px;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     line-height: 1.6;
-    color: #94a3b8;
+    color: var(--text-color-muted);
   }
 }
 
 .topo-summary-bar {
   height: 36px;
-  background: rgba(13, 22, 40, 0.6);
-  border-bottom: 1px solid rgba(0, 225, 255, 0.1);
+  background: var(--swatch-rgba-13-22-40-0_6);
+  border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.1);
   display: flex;
   align-items: center;
   padding: 0 20px;
   gap: 20px;
-  font-size: 13px;
-  color: #cbd5e1;
+  font-size: var(--font-size-md);
+  color: var(--text-color-soft);
 
   .stat-badge {
     display: flex;
@@ -3036,38 +3037,38 @@ onUnmounted(() => {
   }
 
   .dot-sat {
-    background: #00e1ff;
-    box-shadow: 0 0 6px #00e1ff;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 6px var(--accent-cyan);
   }
 
   .dot-rec {
-    background: #00f2fe;
+    background: var(--accent-cyan);
   }
 
   .dot-station {
-    background: #3b82f6;
+    background: var(--accent-color);
   }
 
   .dot-normal-link {
-    background: #52c41a;
+    background: var(--swatch-52c41a);
   }
 
   .dot-striking-link {
-    background: #ff4d4f;
-    box-shadow: 0 0 6px #ff4d4f;
+    background: var(--color-danger-strong);
+    box-shadow: 0 0 6px var(--color-danger-strong);
   }
 
   .dot-severed-link {
-    background: #94a3b8;
+    background: var(--text-color-muted);
   }
 
   .dot-struck-link {
-    background: #ff4d4f;
-    box-shadow: 0 0 6px #ff4d4f;
+    background: var(--color-danger-strong);
+    box-shadow: 0 0 6px var(--color-danger-strong);
   }
 
   .alert-stat {
-    color: #ff7875;
+    color: var(--swatch-ff7875);
   }
 }
 
@@ -3088,13 +3089,13 @@ onUnmounted(() => {
   &--left {
     width: 460px;
     min-width: 460px;
-    border-right: 1px solid rgba(0, 225, 255, 0.18);
+    border-right: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
   }
 
   &--right {
     width: 480px;
     min-width: 480px;
-    border-left: 1px solid rgba(0, 225, 255, 0.18);
+    border-left: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
   }
 
   :deep(.c2-panel) {
@@ -3105,8 +3106,8 @@ onUnmounted(() => {
 .topo-chain-banner {
   margin: 0;
   padding: 8px 16px 10px;
-  border-bottom: 1px solid rgba(0, 225, 255, 0.18);
-  background: linear-gradient(180deg, rgba(8, 20, 40, 0.95) 0%, rgba(6, 14, 28, 0.85) 100%);
+  border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
+  background: linear-gradient(180deg, var(--swatch-rgba-8-20-40-0_95) 0%, var(--swatch-rgba-6-14-28-0_85) 100%);
 
   .chain-banner-head {
     display: flex;
@@ -3117,15 +3118,15 @@ onUnmounted(() => {
   }
 
   .chain-banner-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: #7dd3fc;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-info-soft);
   }
 
   .chain-banner-time {
-    font-size: 12px;
-    font-family: monospace;
-    color: #67e8f9;
+    font-size: var(--font-size-sm);
+    font-family: var(--font-family-mono);
+    color: var(--color-info-bright);
   }
 
   .chain-banner-flow {
@@ -3135,8 +3136,8 @@ onUnmounted(() => {
     gap: 6px 8px;
     padding: 8px 10px;
     border-radius: 6px;
-    border: 1px solid rgba(56, 189, 248, 0.25);
-    background: rgba(10, 18, 34, 0.85);
+    border: 1px solid var(--swatch-rgba-56-189-248-0_25);
+    background: var(--swatch-rgba-10-18-34-0_85);
   }
 
   .chain-banner-step {
@@ -3147,13 +3148,13 @@ onUnmounted(() => {
     max-width: 120px;
 
     .step-icon {
-      font-size: 14px;
+      font-size: var(--font-size-base);
     }
 
     .step-name {
-      font-size: 12px;
-      font-weight: 600;
-      color: #e2e8f0;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-color-soft);
       text-align: center;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -3162,24 +3163,24 @@ onUnmounted(() => {
     }
 
     .step-sub {
-      font-size: 9px;
-      color: #64748b;
+      font-size: var(--font-size-caption);
+      color: var(--text-color-subtle);
     }
   }
 
   .chain-banner-arrow {
-    color: #38bdf8;
-    font-weight: 700;
-    font-size: 14px;
+    color: var(--color-info);
+    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-base);
   }
 
   .chain-banner-blocked {
-    font-size: 11px;
-    color: #fca5a5;
+    font-size: var(--font-size-xs);
+    color: var(--color-danger-soft);
     padding: 6px 10px;
     border-radius: 4px;
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.25);
+    background: var(--swatch-rgba-239-68-68-0_1);
+    border: 1px solid var(--swatch-rgba-239-68-68-0_25);
   }
 }
 
@@ -3224,15 +3225,15 @@ onUnmounted(() => {
   max-width: 320px;
   padding: 6px 10px;
   border-radius: 6px;
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid rgba(250, 204, 21, 0.4);
-  color: #fde68a;
-  font-size: 12px;
-  font-weight: 600;
+  background: var(--swatch-rgba-15-23-42-0_92);
+  border: 1px solid var(--swatch-rgba-250-204-21-0_4);
+  color: var(--swatch-fde68a);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.45;
   text-align: left;
   pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 12px var(--swatch-rgba-0-0-0-0_35);
 }
 
 .graph-layer-label {
@@ -3245,12 +3246,12 @@ onUnmounted(() => {
   gap: 8px;
   padding: 6px 8px;
   border-radius: 6px;
-  background: rgba(13, 24, 46, 0.88);
-  border: 1px solid rgba(0, 225, 255, 0.25);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  background: var(--swatch-rgba-13-24-46-0_88);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
+  box-shadow: 0 4px 12px var(--swatch-rgba-0-0-0-0_35);
 
   .layer-icon {
-    font-size: 16px;
+    font-size: var(--font-size-lg);
     flex-shrink: 0;
   }
 
@@ -3261,39 +3262,39 @@ onUnmounted(() => {
   }
 
   .layer-title {
-    font-size: 12px;
-    font-weight: 700;
-    color: #00e1ff;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--accent-cyan);
     line-height: 1.3;
   }
 
   .layer-sub {
-    font-size: 9px;
-    color: #64748b;
+    font-size: var(--font-size-caption);
+    color: var(--text-color-subtle);
     line-height: 1.2;
   }
 
   &.layer-2-item {
-    border-color: rgba(0, 242, 254, 0.3);
+    border-color: var(--swatch-rgba-0-242-254-0_3);
 
     .layer-title {
-      color: #00f2fe;
+      color: var(--accent-cyan);
     }
   }
 
   &.layer-3-item {
-    border-color: rgba(0, 242, 254, 0.3);
+    border-color: var(--swatch-rgba-0-242-254-0_3);
 
     .layer-title {
-      color: #00f2fe;
+      color: var(--accent-cyan);
     }
   }
 
   &.layer-4-item {
-    border-color: rgba(59, 130, 246, 0.3);
+    border-color: var(--swatch-rgba-59-130-246-0_3);
 
     .layer-title {
-      color: #60a5fa;
+      color: var(--swatch-60a5fa);
     }
   }
 }
@@ -3305,24 +3306,24 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 10px;
   padding: 6px 12px;
-  border-top: 1px solid rgba(0, 225, 255, 0.12);
-  background: rgba(9, 16, 30, 0.85);
-  font-size: 13px;
+  border-top: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
+  background: var(--swatch-rgba-9-16-30-0_85);
+  font-size: var(--font-size-md);
 
   .toolbar-label {
-    color: #94a3b8;
+    color: var(--text-color-muted);
   }
 
   .time-value {
-    color: #00e1ff;
-    font-weight: 600;
-    font-family: Consolas, monospace;
+    color: var(--accent-cyan);
+    font-weight: var(--font-weight-semibold);
+    font-family: var(--font-family-mono);
   }
 
   .toolbar-divider {
     width: 1px;
     height: 14px;
-    background: rgba(148, 163, 184, 0.35);
+    background: var(--swatch-rgba-148-163-184-0_35);
   }
 
   .time-window-select {
@@ -3335,32 +3336,32 @@ onUnmounted(() => {
     gap: 6px;
     border-radius: 4px;
     padding: 2px 10px;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 
     .badge-label {
-      color: #94a3b8;
+      color: var(--text-color-muted);
     }
 
     .badge-val {
-      font-size: 14px;
-      font-weight: 700;
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-bold);
     }
 
     &.pre-strike-badge {
-      border: 1px solid rgba(0, 225, 255, 0.35);
-      background: rgba(0, 225, 255, 0.08);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.35);
+      background: rgba(var(--accent-cyan-rgb), 0.08);
 
       .badge-val {
-        color: #00e1ff;
+        color: var(--accent-cyan);
       }
     }
 
     &.post-strike-badge {
-      border: 1px solid rgba(255, 120, 117, 0.35);
-      background: rgba(255, 77, 79, 0.08);
+      border: 1px solid var(--swatch-rgba-255-120-117-0_35);
+      background: var(--swatch-rgba-255-77-79-0_08);
 
       .badge-val {
-        color: #ff7875;
+        color: var(--swatch-ff7875);
       }
     }
   }
@@ -3399,11 +3400,11 @@ onUnmounted(() => {
     pointer-events: none;
     padding: 6px 10px;
     border-radius: 6px;
-    font-size: 12px;
-    color: #e2efff;
-    background: rgba(8, 14, 28, 0.95);
-    border: 1px solid rgba(0, 225, 255, 0.35);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    font-size: var(--font-size-sm);
+    color: var(--text-color-bright);
+    background: var(--swatch-rgba-8-14-28-0_95);
+    border: 1px solid rgba(var(--accent-cyan-rgb), 0.35);
+    box-shadow: 0 4px 14px var(--mask-color);
     white-space: nowrap;
     max-width: 280px;
     overflow: hidden;
@@ -3416,6 +3417,6 @@ onUnmounted(() => {
   height: 100%;
   min-width: 0;
   min-height: 0;
-  background: rgba(8, 15, 26, 0.72);
+  background: var(--swatch-rgba-8-15-26-0_72);
 }
 </style>

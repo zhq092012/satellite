@@ -1178,15 +1178,15 @@ defineExpose({
 
 .assemble-title {
   margin: 0 0 4px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #40f2ff;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--accent-cyan-hover);
 }
 
 .assemble-desc {
   margin: 0;
-  font-size: 12px;
-  color: #94a3b8;
+  font-size: var(--font-size-sm);
+  color: var(--text-color-muted);
   line-height: 1.5;
 }
 
@@ -1194,10 +1194,10 @@ defineExpose({
   flex-shrink: 0;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(250, 204, 21, 0.45);
-  background: rgba(250, 204, 21, 0.12);
-  color: #facc15;
-  font-size: 11px;
+  border: 1px solid var(--swatch-rgba-250-204-21-0_45);
+  background: var(--swatch-rgba-250-204-21-0_12);
+  color: var(--color-warning);
+  font-size: var(--font-size-xs);
   line-height: 18px;
 }
 
@@ -1222,8 +1222,8 @@ defineExpose({
 
 .assemble-count {
   margin-left: auto;
-  font-size: 12px;
-  color: #7dd3fc;
+  font-size: var(--font-size-sm);
+  color: var(--color-info-soft);
   white-space: nowrap;
 }
 
@@ -1253,8 +1253,8 @@ defineExpose({
 
 .assemble-series-empty {
   margin: 0;
-  font-size: 12px;
-  color: #64748b;
+  font-size: var(--font-size-sm);
+  color: var(--text-color-subtle);
   line-height: 1.5;
 }
 
@@ -1268,8 +1268,8 @@ defineExpose({
   }
 
   :deep(.atlas-app-checkbox__label) {
-    color: #cbd5e1;
-    font-size: 12px;
+    color: var(--text-color-soft);
+    font-size: var(--font-size-sm);
   }
 }
 
@@ -1286,9 +1286,9 @@ defineExpose({
   min-width: 0;
   min-height: 0;
   box-sizing: border-box;
-  border: 1px solid rgba(0, 225, 255, 0.16);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.16);
   border-radius: 8px;
-  background: rgba(8, 20, 36, 0.55);
+  background: var(--swatch-rgba-8-20-36-0_55);
   overflow: hidden;
 }
 
@@ -1298,15 +1298,15 @@ defineExpose({
   justify-content: space-between;
   gap: 8px;
   padding: 8px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #7dd3fc;
-  border-bottom: 1px solid rgba(0, 225, 255, 0.12);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-info-soft);
+  border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
 }
 
 .assemble-pane-sub {
-  font-weight: 400;
-  color: #64748b;
+  font-weight: var(--font-weight-regular);
+  color: var(--text-color-subtle);
 }
 
 .assemble-pane-body {
@@ -1322,23 +1322,23 @@ defineExpose({
   display: flex;
   justify-content: flex-end;
   padding: 6px 8px 8px;
-  border-top: 1px solid rgba(0, 225, 255, 0.1);
+  border-top: 1px solid rgba(var(--accent-cyan-rgb), 0.1);
 
   :deep(.atlas-app-pagination__total),
   :deep(.atlas-app-pagination button),
   :deep(.atlas-app-pager li) {
-    color: #94a3b8;
+    color: var(--text-color-muted);
     background: transparent;
   }
 
   :deep(.atlas-app-pager li.is-active) {
-    color: #40f2ff;
+    color: var(--accent-cyan-hover);
   }
 }
 
 .assemble-edit-btn {
   padding: 0;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .assemble-table {
@@ -1346,13 +1346,13 @@ defineExpose({
   min-height: 0;
   height: 100%;
   width: 100%;
-  --atlas-app-table-border-color: rgba(0, 225, 255, 0.12);
-  --atlas-app-table-header-bg-color: rgba(13, 27, 49, 0.95);
+  --atlas-app-table-border-color: rgba(var(--accent-cyan-rgb), 0.12);
+  --atlas-app-table-header-bg-color: var(--panel-bg);
   --atlas-app-table-bg-color: transparent;
   --atlas-app-table-tr-bg-color: transparent;
-  --atlas-app-table-row-hover-bg-color: rgba(0, 225, 255, 0.1);
-  --atlas-app-text-color-regular: #cbd5e1;
-  --atlas-app-text-color-primary: #e2efff;
+  --atlas-app-table-row-hover-bg-color: rgba(var(--accent-cyan-rgb), 0.1);
+  --atlas-app-text-color-regular: var(--text-color-soft);
+  --atlas-app-text-color-primary: var(--text-color-bright);
   background: transparent;
 
   :deep(.atlas-app-table__inner-wrapper::before) {
@@ -1365,21 +1365,21 @@ defineExpose({
   }
 
   :deep(th.atlas-app-table__cell) {
-    color: #00e1ff;
-    font-size: 12px;
-    font-weight: 700;
-    background: rgba(13, 27, 49, 0.95) !important;
+    color: var(--accent-cyan);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    background: var(--panel-bg) !important;
   }
 
   :deep(td.atlas-app-table__cell) {
-    font-size: 12px;
-    color: #cbd5e1;
+    font-size: var(--font-size-sm);
+    color: var(--text-color-soft);
     background: transparent !important;
   }
 
   :deep(.atlas-app-table__empty-block) {
     background: transparent;
-    color: #64748b;
+    color: var(--text-color-subtle);
   }
 }
 
@@ -1399,60 +1399,60 @@ defineExpose({
 <style lang="scss">
 .assemble-crud-dialog-modal.atlas-app-overlay,
 .atlas-app-overlay.assemble-crud-dialog-modal {
-  background-color: rgba(2, 8, 18, 0.72) !important;
+  background-color: var(--swatch-rgba-2-8-18-0_72) !important;
 }
 
 .atlas-app-dialog.assemble-crud-dialog,
 .assemble-crud-dialog .atlas-app-dialog {
-  --atlas-app-dialog-bg-color: #0a1628;
+  --atlas-app-dialog-bg-color: var(--swatch-0a1628);
   --atlas-app-dialog-border-radius: 10px;
-  border: 1px solid rgba(0, 225, 255, 0.22);
-  background: linear-gradient(180deg, rgba(10, 22, 40, 0.98) 0%, rgba(6, 14, 28, 0.98) 100%);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.22);
+  background: linear-gradient(180deg, var(--swatch-rgba-10-22-40-0_98) 0%, var(--swatch-rgba-6-14-28-0_98) 100%);
+  box-shadow: 0 20px 48px var(--mask-color);
 
   .atlas-app-dialog__header {
     padding: 14px 18px 10px;
     margin-right: 0;
-    border-bottom: 1px solid rgba(0, 225, 255, 0.12);
+    border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
   }
 
   .atlas-app-dialog__title {
-    color: #40f2ff;
-    font-size: 15px;
-    font-weight: 700;
+    color: var(--accent-cyan-hover);
+    font-size: var(--font-size-subtitle);
+    font-weight: var(--font-weight-bold);
   }
 
   .atlas-app-dialog__headerbtn .atlas-app-dialog__close {
-    color: #7dd3fc;
+    color: var(--color-info-soft);
 
     &:hover {
-      color: #40f2ff;
+      color: var(--accent-cyan-hover);
     }
   }
 
   .atlas-app-dialog__body {
     padding: 16px 18px 8px;
-    color: #cbd5e1;
+    color: var(--text-color-soft);
   }
 
   .atlas-app-dialog__footer {
     padding: 10px 18px 16px;
-    border-top: 1px solid rgba(0, 225, 255, 0.12);
+    border-top: 1px solid rgba(var(--accent-cyan-rgb), 0.12);
   }
 
   .atlas-app-form-item__label {
-    color: #94a3b8;
+    color: var(--text-color-muted);
   }
 
   .atlas-app-input__wrapper,
   .atlas-app-textarea__inner {
-    background: rgba(8, 20, 36, 0.85);
-    box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.18) inset;
+    background: var(--swatch-rgba-8-20-36-0_85);
+    box-shadow: 0 0 0 1px rgba(var(--accent-cyan-rgb), 0.18) inset;
   }
 
   .atlas-app-input__inner,
   .atlas-app-textarea__inner {
-    color: #e2efff;
+    color: var(--text-color-bright);
   }
 }
 </style>

@@ -19,18 +19,18 @@
         <div class="switch-bars">
           <!-- <el-switch
             v-model="showAnimate"
-            active-color="#13ce66"
-            inactive-color="#ff4949"
+            active-color="var(--swatch-13ce66)"
+            inactive-color="var(--swatch-ff4949)"
             active-text="开启阶段动画"
             size="small"
             :disabled="selectedMode == '天对天'"
           ></el-switch> -->
-          <el-switch v-model="showView2D" active-color="#13ce66" inactive-color="#ff4949" active-text="开启二维视图"
+          <el-switch v-model="showView2D" active-color="var(--swatch-13ce66)" inactive-color="var(--swatch-ff4949)" active-text="开启二维视图"
             size="small" :disabled="selectedMode == '天对天'"></el-switch>
         </div>
       </div>
       <div class="nav-right">
-        <el-switch v-model="store.showNetView" active-color="#13ce66" inactive-color="#ff4949"
+        <el-switch v-model="store.showNetView" active-color="var(--swatch-13ce66)" inactive-color="var(--swatch-ff4949)"
           active-text="开启网络视图"></el-switch>
       </div>
     </div>
@@ -546,7 +546,7 @@ const renderSateliiteOfTask = async (
                   }),
                 },
                 description: `<div style="padding: 10px; font-family: inherit;background-color:white; color:  rgba(0, 0, 0, 0.7); border-radius: 8px;">
-      <h3 style="color: #1890ff; margin: 0 0 10px 0;display:flex; justify-content: space-between; align-items:center;"><span>🛰️ ${satel.name_en}</span> ${createInfoBoxActionButton('详情', { norad: satel.norad_id })}</h3>
+      <h3 style="color: var(--color-link); margin: 0 0 10px 0;display:flex; justify-content: space-between; align-items:center;"><span>🛰️ ${satel.name_en}</span> ${createInfoBoxActionButton('详情', { norad: satel.norad_id })}</h3>
       <p><strong>NORAD:</strong> ${satel.norad_id} </p>
       <p><strong>卫星类型:</strong> ${satel.sat_type}</p>
       <p><strong>所属国家:</strong> ${satel.country}</p>
@@ -1073,7 +1073,7 @@ function loadWeapons(view: Cesium.Viewer, weapons: Weapon[], camp: string) {
             }
             ; (existing as any).description =
               `<div style="padding: 10px; font-family: inherit;background-color:white; color:  rgba(0, 0, 0, 0.7); border-radius: 8px;">
-      <h3 style="color: #1890ff; margin: 0 0 10px 0;">🛰️ ${weapon.name}</h3>
+      <h3 style="color: var(--color-link); margin: 0 0 10px 0;">🛰️ ${weapon.name}</h3>
       <p><strong>武器类型:</strong> ${weapon.type}</p>
       <p><strong>所属国家:</strong> ${weapon.country}</p>
       <p><strong>打击高度:</strong> ${weapon.range} km</p>
@@ -1109,7 +1109,7 @@ function loadWeapons(view: Cesium.Viewer, weapons: Weapon[], camp: string) {
         heightReference: Cesium.HeightReference.NONE, // 使用绝对高度，避免地形异步 clamp 导致位置错位
       },
       description: `<div style="padding: 10px; font-family: inherit;background-color:white; color:  rgba(0, 0, 0, 0.7); border-radius: 8px;">
-      <h3 style="color: #1890ff; margin: 0 0 10px 0;">🛰️ ${weapon.name}</h3>
+      <h3 style="color: var(--color-link); margin: 0 0 10px 0;">🛰️ ${weapon.name}</h3>
       <p><strong>武器类型:</strong> ${weapon.type}</p>
       <p><strong>所属国家:</strong> ${weapon.country}</p>
       <p><strong>打击高度:</strong> ${weapon.range} km</p>
@@ -1513,7 +1513,7 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   box-sizing: border-box;
 
   .nav {
@@ -1521,7 +1521,7 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #06223d;
+    background: var(--swatch-06223d);
     padding: 6px 10px;
 
     .nav-left {
@@ -1530,7 +1530,7 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
       align-items: center;
 
       .title {
-        color: #ccc;
+        color: var(--swatch-ccc);
       }
 
       .switch-bars {
@@ -1618,14 +1618,14 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
       }
 
       .stat-value {
-        font-size: 15px;
-        font-weight: 700;
+        font-size: var(--font-size-subtitle);
+        font-weight: var(--font-weight-bold);
         line-height: 1.1;
       }
 
       .stat-label {
         margin-top: 1px;
-        font-size: 11px;
+        font-size: var(--font-size-xs);
         line-height: 1.15;
         white-space: nowrap;
         overflow: hidden;
@@ -1639,7 +1639,7 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
       grid-row: 1;
 
       .stat-card {
-        background: linear-gradient(to bottom, #f75e61, #f16f71);
+        background: linear-gradient(to bottom, var(--swatch-f75e61), var(--swatch-f16f71));
       }
     }
 
@@ -1683,12 +1683,12 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
       padding: 8px;
 
       .panel-title {
-        font-size: 16px;
-        font-weight: bold;
-        color: #f75e61;
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-bold);
+        color: var(--swatch-f75e61);
         margin-bottom: 8px;
         padding: 5px 0;
-        background: rgba(247, 94, 97, 0.15);
+        background: var(--swatch-rgba-247-94-97-0_15);
       }
 
       :deep(.atlas-app-tree) {
@@ -1699,25 +1699,25 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
     /* 天对地模式时，左红右蓝互换 */
     &.mode-air-to-ground {
       .left-top-bar .stat-card {
-        background: linear-gradient(to bottom, #2ca6ff, #53aff1);
+        background: linear-gradient(to bottom, var(--swatch-2ca6ff), var(--swatch-53aff1));
       }
 
       .left-side-bar .panel-title {
-        color: #2ca6ff;
-        background: rgba(44, 166, 255, 0.15);
+        color: var(--swatch-2ca6ff);
+        background: var(--swatch-rgba-44-166-255-0_15);
       }
 
       .right-top-bar .stat-card {
-        background: linear-gradient(to bottom, #f75e61, #f16f71);
+        background: linear-gradient(to bottom, var(--swatch-f75e61), var(--swatch-f16f71));
       }
 
       .right-side-bar .panel-title {
-        color: #f75e61;
-        background: rgba(247, 94, 97, 0.15);
+        color: var(--swatch-f75e61);
+        background: var(--swatch-rgba-247-94-97-0_15);
       }
 
       .right-side-bar .weapon-window-list {
-        border-left: 2px solid rgba(247, 94, 97, 0.38);
+        border-left: 2px solid var(--swatch-rgba-247-94-97-0_38);
       }
     }
 
@@ -1752,12 +1752,12 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
         height: 200px;
         bottom: 30px;
         right: 3px;
-        border: 1px solid rgba(255, 255, 255, 0.25);
+        border: 1px solid var(--swatch-rgba-255-255-255-0_25);
         border-radius: 8px;
         overflow: hidden;
-        background: rgba(0, 0, 0, 0.2);
+        background: var(--swatch-rgba-0-0-0-0_2);
         z-index: 2000;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 8px 20px var(--swatch-rgba-0-0-0-0_3);
       }
     }
 
@@ -1766,7 +1766,7 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
       grid-row: 1;
 
       .stat-card {
-        background: linear-gradient(to bottom, #2ca6ff, #53aff1);
+        background: linear-gradient(to bottom, var(--swatch-2ca6ff), var(--swatch-53aff1));
       }
     }
 
@@ -1779,10 +1779,10 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
       flex-direction: column;
 
       .panel-title {
-        font-size: 16px;
-        font-weight: bold;
-        color: #2ca6ff;
-        background: rgba(44, 166, 255, 0.15);
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-bold);
+        color: var(--swatch-2ca6ff);
+        background: var(--swatch-rgba-44-166-255-0_15);
         margin-bottom: 8px;
         padding: 5px 0;
       }
@@ -1796,7 +1796,7 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
         .strike-window-list {
           margin-top: 4px;
           padding: 6px;
-          background: rgba(255, 255, 255, 0.1);
+          background: var(--swatch-rgba-255-255-255-0_1);
           border-radius: 4px;
         }
       }
@@ -1808,11 +1808,11 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
       }
 
       .satellite-list li {
-        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+        border-bottom: 1px solid var(--swatch-rgba-255-255-255-0_15);
         margin-bottom: 8px;
         padding-bottom: 8px;
-        color: #eef3ff;
-        font-size: 12px;
+        color: var(--swatch-eef3ff);
+        font-size: var(--font-size-sm);
       }
 
       .satellite-list li>div {
@@ -1822,22 +1822,22 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
       .weapon-window-list {
         margin-left: 6px;
         padding-left: 8px;
-        border-left: 2px solid rgba(44, 166, 255, 0.38);
+        border-left: 2px solid var(--swatch-rgba-44-166-255-0_38);
       }
 
       .weapon-window-list>div {
         margin-bottom: 2px;
-        font-size: 12px;
-        color: #c6d8ff;
+        font-size: var(--font-size-sm);
+        color: var(--swatch-c6d8ff);
       }
 
       .weapon-window-list>div .weapon-name {
-        font-weight: bold;
-        color: #a9cfff;
+        font-weight: var(--font-weight-bold);
+        color: var(--swatch-a9cfff);
       }
 
       .weapon-window-list>div .strike-window {
-        color: #ffffff;
+        color: var(--color-white);
       }
     }
 
@@ -1868,12 +1868,12 @@ const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
         height: 200px;
         bottom: 30px;
         right: 3px;
-        border: 1px solid rgba(255, 255, 255, 0.25);
+        border: 1px solid var(--swatch-rgba-255-255-255-0_25);
         border-radius: 8px;
         overflow: hidden;
-        background: rgba(0, 0, 0, 0.2);
+        background: var(--swatch-rgba-0-0-0-0_2);
         z-index: 2000;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 8px 20px var(--swatch-rgba-0-0-0-0_3);
       }
     }
 

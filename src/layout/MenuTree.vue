@@ -158,7 +158,7 @@ const getIcon = (item: RouteRecordRaw): string => {
 
   .nav-icon {
     margin-right: 8px;
-    font-size: 16px;
+    font-size: var(--font-size-lg);
   }
 
   .disabled-menu-wrapper {
@@ -177,10 +177,10 @@ const getIcon = (item: RouteRecordRaw): string => {
     justify-content: center !important;
     padding: 0 20px !important;
     border-radius: 0 !important;
-    color: #cbd5e1 !important;
-    font-size: 15px !important;
-    font-weight: 600 !important;
-    background: rgba(0, 225, 255, 0.06) !important;
+    color: var(--text-color-soft) !important;
+    font-size: var(--font-size-subtitle) !important;
+    font-weight: var(--font-weight-semibold) !important;
+    background: rgba(var(--accent-cyan-rgb), 0.06) !important;
     border: none !important;
     margin: 0;
     box-sizing: border-box !important;
@@ -192,8 +192,8 @@ const getIcon = (item: RouteRecordRaw): string => {
     }
 
     &:hover {
-      color: #00e1ff !important;
-      background: rgba(0, 225, 255, 0.12) !important;
+      color: var(--accent-cyan) !important;
+      background: rgba(var(--accent-cyan-rgb), 0.12) !important;
       border-top: none !important;
       border-bottom: none !important;
     }
@@ -202,26 +202,26 @@ const getIcon = (item: RouteRecordRaw): string => {
       opacity: 0.45 !important;
       cursor: not-allowed !important;
       background: transparent !important;
-      color: #64748b !important;
+      color: var(--text-color-subtle) !important;
     }
   }
 
   :deep(.atlas-app-menu-item.is-active),
   :deep(.atlas-app-sub-menu.is-active .atlas-app-sub-menu__title) {
-    color: #00e1ff !important;
-    background: linear-gradient(180deg, rgba(0, 225, 255, 0.2) 0%, rgba(0, 225, 255, 0.05) 100%) !important;
+    color: var(--accent-cyan) !important;
+    background: linear-gradient(180deg, rgba(var(--accent-cyan-rgb), 0.2) 0%, rgba(var(--accent-cyan-rgb), 0.05) 100%) !important;
     border-top: none !important;
     border-bottom: none !important;
-    text-shadow: 0 0 10px rgba(0, 225, 255, 0.6);
-    box-shadow: inset 0 0 16px rgba(0, 225, 255, 0.15) !important;
+    text-shadow: 0 0 10px rgba(var(--accent-cyan-rgb), 0.6);
+    box-shadow: inset 0 0 16px rgba(var(--accent-cyan-rgb), 0.15) !important;
 
     .nav-title {
-      font-weight: 700;
+      font-weight: var(--font-weight-bold);
     }
   }
 
   :deep(.atlas-app-sub-menu .el-sub-menu__icon-arrow) {
-    color: #94a3b8;
+    color: var(--text-color-muted);
     margin-left: 6px;
   }
 }
@@ -232,7 +232,7 @@ const getIcon = (item: RouteRecordRaw): string => {
   display: flex !important;
   justify-content: center !important;
   text-align: center !important;
-  font-size: 16px !important;
-  font-weight: 600 !important;
+  font-size: var(--font-size-lg) !important;
+  font-weight: var(--font-weight-semibold) !important;
 }
 </style>

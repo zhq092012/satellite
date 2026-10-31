@@ -1,4 +1,5 @@
 import { type GraphData, type NodeConfig } from '@antv/g6'
+import { readThemeColor } from '@/styles/themeColor'
 import type { MatrixResult } from '@/api/electronic'
 import {
   collectRelaySatelliteTransmissionLinks,
@@ -39,9 +40,9 @@ export interface BuildFocusedReconGraphContext {
 type TopoNodeKind = 'sat' | 'relay' | 'receive' | 'station'
 
 /** 正常链路配色（青色实线） */
-const LINK_COLOR_NORMAL = '#00e1ff'
+const linkColorNormal = () => readThemeColor('--accent-cyan')
 /** 被打击链路配色（灰色虚线） */
-const LINK_COLOR_STRUCK = '#94a3b8'
+const LINK_COLOR_STRUCK = readThemeColor('--swatch-94a3b8')
 
 /** 侦察拓扑 G6 边类型：直线连接各层节点 */
 export const RECON_TOPO_EDGE_TYPE = 'line'
@@ -50,7 +51,7 @@ export const RECON_TOPO_EDGE_TYPE = 'line'
 export const RECON_TOPO_GRAPH_DEFAULT_EDGE = {
   type: RECON_TOPO_EDGE_TYPE,
   style: {
-    stroke: LINK_COLOR_NORMAL,
+    stroke: linkColorNormal(),
     lineWidth: 2.5,
     opacity: 1,
   },
@@ -151,17 +152,17 @@ const resolveStationCenterX = (
  */
 const getTopoNodeColors = (kind: TopoNodeKind, struck: boolean) => {
   if (struck) {
-    return { fill: '#2d1215', stroke: '#ff4d4f', shadow: 'rgba(255, 77, 79, 0.45)' }
+    return { fill: readThemeColor('--swatch-2d1215'), stroke: readThemeColor('--swatch-ff4d4f'), shadow: readThemeColor('--swatch-rgba-255-77-79-0_45') }
   }
   switch (kind) {
     case 'sat':
-      return { fill: '#092638', stroke: '#00e1ff', shadow: 'rgba(0, 225, 255, 0.35)' }
+      return { fill: readThemeColor('--swatch-092638'), stroke: linkColorNormal(), shadow: readThemeColor('--swatch-rgba-0-225-255-0_35') }
     case 'relay':
-      return { fill: '#1e112a', stroke: '#a855f7', shadow: 'rgba(168, 85, 247, 0.4)' }
+      return { fill: readThemeColor('--swatch-1e112a'), stroke: readThemeColor('--swatch-a855f7'), shadow: readThemeColor('--swatch-rgba-168-85-247-0_4') }
     case 'receive':
-      return { fill: '#0a2e2b', stroke: '#00f2fe', shadow: 'rgba(0, 242, 254, 0.35)' }
+      return { fill: readThemeColor('--swatch-0a2e2b'), stroke: readThemeColor('--swatch-00f2fe'), shadow: readThemeColor('--swatch-rgba-0-242-254-0_35') }
     case 'station':
-      return { fill: '#10244c', stroke: '#3b82f6', shadow: 'rgba(59, 130, 246, 0.35)' }
+      return { fill: readThemeColor('--swatch-10244c'), stroke: readThemeColor('--swatch-3b82f6'), shadow: readThemeColor('--swatch-rgba-59-130-246-0_35') }
   }
 }
 
@@ -247,7 +248,7 @@ const buildTopoNode = (
         position: 'bottom',
         offset: hasSubLabel ? 14 : 8,
         style: {
-          fill: '#e2efff',
+          fill: readThemeColor('--swatch-e2efff'),
           fontSize: hasSubLabel ? 9 : 10,
           fontWeight: 500,
           textAlign: 'center' as const,
@@ -264,7 +265,7 @@ const buildTopoNode = (
  * @returns G6 边样式
  */
 const buildLinkEdgeStyle = (struck: boolean) => {
-  const stroke = struck ? LINK_COLOR_STRUCK : LINK_COLOR_NORMAL
+  const stroke = struck ? LINK_COLOR_STRUCK : linkColorNormal()
   return {
     stroke,
     lineWidth: struck ? 2 : 2.5,

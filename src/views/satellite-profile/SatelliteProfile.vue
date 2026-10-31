@@ -1035,6 +1035,7 @@
   </el-dialog>
 </template>
 <script setup lang="ts">
+import { readThemeColor } from '@/styles/themeColor'
 import { nextTick, onBeforeUnmount, ref, watch, computed } from 'vue'
 import * as echarts from 'echarts'
 import satelliteFallback from '@/assets/img/satellite.png'
@@ -1107,14 +1108,14 @@ const getThemeColor = (token: string, fallback: string) => {
   return value || fallback
 }
 const themePalette = {
-  accent: getThemeColor('--accent-color', '#4f93dd'),
-  accentStrong: getThemeColor('--accent-color-active', '#7ec4ff'),
-  text: getThemeColor('--text-color-primary', '#dbe9ff'),
-  textStrong: getThemeColor('--text-color-strong', '#eef6ff'),
-  textMuted: getThemeColor('--text-color-secondary', '#9fb3c8'),
-  line: getThemeColor('--surface-border-color', 'rgba(143, 176, 207, 0.55)'),
-  chartGrid: 'rgba(171, 205, 234, 0.22)',
-  danger: '#f56c6c',
+  accent: getThemeColor('--accent-color', readThemeColor('--accent-color')),
+  accentStrong: getThemeColor('--accent-color-active', readThemeColor('--swatch-7ec4ff')),
+  text: getThemeColor('--text-color-primary', readThemeColor('--swatch-dbe9ff')),
+  textStrong: getThemeColor('--text-color-strong', readThemeColor('--swatch-eef6ff')),
+  textMuted: getThemeColor('--text-color-secondary', readThemeColor('--swatch-9fb3c8')),
+  line: getThemeColor('--surface-border-color', readThemeColor('--swatch-rgba-143-176-207-0_55')),
+  chartGrid: readThemeColor('--swatch-rgba-171-205-234-0_22'),
+  danger: readThemeColor('--swatch-f56c6c'),
 }
 const timelineColor = themePalette.accent
 
@@ -2214,13 +2215,13 @@ const formatEpoch = (epoch: string | number | undefined) => {
         & > div {
           display: flex;
           align-items: center;
-          font-size: 12px;
+          font-size: var(--font-size-sm);
           min-height: 30px;
         }
         & > div:first-child {
           flex: 1;
-          font-size: 24px;
-          font-weight: bold;
+          font-size: var(--font-size-2xl);
+          font-weight: var(--font-weight-bold);
           gap: 20px;
 
           .news-content-row {
@@ -2239,7 +2240,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
       }
       .desc-item {
         padding-top: 10px;
-        font-size: 12px;
+        font-size: var(--font-size-sm);
 
         min-height: 25px;
         display: flex;
@@ -2261,7 +2262,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
       .left-2-2 {
         & > div {
           text-align: left;
-          font-size: 12px;
+          font-size: var(--font-size-sm);
           line-height: 22px;
         }
       }
@@ -2276,7 +2277,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
         flex-direction: column;
         flex: 1;
         & > span:last-child {
-          font-size: 12px;
+          font-size: var(--font-size-sm);
         }
       }
     }
@@ -2296,7 +2297,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
         & > span {
           width: 50%;
           text-align: left;
-          font-size: 13px;
+          font-size: var(--font-size-md);
         }
       }
     }
@@ -2324,7 +2325,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
         & > span {
           width: 50%;
           text-align: left;
-          font-size: 13px;
+          font-size: var(--font-size-md);
         }
       }
     }
@@ -2383,7 +2384,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             display: flex;
             align-items: center;
             .tab-1__timetitle {
-              font-size: 12px;
+              font-size: var(--font-size-sm);
               min-width: 50px;
             }
           }
@@ -2412,7 +2413,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
           gap: 3px;
           .bd_title {
             text-align: left;
-            font-size: 12px;
+            font-size: var(--font-size-sm);
             padding: 5px;
             width: 100%;
           }
@@ -2428,7 +2429,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             .bd-zb__item {
               background: var(--app-bg-color);
 
-              font-size: 12px;
+              font-size: var(--font-size-sm);
               flex: 1;
               padding: 5px;
               & > div {
@@ -2451,9 +2452,9 @@ const formatEpoch = (epoch: string | number | undefined) => {
                 flex-direction: column;
                 align-items: start;
                 justify-content: start;
-                font-size: 12px;
+                font-size: var(--font-size-sm);
                 & > div:first-child {
-                  font-size: 14px;
+                  font-size: var(--font-size-base);
                   padding-bottom: 10px;
                 }
               }
@@ -2463,7 +2464,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
                 align-items: center;
                 gap: 5px;
                 .timetitle {
-                  font-size: 12px;
+                  font-size: var(--font-size-sm);
                 }
                 .select {
                   width: 80px;
@@ -2483,10 +2484,10 @@ const formatEpoch = (epoch: string | number | undefined) => {
                 justify-content: center;
                 padding: 5px;
                 & > span:first-child {
-                  font-weight: bold;
+                  font-weight: var(--font-weight-bold);
                 }
                 & > span:last-child {
-                  font-size: 12px;
+                  font-size: var(--font-size-sm);
                   color: var(--sp-text-muted);
                 }
               }
@@ -2502,7 +2503,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
 
                   margin-right: 5px;
                   padding: 2px 10px;
-                  font-size: 12px;
+                  font-size: var(--font-size-sm);
                   background: var(--menu-bg-color);
                   cursor: pointer;
                   &.active {
@@ -2529,11 +2530,11 @@ const formatEpoch = (epoch: string | number | undefined) => {
                     margin: 5px;
                     background: var(--menu-bg-color);
                     & > span:first-child {
-                      font-size: 18px;
-                      font-weight: bold;
+                      font-size: var(--font-size-xl);
+                      font-weight: var(--font-weight-bold);
                     }
                     & > span:last-child {
-                      font-size: 12px;
+                      font-size: var(--font-size-sm);
                     }
                   }
                 }
@@ -2555,7 +2556,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             border: 1px solid var(--surface-border-color);
             padding: 5px;
             background: var(--app-bg-color);
-            font-size: 12px;
+            font-size: var(--font-size-sm);
             .title {
               text-align: left;
               padding-bottom: 10px;
@@ -2585,7 +2586,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             border: 1px solid var(--surface-border-color);
             padding: 5px;
             background: var(--app-bg-color);
-            font-size: 12px;
+            font-size: var(--font-size-sm);
             .cs-box {
               border: 1px solid var(--surface-border-color);
               &:first-of-type {
@@ -2599,7 +2600,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
                   & > span {
                     display: inline-block;
                     padding: 2px 10px;
-                    font-size: 12px;
+                    font-size: var(--font-size-sm);
                     background: var(--menu-bg-color);
                     cursor: pointer;
                     &.active {
@@ -2637,7 +2638,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
               & > span {
                 display: inline-block;
                 padding: 2px 10px;
-                font-size: 12px;
+                font-size: var(--font-size-sm);
                 background: var(--menu-bg-color);
                 cursor: pointer;
                 &.active {
@@ -2647,7 +2648,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             }
             .wx-content {
               text-align: left;
-              font-size: 14px;
+              font-size: var(--font-size-base);
               .wx-item {
                 box-shadow: var(--sp-sep-shadow-strong);
                 margin: 10px;
@@ -2667,7 +2668,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
         .r-wx {
           background: var(--app-bg-color);
           box-shadow: var(--sp-sep-shadow-strong);
-          font-size: 12px;
+          font-size: var(--font-size-sm);
           padding: 10px;
           min-height: 0;
           overflow: auto;
@@ -2723,8 +2724,8 @@ const formatEpoch = (epoch: string | number | undefined) => {
           overflow: auto;
 
           .threat-panel__title {
-            font-size: 16px;
-            font-weight: 600;
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
             padding-bottom: 14px;
           }
           .threat-panel__summary {
@@ -2739,14 +2740,14 @@ const formatEpoch = (epoch: string | number | undefined) => {
               padding: 10px;
               display: flex;
               flex-direction: column;
-              font-size: 13px;
+              font-size: var(--font-size-md);
               span {
                 color: var(--sp-text-muted);
                 margin-bottom: 6px;
               }
               strong {
                 color: var(--sp-text-strong);
-                font-size: 14px;
+                font-size: var(--font-size-base);
               }
             }
           }
@@ -2773,14 +2774,14 @@ const formatEpoch = (epoch: string | number | undefined) => {
           }
 
           .strike-panel__title {
-            font-size: 16px;
-            font-weight: 600;
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
             color: var(--sp-text-strong);
           }
 
           .strike-panel__desc {
             margin-top: 4px;
-            font-size: 12px;
+            font-size: var(--font-size-sm);
             color: var(--sp-text-muted);
           }
 
@@ -2791,7 +2792,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             background: var(--sp-accent-soft-bg);
             box-shadow: var(--sp-sep-shadow);
             color: var(--sp-text-main);
-            font-weight: 600;
+            font-weight: var(--font-weight-semibold);
           }
 
           .strike-panel__summary {
@@ -2807,7 +2808,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
               padding: 10px;
               display: flex;
               flex-direction: column;
-              font-size: 13px;
+              font-size: var(--font-size-md);
 
               span {
                 color: var(--sp-text-muted);
@@ -2816,7 +2817,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
 
               strong {
                 color: var(--sp-text-strong);
-                font-size: 14px;
+                font-size: var(--font-size-base);
               }
             }
           }
@@ -2836,8 +2837,8 @@ const formatEpoch = (epoch: string | number | undefined) => {
 
           .strike-window-panel__title {
             margin-bottom: 12px;
-            font-size: 15px;
-            font-weight: 700;
+            font-size: var(--font-size-subtitle);
+            font-weight: var(--font-weight-bold);
             color: var(--sp-text-strong);
             text-align: left;
           }
@@ -2866,19 +2867,19 @@ const formatEpoch = (epoch: string | number | undefined) => {
 
             strong {
               color: var(--sp-text-strong);
-              font-size: 14px;
+              font-size: var(--font-size-base);
             }
 
             span {
               color: var(--sp-text-main);
-              font-size: 12px;
+              font-size: var(--font-size-sm);
             }
           }
 
           .strike-window-card__score {
             margin-bottom: 8px;
             color: var(--sp-text-muted);
-            font-size: 12px;
+            font-size: var(--font-size-sm);
             text-align: left;
           }
 
@@ -2918,7 +2919,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
 
           :deep(.atlas-app-table th.el-table__cell) {
             color: var(--sp-accent-strong);
-            font-weight: 700;
+            font-weight: var(--font-weight-bold);
           }
 
           :deep(.atlas-app-table td.el-table__cell),
@@ -2955,7 +2956,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             display: flex;
             align-items: center;
             .tab-1__timetitle {
-              font-size: 12px;
+              font-size: var(--font-size-sm);
               min-width: 50px;
             }
           }
@@ -2968,7 +2969,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             padding: 10px;
             background: var(--app-bg-color);
             text-align: left;
-            font-size: 14px;
+            font-size: var(--font-size-base);
             border: 1px solid var(--sp-accent-soft-line);
           }
           .l-box {
@@ -3006,7 +3007,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             display: flex;
             align-items: center;
             .tab-2__timetitle {
-              font-size: 12px;
+              font-size: var(--font-size-sm);
               min-width: 50px;
             }
           }
@@ -3070,7 +3071,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             .content-box {
               text-align: left;
               padding: 5px;
-              font-size: 14px;
+              font-size: var(--font-size-base);
               min-height: 0;
               white-space: pre-wrap;
               line-height: 1.7;
@@ -3118,21 +3119,21 @@ const formatEpoch = (epoch: string | number | undefined) => {
         }
 
         .tle-card__title {
-          font-size: 16px;
-          font-weight: 600;
+          font-size: var(--font-size-lg);
+          font-weight: var(--font-weight-semibold);
           color: var(--sp-text-strong);
         }
 
         .tle-card__desc {
           margin-top: 4px;
-          font-size: 12px;
+          font-size: var(--font-size-sm);
           color: var(--sp-text-muted);
         }
 
         .tle-card__meta {
           flex-shrink: 0;
           color: var(--sp-text-main);
-          font-size: 12px;
+          font-size: var(--font-size-sm);
         }
 
         .tle-table-wrap {
@@ -3217,7 +3218,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
             }
             & > div:last-child {
               text-align: left;
-              font-size: 12px;
+              font-size: var(--font-size-sm);
               color: var(--sp-text-muted);
             }
           }
@@ -3227,7 +3228,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
           display: flex;
           gap: 10px;
           align-items: center;
-          font-size: 12px;
+          font-size: var(--font-size-sm);
         }
         .qbjc-content {
           padding: 10px 0;
@@ -3274,13 +3275,13 @@ const formatEpoch = (epoch: string | number | undefined) => {
             }
             .qbjc-title {
               text-align: left;
-              font-size: 14px;
-              font-weight: 600;
+              font-size: var(--font-size-base);
+              font-weight: var(--font-weight-semibold);
               color: var(--sp-text-strong);
               line-height: 1.5;
             }
             .qbjc-source {
-              font-size: 12px;
+              font-size: var(--font-size-sm);
               color: var(--sp-text-muted);
               display: flex;
               gap: 10px;
@@ -3297,18 +3298,18 @@ const formatEpoch = (epoch: string | number | undefined) => {
             cursor: pointer;
             .fzqb-title {
               text-align: left;
-              font-size: 14px;
+              font-size: var(--font-size-base);
             }
             .fzqb-article {
               text-align: left;
-              font-size: 12px;
+              font-size: var(--font-size-sm);
               color: var(--sp-text-muted);
               padding: 10px 0;
             }
             .fzqb-source {
               display: flex;
               justify-content: start;
-              font-size: 12px;
+              font-size: var(--font-size-sm);
               gap: 10px;
               color: var(--sp-text-muted);
             }
@@ -3372,7 +3373,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
         background: var(--app-bg-color);
         padding: 5px;
         .item-title {
-          font-size: 12px;
+          font-size: var(--font-size-sm);
           text-align: left;
           padding: 10px 0;
         }
@@ -3393,7 +3394,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
           .son-item {
             background: var(--app-bg-color);
             text-align: left;
-            font-size: 12px;
+            font-size: var(--font-size-sm);
             box-sizing: border-box;
             padding: 5px;
             display: flex;
@@ -3427,7 +3428,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
       gap: 16px;
       margin-bottom: 16px;
       color: var(--sp-text-muted);
-      font-size: 12px;
+      font-size: var(--font-size-sm);
     }
 
     .intelligence-editor__upload {
@@ -3440,7 +3441,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
 
     .intelligence-editor__file-name {
       color: var(--sp-text-muted);
-      font-size: 12px;
+      font-size: var(--font-size-sm);
     }
 
     .intelligence-editor__preview {
@@ -3463,14 +3464,14 @@ const formatEpoch = (epoch: string | number | undefined) => {
   gap: 12px;
 
   .news-detail__title {
-    font-size: 18px;
-    font-weight: 600;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
     color: var(--sp-text-strong);
     line-height: 1.5;
   }
 
   .news-detail__meta {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--sp-text-muted);
   }
 
@@ -3478,7 +3479,7 @@ const formatEpoch = (epoch: string | number | undefined) => {
     white-space: pre-wrap;
     line-height: 1.8;
     color: var(--sp-text-main);
-    font-size: 14px;
+    font-size: var(--font-size-base);
   }
 }
 </style>

@@ -101,9 +101,9 @@ const statusLabel = (status?: number) => stationStatusLabel(status)
 
 <style lang="scss" scoped>
 .sub-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #b5d5ff;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--swatch-b5d5ff);
   margin: 14px 0 8px;
 }
 
@@ -115,24 +115,24 @@ const statusLabel = (status?: number) => stationStatusLabel(status)
 .native-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 15px;
+  font-size: var(--font-size-subtitle);
 
   th,
   td {
     padding: 10px 12px;
-    border: 1px solid rgba(79, 147, 221, 0.2);
+    border: 1px solid var(--accent-bg);
     text-align: left;
-    color: #e2e8f0;
+    color: var(--text-color-soft);
   }
 
   th {
-    font-weight: 700;
-    color: #7dd3fc;
-    background: rgba(14, 28, 48, 0.8);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-info-soft);
+    background: var(--swatch-rgba-14-28-48-0_8);
   }
 
   tr:nth-child(even) td {
-    background: rgba(8, 15, 26, 0.4);
+    background: var(--swatch-rgba-8-15-26-0_4);
   }
 }
 
@@ -140,26 +140,26 @@ const statusLabel = (status?: number) => stationStatusLabel(status)
   display: inline-block;
   margin: 2px 6px 2px 0;
   padding: 2px 8px;
-  font-size: 13px;
-  color: #7dd3fc;
-  border: 1px solid rgba(0, 225, 255, 0.25);
+  font-size: var(--font-size-md);
+  color: var(--color-info-soft);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
   border-radius: 4px;
-  background: rgba(0, 225, 255, 0.06);
+  background: rgba(var(--accent-cyan-rgb), 0.06);
 }
 
 .num-green {
-  color: #4ade80;
-  font-weight: 800;
+  color: var(--color-success-soft);
+  font-weight: var(--font-weight-heavy);
 }
 
 .num-red {
-  color: #f87171;
-  font-weight: 800;
+  color: var(--color-danger-soft);
+  font-weight: var(--font-weight-heavy);
 }
 
 .empty-hint {
-  font-size: 15px;
-  color: #64748b;
+  font-size: var(--font-size-subtitle);
+  color: var(--text-color-subtle);
   padding: 12px 0;
 }
 </style>

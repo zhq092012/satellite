@@ -114,7 +114,7 @@ const currentComponent = computed<Component>(() => {
   width: 100%;
   height: calc(100vh - 60px);
   overflow: hidden;
-  background-color: #0b1528;
+  background-color: var(--swatch-0b1528);
 
   /* 下层内容展示区域 */
   .bottom-content {

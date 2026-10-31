@@ -133,24 +133,24 @@ const isWindowExpanded = (norad: number) => props.expandedWindows.has(`${props.p
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 14px;
-    font-weight: 700;
-    color: #b5d5ff;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
+    color: var(--swatch-b5d5ff);
     margin-bottom: 12px;
 
     .count-tag {
-      font-size: 11px;
+      font-size: var(--font-size-xs);
       padding: 1px 8px;
       border-radius: 10px;
-      background: rgba(56, 189, 248, 0.15);
-      color: #7dd3fc;
+      background: var(--swatch-rgba-56-189-248-0_15);
+      color: var(--color-info-soft);
     }
   }
 }
 
 .empty-tip {
-  font-size: 12px;
-  color: #64748b;
+  font-size: var(--font-size-sm);
+  color: var(--text-color-subtle);
   text-align: center;
   padding: 16px;
 }
@@ -164,15 +164,15 @@ const isWindowExpanded = (norad: number) => props.expandedWindows.has(`${props.p
 .satellite-card {
   padding: 12px;
   border-radius: 8px;
-  background: rgba(18, 32, 54, 0.85);
-  border: 1px solid rgba(79, 147, 221, 0.2);
+  background: var(--swatch-rgba-18-32-54-0_85);
+  border: 1px solid var(--accent-bg);
   display: flex;
   flex-direction: column;
   gap: 10px;
 
   &.struck {
-    border-color: rgba(239, 68, 68, 0.35);
-    background: rgba(36, 18, 24, 0.45);
+    border-color: var(--color-danger-glow);
+    background: var(--swatch-rgba-36-18-24-0_45);
   }
 
   .sat-header {
@@ -187,23 +187,23 @@ const isWindowExpanded = (norad: number) => props.expandedWindows.has(`${props.p
       gap: 6px;
 
       .sat-name {
-        font-size: 14px;
-        font-weight: 700;
-        color: #fff;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-bold);
+        color: var(--color-white);
       }
 
       .sat-type-tag,
       .usage-tag {
-        font-size: 10px;
+        font-size: var(--font-size-caption);
         padding: 1px 6px;
         border-radius: 4px;
-        background: rgba(0, 225, 255, 0.12);
-        color: #7dd3fc;
+        background: rgba(var(--accent-cyan-rgb), 0.12);
+        color: var(--color-info-soft);
       }
 
       .usage-tag {
-        background: rgba(251, 191, 36, 0.12);
-        color: #fbbf24;
+        background: var(--swatch-rgba-251-191-36-0_12);
+        color: var(--color-warning);
       }
     }
 
@@ -212,22 +212,22 @@ const isWindowExpanded = (norad: number) => props.expandedWindows.has(`${props.p
       flex-direction: column;
       align-items: flex-end;
       gap: 4px;
-      font-size: 11px;
-      color: #94a3b8;
+      font-size: var(--font-size-xs);
+      color: var(--text-color-muted);
 
       .status-tag {
         padding: 1px 6px;
         border-radius: 4px;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
 
         &.ok {
-          color: #86efac;
-          background: rgba(34, 197, 94, 0.15);
+          color: var(--color-success-soft);
+          background: var(--swatch-rgba-34-197-94-0_15);
         }
 
         &.struck {
-          color: #fca5a5;
-          background: rgba(239, 68, 68, 0.15);
+          color: var(--color-danger-soft);
+          background: var(--swatch-rgba-239-68-68-0_15);
         }
       }
     }
@@ -241,18 +241,18 @@ const isWindowExpanded = (norad: number) => props.expandedWindows.has(`${props.p
     .metric-item {
       padding: 6px 8px;
       border-radius: 4px;
-      background: rgba(8, 15, 26, 0.55);
+      background: var(--swatch-rgba-8-15-26-0_55);
 
       .metric-label {
         display: block;
-        font-size: 10px;
-        color: #64748b;
+        font-size: var(--font-size-caption);
+        color: var(--text-color-subtle);
       }
 
       .metric-val {
-        font-size: 12px;
-        font-weight: 700;
-        color: #e2e8f0;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-bold);
+        color: var(--text-color-soft);
       }
     }
   }
@@ -260,9 +260,9 @@ const isWindowExpanded = (norad: number) => props.expandedWindows.has(`${props.p
   .weapon-block,
   .window-block {
     .block-title {
-      font-size: 12px;
-      font-weight: 600;
-      color: #7dd3fc;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-info-soft);
       margin-bottom: 6px;
     }
 
@@ -274,22 +274,22 @@ const isWindowExpanded = (norad: number) => props.expandedWindows.has(`${props.p
       padding: 6px 8px;
       margin-bottom: 0;
       border-radius: 4px;
-      background: rgba(0, 225, 255, 0.06);
-      border: 1px solid rgba(0, 225, 255, 0.15);
+      background: rgba(var(--accent-cyan-rgb), 0.06);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.15);
       cursor: pointer;
       text-align: left;
 
       &:hover {
-        background: rgba(0, 225, 255, 0.12);
+        background: rgba(var(--accent-cyan-rgb), 0.12);
       }
 
       &.expanded {
-        border-color: rgba(0, 225, 255, 0.35);
+        border-color: rgba(var(--accent-cyan-rgb), 0.35);
       }
 
       .expand-icon {
-        font-size: 10px;
-        color: #94a3b8;
+        font-size: var(--font-size-caption);
+        color: var(--text-color-muted);
       }
     }
   }
@@ -300,16 +300,16 @@ const isWindowExpanded = (norad: number) => props.expandedWindows.has(`${props.p
     gap: 6px;
 
     .weapon-chip {
-      font-size: 11px;
+      font-size: var(--font-size-xs);
       padding: 2px 8px;
       border-radius: 4px;
-      color: #fca5a5;
-      background: rgba(239, 68, 68, 0.12);
-      border: 1px solid rgba(239, 68, 68, 0.25);
+      color: var(--color-danger-soft);
+      background: var(--color-danger-bg);
+      border: 1px solid var(--swatch-rgba-239-68-68-0_25);
 
       em {
         font-style: normal;
-        color: #94a3b8;
+        color: var(--text-color-muted);
       }
     }
   }
@@ -326,11 +326,11 @@ const isWindowExpanded = (norad: number) => props.expandedWindows.has(`${props.p
   .window-item {
     padding: 8px;
     border-radius: 6px;
-    background: rgba(8, 15, 26, 0.55);
-    border: 1px solid rgba(79, 147, 221, 0.15);
+    background: var(--swatch-rgba-8-15-26-0_55);
+    border: 1px solid var(--swatch-rgba-79-147-221-0_15);
 
     &.struck {
-      border-color: rgba(239, 68, 68, 0.3);
+      border-color: var(--swatch-rgba-239-68-68-0_3);
     }
 
     .window-top {
@@ -340,54 +340,54 @@ const isWindowExpanded = (norad: number) => props.expandedWindows.has(`${props.p
       gap: 8px;
 
       .receive-name {
-        font-size: 12px;
-        font-weight: 600;
-        color: #e2e8f0;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
+        color: var(--text-color-soft);
       }
 
       .strike-tag {
-        font-size: 10px;
+        font-size: var(--font-size-caption);
         padding: 1px 6px;
         border-radius: 4px;
-        font-weight: 700;
+        font-weight: var(--font-weight-bold);
 
         &.ok {
-          color: #86efac;
-          background: rgba(34, 197, 94, 0.12);
+          color: var(--color-success-soft);
+          background: var(--swatch-rgba-34-197-94-0_12);
         }
 
         &.struck {
-          color: #fca5a5;
-          background: rgba(239, 68, 68, 0.12);
+          color: var(--color-danger-soft);
+          background: var(--color-danger-bg);
         }
       }
     }
 
     .window-time {
       margin-top: 4px;
-      font-size: 11px;
-      color: #94a3b8;
+      font-size: var(--font-size-xs);
+      color: var(--text-color-muted);
     }
 
     .window-weapons {
       margin-top: 4px;
-      font-size: 11px;
-      color: #cbd5e1;
+      font-size: var(--font-size-xs);
+      color: var(--text-color-soft);
 
       .weapon-label {
-        color: #64748b;
+        color: var(--text-color-subtle);
       }
 
       .mini-weapon {
         margin-right: 6px;
-        color: #fca5a5;
+        color: var(--color-danger-soft);
       }
     }
   }
 
   .no-window-tip {
-    font-size: 11px;
-    color: #64748b;
+    font-size: var(--font-size-xs);
+    color: var(--text-color-subtle);
     margin-top: 6px;
   }
 }

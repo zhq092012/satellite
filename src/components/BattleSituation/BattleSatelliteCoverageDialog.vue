@@ -20,6 +20,7 @@
 </template>
 
 <script setup lang="ts">
+import { readThemeColor } from '@/styles/themeColor'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import type { MatrixResult } from '@/api/electronic'
@@ -131,15 +132,15 @@ const renderHeatmap = (): boolean => {
           : '色块表示该时间片内卫星所处覆盖率梯队；悬停可看打击前后覆盖率',
         left: 16,
         top: 4,
-        subtextStyle: { color: '#94a3b8', fontSize: 10 },
+        subtextStyle: { color: readThemeColor('--text-color-muted'), fontSize: 10 },
       },
       tooltip: {
         trigger: 'item',
         confine: true,
-        backgroundColor: 'rgba(8, 15, 26, 0.96)',
-        borderColor: 'rgba(234, 179, 8, 0.55)',
+        backgroundColor: readThemeColor('--dialog-bg'),
+        borderColor: readThemeColor('--swatch-rgba-234-179-8-0_55'),
         borderWidth: 1,
-        textStyle: { color: '#e2e8f0', fontSize: 12 },
+        textStyle: { color: readThemeColor('--text-color-soft'), fontSize: 12 },
         formatter: (params: { data?: readonly [string, string, number] }) => {
           const point = params.data
           if (!point) return '暂无覆盖率数据'
@@ -156,15 +157,15 @@ const renderHeatmap = (): boolean => {
       xAxis: {
         type: 'category',
         data: model.timeLabels,
-        axisLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.35)' } },
-        splitArea: { show: true, areaStyle: { color: ['rgba(14, 28, 48, 0.46)', 'rgba(8, 15, 26, 0.46)'] } },
+        axisLine: { lineStyle: { color: readThemeColor('--swatch-rgba-103-232-249-0_35') } },
+        splitArea: { show: true, areaStyle: { color: [readThemeColor('--swatch-rgba-14-28-48-0_46'), readThemeColor('--swatch-rgba-8-15-26-0_46')] } },
       },
       yAxis: {
         type: 'category',
         data: STARLINK_COVERAGE_BRACKETS,
-        axisLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.35)' } },
-        axisLabel: { color: '#94a3b8', fontSize: 9, interval: 0 },
-        splitArea: { show: true, areaStyle: { color: ['rgba(14, 28, 48, 0.46)', 'rgba(8, 15, 26, 0.46)'] } },
+        axisLine: { lineStyle: { color: readThemeColor('--swatch-rgba-103-232-249-0_35') } },
+        axisLabel: { color: readThemeColor('--text-color-muted'), fontSize: 9, interval: 0 },
+        splitArea: { show: true, areaStyle: { color: [readThemeColor('--swatch-rgba-14-28-48-0_46'), readThemeColor('--swatch-rgba-8-15-26-0_46')] } },
       },
       visualMap: {
         show: true,
@@ -178,21 +179,21 @@ const renderHeatmap = (): boolean => {
         itemWidth: 8,
         itemHeight: 88,
         text: ['有', '无'],
-        textStyle: { color: '#94a3b8', fontSize: 10 },
-        inRange: { color: ['#102a43', '#1890ff', '#52c41a', '#faad14', '#ff4d4f'] },
+        textStyle: { color: readThemeColor('--text-color-muted'), fontSize: 10 },
+        inRange: { color: [readThemeColor('--swatch-102a43'), readThemeColor('--color-link'), readThemeColor('--swatch-52c41a'), readThemeColor('--swatch-faad14'), readThemeColor('--color-danger-strong')] },
       },
       series: [
         {
           type: 'heatmap',
           data: heatmapData,
           label: { show: false },
-          itemStyle: { borderColor: 'rgba(8, 15, 26, 0.9)', borderWidth: 1 },
+          itemStyle: { borderColor: readThemeColor('--swatch-rgba-8-15-26-0_9'), borderWidth: 1 },
           markLine: strikeSplitLabel
             ? {
                 silent: true,
                 symbol: 'none',
                 animation: false,
-                lineStyle: { color: '#fb923c', width: 2, type: 'dashed' },
+                lineStyle: { color: readThemeColor('--color-orange'), width: 2, type: 'dashed' },
                 data: [{ xAxis: strikeSplitLabel }],
               }
             : undefined,
@@ -202,11 +203,11 @@ const renderHeatmap = (): boolean => {
                   silent: true,
                   data: [
                     [
-                      { xAxis: firstTimeLabel, itemStyle: { color: 'rgba(34, 197, 94, 0.08)' } },
+                      { xAxis: firstTimeLabel, itemStyle: { color: readThemeColor('--swatch-rgba-34-197-94-0_08') } },
                       { xAxis: strikeSplitLabel },
                     ],
                     [
-                      { xAxis: strikeSplitLabel, itemStyle: { color: 'rgba(249, 115, 22, 0.10)' } },
+                      { xAxis: strikeSplitLabel, itemStyle: { color: readThemeColor('--swatch-rgba-249-115-22-0_10') } },
                       { xAxis: lastTimeLabel },
                     ],
                   ],
@@ -250,8 +251,8 @@ onUnmounted(() => {
 <style scoped lang="scss">
 .battle-sat-chart-subtitle {
   margin: 0 0 8px;
-  font-size: 13px;
-  color: #94a3b8;
+  font-size: var(--font-size-md);
+  color: var(--text-color-muted);
 }
 
 .battle-sat-coverage-heatmap {
@@ -262,8 +263,8 @@ onUnmounted(() => {
 
 .battle-sat-chart-empty {
   margin: 8px 0 0;
-  font-size: 12px;
-  color: #64748b;
+  font-size: var(--font-size-sm);
+  color: var(--text-color-subtle);
   text-align: center;
 }
 
@@ -280,13 +281,13 @@ onUnmounted(() => {
 
 .atlas-app-dialog.battle-sat-coverage-dialog,
 .battle-sat-coverage-dialog .atlas-app-dialog {
-  --el-dialog-bg-color: rgba(8, 15, 26, 0.96);
-  border: 1px solid rgba(0, 225, 255, 0.25);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  --el-dialog-bg-color: var(--dialog-bg);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
+  box-shadow: 0 16px 48px var(--mask-color);
 }
 
 .battle-sat-coverage-dialog .atlas-app-dialog__title {
-  color: #e2e8f0;
-  font-weight: 700;
+  color: var(--text-color-soft);
+  font-weight: var(--font-weight-bold);
 }
 </style>

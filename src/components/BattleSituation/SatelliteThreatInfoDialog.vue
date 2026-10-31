@@ -68,8 +68,8 @@ const fieldRows = computed(() => buildSatelliteThreatInfoFieldRows(props.threatI
 
 .satellite-threat-info-subtitle {
   margin: 0 0 12px;
-  font-size: 13px;
-  color: #94a3b8;
+  font-size: var(--font-size-md);
+  color: var(--text-color-muted);
 }
 
 .satellite-threat-info-grid {
@@ -86,29 +86,29 @@ const fieldRows = computed(() => buildSatelliteThreatInfoFieldRows(props.threatI
 
 .satellite-threat-info-label {
   margin: 0;
-  font-size: 12px;
-  color: #64748b;
+  font-size: var(--font-size-sm);
+  color: var(--text-color-subtle);
   line-height: 1.5;
 }
 
 .satellite-threat-info-value {
   margin: 0;
-  font-size: 12px;
-  color: #e2e8f0;
+  font-size: var(--font-size-sm);
+  color: var(--text-color-soft);
   line-height: 1.5;
   word-break: break-word;
   white-space: pre-wrap;
 
   &.is-formula {
-    color: #7dd3fc;
-    font-family: Consolas, 'Courier New', monospace;
+    color: var(--color-info-soft);
+    font-family: var(--font-family-mono);
   }
 }
 
 .satellite-threat-info-empty {
   margin: 12px 0 0;
-  font-size: 12px;
-  color: #64748b;
+  font-size: var(--font-size-sm);
+  color: var(--text-color-subtle);
   text-align: center;
 }
 
@@ -125,30 +125,30 @@ const fieldRows = computed(() => buildSatelliteThreatInfoFieldRows(props.threatI
 
 .atlas-app-dialog.satellite-threat-info-dialog,
 .satellite-threat-info-dialog .atlas-app-dialog {
-  --el-dialog-bg-color: rgba(8, 15, 26, 0.96);
-  --el-dialog-title-font-size: 16px;
-  border: 1px solid rgba(0, 225, 255, 0.25);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  --el-dialog-bg-color: var(--dialog-bg);
+  --el-dialog-title-font-size: var(--font-size-lg);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
+  box-shadow: 0 16px 48px var(--mask-color);
 }
 
 .satellite-threat-info-dialog .atlas-app-dialog__header {
-  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  border-bottom: 1px solid var(--swatch-rgba-148-163-184-0_15);
   margin-right: 0;
   padding-bottom: 12px;
 }
 
 .satellite-threat-info-dialog .atlas-app-dialog__title {
-  color: #e2e8f0;
-  font-weight: 700;
+  color: var(--text-color-soft);
+  font-weight: var(--font-weight-bold);
 }
 
 .satellite-threat-info-dialog .atlas-app-dialog__body {
   padding-top: 16px;
-  color: #e2e8f0;
+  color: var(--text-color-soft);
 }
 
 .satellite-threat-info-dialog .atlas-app-dialog__footer {
-  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  border-top: 1px solid var(--swatch-rgba-148-163-184-0_12);
   padding-top: 12px;
 }
 </style>

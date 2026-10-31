@@ -921,10 +921,10 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   height: 100%;
   padding: 10px 12px;
   box-sizing: border-box;
-  background: rgba(8, 15, 26, 0.88);
-  border: 1px solid rgba(0, 225, 255, 0.18);
+  background: var(--swatch-rgba-8-15-26-0_88);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
   border-radius: 10px;
-  color: #e2efff;
+  color: var(--text-color-bright);
   overflow: hidden;
 }
 
@@ -934,16 +934,16 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   justify-content: space-between;
   gap: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(0, 225, 255, 0.15);
+  border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.15);
   margin-bottom: 8px;
 
   .header-left-title {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 15px;
-    font-weight: 700;
-    color: #40f2ff;
+    font-size: var(--font-size-subtitle);
+    font-weight: var(--font-weight-bold);
+    color: var(--accent-cyan-hover);
     white-space: nowrap;
   }
 }
@@ -952,10 +952,10 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(14, 25, 42, 0.9);
+  background: var(--swatch-rgba-14-25-42-0_9);
   padding: 2px;
   border-radius: 6px;
-  border: 1px solid rgba(0, 225, 255, 0.18);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
 
   .tab-btn {
     display: flex;
@@ -966,38 +966,38 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     border-radius: 4px;
     border: none;
     background: transparent;
-    color: #94a3b8;
-    font-size: 12px;
-    font-weight: 600;
+    color: var(--text-color-muted);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
     transition: all 0.2s ease;
 
     &:hover {
-      color: #e2efff;
-      background: rgba(0, 225, 255, 0.08);
+      color: var(--text-color-bright);
+      background: rgba(var(--accent-cyan-rgb), 0.08);
     }
 
     &.active {
-      background: rgba(0, 225, 255, 0.18);
-      color: #40f2ff;
-      border: 1px solid rgba(0, 225, 255, 0.35);
-      box-shadow: 0 0 8px rgba(0, 225, 255, 0.2);
+      background: rgba(var(--accent-cyan-rgb), 0.18);
+      color: var(--accent-cyan-hover);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.35);
+      box-shadow: 0 0 8px rgba(var(--accent-cyan-rgb), 0.2);
     }
 
     .tab-count-badge {
-      font-size: 10px;
+      font-size: var(--font-size-caption);
       padding: 1px 4px;
       border-radius: 3px;
-      background: rgba(234, 179, 8, 0.25);
-      color: #facc15;
-      font-weight: 700;
+      background: var(--swatch-rgba-234-179-8-0_25);
+      color: var(--color-warning);
+      font-weight: var(--font-weight-bold);
     }
 
     .tab-dot {
       width: 5px;
       height: 5px;
       border-radius: 50%;
-      background: #40f2ff;
+      background: var(--accent-cyan-hover);
     }
   }
 }
@@ -1016,16 +1016,16 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   padding: 8px 10px;
   margin-bottom: 10px;
   border-radius: 6px;
-  background: rgba(14, 25, 42, 0.85);
-  border: 1px solid rgba(0, 225, 255, 0.15);
+  background: var(--swatch-rgba-14-25-42-0_85);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.15);
 
   .weight-banner-title {
     display: flex;
     align-items: center;
     gap: 5px;
-    font-size: 12px;
-    font-weight: 700;
-    color: #7dd3fc;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-info-soft);
     margin-bottom: 6px;
   }
 
@@ -1039,12 +1039,12 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 11px;
+    font-size: var(--font-size-xs);
     padding: 1px 6px;
     border-radius: 3px;
-    background: rgba(8, 18, 32, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: #cbd5e1;
+    background: var(--swatch-rgba-8-18-32-0_7);
+    border: 1px solid var(--swatch-rgba-255-255-255-0_08);
+    color: var(--text-color-soft);
 
     .chip-dot {
       width: 4px;
@@ -1053,23 +1053,23 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     }
 
     &.chip--threat .chip-dot {
-      background: #f87171;
+      background: var(--color-danger-soft);
     }
 
     &.chip--coverage .chip-dot {
-      background: #22d3ee;
+      background: var(--color-info-bright);
     }
 
     &.chip--time .chip-dot {
-      background: #fbbf24;
+      background: var(--color-warning);
     }
 
     &.chip--iso .chip-dot {
-      background: #34d399;
+      background: var(--color-success);
     }
 
     &.chip--relay .chip-dot {
-      background: #c084fc;
+      background: var(--swatch-c084fc);
     }
   }
 }
@@ -1086,55 +1086,55 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   box-sizing: border-box;
   padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(14, 25, 42, 0.85);
-  border: 1px solid rgba(0, 225, 255, 0.18);
-  border-left: 4px solid #38bdf8;
+  background: var(--swatch-rgba-14-25-42-0_85);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
+  border-left: 4px solid var(--color-info);
   cursor: pointer;
   transition: all 0.25s ease;
   text-align: left;
 
   &:hover {
-    background: rgba(20, 36, 60, 0.92);
+    background: var(--swatch-rgba-20-36-60-0_92);
     transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(0, 225, 255, 0.15);
+    box-shadow: 0 4px 14px rgba(var(--accent-cyan-rgb), 0.15);
   }
 
   &.active {
-    border-color: #00e1ff;
-    box-shadow: 0 0 14px rgba(0, 225, 255, 0.3), inset 0 0 12px rgba(0, 225, 255, 0.08);
-    background: linear-gradient(135deg, rgba(0, 225, 255, 0.15) 0%, rgba(14, 28, 48, 0.95) 100%);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 14px rgba(var(--accent-cyan-rgb), 0.3), inset 0 0 12px rgba(var(--accent-cyan-rgb), 0.08);
+    background: linear-gradient(135deg, rgba(var(--accent-cyan-rgb), 0.15) 0%, var(--swatch-rgba-14-28-48-0_95) 100%);
   }
 
   &.rank-1 {
-    border-left-color: #eab308;
-    background: linear-gradient(180deg, rgba(30, 26, 16, 0.85) 0%, rgba(14, 25, 42, 0.85) 100%);
-    border-color: rgba(234, 179, 8, 0.35);
+    border-left-color: var(--swatch-eab308);
+    background: linear-gradient(180deg, var(--swatch-rgba-30-26-16-0_85) 0%, var(--swatch-rgba-14-25-42-0_85) 100%);
+    border-color: var(--swatch-rgba-234-179-8-0_35);
 
     &.active {
-      border-color: #facc15;
-      box-shadow: 0 0 16px rgba(234, 179, 8, 0.35);
+      border-color: var(--color-warning);
+      box-shadow: 0 0 16px var(--swatch-rgba-234-179-8-0_35);
     }
   }
 
   &.rank-2 {
-    border-left-color: #38bdf8;
-    background: linear-gradient(180deg, rgba(16, 28, 42, 0.85) 0%, rgba(14, 25, 42, 0.85) 100%);
-    border-color: rgba(56, 189, 248, 0.35);
+    border-left-color: var(--color-info);
+    background: linear-gradient(180deg, var(--swatch-rgba-16-28-42-0_85) 0%, var(--swatch-rgba-14-25-42-0_85) 100%);
+    border-color: var(--swatch-rgba-56-189-248-0_35);
 
     &.active {
-      border-color: #38bdf8;
-      box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+      border-color: var(--color-info);
+      box-shadow: 0 0 16px var(--swatch-rgba-56-189-248-0_35);
     }
   }
 
   &.rank-3 {
-    border-left-color: #fb923c;
-    background: linear-gradient(180deg, rgba(30, 22, 16, 0.85) 0%, rgba(14, 25, 42, 0.85) 100%);
-    border-color: rgba(251, 146, 60, 0.35);
+    border-left-color: var(--color-orange);
+    background: linear-gradient(180deg, var(--swatch-rgba-30-22-16-0_85) 0%, var(--swatch-rgba-14-25-42-0_85) 100%);
+    border-color: var(--swatch-rgba-251-146-60-0_35);
 
     &.active {
-      border-color: #fb923c;
-      box-shadow: 0 0 16px rgba(251, 146, 60, 0.35);
+      border-color: var(--color-orange);
+      box-shadow: 0 0 16px var(--swatch-rgba-251-146-60-0_35);
     }
   }
 
@@ -1164,29 +1164,29 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     gap: 4px;
     padding: 2px 7px;
     border-radius: 4px;
-    font-size: 12px;
-    font-weight: 800;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-heavy);
     letter-spacing: 0.5px;
 
     &--1 {
-      background: linear-gradient(135deg, rgba(234, 179, 8, 0.3) 0%, rgba(180, 83, 9, 0.4) 100%);
-      color: #fef08a;
-      border: 1px solid rgba(234, 179, 8, 0.6);
-      text-shadow: 0 0 6px rgba(234, 179, 8, 0.6);
+      background: linear-gradient(135deg, var(--swatch-rgba-234-179-8-0_3) 0%, var(--swatch-rgba-180-83-9-0_4) 100%);
+      color: var(--swatch-fef08a);
+      border: 1px solid var(--swatch-rgba-234-179-8-0_6);
+      text-shadow: 0 0 6px var(--swatch-rgba-234-179-8-0_6);
     }
 
     &--2 {
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.3) 0%, rgba(2, 132, 199, 0.4) 100%);
-      color: #bae6fd;
-      border: 1px solid rgba(56, 189, 248, 0.6);
-      text-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+      background: linear-gradient(135deg, var(--swatch-rgba-56-189-248-0_3) 0%, var(--swatch-rgba-2-132-199-0_4) 100%);
+      color: var(--swatch-bae6fd);
+      border: 1px solid var(--swatch-rgba-56-189-248-0_6);
+      text-shadow: 0 0 6px var(--swatch-rgba-56-189-248-0_6);
     }
 
     &--3 {
-      background: linear-gradient(135deg, rgba(249, 115, 22, 0.3) 0%, rgba(194, 65, 12, 0.4) 100%);
-      color: #fed7aa;
-      border: 1px solid rgba(249, 115, 22, 0.6);
-      text-shadow: 0 0 6px rgba(249, 115, 22, 0.6);
+      background: linear-gradient(135deg, var(--swatch-rgba-249-115-22-0_3) 0%, var(--swatch-rgba-194-65-12-0_4) 100%);
+      color: var(--swatch-fed7aa);
+      border: 1px solid var(--swatch-rgba-249-115-22-0_6);
+      text-shadow: 0 0 6px var(--swatch-rgba-249-115-22-0_6);
     }
   }
 
@@ -1196,24 +1196,24 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     gap: 3px;
     padding: 1px 6px;
     border-radius: 4px;
-    background: rgba(0, 225, 255, 0.08);
-    border: 1px solid rgba(0, 225, 255, 0.25);
+    background: rgba(var(--accent-cyan-rgb), 0.08);
+    border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
 
     .score-label {
-      font-size: 10px;
-      color: #94a3b8;
+      font-size: var(--font-size-caption);
+      color: var(--text-color-muted);
     }
 
     .score-number {
-      font-size: 15px;
-      font-weight: 800;
-      color: #40f2ff;
-      font-family: Consolas, monospace;
+      font-size: var(--font-size-subtitle);
+      font-weight: var(--font-weight-heavy);
+      color: var(--accent-cyan-hover);
+      font-family: var(--font-family-mono);
     }
 
     .score-unit {
-      font-size: 10px;
-      color: #7dd3fc;
+      font-size: var(--font-size-caption);
+      color: var(--color-info-soft);
     }
   }
 }
@@ -1226,55 +1226,55 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   padding: 6px 8px;
   margin-bottom: 8px;
   border-radius: 4px;
-  background: rgba(8, 15, 26, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--swatch-rgba-8-15-26-0_65);
+  border: 1px solid var(--swatch-rgba-255-255-255-0_06);
 
   .flow-node {
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    font-size: 12px;
-    font-weight: 700;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
     padding: 1px 4px;
     border-radius: 3px;
     transition: all 0.2s ease;
 
     .flow-icon {
-      font-size: 12px;
+      font-size: var(--font-size-sm);
     }
 
     &--sat .flow-name {
-      color: #67e8f9;
+      color: var(--color-info-bright);
     }
 
     &--relay .flow-name {
-      color: #c4b5fd;
+      color: var(--swatch-c4b5fd);
     }
 
     &--receive .flow-name {
-      color: #5eead4;
+      color: var(--swatch-5eead4);
     }
 
     &--station .flow-name {
-      color: #93c5fd;
+      color: var(--swatch-93c5fd);
     }
 
     &--struck {
-      background: rgba(239, 68, 68, 0.22);
-      border: 1px solid rgba(248, 113, 113, 0.6);
-      box-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
+      background: var(--swatch-rgba-239-68-68-0_22);
+      border: 1px solid var(--swatch-rgba-248-113-113-0_6);
+      box-shadow: 0 0 8px var(--color-danger-glow);
 
       .flow-name {
-        color: #f87171 !important;
-        font-weight: 800;
-        text-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+        color: var(--color-danger-soft) !important;
+        font-weight: var(--font-weight-heavy);
+        text-shadow: 0 0 6px var(--swatch-rgba-239-68-68-0_6);
       }
     }
   }
 
   .flow-arrow {
-    color: #475569;
-    font-size: 11px;
+    color: var(--text-color-disabled);
+    font-size: var(--font-size-xs);
   }
 }
 
@@ -1285,16 +1285,16 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   margin-bottom: 8px;
   padding: 6px 8px;
   border-radius: 4px;
-  background: rgba(8, 18, 32, 0.5);
+  background: var(--swatch-rgba-8-18-32-0_5);
 
   .dim-item {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
+    font-size: var(--font-size-xs);
 
     .dim-label {
-      color: #94a3b8;
+      color: var(--text-color-muted);
       width: 60px;
       flex-shrink: 0;
       white-space: nowrap;
@@ -1303,7 +1303,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     .dim-val-bar {
       flex: 1;
       height: 4px;
-      background: rgba(255, 255, 255, 0.08);
+      background: var(--swatch-rgba-255-255-255-0_08);
       border-radius: 2px;
       overflow: hidden;
 
@@ -1313,31 +1313,31 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
         transition: width 0.3s ease;
 
         &--threat {
-          background: linear-gradient(90deg, #f87171, #ef4444);
+          background: linear-gradient(90deg, var(--color-danger-soft), var(--color-danger-strong));
         }
 
         &--coverage {
-          background: linear-gradient(90deg, #22d3ee, #0891b2);
+          background: linear-gradient(90deg, var(--color-info-bright), var(--swatch-0891b2));
         }
 
         &--time {
-          background: linear-gradient(90deg, #fbbf24, #f59e0b);
+          background: linear-gradient(90deg, var(--color-warning), var(--swatch-f59e0b));
         }
 
         &--iso {
-          background: linear-gradient(90deg, #34d399, #10b981);
+          background: linear-gradient(90deg, var(--color-success), var(--color-success-strong));
         }
 
         &--relay {
-          background: linear-gradient(90deg, #c084fc, #a855f7);
+          background: linear-gradient(90deg, var(--swatch-c084fc), var(--color-purple-deep));
         }
       }
     }
 
     .dim-score {
-      font-size: 11px;
-      font-weight: 700;
-      color: #e2efff;
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-bold);
+      color: var(--text-color-bright);
       width: 28px;
       text-align: right;
       flex-shrink: 0;
@@ -1348,8 +1348,8 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
 .reason-box {
   padding: 8px 10px;
   border-radius: 6px;
-  background: rgba(12, 22, 38, 0.95);
-  border: 1px solid rgba(0, 225, 255, 0.2);
+  background: var(--swatch-rgba-12-22-38-0_95);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.2);
   margin-bottom: 6px;
 
   .reason-title {
@@ -1357,12 +1357,12 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-    font-size: 12px;
-    color: #40f2ff;
+    font-size: var(--font-size-sm);
+    color: var(--accent-cyan-hover);
     margin-bottom: 6px;
 
     strong {
-      font-weight: 700;
+      font-weight: var(--font-weight-bold);
     }
   }
 
@@ -1374,12 +1374,12 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   }
 
   .reason-tag {
-    font-size: 10px;
+    font-size: var(--font-size-caption);
     padding: 0 4px;
     border-radius: 3px;
-    background: rgba(0, 225, 255, 0.12);
-    border: 1px solid rgba(0, 225, 255, 0.25);
-    color: #7dd3fc;
+    background: rgba(var(--accent-cyan-rgb), 0.12);
+    border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
+    color: var(--color-info-soft);
   }
 
   .reason-points {
@@ -1389,9 +1389,9 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     line-height: 1.45;
-    color: #cbd5e1;
+    color: var(--text-color-soft);
 
     li {
       position: relative;
@@ -1402,13 +1402,13 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
         position: absolute;
         left: 0;
         top: 0;
-        color: #00e1ff;
+        color: var(--accent-cyan);
       }
     }
 
     .point-label {
-      color: #93c5fd;
-      font-weight: 600;
+      color: var(--swatch-93c5fd);
+      font-weight: var(--font-weight-semibold);
     }
   }
 }
@@ -1418,14 +1418,14 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   align-items: center;
   justify-content: space-between;
   padding-top: 4px;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 
   .action-hint {
-    color: #64748b;
+    color: var(--text-color-subtle);
   }
 
   .view-detail-link {
-    font-size: 11px;
+    font-size: var(--font-size-xs);
     padding: 0;
     height: auto;
   }
@@ -1438,15 +1438,15 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
 .detail-card {
   padding: 12px;
   border-radius: 8px;
-  background: rgba(18, 32, 54, 0.8);
-  border: 1px solid rgba(79, 147, 221, 0.2);
-  border-left: 3px solid #00e1ff;
+  background: var(--swatch-rgba-18-32-54-0_8);
+  border: 1px solid var(--accent-bg);
+  border-left: 3px solid var(--accent-cyan);
   margin-bottom: 12px;
   text-align: left;
 
   &.struck {
-    border-left-color: #94a3b8;
-    background: rgba(30, 35, 45, 0.75);
+    border-left-color: var(--text-color-muted);
+    background: var(--swatch-rgba-30-35-45-0_75);
   }
 }
 
@@ -1456,7 +1456,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   gap: 10px;
 
   .detail-icon {
-    font-size: 22px;
+    font-size: var(--font-size-2xl);
     flex-shrink: 0;
     margin-top: 2px;
   }
@@ -1479,84 +1479,84 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    font-size: 14px;
-    font-weight: 700;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
     padding: 1px 4px;
     border-radius: 3px;
     transition: all 0.2s ease;
 
     .path-icon {
-      font-size: 13px;
+      font-size: var(--font-size-md);
     }
 
     &--sat .path-name {
-      color: #67e8f9;
+      color: var(--color-info-bright);
     }
 
     &--relay .path-name {
-      color: #c4b5fd;
+      color: var(--swatch-c4b5fd);
     }
 
     &--receive .path-name {
-      color: #5eead4;
+      color: var(--swatch-5eead4);
     }
 
     &--station .path-name {
-      color: #93c5fd;
+      color: var(--swatch-93c5fd);
     }
 
     &--struck {
-      background: rgba(239, 68, 68, 0.22);
-      border: 1px solid rgba(248, 113, 113, 0.6);
-      box-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
+      background: var(--swatch-rgba-239-68-68-0_22);
+      border: 1px solid var(--swatch-rgba-248-113-113-0_6);
+      box-shadow: 0 0 8px var(--color-danger-glow);
 
       .path-name {
-        color: #f87171 !important;
-        font-weight: 800;
-        text-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+        color: var(--color-danger-soft) !important;
+        font-weight: var(--font-weight-heavy);
+        text-shadow: 0 0 6px var(--swatch-rgba-239-68-68-0_6);
       }
     }
   }
 
   .path-arrow {
-    color: #475569;
-    font-size: 12px;
+    color: var(--text-color-disabled);
+    font-size: var(--font-size-sm);
   }
 
   .detail-name {
-    font-size: 16px;
-    font-weight: 700;
-    color: #fff;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-white);
     word-break: break-all;
   }
 
   .detail-type {
-    font-size: 12px;
-    color: #7dd3fc;
+    font-size: var(--font-size-sm);
+    color: var(--color-info-soft);
     margin-top: 4px;
   }
 }
 
 .status-badge {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   padding: 2px 8px;
   border-radius: 4px;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   max-width: 100%;
   white-space: nowrap;
 
   &.ok {
-    color: #00e1ff;
-    background: rgba(0, 225, 255, 0.12);
-    border: 1px solid rgba(0, 225, 255, 0.35);
+    color: var(--accent-cyan);
+    background: rgba(var(--accent-cyan-rgb), 0.12);
+    border: 1px solid rgba(var(--accent-cyan-rgb), 0.35);
   }
 
   &.struck {
-    color: #fecaca;
-    background: rgba(239, 68, 68, 0.18);
-    border: 1px solid rgba(248, 113, 113, 0.45);
-    text-shadow: 0 0 6px rgba(239, 68, 68, 0.35);
+    color: var(--swatch-fecaca);
+    background: var(--swatch-rgba-239-68-68-0_18);
+    border: 1px solid var(--swatch-rgba-248-113-113-0_45);
+    text-shadow: 0 0 6px var(--color-danger-glow);
   }
 }
 
@@ -1572,9 +1572,9 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   grid-template-columns: 72px 1fr;
   gap: 10px;
   align-items: start;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   padding: 7px 0;
-  border-bottom: 1px dashed rgba(148, 163, 184, 0.15);
+  border-bottom: 1px dashed var(--swatch-rgba-148-163-184-0_15);
   text-align: left;
 
   &:last-child {
@@ -1582,48 +1582,48 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   }
 
   .meta-label {
-    color: #64748b;
-    font-weight: 500;
+    color: var(--text-color-subtle);
+    font-weight: var(--font-weight-medium);
   }
 
   .meta-val {
-    color: #e2efff;
-    font-weight: 600;
+    color: var(--text-color-bright);
+    font-weight: var(--font-weight-semibold);
     word-break: break-all;
   }
 
   &--time .meta-val {
-    color: #94a3b8;
-    font-weight: 500;
+    color: var(--text-color-muted);
+    font-weight: var(--font-weight-medium);
   }
 
   &--delay .meta-val {
-    color: #94a3b8;
+    color: var(--text-color-muted);
     font-style: italic;
   }
 
   &--weapon .meta-val {
-    color: #fdba74;
+    color: var(--color-warning-soft);
   }
 
   &--coverage-before .meta-val {
-    color: #4ade80;
-    font-weight: 700;
+    color: var(--color-success-soft);
+    font-weight: var(--font-weight-bold);
   }
 
   &--coverage-after .meta-val {
-    color: #fb923c;
-    font-weight: 700;
+    color: var(--color-orange);
+    font-weight: var(--font-weight-bold);
   }
 
   &--strike .meta-val {
-    color: #fca5a5;
-    font-weight: 700;
+    color: var(--color-danger-soft);
+    font-weight: var(--font-weight-bold);
   }
 
   &--neutral .meta-val {
-    color: #64748b;
-    font-weight: 500;
+    color: var(--text-color-subtle);
+    font-weight: var(--font-weight-medium);
   }
 }
 
@@ -1632,11 +1632,11 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   text-align: left;
 
   .section-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: #7dd3fc;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-info-soft);
     margin-bottom: 8px;
-    border-left: 2px solid rgba(0, 225, 255, 0.5);
+    border-left: 2px solid rgba(var(--accent-cyan-rgb), 0.5);
     padding-left: 8px;
   }
 }
@@ -1651,16 +1651,16 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   padding: 10px 12px;
   margin-bottom: 8px;
   border-radius: 8px;
-  background: rgba(12, 22, 38, 0.85);
-  border: 1px solid rgba(79, 147, 221, 0.18);
-  border-left: 3px solid #00e1ff;
-  font-size: 12px;
+  background: var(--swatch-rgba-12-22-38-0_85);
+  border: 1px solid var(--accent-border);
+  border-left: 3px solid var(--accent-cyan);
+  font-size: var(--font-size-sm);
   text-align: left;
 
   &.struck {
-    border-left-color: #f87171;
-    border-color: rgba(248, 113, 113, 0.22);
-    background: rgba(30, 24, 28, 0.75);
+    border-left-color: var(--color-danger-soft);
+    border-color: var(--swatch-rgba-248-113-113-0_22);
+    background: var(--swatch-rgba-30-24-28-0_75);
   }
 
   .window-top {
@@ -1670,7 +1670,7 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
     gap: 10px;
     margin-bottom: 8px;
     padding-bottom: 8px;
-    border-bottom: 1px dashed rgba(148, 163, 184, 0.12);
+    border-bottom: 1px dashed var(--swatch-rgba-148-163-184-0_12);
   }
 
   .window-title-wrap {
@@ -1681,15 +1681,15 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   }
 
   .window-subject {
-    font-size: 11px;
-    color: #64748b;
-    font-weight: 500;
+    font-size: var(--font-size-xs);
+    color: var(--text-color-subtle);
+    font-weight: var(--font-weight-medium);
   }
 
   .window-name {
-    font-size: 14px;
-    font-weight: 700;
-    color: #e2efff;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-color-bright);
     word-break: break-word;
     line-height: 1.35;
   }
@@ -1706,45 +1706,45 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   }
 
   .window-field-label {
-    font-size: 11px;
-    color: #64748b;
+    font-size: var(--font-size-xs);
+    color: var(--text-color-subtle);
     flex-shrink: 0;
   }
 
   .window-time {
-    color: #94a3b8;
-    font-family: Consolas, monospace;
-    font-size: 11px;
+    color: var(--text-color-muted);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-xs);
     word-break: break-all;
   }
 
   .window-delay {
-    color: #fca5a5;
-    font-weight: 600;
+    color: var(--color-danger-soft);
+    font-weight: var(--font-weight-semibold);
   }
 
   .window-weapons {
-    color: #fdba74;
+    color: var(--color-warning-soft);
     word-break: break-word;
   }
 
   .strike-tag {
     flex-shrink: 0;
-    font-size: 11px;
-    font-weight: 700;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
     padding: 2px 8px;
     border-radius: 4px;
 
     &.ok {
-      color: #00e1ff;
-      background: rgba(0, 225, 255, 0.1);
-      border: 1px solid rgba(0, 225, 255, 0.25);
+      color: var(--accent-cyan);
+      background: rgba(var(--accent-cyan-rgb), 0.1);
+      border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
     }
 
     &.struck {
-      color: #fecaca;
-      background: rgba(239, 68, 68, 0.12);
-      border: 1px solid rgba(248, 113, 113, 0.28);
+      color: var(--swatch-fecaca);
+      background: var(--color-danger-bg);
+      border: 1px solid var(--swatch-rgba-248-113-113-0_28);
     }
   }
 }
@@ -1755,12 +1755,12 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   gap: 6px;
 
   .weapon-chip {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     padding: 2px 8px;
     border-radius: 4px;
-    color: #fca5a5;
-    background: rgba(239, 68, 68, 0.12);
-    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: var(--color-danger-soft);
+    background: var(--color-danger-bg);
+    border: 1px solid var(--swatch-rgba-239-68-68-0_25);
   }
 }
 
@@ -1771,11 +1771,11 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   grid-template-columns: 24px 72px minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   padding: 7px 10px;
   margin-bottom: 4px;
   border-radius: 4px;
-  background: rgba(8, 15, 26, 0.55);
+  background: var(--swatch-rgba-8-15-26-0_55);
   text-align: left;
 
   &--with-badge {
@@ -1783,55 +1783,55 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   }
 
   .conn-icon {
-    font-size: 15px;
+    font-size: var(--font-size-subtitle);
     flex-shrink: 0;
   }
 
   .conn-layer {
-    font-size: 12px;
-    color: #64748b;
-    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--text-color-subtle);
+    font-weight: var(--font-weight-semibold);
   }
 
   .conn-name {
-    color: #e2efff;
-    font-weight: 600;
+    color: var(--text-color-bright);
+    font-weight: var(--font-weight-semibold);
     word-break: break-all;
   }
 
   .conn-strike-badge {
-    font-size: 11px;
-    font-weight: 700;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
     padding: 1px 6px;
     border-radius: 3px;
 
     &.struck {
-      color: #fca5a5;
-      background: rgba(239, 68, 68, 0.18);
-      border: 1px solid rgba(248, 113, 113, 0.45);
+      color: var(--color-danger-soft);
+      background: var(--swatch-rgba-239-68-68-0_18);
+      border: 1px solid var(--swatch-rgba-248-113-113-0_45);
     }
 
     &.ok {
-      color: #7dd3fc;
-      background: rgba(56, 189, 248, 0.08);
-      border: 1px solid rgba(56, 189, 248, 0.25);
+      color: var(--color-info-soft);
+      background: var(--swatch-rgba-56-189-248-0_08);
+      border: 1px solid var(--swatch-rgba-56-189-248-0_25);
     }
   }
 
   &--sat .conn-name {
-    color: #67e8f9;
+    color: var(--color-info-bright);
   }
 
   &--relay .conn-name {
-    color: #c4b5fd;
+    color: var(--swatch-c4b5fd);
   }
 
   &--receive .conn-name {
-    color: #5eead4;
+    color: var(--swatch-5eead4);
   }
 
   &--station .conn-name {
-    color: #93c5fd;
+    color: var(--swatch-93c5fd);
   }
 }
 
@@ -1842,13 +1842,13 @@ const resolveSatName = (data: MatrixResult, norad: number): string => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: #64748b;
-  font-size: 14px;
+  color: var(--text-color-subtle);
+  font-size: var(--font-size-base);
   text-align: center;
   padding: 24px 12px;
 
   .empty-icon {
-    font-size: 28px;
+    font-size: var(--font-size-3xl);
   }
 }
 </style>

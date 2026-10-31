@@ -1,6 +1,7 @@
 import type { StrikePlanV2MissionWindowItem } from '@/api/strike-plan/satellite-strike-plan-api'
 import type { StrikePhase, StrikeTypeStyle } from '@/types/strike'
 import * as Cesium from 'cesium'
+import { readThemeColor } from '@/styles/themeColor'
 import { parseMissionWindowDate } from './dateFormat'
 
 /**
@@ -93,18 +94,18 @@ export const getStrikeTypeStyle = (
     return {
       width: phase === 'active' ? 2.5 : phase === 'fading' ? 2.2 * Math.max(0.55, fadeRatio) : 2,
       material: new Cesium.PolylineDashMaterialProperty({
-        color: createColor('#b15cff', 0.5 * linkAlpha),
-        gapColor: createColor('#b15cff', 0.15 * linkAlpha),
+        color: createColor(readThemeColor('--swatch-b15cff'), 0.5 * linkAlpha),
+        gapColor: createColor(readThemeColor('--swatch-b15cff'), 0.15 * linkAlpha),
         dashLength: 16,
       }),
-      pointColor: createColor('#b15cff', pointAlpha),
-      ellipseColor: createColor('#b15cff', phase === 'active' ? 0.14 : phase === 'fading' ? 0.12 * fadeRatio : 0.08),
+      pointColor: createColor(readThemeColor('--swatch-b15cff'), pointAlpha),
+      ellipseColor: createColor(readThemeColor('--swatch-b15cff'), phase === 'active' ? 0.14 : phase === 'fading' ? 0.12 * fadeRatio : 0.08),
       ellipseOutlineColor: createColor(
-        '#b15cff',
+        readThemeColor('--swatch-b15cff'),
         phase === 'active' ? 0.6 : phase === 'fading' ? 0.55 * fadeRatio : 0.45
       ),
-      satelliteColor: createColor('#b15cff', satelliteAlpha),
-      effectColor: createColor('#b15cff', phase === 'active' ? 0.8 : phase === 'fading' ? 0.8 * fadeRatio : 0.75),
+      satelliteColor: createColor(readThemeColor('--swatch-b15cff'), satelliteAlpha),
+      effectColor: createColor(readThemeColor('--swatch-b15cff'), phase === 'active' ? 0.8 : phase === 'fading' ? 0.8 * fadeRatio : 0.75),
     }
   }
 
@@ -112,14 +113,14 @@ export const getStrikeTypeStyle = (
     return {
       width: phase === 'active' ? 1.5 : phase === 'fading' ? 1.3 * Math.max(0.55, fadeRatio) : 1,
       material: Cesium.Color.RED.withAlpha(0.95 * linkAlpha),
-      pointColor: createColor('#ef6b73', pointAlpha),
-      ellipseColor: createColor('#ef6b73', phase === 'active' ? 0.14 : phase === 'fading' ? 0.12 * fadeRatio : 0.08),
+      pointColor: createColor(readThemeColor('--color-danger'), pointAlpha),
+      ellipseColor: createColor(readThemeColor('--color-danger'), phase === 'active' ? 0.14 : phase === 'fading' ? 0.12 * fadeRatio : 0.08),
       ellipseOutlineColor: createColor(
-        '#ef6b73',
+        readThemeColor('--color-danger'),
         phase === 'active' ? 0.6 : phase === 'fading' ? 0.55 * fadeRatio : 0.45
       ),
-      satelliteColor: createColor('#ef6b73', satelliteAlpha),
-      effectColor: createColor('#ef6b73', phase === 'active' ? 0.85 : phase === 'fading' ? 0.85 * fadeRatio : 0.8),
+      satelliteColor: createColor(readThemeColor('--color-danger'), satelliteAlpha),
+      effectColor: createColor(readThemeColor('--color-danger'), phase === 'active' ? 0.85 : phase === 'fading' ? 0.85 * fadeRatio : 0.8),
     }
   }
 
@@ -128,45 +129,45 @@ export const getStrikeTypeStyle = (
       width: phase === 'active' ? 4.5 : phase === 'fading' ? 4.2 * Math.max(0.55, fadeRatio) : 4,
       material: new Cesium.PolylineGlowMaterialProperty({
         glowPower: 0.2,
-        color: createColor('#7cd992', 0.7 * linkAlpha),
+        color: createColor(readThemeColor('--swatch-7cd992'), 0.7 * linkAlpha),
       }),
-      pointColor: createColor('#7cd992', pointAlpha),
-      ellipseColor: createColor('#7cd992', phase === 'active' ? 0.14 : phase === 'fading' ? 0.12 * fadeRatio : 0.08),
+      pointColor: createColor(readThemeColor('--swatch-7cd992'), pointAlpha),
+      ellipseColor: createColor(readThemeColor('--swatch-7cd992'), phase === 'active' ? 0.14 : phase === 'fading' ? 0.12 * fadeRatio : 0.08),
       ellipseOutlineColor: createColor(
-        '#7cd992',
+        readThemeColor('--swatch-7cd992'),
         phase === 'active' ? 0.6 : phase === 'fading' ? 0.55 * fadeRatio : 0.45
       ),
-      satelliteColor: createColor('#7cd992', satelliteAlpha),
-      effectColor: createColor('#7cd992', phase === 'active' ? 0.85 : phase === 'fading' ? 0.85 * fadeRatio : 0.8),
+      satelliteColor: createColor(readThemeColor('--swatch-7cd992'), satelliteAlpha),
+      effectColor: createColor(readThemeColor('--swatch-7cd992'), phase === 'active' ? 0.85 : phase === 'fading' ? 0.85 * fadeRatio : 0.8),
     }
   }
 
   if (normalizedType.includes('天基')) {
     return {
       width: phase === 'active' ? 5.5 : phase === 'fading' ? 5 * Math.max(0.6, fadeRatio) : 4.5,
-      material: new Cesium.PolylineArrowMaterialProperty(createColor('#8cc6ff', 0.7 * linkAlpha)),
-      pointColor: createColor('#8cc6ff', pointAlpha),
-      ellipseColor: createColor('#8cc6ff', phase === 'active' ? 0.12 : phase === 'fading' ? 0.1 * fadeRatio : 0.07),
+      material: new Cesium.PolylineArrowMaterialProperty(createColor(readThemeColor('--swatch-8cc6ff'), 0.7 * linkAlpha)),
+      pointColor: createColor(readThemeColor('--swatch-8cc6ff'), pointAlpha),
+      ellipseColor: createColor(readThemeColor('--swatch-8cc6ff'), phase === 'active' ? 0.12 : phase === 'fading' ? 0.1 * fadeRatio : 0.07),
       ellipseOutlineColor: createColor(
-        '#f4fbff',
+        readThemeColor('--swatch-f4fbff'),
         phase === 'active' ? 0.62 : phase === 'fading' ? 0.58 * fadeRatio : 0.5
       ),
-      satelliteColor: createColor('#8cc6ff', satelliteAlpha),
-      effectColor: createColor('#8cc6ff', phase === 'active' ? 0.85 : phase === 'fading' ? 0.85 * fadeRatio : 0.8),
+      satelliteColor: createColor(readThemeColor('--swatch-8cc6ff'), satelliteAlpha),
+      effectColor: createColor(readThemeColor('--swatch-8cc6ff'), phase === 'active' ? 0.85 : phase === 'fading' ? 0.85 * fadeRatio : 0.8),
     }
   }
 
   // 默认样式（未知武器类型）
   return {
     width: phase === 'active' ? 3.5 : phase === 'fading' ? 3.1 * Math.max(0.55, fadeRatio) : 2.5,
-    material: Cesium.Color.fromCssColorString('#ef6b73').withAlpha(runtimeAlpha),
-    pointColor: createColor('#ef6b73', pointAlpha),
-    ellipseColor: createColor('#ef6b73', phase === 'active' ? 0.14 : phase === 'fading' ? 0.12 * fadeRatio : 0.08),
+    material: Cesium.Color.fromCssColorString(readThemeColor('--color-danger')).withAlpha(runtimeAlpha),
+    pointColor: createColor(readThemeColor('--color-danger'), pointAlpha),
+    ellipseColor: createColor(readThemeColor('--color-danger'), phase === 'active' ? 0.14 : phase === 'fading' ? 0.12 * fadeRatio : 0.08),
     ellipseOutlineColor: createColor(
-      '#ef6b73',
+      readThemeColor('--color-danger'),
       phase === 'active' ? 0.6 : phase === 'fading' ? 0.55 * fadeRatio : 0.45
     ),
-    satelliteColor: createColor('#ef6b73', satelliteAlpha),
-    effectColor: createColor('#ef6b73', phase === 'active' ? 0.85 : phase === 'fading' ? 0.85 * fadeRatio : 0.8),
+    satelliteColor: createColor(readThemeColor('--color-danger'), satelliteAlpha),
+    effectColor: createColor(readThemeColor('--color-danger'), phase === 'active' ? 0.85 : phase === 'fading' ? 0.85 * fadeRatio : 0.8),
   }
 }

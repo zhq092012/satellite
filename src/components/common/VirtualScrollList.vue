@@ -262,7 +262,7 @@ defineExpose({
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(56, 189, 248, 0.65) rgba(8, 20, 40, 0.9);
+  scrollbar-color: var(--swatch-rgba-56-189-248-0_65) var(--swatch-rgba-8-20-40-0_9);
 }
 
 .virtual-scroll-list::-webkit-scrollbar {
@@ -270,12 +270,12 @@ defineExpose({
 }
 
 .virtual-scroll-list::-webkit-scrollbar-thumb {
-  background: rgba(56, 189, 248, 0.55);
+  background: var(--swatch-rgba-56-189-248-0_55);
   border-radius: 4px;
 }
 
 .virtual-scroll-list::-webkit-scrollbar-track {
-  background: rgba(8, 20, 40, 0.85);
+  background: var(--swatch-rgba-8-20-40-0_85);
 }
 
 .virtual-scroll-list__spacer {

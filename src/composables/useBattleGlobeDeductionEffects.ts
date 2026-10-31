@@ -1,3 +1,4 @@
+import { readThemeColor } from '@/styles/themeColor'
 import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
 import { onBeforeUnmount, watch, type ComputedRef, type Ref, ref } from 'vue'
@@ -336,7 +337,7 @@ export const useBattleGlobeDeductionEffects = (
         positions: new Cesium.ConstantProperty(linePositions),
         width: 2,
         material: new Cesium.PolylineDashMaterialProperty({
-          color: Cesium.Color.fromCssColorString('#facc15'),
+          color: Cesium.Color.fromCssColorString(readThemeColor('--swatch-facc15')),
           dashLength: 16,
         }),
         arcType: Cesium.ArcType.NONE,

@@ -180,8 +180,8 @@ const rowVariantClass = (variant?: ZhchPlanMetricsTableRowView['rowVariant']): s
 <style lang="scss" scoped>
 .zhch-metrics-table {
   border-radius: 8px;
-  border: 1px solid rgba(79, 147, 221, 0.25);
-  background: rgba(14, 28, 48, 0.6);
+  border: 1px solid var(--accent-border-strong);
+  background: var(--swatch-rgba-14-28-48-0_6);
   overflow: hidden;
 
   .zhch-plan-detail--align & {
@@ -194,7 +194,7 @@ const rowVariantClass = (variant?: ZhchPlanMetricsTableRowView['rowVariant']): s
 
   &--vertical {
     .zhch-metrics-table__head {
-      font-size: 17px;
+      font-size: var(--font-size-lg);
       padding: 8px 10px;
     }
 
@@ -203,7 +203,7 @@ const rowVariantClass = (variant?: ZhchPlanMetricsTableRowView['rowVariant']): s
     }
 
     .zhch-metrics-table__grid--vertical {
-      font-size: 16px;
+      font-size: var(--font-size-lg);
       table-layout: fixed;
       width: 100%;
     }
@@ -241,12 +241,12 @@ const rowVariantClass = (variant?: ZhchPlanMetricsTableRowView['rowVariant']): s
       text-align: left;
       padding-left: 8px;
       padding-right: 4px;
-      color: #94a3b8;
-      font-weight: 700;
+      color: var(--text-color-muted);
+      font-weight: var(--font-weight-bold);
     }
 
     .zhch-metrics-table__th--label {
-      color: #00e1ff;
+      color: var(--accent-cyan);
     }
 
     .zhch-metrics-table__th--value,
@@ -257,18 +257,18 @@ const rowVariantClass = (variant?: ZhchPlanMetricsTableRowView['rowVariant']): s
     }
 
     .zhch-metrics-table__th--value {
-      color: #00e1ff;
-      font-weight: 700;
+      color: var(--accent-cyan);
+      font-weight: var(--font-weight-bold);
     }
   }
 
   &__head {
-    font-size: 17px;
-    font-weight: 800;
-    color: #7dd3fc;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-heavy);
+    color: var(--color-info-soft);
     padding: 10px 14px;
-    border-bottom: 1px solid rgba(79, 147, 221, 0.2);
-    background: rgba(0, 225, 255, 0.06);
+    border-bottom: 1px solid var(--accent-bg);
+    background: rgba(var(--accent-cyan-rgb), 0.06);
     text-align: center;
   }
 
@@ -282,16 +282,16 @@ const rowVariantClass = (variant?: ZhchPlanMetricsTableRowView['rowVariant']): s
     width: 100%;
     border-collapse: collapse;
     table-layout: auto;
-    font-size: 16px;
+    font-size: var(--font-size-lg);
   }
 
   &__th {
     padding: 10px 8px;
     text-align: center;
-    font-weight: 700;
-    color: #00e1ff;
-    background: rgba(13, 27, 49, 0.95);
-    border-bottom: 1px solid rgba(0, 225, 255, 0.18);
+    font-weight: var(--font-weight-bold);
+    color: var(--accent-cyan);
+    background: var(--panel-bg);
+    border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
     white-space: nowrap;
 
     &--phase {
@@ -307,8 +307,8 @@ const rowVariantClass = (variant?: ZhchPlanMetricsTableRowView['rowVariant']): s
     padding: 10px 8px;
     text-align: center;
     vertical-align: middle;
-    color: #e2e8f0;
-    border-bottom: 1px solid rgba(0, 225, 255, 0.08);
+    color: var(--text-color-soft);
+    border-bottom: 1px solid rgba(var(--accent-cyan-rgb), 0.08);
     line-height: 1.45;
 
     &--horizontal-value {
@@ -321,22 +321,22 @@ const rowVariantClass = (variant?: ZhchPlanMetricsTableRowView['rowVariant']): s
     &--phase {
       text-align: left;
       padding-left: 14px;
-      font-weight: 800;
+      font-weight: var(--font-weight-heavy);
       white-space: nowrap;
       position: sticky;
       left: 0;
       z-index: 1;
-      background: rgba(14, 28, 48, 0.98);
+      background: var(--swatch-rgba-14-28-48-0_98);
     }
   }
 
   &__tr--before :deep(.zhch-metric-cell__value) {
-    color: #cbd5e1;
+    color: var(--text-color-soft);
   }
 
   &__tr--after :deep(.zhch-metric-cell__value) {
-    color: #f8fafc;
-    font-weight: 600;
+    color: var(--text-color-strong);
+    font-weight: var(--font-weight-semibold);
   }
 }
 </style>

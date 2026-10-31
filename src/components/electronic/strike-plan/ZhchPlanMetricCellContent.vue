@@ -107,43 +107,43 @@ const toneToDeltaClass = (tone?: ZhchPlanMetricDeltaTone): string => {
 }
 
 .zhch-metric-cell__value--favorable {
-  color: #4ade80;
-  font-weight: 700;
+  color: var(--color-success-soft);
+  font-weight: var(--font-weight-bold);
 }
 
 .zhch-metric-cell__value--adverse {
-  color: #f87171;
-  font-weight: 700;
+  color: var(--color-danger-soft);
+  font-weight: var(--font-weight-bold);
 }
 
 .zhch-metric-cell__value--warning {
-  color: #fbbf24;
-  font-weight: 700;
+  color: var(--color-warning);
+  font-weight: var(--font-weight-bold);
 }
 
 .zhch-metric-cell__delta {
   display: block;
-  font-size: 16px;
-  font-weight: 800;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-heavy);
   font-variant-numeric: tabular-nums;
   line-height: 1.3;
   word-break: break-word;
   white-space: normal;
 
   &--neutral {
-    color: #94a3b8;
+    color: var(--text-color-muted);
   }
 
   &--favorable {
-    color: #4ade80;
+    color: var(--color-success-soft);
   }
 
   &--adverse {
-    color: #f87171;
+    color: var(--color-danger-soft);
   }
 
   &--warning {
-    color: #fbbf24;
+    color: var(--color-warning);
   }
 }
 </style>

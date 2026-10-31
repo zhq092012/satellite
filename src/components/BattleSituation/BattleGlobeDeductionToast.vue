@@ -69,10 +69,10 @@ const hasMetrics = computed(
   margin-bottom: 8px;
   padding: 10px 16px;
   border-radius: 8px;
-  background: rgba(8, 20, 36, 0.92);
-  border: 1px solid rgba(0, 225, 255, 0.28);
+  background: var(--swatch-rgba-8-20-36-0_92);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.28);
   backdrop-filter: blur(12px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 24px var(--mask-color);
   pointer-events: none;
   box-sizing: border-box;
 }
@@ -102,15 +102,15 @@ const hasMetrics = computed(
   align-items: stretch;
   gap: 6px;
   padding-left: 16px;
-  border-left: 1px solid rgba(0, 225, 255, 0.18);
+  border-left: 1px solid rgba(var(--accent-cyan-rgb), 0.18);
 }
 
 .globe-deduction-toast-line {
   margin: 0;
   width: 100%;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   line-height: 1.55;
-  color: #e2e8f0;
+  color: var(--text-color-soft);
   text-align: left;
 
   & + & {
@@ -128,7 +128,7 @@ const hasMetrics = computed(
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.45;
   white-space: nowrap;
 }
@@ -136,61 +136,61 @@ const hasMetrics = computed(
 .globe-deduction-metric-label {
   flex-shrink: 0;
   text-align: left;
-  color: #94a3b8;
+  color: var(--text-color-muted);
 }
 
 .globe-deduction-metric-value {
   flex-shrink: 0;
   text-align: right;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .globe-deduction-metric-value--reduce {
-  color: #34d399;
+  color: var(--color-success);
 }
 
 .globe-deduction-metric-value--delay {
-  color: #fbbf24;
+  color: var(--color-warning);
 }
 
 .globe-deduction-segment--satellite {
-  color: #fbbf24;
-  font-weight: 700;
-  text-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
+  color: var(--color-warning);
+  font-weight: var(--font-weight-bold);
+  text-shadow: 0 0 8px var(--swatch-rgba-251-191-36-0_45);
 }
 
 .globe-deduction-segment--event {
-  color: #7dd3fc;
-  font-weight: 700;
+  color: var(--color-info-soft);
+  font-weight: var(--font-weight-bold);
 }
 
 .globe-deduction-segment--threat {
-  color: #f87171;
-  font-weight: 700;
+  color: var(--color-danger-soft);
+  font-weight: var(--font-weight-bold);
 }
 
 .globe-deduction-segment--delay {
-  color: #a78bfa;
-  font-weight: 700;
+  color: var(--swatch-a78bfa);
+  font-weight: var(--font-weight-bold);
 }
 
 .globe-deduction-segment--coverage {
-  color: #34d399;
-  font-weight: 700;
+  color: var(--color-success);
+  font-weight: var(--font-weight-bold);
 }
 
 .globe-deduction-segment--time {
-  color: #fde047;
-  font-weight: 600;
+  color: var(--color-warning);
+  font-weight: var(--font-weight-semibold);
 }
 
 .globe-deduction-segment--weapon {
-  color: #fb923c;
-  font-weight: 700;
+  color: var(--color-orange);
+  font-weight: var(--font-weight-bold);
 }
 
 .globe-deduction-segment--station {
-  color: #22d3ee;
-  font-weight: 700;
+  color: var(--color-info-bright);
+  font-weight: var(--font-weight-bold);
 }
 </style>

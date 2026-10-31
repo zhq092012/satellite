@@ -231,8 +231,8 @@ const hideTooltip = () => {
 .series-link-timeline {
   padding: 16px;
   border-radius: 10px;
-  border: 1px solid rgba(0, 225, 255, 0.25);
-  background: linear-gradient(180deg, rgba(8, 18, 32, 0.95) 0%, rgba(6, 12, 22, 0.98) 100%);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
+  background: linear-gradient(180deg, var(--swatch-rgba-8-18-32-0_95) 0%, var(--swatch-rgba-6-12-22-0_98) 100%);
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -256,23 +256,23 @@ const hideTooltip = () => {
 }
 
 .timeline-title {
-  font-size: 18px;
-  font-weight: 800;
-  color: #40f2ff;
-  text-shadow: 0 0 10px rgba(64, 242, 255, 0.35);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-heavy);
+  color: var(--accent-cyan-hover);
+  text-shadow: 0 0 10px var(--swatch-rgba-64-242-255-0_35);
 }
 
 .timeline-hint {
-  font-size: 12px;
-  color: #64748b;
+  font-size: var(--font-size-sm);
+  color: var(--text-color-subtle);
 }
 
 .timeline-legend {
   display: flex;
   align-items: center;
   gap: 16px;
-  font-size: 13px;
-  color: #94a3b8;
+  font-size: var(--font-size-md);
+  color: var(--text-color-muted);
 }
 
 .legend-item {
@@ -287,19 +287,19 @@ const hideTooltip = () => {
   border-radius: 3px;
 
   &--ok {
-    background: #22c55e;
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.45);
+    background: var(--swatch-22c55e);
+    box-shadow: 0 0 8px var(--swatch-rgba-34-197-94-0_45);
   }
 
   &--struck {
-    background: #64748b;
+    background: var(--text-color-subtle);
   }
 }
 
 .line {
   width: 18px;
   height: 0;
-  border-top: 2px dashed #22d3ee;
+  border-top: 2px dashed var(--color-info-bright);
 
   &--link {
     display: inline-block;
@@ -309,8 +309,8 @@ const hideTooltip = () => {
 .timeline-empty {
   padding: 28px 0;
   text-align: center;
-  font-size: 15px;
-  color: #64748b;
+  font-size: var(--font-size-subtitle);
+  color: var(--text-color-subtle);
 }
 
 .timeline-scroll {
@@ -335,7 +335,7 @@ const hideTooltip = () => {
 .axis-track {
   position: relative;
   height: 28px;
-  border-bottom: 1px solid rgba(79, 147, 221, 0.25);
+  border-bottom: 1px solid var(--accent-border-strong);
 }
 
 .axis-tick {
@@ -349,13 +349,13 @@ const hideTooltip = () => {
   .tick-line {
     width: 1px;
     height: 8px;
-    background: rgba(125, 211, 252, 0.5);
+    background: var(--swatch-rgba-125-211-252-0_5);
   }
 
   .tick-label {
     margin-top: 2px;
-    font-size: 11px;
-    color: #7dd3fc;
+    font-size: var(--font-size-xs);
+    color: var(--color-info-soft);
     white-space: nowrap;
   }
 }
@@ -363,14 +363,14 @@ const hideTooltip = () => {
 .series-group {
   margin-bottom: 18px;
   padding: 10px 0 6px;
-  border-top: 1px dashed rgba(79, 147, 221, 0.2);
+  border-top: 1px dashed var(--accent-bg);
 }
 
 .series-group-head {
   margin-bottom: 8px;
-  font-size: 16px;
-  font-weight: 800;
-  color: #e2e8f0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-heavy);
+  color: var(--text-color-soft);
   letter-spacing: 1px;
 }
 
@@ -399,14 +399,14 @@ const hideTooltip = () => {
   align-items: center;
   justify-content: center;
   padding: 4px 6px;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
   line-height: 1.35;
   text-align: center;
   word-break: break-all;
-  color: #7dd3fc;
-  background: rgba(14, 28, 48, 0.65);
-  border: 1px solid rgba(79, 147, 221, 0.2);
+  color: var(--color-info-soft);
+  background: var(--swatch-rgba-14-28-48-0_65);
+  border: 1px solid var(--accent-bg);
   border-radius: 4px;
   margin-right: 0;
   box-sizing: border-box;
@@ -417,12 +417,12 @@ const hideTooltip = () => {
   margin-left: 0;
   background:
     repeating-linear-gradient(90deg,
-      rgba(79, 147, 221, 0.06) 0,
-      rgba(79, 147, 221, 0.06) 1px,
+      var(--swatch-rgba-79-147-221-0_06) 0,
+      var(--swatch-rgba-79-147-221-0_06) 1px,
       transparent 1px,
       transparent 60px),
-    rgba(6, 12, 22, 0.55);
-  border: 1px solid rgba(79, 147, 221, 0.18);
+    var(--swatch-rgba-6-12-22-0_55);
+  border: 1px solid var(--accent-border);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -435,7 +435,7 @@ const hideTooltip = () => {
 }
 
 .link-line {
-  stroke: #22d3ee;
+  stroke: var(--color-info-bright);
   stroke-width: 1.5;
   stroke-dasharray: 4 3;
   opacity: 0.65;
@@ -443,15 +443,15 @@ const hideTooltip = () => {
 
   &.is-dimmed {
     opacity: 0.1;
-    stroke: #475569;
+    stroke: var(--text-color-disabled);
   }
 
   &.is-highlighted {
-    stroke: #00f0ff;
+    stroke: var(--swatch-00f0ff);
     stroke-width: 2.5;
     stroke-dasharray: 6 3;
     opacity: 1;
-    filter: drop-shadow(0 0 6px #00e1ff);
+    filter: drop-shadow(0 0 6px var(--accent-cyan));
     animation: linkDashFlow 0.8s linear infinite;
   }
 }
@@ -483,15 +483,15 @@ const hideTooltip = () => {
     opacity: 1;
     z-index: 8;
     filter: brightness(1.2);
-    box-shadow: 0 0 10px rgba(0, 225, 255, 0.7);
+    box-shadow: 0 0 10px rgba(var(--accent-cyan-rgb), 0.7);
   }
 
   &.is-selected {
     opacity: 1;
     z-index: 10;
     transform: scale(1.15);
-    box-shadow: 0 0 14px #00e1ff, inset 0 0 4px #ffffff;
-    outline: 2px solid #00f0ff;
+    box-shadow: 0 0 14px var(--accent-cyan), inset 0 0 4px var(--color-white);
+    outline: 2px solid var(--swatch-00f0ff);
     outline-offset: 1px;
   }
 
@@ -502,15 +502,15 @@ const hideTooltip = () => {
   }
 
   &.is-ok {
-    background: linear-gradient(180deg, #34d399 0%, #10b981 100%);
-    border: 1px solid rgba(134, 239, 172, 0.8);
-    box-shadow: 0 0 6px rgba(16, 185, 129, 0.35);
+    background: linear-gradient(180deg, var(--color-success) 0%, var(--color-success-strong) 100%);
+    border: 1px solid var(--swatch-rgba-134-239-172-0_8);
+    box-shadow: 0 0 6px var(--swatch-rgba-16-185-129-0_35);
   }
 
   &.is-struck {
-    background: linear-gradient(180deg, #94a3b8 0%, #64748b 100%);
-    border: 1px solid rgba(148, 163, 184, 0.7);
-    box-shadow: 0 0 4px rgba(100, 116, 139, 0.25);
+    background: linear-gradient(180deg, var(--text-color-muted) 0%, var(--text-color-subtle) 100%);
+    border: 1px solid var(--swatch-rgba-148-163-184-0_7);
+    box-shadow: 0 0 4px var(--swatch-rgba-100-116-139-0_25);
   }
 }
 </style>
@@ -523,22 +523,22 @@ const hideTooltip = () => {
   max-width: 320px;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(34, 211, 238, 0.45);
-  background: rgba(8, 20, 36, 0.96);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--swatch-rgba-34-211-238-0_45);
+  background: var(--swatch-rgba-8-20-36-0_96);
+  box-shadow: 0 8px 24px var(--mask-color);
   pointer-events: none;
 
   .tooltip-title {
-    font-size: 14px;
-    font-weight: 800;
-    color: #22d3ee;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-heavy);
+    color: var(--color-info-bright);
     margin-bottom: 6px;
   }
 
   .tooltip-line {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     line-height: 1.6;
-    color: #cbd5e1;
+    color: var(--text-color-soft);
   }
 }
 </style>

@@ -1,3 +1,4 @@
+import { readThemeColor } from '@/styles/themeColor'
 /**
  * 卫星关系数据管理
  * 负责加载卫星间的关系数据（共轨、共面、抵近等）并计算关系项列表
@@ -85,15 +86,15 @@ export function useSatelliteRelation(
   const getRelationColor = (label: string): string => {
     switch (label) {
       case '共轨':
-        return '#58c9d1'
+        return readThemeColor('--swatch-58c9d1')
       case '共面':
-        return '#7cd992'
+        return readThemeColor('--swatch-7cd992')
       case '相位稳定':
-        return '#8cc6ff'
+        return readThemeColor('--swatch-8cc6ff')
       case '抵近':
-        return '#f0b35b'
+        return readThemeColor('--swatch-f0b35b')
       default:
-        return '#f4fbff'
+        return readThemeColor('--swatch-f4fbff')
     }
   }
 

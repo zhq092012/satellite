@@ -545,8 +545,8 @@ onMounted(async () => {
         display: flex;
         align-items: center;
         gap: 8px;
-        font-size: 16px;
-        font-weight: bold;
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-bold);
         color: var(--text-color-strong);
       }
 
@@ -576,7 +576,7 @@ onMounted(async () => {
         align-items: center;
         justify-content: space-between;
         padding: 14px 18px;
-        background: rgba(0, 225, 255, 0.04);
+        background: rgba(var(--accent-cyan-rgb), 0.04);
         cursor: pointer;
 
         .header-left {
@@ -593,9 +593,9 @@ onMounted(async () => {
           }
 
           .battle-name {
-            font-size: 15px;
-            font-weight: 700;
-            color: #7dd3fc;
+            font-size: var(--font-size-subtitle);
+            font-weight: var(--font-weight-bold);
+            color: var(--color-info-soft);
           }
         }
 
@@ -629,7 +629,7 @@ onMounted(async () => {
 .polygon-area-item {
   margin: 10px 0;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--swatch-rgba-255-255-255-0_03);
   border-radius: 6px;
 
   .area-name-row {
@@ -655,7 +655,7 @@ onMounted(async () => {
       span {
         white-space: nowrap;
         flex-shrink: 0;
-        font-size: 13px;
+        font-size: var(--font-size-md);
       }
 
       .el-input {
@@ -668,6 +668,6 @@ onMounted(async () => {
 
 .text-muted {
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 </style>

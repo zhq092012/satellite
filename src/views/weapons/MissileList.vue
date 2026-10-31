@@ -300,7 +300,7 @@ onMounted(async () => {
   border: 1px solid var(--surface-border-color);
   border-radius: 24px;
   background: linear-gradient(180deg, var(--surface-bg-color-soft) 0%, var(--surface-bg-color) 100%);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 18px 36px var(--swatch-rgba-0-0-0-0_28);
 }
 
 .hero-card__eyebrow {
@@ -308,19 +308,19 @@ onMounted(async () => {
   margin: 0 0 10px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(79, 147, 221, 0.18);
+  background: var(--accent-border);
   color: var(--accent-color-active);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
   letter-spacing: 0.08em;
 }
 
 .hero-card h1 {
   margin: 0;
   color: var(--text-color-strong);
-  font-size: 38px;
+  font-size: var(--font-size-display);
   line-height: 1.1;
-  font-weight: 800;
+  font-weight: var(--font-weight-heavy);
 }
 
 .hero-card__desc {
@@ -349,13 +349,13 @@ onMounted(async () => {
   display: block;
   margin-bottom: 10px;
   color: var(--text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 .stat-card strong {
   color: var(--text-color-strong);
-  font-size: 24px;
-  font-weight: 800;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-heavy);
 }
 
 .toolbar-card,
@@ -387,8 +387,8 @@ onMounted(async () => {
   --el-table-header-bg-color: var(--surface-bg-color-strong);
   --el-table-bg-color: var(--surface-bg-color);
   --el-table-tr-bg-color: var(--surface-bg-color);
-  --el-table-row-hover-bg-color: rgba(79, 147, 221, 0.18);
-  --el-fill-color-lighter: rgba(79, 147, 221, 0.14);
+  --el-table-row-hover-bg-color: var(--accent-border);
+  --el-fill-color-lighter: var(--accent-bg);
   --el-text-color-regular: var(--text-color-primary);
   --el-text-color-primary: var(--text-color-strong);
   border-radius: 16px;
@@ -397,8 +397,8 @@ onMounted(async () => {
 
 .table-card :deep(.atlas-app-table th.el-table__cell) {
   color: var(--accent-color-active);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-heavy);
 }
 
 .table-card :deep(.atlas-app-table td.el-table__cell) {
@@ -448,7 +448,7 @@ onMounted(async () => {
   }
 
   .hero-card h1 {
-    font-size: 30px;
+    font-size: var(--font-size-3xl);
   }
 
   .hero-card__stats {

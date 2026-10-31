@@ -162,9 +162,9 @@ const handleTrackClick = (event: MouseEvent) => {
   }
 
   .header-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #40f2ff;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--accent-cyan-hover);
     letter-spacing: 0.3px;
     line-height: 18px;
     white-space: nowrap;
@@ -184,20 +184,20 @@ const handleTrackClick = (event: MouseEvent) => {
     height: 22px;
     padding: 0 8px;
     border-radius: 4px;
-    border: 1px solid rgba(0, 225, 255, 0.35);
-    background: rgba(0, 225, 255, 0.08);
-    color: #7dd3fc;
-    font-size: 11px;
+    border: 1px solid rgba(var(--accent-cyan-rgb), 0.35);
+    background: rgba(var(--accent-cyan-rgb), 0.08);
+    color: var(--color-info-soft);
+    font-size: var(--font-size-xs);
     cursor: pointer;
 
     &:hover {
-      background: rgba(0, 225, 255, 0.18);
-      color: #ffffff;
+      background: rgba(var(--accent-cyan-rgb), 0.18);
+      color: var(--color-white);
     }
   }
 
   .control-btn-icon {
-    font-size: 10px;
+    font-size: var(--font-size-caption);
     line-height: 1;
   }
 
@@ -208,8 +208,8 @@ const handleTrackClick = (event: MouseEvent) => {
   }
 
   .speed-label {
-    font-size: 10px;
-    color: #64748b;
+    font-size: var(--font-size-caption);
+    color: var(--text-color-subtle);
     white-space: nowrap;
   }
 
@@ -218,29 +218,29 @@ const handleTrackClick = (event: MouseEvent) => {
     height: 22px;
     padding: 0 6px;
     border-radius: 4px;
-    border: 1px solid rgba(0, 225, 255, 0.2);
-    background: rgba(8, 20, 36, 0.6);
-    color: #94a3b8;
-    font-size: 10px;
+    border: 1px solid rgba(var(--accent-cyan-rgb), 0.2);
+    background: var(--swatch-rgba-8-20-36-0_6);
+    color: var(--text-color-muted);
+    font-size: var(--font-size-caption);
     cursor: pointer;
 
     &.is-active {
-      color: #40f2ff;
-      border-color: rgba(64, 242, 255, 0.65);
-      background: rgba(0, 225, 255, 0.16);
+      color: var(--accent-cyan-hover);
+      border-color: var(--swatch-rgba-64-242-255-0_65);
+      background: rgba(var(--accent-cyan-rgb), 0.16);
     }
 
     &:hover {
-      color: #ffffff;
-      border-color: rgba(64, 242, 255, 0.45);
+      color: var(--color-white);
+      border-color: var(--swatch-rgba-64-242-255-0_45);
     }
   }
 
   .current-time-tag {
-    font-size: 11px;
-    font-weight: 600;
-    color: #7dd3fc;
-    font-family: Consolas, 'Courier New', monospace;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-info-soft);
+    font-family: var(--font-family-mono);
   }
 }
 
@@ -289,12 +289,12 @@ $label-track-gap: 8px;
     transform: translateX(-50%);
     width: 1px;
     height: 100%;
-    background: rgba(125, 211, 252, 0.55);
+    background: var(--swatch-rgba-125-211-252-0_55);
   }
 
   &.major .tick-line {
     width: 2px;
-    background: rgba(64, 242, 255, 0.9);
+    background: var(--swatch-rgba-64-242-255-0_9);
   }
 
   .tick-label {
@@ -302,8 +302,8 @@ $label-track-gap: 8px;
     left: 50%;
     bottom: calc(100% + #{$label-track-gap});
     transform: translateX(-50%);
-    font-size: 9px;
-    color: #64748b;
+    font-size: var(--font-size-caption);
+    color: var(--text-color-subtle);
     white-space: nowrap;
     line-height: 1.2;
   }
@@ -331,8 +331,8 @@ $label-track-gap: 8px;
     width: 100%;
     height: 100%;
     border-radius: 4px;
-    background: linear-gradient(90deg, rgba(0, 225, 255, 0.08), rgba(0, 225, 255, 0.22));
-    border: 1px solid rgba(0, 225, 255, 0.25);
+    background: linear-gradient(90deg, rgba(var(--accent-cyan-rgb), 0.08), rgba(var(--accent-cyan-rgb), 0.22));
+    border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
   }
 }
 
@@ -348,8 +348,8 @@ $label-track-gap: 8px;
     width: 2px;
     height: calc(#{$track-height} + 8px);
     margin: 0 auto;
-    background: #fbbf24;
-    box-shadow: 0 0 6px rgba(251, 191, 36, 0.65);
+    background: var(--color-warning);
+    box-shadow: 0 0 6px var(--swatch-rgba-251-191-36-0_65);
   }
 
   .orbit-playhead-dot {
@@ -358,8 +358,8 @@ $label-track-gap: 8px;
     height: 8px;
     margin: -2px auto 0;
     border-radius: 50%;
-    background: #fbbf24;
-    box-shadow: 0 0 8px rgba(251, 191, 36, 0.8);
+    background: var(--color-warning);
+    box-shadow: 0 0 8px var(--swatch-rgba-251-191-36-0_8);
   }
 }
 
@@ -370,8 +370,8 @@ $label-track-gap: 8px;
   bottom: 0;
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
-  color: #64748b;
-  font-family: Consolas, 'Courier New', monospace;
+  font-size: var(--font-size-caption);
+  color: var(--text-color-subtle);
+  font-family: var(--font-family-mono);
 }
 </style>

@@ -57,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import { readThemeColor } from '@/styles/themeColor'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import G6, { type Graph } from '@antv/g6'
 import type { MatrixResult } from '@/api/electronic'
@@ -214,7 +215,7 @@ const initOrUpdateGraph = (): boolean => {
       modes: { default: [] },
       defaultNode: {
         type: 'circle',
-        style: { fill: '#092638', stroke: '#00e1ff', lineWidth: 2 },
+        style: { fill: readThemeColor('--swatch-092638'), stroke: readThemeColor('--accent-cyan'), lineWidth: 2 },
       },
       defaultEdge: RECON_TOPO_GRAPH_DEFAULT_EDGE,
     })
@@ -257,26 +258,26 @@ onUnmounted(() => {
 <style scoped lang="scss">
 .battle-sat-chart-subtitle {
   margin: 0 0 8px;
-  font-size: 13px;
-  color: #94a3b8;
+  font-size: var(--font-size-md);
+  color: var(--text-color-muted);
 }
 
 .battle-sat-link-graph-title {
   margin: 14px 0 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #7dd3fc;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-info-soft);
 }
 
 .battle-sat-threat-table {
   width: 100%;
-  --atlas-app-table-border-color: rgba(0, 225, 255, 0.12);
-  --atlas-app-table-header-bg-color: rgba(13, 27, 49, 0.95);
+  --atlas-app-table-border-color: rgba(var(--accent-cyan-rgb), 0.12);
+  --atlas-app-table-header-bg-color: var(--panel-bg);
   --atlas-app-table-bg-color: transparent;
   --atlas-app-table-tr-bg-color: transparent;
-  --atlas-app-table-row-hover-bg-color: rgba(0, 225, 255, 0.08);
-  --atlas-app-text-color-regular: #cbd5e1;
-  --atlas-app-text-color-primary: #e2efff;
+  --atlas-app-table-row-hover-bg-color: rgba(var(--accent-cyan-rgb), 0.08);
+  --atlas-app-text-color-regular: var(--text-color-soft);
+  --atlas-app-text-color-primary: var(--text-color-bright);
   background: transparent;
 
   :deep(.atlas-app-table__inner-wrapper::before) {
@@ -284,15 +285,15 @@ onUnmounted(() => {
   }
 
   :deep(th.atlas-app-table__cell) {
-    color: #00e1ff;
-    font-size: 12px;
-    font-weight: 700;
-    background: rgba(13, 27, 49, 0.95) !important;
+    color: var(--accent-cyan);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    background: var(--panel-bg) !important;
   }
 
   :deep(td.atlas-app-table__cell) {
-    font-size: 12px;
-    color: #e2efff;
+    font-size: var(--font-size-sm);
+    color: var(--text-color-bright);
     background: transparent !important;
   }
 }
@@ -304,8 +305,8 @@ onUnmounted(() => {
   min-height: 320px;
   overflow: hidden;
   border-radius: 6px;
-  background: rgba(6, 12, 22, 0.65);
-  border: 1px solid rgba(103, 232, 249, 0.12);
+  background: var(--swatch-rgba-6-12-22-0_65);
+  border: 1px solid var(--swatch-rgba-103-232-249-0_12);
 }
 
 .battle-sat-link-layer-labels {
@@ -326,8 +327,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  color: #94a3b8;
+  font-size: var(--font-size-xs);
+  color: var(--text-color-muted);
 }
 
 .layer-icon {
@@ -346,8 +347,8 @@ onUnmounted(() => {
 
 .battle-sat-chart-empty {
   margin: 8px 0 0;
-  font-size: 12px;
-  color: #64748b;
+  font-size: var(--font-size-sm);
+  color: var(--text-color-subtle);
   text-align: center;
 }
 
@@ -359,13 +360,13 @@ onUnmounted(() => {
 <style lang="scss">
 .atlas-app-dialog.battle-sat-link-dialog,
 .battle-sat-link-dialog .atlas-app-dialog {
-  --el-dialog-bg-color: rgba(8, 15, 26, 0.96);
-  border: 1px solid rgba(0, 225, 255, 0.25);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  --el-dialog-bg-color: var(--dialog-bg);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
+  box-shadow: 0 16px 48px var(--mask-color);
 }
 
 .battle-sat-link-dialog .atlas-app-dialog__title {
-  color: #e2e8f0;
-  font-weight: 700;
+  color: var(--text-color-soft);
+  font-weight: var(--font-weight-bold);
 }
 </style>

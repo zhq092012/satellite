@@ -100,9 +100,9 @@ const handleLogin = async () => {
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(circle at top left, rgba(38, 97, 170, 0.35), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(0, 201, 255, 0.18), transparent 32%),
-    linear-gradient(135deg, #06111d 0%, #0b2034 45%, #102844 100%);
+    radial-gradient(circle at top left, var(--swatch-rgba-38-97-170-0_35), transparent 30%),
+    radial-gradient(circle at bottom right, var(--swatch-rgba-0-201-255-0_18), transparent 32%),
+    linear-gradient(135deg, var(--swatch-06111d) 0%, var(--swatch-0b2034) 45%, var(--swatch-102844) 100%);
 }
 
 .login-panel {
@@ -114,7 +114,7 @@ const handleLogin = async () => {
 }
 
 .brand-block {
-  color: #eaf3ff;
+  color: var(--text-color-bright);
   text-align: center;
 
   .brand-badge {
@@ -124,19 +124,19 @@ const handleLogin = async () => {
     border-radius: 14px;
     display: grid;
     place-items: center;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     letter-spacing: 3px;
-    font-size: 22px;
-    color: #eaf3ff;
-    background: linear-gradient(135deg, #21496f 0%, #12324f 50%, #0f2236 100%);
-    border: 1px solid rgba(107, 168, 214, 0.35);
-    box-shadow: 0 18px 40px rgba(10, 28, 46, 0.42);
+    font-size: var(--font-size-2xl);
+    color: var(--text-color-bright);
+    background: linear-gradient(135deg, var(--swatch-21496f) 0%, var(--swatch-12324f) 50%, var(--swatch-0f2236) 100%);
+    border: 1px solid var(--swatch-rgba-107-168-214-0_35);
+    box-shadow: 0 18px 40px var(--swatch-rgba-10-28-46-0_42);
   }
 
   .brand-kicker {
     margin: 0 0 10px;
-    color: rgba(178, 210, 236, 0.78);
-    font-size: 12px;
+    color: var(--swatch-rgba-178-210-236-0_78);
+    font-size: var(--font-size-sm);
     letter-spacing: 4px;
     text-transform: uppercase;
   }
@@ -150,18 +150,18 @@ const handleLogin = async () => {
 
   .brand-subtitle {
     margin: 16px 0 0;
-    color: rgba(234, 243, 255, 0.72);
-    font-size: 15px;
+    color: var(--swatch-rgba-234-243-255-0_72);
+    font-size: var(--font-size-subtitle);
     letter-spacing: 1px;
   }
 }
 
 .login-card {
   border-radius: 16px;
-  border: 1px solid rgba(126, 176, 214, 0.18);
-  background: rgba(8, 18, 29, 0.92);
-  color: #eaf3ff;
-  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--swatch-rgba-126-176-214-0_18);
+  background: var(--swatch-rgba-8-18-29-0_92);
+  color: var(--text-color-bright);
+  box-shadow: 0 24px 56px var(--swatch-rgba-0-0-0-0_35);
 
   h2 {
     margin: 0 0 20px;
@@ -171,7 +171,7 @@ const handleLogin = async () => {
 
 .login-form {
   :deep(.atlas-app-form-item__label) {
-    color: rgba(234, 243, 255, 0.78);
+    color: var(--swatch-rgba-234-243-255-0_78);
   }
 }
 

@@ -471,6 +471,7 @@
 </template>
 
 <script setup lang="ts">
+import { readThemeColor } from '@/styles/themeColor'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as Cesium from 'cesium'
@@ -1534,22 +1535,22 @@ const showWeaponLegend = computed(() => {
 const weaponLegendItems = computed(() => [
   {
     label: '动能武器',
-    color: '#ef6b73',
+    color: readThemeColor('--color-danger'),
     count: redWeapons.value.filter((weapon) => weapon.type?.includes('动能')).length,
   },
   {
     label: '电子干扰',
-    color: '#b15cff',
+    color: readThemeColor('--color-purple'),
     count: redWeapons.value.filter((weapon) => weapon.type?.includes('电子干扰')).length,
   },
   {
     label: '定向能',
-    color: '#7cd992',
+    color: readThemeColor('--color-success-soft'),
     count: redWeapons.value.filter((weapon) => weapon.type?.includes('定向能')).length,
   },
   {
     label: '天基武器',
-    color: '#8cc6ff',
+    color: readThemeColor('--color-info-soft'),
     count: redWeapons.value.filter((weapon) => weapon.type?.includes('天基')).length,
   },
 ])
@@ -1560,14 +1561,14 @@ defineExpose({
 </script>
 <style scoped>
 .simulation-page {
-  --card-bg: rgba(10, 29, 48, 0.92);
-  --card-bg-strong: rgba(12, 35, 57, 0.98);
-  --card-border: rgba(106, 164, 220, 0.18);
-  --card-border-strong: rgba(106, 164, 220, 0.3);
-  --accent-cyan: #58c9d1;
-  --accent-green: #7cd992;
-  --accent-amber: #f0b35b;
-  --accent-red: #ef6b73;
+  --card-bg: var(--swatch-rgba-10-29-48-0_92);
+  --card-bg-strong: var(--swatch-rgba-12-35-57-0_98);
+  --card-border: var(--swatch-rgba-106-164-220-0_18);
+  --card-border-strong: var(--swatch-rgba-106-164-220-0_3);
+  --accent-cyan: var(--swatch-58c9d1);
+  --accent-green: var(--color-success-soft);
+  --accent-amber: var(--color-warning);
+  --accent-red: var(--color-danger);
   /* [修改说明] 严格锁定页面总高度为 100% 容器高度，禁止页面随内容加载向外无限拉长超出屏幕 */
   height: calc(100vh - 140px);
   max-height: 100%;
@@ -1578,15 +1579,15 @@ defineExpose({
   box-sizing: border-box;
   color: var(--text-color-primary);
   background:
-    radial-gradient(circle at top left, rgba(57, 129, 194, 0.24), transparent 30%),
-    radial-gradient(circle at 85% 10%, rgba(88, 201, 209, 0.18), transparent 22%),
-    linear-gradient(180deg, rgba(6, 18, 31, 0.96) 0%, rgba(8, 22, 42, 0.98) 55%, rgba(6, 16, 27, 1) 100%);
+    radial-gradient(circle at top left, var(--swatch-rgba-57-129-194-0_24), transparent 30%),
+    radial-gradient(circle at 85% 10%, var(--swatch-rgba-88-201-209-0_18), transparent 22%),
+    linear-gradient(180deg, var(--swatch-rgba-6-18-31-0_96) 0%, var(--swatch-rgba-8-22-42-0_98) 55%, var(--swatch-rgba-6-16-27-1) 100%);
 }
 
 .panel-subtitle,
 .viewer-overlay__badge {
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -1601,10 +1602,10 @@ defineExpose({
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid rgba(116, 168, 225, 0.28);
-  background: rgba(15, 42, 67, 0.88);
+  border: 1px solid var(--swatch-rgba-116-168-225-0_28);
+  background: var(--swatch-rgba-15-42-67-0_88);
   color: var(--text-color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   padding: 7px 30px;
   white-space: normal;
   word-wrap: break-word;
@@ -1626,9 +1627,9 @@ defineExpose({
 
   &.is-active {
     color: var(--text-color-strong);
-    border-color: rgba(98, 213, 255, 0.72);
-    background: linear-gradient(180deg, rgba(26, 93, 142, 0.98), rgba(14, 58, 92, 0.96));
-    box-shadow: 0 8px 18px rgba(14, 58, 92, 0.28);
+    border-color: var(--swatch-rgba-98-213-255-0_72);
+    background: linear-gradient(180deg, var(--swatch-rgba-26-93-142-0_98), var(--swatch-rgba-14-58-92-0_96));
+    box-shadow: 0 8px 18px var(--swatch-rgba-14-58-92-0_28);
     transform: translateY(-1px);
   }
 }
@@ -1720,14 +1721,14 @@ defineExpose({
   gap: 10px;
   margin-bottom: 12px;
   padding: 12px 14px;
-  border: 1px solid rgba(116, 168, 225, 0.16);
+  border: 1px solid var(--border-color);
   border-radius: 16px;
-  background: rgba(10, 29, 48, 0.72);
+  background: var(--swatch-rgba-10-29-48-0_72);
 }
 
 .plan-mode-switcher__label {
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1746,7 +1747,7 @@ defineExpose({
 
 .panel-card__header h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   min-width: 65px;
 }
 
@@ -1777,9 +1778,9 @@ defineExpose({
   padding: 12px;
   text-align: left;
   border-radius: 16px;
-  border: 1px solid rgba(116, 168, 225, 0.16);
-  background: linear-gradient(180deg, rgba(14, 38, 60, 0.92), rgba(10, 28, 45, 0.92));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  background: linear-gradient(180deg, var(--swatch-rgba-14-38-60-0_92), var(--swatch-rgba-10-28-45-0_92));
+  box-shadow: inset 0 1px 0 var(--swatch-rgba-255-255-255-0_04);
 }
 
 .kv-item span,
@@ -1787,11 +1788,11 @@ defineExpose({
 .metric-card p {
   margin: 0;
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .kv-list--overview .kv-item span {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1824,7 +1825,7 @@ defineExpose({
   padding: 12px 14px;
   border-radius: 16px;
   border: 1px solid var(--card-border);
-  background: rgba(11, 31, 50, 0.9);
+  background: var(--swatch-rgba-11-31-50-0_9);
   color: var(--text-color-primary);
   text-align: left;
   cursor: pointer;
@@ -1832,24 +1833,24 @@ defineExpose({
 
 .stage-item.is-active {
   border-color: var(--card-border-strong);
-  background: linear-gradient(135deg, rgba(22, 64, 96, 0.95), rgba(12, 34, 54, 0.95));
+  background: linear-gradient(135deg, var(--swatch-rgba-22-64-96-0_95), var(--swatch-rgba-12-34-54-0_95));
 }
 
 .stage-item__dot {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #62d5ff, #2d8cff);
-  box-shadow: 0 0 12px rgba(98, 213, 255, 0.45);
+  background: linear-gradient(180deg, var(--swatch-62d5ff), var(--swatch-2d8cff));
+  box-shadow: 0 0 12px var(--swatch-rgba-98-213-255-0_45);
 }
 
 .stage-item__name {
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 .stage-item__time {
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .metric-card__head,
@@ -1876,7 +1877,7 @@ defineExpose({
   border: 1px solid var(--card-border);
   border-radius: 22px;
   background: var(--card-bg-strong);
-  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.26);
+  box-shadow: 0 20px 42px var(--swatch-rgba-0-0-0-0_26);
 }
 
 .map-stage__viewport {
@@ -1899,7 +1900,7 @@ defineExpose({
 }
 
 .viewport-title strong {
-  font-size: 18px;
+  font-size: var(--font-size-xl);
 }
 
 .layer-tags {
@@ -1924,11 +1925,11 @@ defineExpose({
   flex: 1;
   min-height: 0;
   border-radius: 24px 24px 0 0;
-  border: 1px solid rgba(116, 168, 225, 0.16);
+  border: 1px solid var(--border-color);
   background:
-    radial-gradient(circle at center, rgba(32, 92, 138, 0.28), transparent 28%),
-    radial-gradient(circle at 30% 30%, rgba(88, 201, 209, 0.12), transparent 20%),
-    linear-gradient(180deg, rgba(5, 15, 27, 0.9), rgba(7, 22, 38, 0.98));
+    radial-gradient(circle at center, var(--swatch-rgba-32-92-138-0_28), transparent 28%),
+    radial-gradient(circle at 30% 30%, var(--swatch-rgba-88-201-209-0_12), transparent 20%),
+    linear-gradient(180deg, var(--swatch-rgba-5-15-27-0_9), var(--swatch-rgba-7-22-38-0_98));
   overflow: hidden;
 }
 
@@ -1947,7 +1948,7 @@ defineExpose({
 }
 
 :deep(.cesium-viewer-timelineContainer .cesium-timeline) {
-  background: rgba(9, 25, 42, 0.72);
+  background: var(--swatch-rgba-9-25-42-0_72);
 }
 
 :deep(.cesium-infoBox) {
@@ -1985,14 +1986,14 @@ defineExpose({
   gap: 8px;
   max-width: min(360px, 32%);
   padding: 10px 12px;
-  border: 1px solid rgba(116, 168, 225, 0.16);
+  border: 1px solid var(--border-color);
   border-radius: 14px;
-  background: rgba(10, 29, 48, 0.72);
+  background: var(--swatch-rgba-10-29-48-0_72);
 }
 
 .viewer-weapon-legend__title {
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -2003,7 +2004,7 @@ defineExpose({
   align-items: center;
   gap: 8px;
   color: var(--text-color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .compare-viewer-grid {
@@ -2027,21 +2028,21 @@ defineExpose({
   justify-content: center;
   width: 100%;
   height: 100%;
-  border: 1px dashed rgba(116, 168, 225, 0.28);
+  border: 1px dashed var(--swatch-rgba-116-168-225-0_28);
   border-radius: 18px;
-  background: rgba(10, 29, 48, 0.62);
+  background: var(--swatch-rgba-10-29-48-0_62);
   color: var(--text-color-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 .compare-viewer-card {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border: 1px solid rgba(116, 168, 225, 0.18);
+  border: 1px solid var(--swatch-rgba-116-168-225-0_18);
   border-radius: 18px;
   overflow: hidden;
-  background: rgba(10, 29, 48, 0.72);
+  background: var(--swatch-rgba-10-29-48-0_72);
 }
 
 .compare-viewer-card__header {
@@ -2049,18 +2050,18 @@ defineExpose({
   flex-direction: column;
   gap: 4px;
   padding: 12px 14px;
-  border-bottom: 1px solid rgba(116, 168, 225, 0.14);
-  background: rgba(8, 24, 39, 0.92);
+  border-bottom: 1px solid var(--swatch-rgba-116-168-225-0_14);
+  background: var(--swatch-rgba-8-24-39-0_92);
 }
 
 .compare-viewer-card__header strong {
   color: var(--text-color-primary);
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 .compare-viewer-card__header span {
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .compare-viewer-card__stage {
@@ -2086,30 +2087,30 @@ defineExpose({
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  border: 1px solid rgba(116, 168, 225, 0.22);
+  border: 1px solid var(--swatch-rgba-116-168-225-0_22);
   border-radius: 999px;
-  background: rgba(15, 42, 67, 0.88);
+  background: var(--swatch-rgba-15-42-67-0_88);
   color: var(--text-color-primary);
   cursor: pointer;
 }
 
 .history-plan-card__selector.is-checked {
-  border-color: rgba(88, 201, 209, 0.42);
-  background: rgba(88, 201, 209, 0.16);
+  border-color: var(--swatch-rgba-88-201-209-0_42);
+  background: var(--swatch-rgba-88-201-209-0_16);
 }
 
 .history-plan-card__selector-box {
   width: 14px;
   height: 14px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.52);
+  border: 1px solid var(--swatch-rgba-255-255-255-0_52);
   background: transparent;
   position: relative;
 }
 
 .history-plan-card__selector.is-checked .history-plan-card__selector-box {
-  border-color: rgba(88, 201, 209, 0.92);
-  background: rgba(88, 201, 209, 0.92);
+  border-color: var(--swatch-rgba-88-201-209-0_92);
+  background: var(--swatch-rgba-88-201-209-0_92);
 }
 
 .history-plan-card__selector.is-checked .history-plan-card__selector-box::after {
@@ -2119,8 +2120,8 @@ defineExpose({
   top: 0px;
   width: 5px;
   height: 9px;
-  border-right: 2px solid #062031;
-  border-bottom: 2px solid #062031;
+  border-right: 2px solid var(--swatch-062031);
+  border-bottom: 2px solid var(--swatch-062031);
   transform: rotate(40deg);
 }
 
@@ -2128,7 +2129,7 @@ defineExpose({
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 10px var(--swatch-rgba-255-255-255-0_18);
 }
 
 .viewer-weapon-legend__label {
@@ -2137,7 +2138,7 @@ defineExpose({
 
 .viewer-weapon-legend__count {
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .strike-list {
@@ -2148,7 +2149,7 @@ defineExpose({
   margin-top: 12px;
   min-height: 0;
   border-radius: 18px;
-  background: rgba(10, 29, 48, 0.72);
+  background: var(--swatch-rgba-10-29-48-0_72);
 }
 
 .strike-list__header {
@@ -2160,7 +2161,7 @@ defineExpose({
 
 .strike-list__header h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   color: var(--text-color-primary);
 }
 
@@ -2183,11 +2184,11 @@ defineExpose({
 
 .strike-list__items::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(116, 168, 225, 0.35);
+  background: var(--swatch-rgba-116-168-225-0_35);
 }
 
 .strike-list__items::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--swatch-rgba-255-255-255-0_04);
 }
 
 .strike-item {
@@ -2197,8 +2198,8 @@ defineExpose({
   gap: 12px;
   padding: 12px 14px;
   border-radius: 14px;
-  border: 1px solid rgba(116, 168, 225, 0.14);
-  background: rgba(7, 23, 37, 0.88);
+  border: 1px solid var(--swatch-rgba-116-168-225-0_14);
+  background: var(--swatch-rgba-7-23-37-0_88);
 }
 
 .strike-item--empty {
@@ -2216,14 +2217,14 @@ defineExpose({
 
 .strike-item__info strong {
   color: var(--text-color-primary);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   line-height: 1.5;
   word-break: break-word;
 }
 
 .strike-item__info span {
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
 }
 
@@ -2235,26 +2236,26 @@ defineExpose({
   min-width: 64px;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(88, 201, 209, 0.26);
-  background: rgba(88, 201, 209, 0.14);
-  color: #86f3ff;
-  font-size: 12px;
+  border: 1px solid var(--swatch-rgba-88-201-209-0_26);
+  background: var(--swatch-rgba-88-201-209-0_14);
+  color: var(--swatch-86f3ff);
+  font-size: var(--font-size-sm);
 }
 
 .strike-item__status.is-active {
-  box-shadow: 0 0 12px rgba(88, 201, 209, 0.16);
+  box-shadow: 0 0 12px var(--swatch-rgba-88-201-209-0_16);
 }
 
 .strike-item__status.is-completed {
-  border-color: rgba(124, 217, 146, 0.24);
-  background: rgba(124, 217, 146, 0.14);
-  color: #9ff0b2;
+  border-color: var(--swatch-rgba-124-217-146-0_24);
+  background: var(--swatch-rgba-124-217-146-0_14);
+  color: var(--swatch-9ff0b2);
 }
 
 .viewer-legend {
   justify-content: flex-start;
   color: var(--text-color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .legend-dot {
@@ -2266,13 +2267,13 @@ defineExpose({
 }
 
 .legend-dot--red {
-  background: #ef6b73;
-  box-shadow: 0 0 10px rgba(239, 107, 115, 0.45);
+  background: var(--color-danger);
+  box-shadow: 0 0 10px var(--swatch-rgba-239-107-115-0_45);
 }
 
 .legend-dot--blue {
-  background: #4ea6ff;
-  box-shadow: 0 0 10px rgba(78, 166, 255, 0.45);
+  background: var(--accent-color-hover);
+  box-shadow: 0 0 10px var(--swatch-rgba-78-166-255-0_45);
 }
 
 .history-plan-dialog__summary {
@@ -2295,8 +2296,8 @@ defineExpose({
   margin: 10px 0 16px;
   padding: 14px;
   border-radius: 18px;
-  border: 1px solid rgba(116, 168, 225, 0.16);
-  background: rgba(10, 29, 48, 0.72);
+  border: 1px solid var(--border-color);
+  background: var(--swatch-rgba-10-29-48-0_72);
 }
 
 .history-plan-dialog__field {
@@ -2308,7 +2309,7 @@ defineExpose({
 
 .history-plan-dialog__field-label {
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -2337,9 +2338,9 @@ defineExpose({
   min-width: 0;
   padding: 16px;
   border-radius: 20px;
-  border: 1px solid rgba(116, 168, 225, 0.18);
-  background: linear-gradient(180deg, rgba(11, 31, 50, 0.96), rgba(8, 24, 39, 0.96)), rgba(10, 29, 48, 0.92);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--swatch-rgba-116-168-225-0_18);
+  background: linear-gradient(180deg, var(--swatch-rgba-11-31-50-0_96), var(--swatch-rgba-8-24-39-0_96)), var(--swatch-rgba-10-29-48-0_92);
+  box-shadow: inset 0 1px 0 var(--swatch-rgba-255-255-255-0_03);
 }
 
 .history-plan-card__header {
@@ -2357,15 +2358,15 @@ defineExpose({
 .history-plan-card__eyebrow {
   display: inline-block;
   color: var(--text-color-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .history-plan-card__title {
   margin: 6px 0 0;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.2;
   word-break: break-word;
 }
@@ -2373,7 +2374,7 @@ defineExpose({
 .history-plan-card__subline {
   margin: 6px 0 0;
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .history-plan-card__badges {
@@ -2390,21 +2391,21 @@ defineExpose({
   justify-content: center;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(116, 168, 225, 0.22);
-  background: rgba(15, 42, 67, 0.88);
+  border: 1px solid var(--swatch-rgba-116-168-225-0_22);
+  background: var(--swatch-rgba-15-42-67-0_88);
   color: var(--text-color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   white-space: nowrap;
 }
 
 .history-plan-card__badge--mode.is-threat_first {
-  border-color: rgba(239, 107, 115, 0.32);
-  background: rgba(239, 107, 115, 0.14);
+  border-color: var(--swatch-rgba-239-107-115-0_32);
+  background: var(--swatch-rgba-239-107-115-0_14);
 }
 
 .history-plan-card__badge--mode.is-max_targets {
-  border-color: rgba(88, 201, 209, 0.32);
-  background: rgba(88, 201, 209, 0.14);
+  border-color: var(--swatch-rgba-88-201-209-0_32);
+  background: var(--swatch-rgba-88-201-209-0_14);
 }
 
 .history-plan-card__stats {
@@ -2417,8 +2418,8 @@ defineExpose({
   min-width: 0;
   padding: 12px;
   border-radius: 16px;
-  border: 1px solid rgba(116, 168, 225, 0.14);
-  background: rgba(10, 29, 48, 0.74);
+  border: 1px solid var(--swatch-rgba-116-168-225-0_14);
+  background: var(--swatch-rgba-10-29-48-0_74);
 }
 
 .history-plan-card__stat span,
@@ -2426,14 +2427,14 @@ defineExpose({
 .history-plan-card__footer-note {
   display: block;
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .history-plan-card__stat strong {
   display: block;
   margin-top: 6px;
   color: var(--text-color-primary);
-  font-size: 14px;
+  font-size: var(--font-size-base);
   line-height: 1.45;
   word-break: break-word;
 }
@@ -2461,23 +2462,23 @@ defineExpose({
   max-width: 100%;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(116, 168, 225, 0.18);
-  background: rgba(12, 33, 53, 0.92);
+  border: 1px solid var(--swatch-rgba-116-168-225-0_18);
+  background: var(--swatch-rgba-12-33-53-0_92);
   color: var(--text-color-primary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   word-break: break-word;
   flex: 1 1 calc(25%);
   justify-content: center;
 }
 
 .history-plan-card__chip--target {
-  border-color: rgba(240, 179, 91, 0.28);
-  background: rgba(240, 179, 91, 0.12);
+  border-color: var(--swatch-rgba-240-179-91-0_28);
+  background: var(--swatch-rgba-240-179-91-0_12);
 }
 
 .history-plan-card__empty-inline {
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .history-plan-card__footer {
@@ -2517,7 +2518,7 @@ defineExpose({
 }
 
 .metric-card strong {
-  font-size: 18px;
+  font-size: var(--font-size-xl);
 }
 
 .metric-status-grid {
@@ -2532,26 +2533,26 @@ defineExpose({
   gap: 8px;
   padding: 14px;
   border-radius: 16px;
-  border: 1px solid rgba(116, 168, 225, 0.16);
-  background: linear-gradient(180deg, rgba(12, 33, 53, 0.96), rgba(8, 24, 39, 0.94));
+  border: 1px solid var(--border-color);
+  background: linear-gradient(180deg, var(--swatch-rgba-12-33-53-0_96), var(--swatch-rgba-8-24-39-0_94));
 }
 
 .metric-status-card__label {
   color: var(--text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .metric-status-card__value {
   color: var(--text-color-primary);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   line-height: 1.4;
   word-break: break-word;
 }
 
 :deep(.atlas-app-progress-bar__outer) {
-  background-color: rgba(116, 168, 225, 0.14);
+  background-color: var(--swatch-rgba-116-168-225-0_14);
 }
 
 @media (max-width: 1480px) {
@@ -2613,20 +2614,20 @@ defineExpose({
 .killchain-plan-dialog :deep(.atlas-app-dialog) {
   background: var(--card-bg-strong);
   border: 1px solid var(--card-border-strong);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 20px 50px var(--mask-color);
   border-radius: 24px;
   overflow: hidden;
 }
 
 .killchain-plan-dialog :deep(.atlas-app-dialog__header) {
-  border-bottom: 1px solid rgba(116, 168, 225, 0.16);
+  border-bottom: 1px solid var(--border-color);
   padding: 20px 24px;
 }
 
 .killchain-plan-dialog :deep(.atlas-app-dialog__title) {
   color: var(--text-color-primary);
-  font-size: 18px;
-  font-weight: 600;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.05em;
 }
 
@@ -2642,18 +2643,18 @@ defineExpose({
 }
 
 .killchain-plan-dialog__radio-group :deep(.atlas-app-radio-button__inner) {
-  background: rgba(15, 42, 67, 0.88);
-  border-color: rgba(116, 168, 225, 0.28);
+  background: var(--swatch-rgba-15-42-67-0_88);
+  border-color: var(--swatch-rgba-116-168-225-0_28);
   color: var(--text-color-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-base);
   padding: 10px 24px;
 }
 
 .killchain-plan-dialog__radio-group :deep(.atlas-app-radio-button__original-radio:checked + .el-radio-button__inner) {
-  background: linear-gradient(180deg, rgba(26, 93, 142, 0.98), rgba(14, 58, 92, 0.96));
-  border-color: rgba(98, 213, 255, 0.72);
+  background: linear-gradient(180deg, var(--swatch-rgba-26-93-142-0_98), var(--swatch-rgba-14-58-92-0_96));
+  border-color: var(--swatch-rgba-98-213-255-0_72);
   color: var(--text-color-strong);
-  box-shadow: -1px 0 0 0 rgba(98, 213, 255, 0.72);
+  box-shadow: -1px 0 0 0 var(--swatch-rgba-98-213-255-0_72);
 }
 
 /* 杀伤链方案卡片列表容器：采用 Flex 垂直单列布局 */
@@ -2670,20 +2671,20 @@ defineExpose({
   gap: 16px;
   padding: 20px;
   border-radius: 20px;
-  border: 1px solid rgba(116, 168, 225, 0.18);
-  background: linear-gradient(180deg, rgba(11, 31, 50, 0.96), rgba(8, 24, 39, 0.96));
+  border: 1px solid var(--swatch-rgba-116-168-225-0_18);
+  background: linear-gradient(180deg, var(--swatch-rgba-11-31-50-0_96), var(--swatch-rgba-8-24-39-0_96));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 8px 16px rgba(0, 0, 0, 0.2);
+    inset 0 1px 0 var(--swatch-rgba-255-255-255-0_03),
+    0 8px 16px var(--swatch-rgba-0-0-0-0_2);
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .killchain-plan-card:hover {
   transform: translateY(-4px);
-  border-color: rgba(98, 213, 255, 0.45);
+  border-color: var(--swatch-rgba-98-213-255-0_45);
   box-shadow:
-    0 12px 24px rgba(0, 0, 0, 0.35),
-    0 0 15px rgba(98, 213, 255, 0.1);
+    0 12px 24px var(--swatch-rgba-0-0-0-0_35),
+    0 0 15px var(--swatch-rgba-98-213-255-0_1);
 }
 
 .killchain-plan-card__header {
@@ -2700,16 +2701,16 @@ defineExpose({
 .killchain-plan-card__eyebrow {
   display: inline-block;
   color: var(--accent-cyan);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .killchain-plan-card__title {
   margin: 6px 0 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.3;
   color: var(--text-color-primary);
   word-break: break-word;
@@ -2718,7 +2719,7 @@ defineExpose({
 .killchain-plan-card__subline {
   margin: 4px 0 0;
   color: var(--text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .killchain-plan-card__badges {
@@ -2735,28 +2736,28 @@ defineExpose({
   justify-content: center;
   padding: 4px 8px;
   border-radius: 6px;
-  border: 1px solid rgba(116, 168, 225, 0.15);
-  background: rgba(15, 42, 67, 0.6);
+  border: 1px solid var(--swatch-rgba-116-168-225-0_15);
+  background: var(--swatch-rgba-15-42-67-0_6);
   color: var(--text-color-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   white-space: nowrap;
 }
 
 .killchain-plan-card__badge.is-type {
-  border-color: rgba(124, 217, 146, 0.2);
-  background: rgba(124, 217, 146, 0.08);
+  border-color: var(--swatch-rgba-124-217-146-0_2);
+  background: var(--swatch-rgba-124-217-146-0_08);
   color: var(--accent-green);
 }
 
 .killchain-plan-card__badge.is-price {
-  border-color: rgba(240, 179, 91, 0.2);
-  background: rgba(240, 179, 91, 0.08);
+  border-color: var(--swatch-rgba-240-179-91-0_2);
+  background: var(--swatch-rgba-240-179-91-0_08);
   color: var(--accent-amber);
 }
 
 .killchain-plan-card__badge.is-feasible {
-  border-color: rgba(98, 213, 255, 0.2);
-  background: rgba(98, 213, 255, 0.08);
+  border-color: var(--swatch-rgba-98-213-255-0_2);
+  background: var(--swatch-rgba-98-213-255-0_08);
   color: var(--accent-cyan);
 }
 
@@ -2770,22 +2771,22 @@ defineExpose({
 .killchain-plan-card__stat {
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(116, 168, 225, 0.12);
-  background: rgba(10, 29, 48, 0.6);
+  border: 1px solid var(--swatch-rgba-116-168-225-0_12);
+  background: var(--swatch-rgba-10-29-48-0_6);
 }
 
 .killchain-plan-card__stat span {
   display: block;
   color: var(--text-color-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   margin-bottom: 4px;
 }
 
 .killchain-plan-card__stat strong {
   display: block;
   color: var(--text-color-primary);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
 }
 
 .killchain-plan-card__stat--wide {
@@ -2800,8 +2801,8 @@ defineExpose({
 
 .killchain-plan-card__section-title {
   color: var(--text-color-secondary);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
 }
 
 .killchain-plan-card__chips {
@@ -2815,10 +2816,10 @@ defineExpose({
   align-items: center;
   padding: 4px 8px;
   border-radius: 6px;
-  border: 1px solid rgba(116, 168, 225, 0.12);
-  background: rgba(12, 33, 53, 0.6);
+  border: 1px solid var(--swatch-rgba-116-168-225-0_12);
+  background: var(--swatch-rgba-12-33-53-0_6);
   color: var(--text-color-primary);
-  font-size: 10px;
+  font-size: var(--font-size-caption);
 }
 
 .killchain-plan-card__footer {
@@ -2826,7 +2827,7 @@ defineExpose({
   justify-content: flex-end;
   margin-top: auto;
   padding-top: 10px;
-  border-top: 1px solid rgba(116, 168, 225, 0.1);
+  border-top: 1px solid var(--swatch-rgba-116-168-225-0_1);
 }
 
 .killchain-plan-card__footer.is-high {

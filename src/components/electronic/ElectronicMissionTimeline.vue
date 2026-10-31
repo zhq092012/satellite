@@ -358,9 +358,9 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
   z-index: 100;
   padding: 10px 16px 12px 18px;
   border-radius: 10px;
-  background: rgba(8, 14, 28, 0.94);
-  border: 1px solid rgba(0, 225, 255, 0.28);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  background: var(--swatch-rgba-8-14-28-0_94);
+  border: 1px solid rgba(var(--accent-cyan-rgb), 0.28);
+  box-shadow: 0 8px 28px var(--swatch-rgba-0-0-0-0_5);
   backdrop-filter: blur(10px);
 }
 
@@ -372,21 +372,21 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
   gap: 8px;
 
   .header-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: #40f2ff;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--accent-cyan-hover);
     letter-spacing: 0.3px;
   }
 
   .current-time-tag {
     margin-left: auto;
-    font-size: 11px;
-    font-family: monospace;
-    color: #67e8f9;
+    font-size: var(--font-size-xs);
+    font-family: var(--font-family-mono);
+    color: var(--color-info-bright);
     padding: 2px 8px;
     border-radius: 4px;
-    background: rgba(0, 225, 255, 0.1);
-    border: 1px solid rgba(0, 225, 255, 0.25);
+    background: rgba(var(--accent-cyan-rgb), 0.1);
+    border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
   }
 
   .legend-row {
@@ -396,27 +396,27 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
   }
 
   .legend-chip {
-    font-size: 10px;
+    font-size: var(--font-size-caption);
     padding: 2px 8px;
     border-radius: 4px;
     border: 1px solid transparent;
 
     &.chip-normal {
-      color: #86efac;
-      background: rgba(34, 197, 94, 0.12);
-      border-color: rgba(74, 222, 128, 0.3);
+      color: var(--color-success-soft);
+      background: var(--swatch-rgba-34-197-94-0_12);
+      border-color: var(--swatch-rgba-74-222-128-0_3);
     }
 
     &.chip-jam {
-      color: #fca5a5;
-      background: rgba(239, 68, 68, 0.12);
-      border-color: rgba(248, 113, 113, 0.3);
+      color: var(--color-danger-soft);
+      background: var(--color-danger-bg);
+      border-color: var(--swatch-rgba-248-113-113-0_3);
     }
 
     &.chip-post {
-      color: #7dd3fc;
-      background: rgba(56, 189, 248, 0.12);
-      border-color: rgba(64, 242, 255, 0.3);
+      color: var(--color-info-soft);
+      background: var(--swatch-rgba-56-189-248-0_12);
+      border-color: var(--swatch-rgba-64-242-255-0_3);
     }
   }
 }
@@ -454,20 +454,20 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
     .tick-line {
       width: 1px;
       height: 6px;
-      background: rgba(148, 163, 184, 0.45);
+      background: var(--swatch-rgba-148-163-184-0_45);
     }
 
     &.major .tick-line {
       height: 10px;
-      background: rgba(148, 163, 184, 0.7);
+      background: var(--swatch-rgba-148-163-184-0_7);
     }
 
     .tick-label {
-      font-size: 9px;
-      color: #64748b;
+      font-size: var(--font-size-caption);
+      color: var(--text-color-subtle);
       margin-top: 2px;
       white-space: nowrap;
-      font-family: Consolas, monospace;
+      font-family: var(--font-family-mono);
     }
   }
 }
@@ -481,12 +481,12 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
   transition: box-shadow 0.2s ease;
 
   &:hover {
-    box-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
+    box-shadow: 0 0 8px rgba(var(--accent-cyan-rgb), 0.35);
   }
 
   &--default .track-base {
-    background: #1e293b;
-    border-color: rgba(71, 85, 105, 0.6);
+    background: var(--surface-slate);
+    border-color: var(--swatch-rgba-71-85-105-0_6);
   }
 }
 
@@ -505,8 +505,8 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
     bottom: 0;
     width: 2px;
     margin-left: -1px;
-    background: linear-gradient(180deg, rgba(245, 230, 163, 0.2), #f5e6a3);
-    box-shadow: 0 0 8px rgba(245, 230, 163, 0.55);
+    background: linear-gradient(180deg, var(--swatch-rgba-245-230-163-0_2), var(--swatch-f5e6a3));
+    box-shadow: 0 0 8px var(--swatch-rgba-245-230-163-0_55);
   }
 
   .task-playhead-dot {
@@ -517,17 +517,17 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
     height: 8px;
     margin-left: -4px;
     border-radius: 50%;
-    background: #f5e6a3;
-    border: 2px solid #fef9c3;
-    box-shadow: 0 0 10px rgba(245, 230, 163, 0.75);
+    background: var(--swatch-f5e6a3);
+    border: 2px solid var(--swatch-fef9c3);
+    box-shadow: 0 0 10px var(--swatch-rgba-245-230-163-0_75);
   }
 }
 
 .track-base {
   position: absolute;
   inset: 0;
-  background: #1e293b;
-  border: 1px solid rgba(71, 85, 105, 0.6);
+  background: var(--surface-slate);
+  border: 1px solid var(--swatch-rgba-71-85-105-0_6);
 }
 
 .track-segment {
@@ -537,16 +537,16 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
   pointer-events: none;
 
   &.segment-normal {
-    background: rgba(34, 197, 94, 0.5);
+    background: var(--swatch-rgba-34-197-94-0_5);
   }
 
   &.segment-jam {
-    background: rgba(239, 68, 68, 0.6);
+    background: var(--swatch-rgba-239-68-68-0_6);
     z-index: 2;
   }
 
   &.segment-post {
-    background: rgba(56, 189, 248, 0.45);
+    background: var(--swatch-rgba-56-189-248-0_45);
     z-index: 1;
   }
 }
@@ -577,8 +577,8 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
   .tick-square {
     display: block;
     border-radius: 2px;
-    border: 2px solid rgba(255, 255, 255, 0.9);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    border: 2px solid var(--swatch-rgba-255-255-255-0_9);
+    box-shadow: 0 1px 4px var(--mask-color);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
 
@@ -599,36 +599,36 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
 
   &:hover .tick-square {
     transform: scale(1.15);
-    box-shadow: 0 0 10px rgba(64, 242, 255, 0.5);
+    box-shadow: 0 0 10px var(--swatch-rgba-64-242-255-0_5);
   }
 
   &.is-selected .tick-square {
     transform: scale(1.2);
-    box-shadow: 0 0 0 2px #67e8f9, 0 0 12px rgba(103, 232, 249, 0.7);
-    border-color: #67e8f9;
+    box-shadow: 0 0 0 2px var(--color-info-bright), 0 0 12px var(--swatch-rgba-103-232-249-0_7);
+    border-color: var(--color-info-bright);
   }
 
   &.tick-task_start .tick-square,
   &.tick-task_end .tick-square {
-    background: #94a3b8;
+    background: var(--text-color-muted);
   }
 
   &.tick-first_transmit .tick-square {
-    background: #22c55e;
+    background: var(--swatch-22c55e);
   }
 
   &.tick-jam .tick-square {
-    background: #ef4444;
-    border-color: #fecaca;
+    background: var(--color-danger-strong);
+    border-color: var(--swatch-fecaca);
   }
 
   &.tick-post_chain_finish .tick-square {
-    background: #0ea5e9;
+    background: var(--swatch-0ea5e9);
   }
 
   &.tick-all_blocked .tick-square {
-    background: #dc2626;
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+    background: var(--swatch-dc2626);
+    box-shadow: 0 0 8px var(--swatch-rgba-239-68-68-0_6);
   }
 }
 
@@ -636,9 +636,9 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
   display: flex;
   justify-content: space-between;
   margin-top: 8px;
-  font-size: 10px;
-  color: #64748b;
-  font-family: Consolas, monospace;
+  font-size: var(--font-size-caption);
+  color: var(--text-color-subtle);
+  font-family: var(--font-family-mono);
 }
 </style>
 
@@ -654,9 +654,9 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
     max-width: 280px;
     padding: 10px 12px;
     border-radius: 8px;
-    background: rgba(10, 18, 32, 0.96);
-    border: 1px solid rgba(0, 225, 255, 0.25);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    background: var(--swatch-rgba-10-18-32-0_96);
+    border: 1px solid rgba(var(--accent-cyan-rgb), 0.25);
+    box-shadow: 0 8px 24px var(--mask-color);
 
     .tooltip-header {
       display: flex;
@@ -664,53 +664,53 @@ defineExpose({ syncTaskStart: syncSelectedSatelliteTime })
       gap: 8px;
       margin-bottom: 6px;
       padding-bottom: 6px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom: 1px solid var(--swatch-rgba-255-255-255-0_08);
 
       .tooltip-icon {
-        font-size: 14px;
+        font-size: var(--font-size-base);
       }
 
       .tooltip-title {
-        font-size: 13px;
-        font-weight: 700;
-        color: #e2efff;
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-bold);
+        color: var(--text-color-bright);
       }
 
       &.type-first_transmit .tooltip-title {
-        color: #4ade80;
+        color: var(--color-success-soft);
       }
 
       &.type-jam .tooltip-title {
-        color: #fca5a5;
+        color: var(--color-danger-soft);
       }
 
       &.type-post_chain_finish .tooltip-title {
-        color: #38bdf8;
+        color: var(--color-info);
       }
 
       &.type-all_blocked .tooltip-title {
-        color: #f87171;
+        color: var(--color-danger-soft);
       }
     }
 
     .tooltip-time {
-      font-size: 12px;
-      font-family: Consolas, monospace;
-      color: #40f2ff;
+      font-size: var(--font-size-sm);
+      font-family: var(--font-family-mono);
+      color: var(--accent-cyan-hover);
       margin-bottom: 4px;
     }
 
     .tooltip-desc {
-      font-size: 11px;
-      color: #94a3b8;
+      font-size: var(--font-size-xs);
+      color: var(--text-color-muted);
       line-height: 1.5;
     }
 
     .tooltip-list {
       margin: 6px 0 0;
       padding-left: 16px;
-      font-size: 11px;
-      color: #cbd5e1;
+      font-size: var(--font-size-xs);
+      color: var(--text-color-soft);
       line-height: 1.45;
 
       li {

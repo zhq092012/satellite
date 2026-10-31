@@ -1,3 +1,4 @@
+import { readThemeColor } from '@/styles/themeColor'
 import * as satellitejs from 'satellite.js'
 import * as Cesium from 'cesium'
 import type { SatelliteAnalysisData } from '@/api/task/task'
@@ -340,7 +341,7 @@ export const BATTLE_GLOBE_ORBIT_PATH_WIDTH = 2
 export const BATTLE_GLOBE_ORBIT_PATH_GLOW_POWER = 0.25
 
 /** 态势地球卫星轨道颜色（CSS） */
-export const BATTLE_GLOBE_ORBIT_PATH_COLOR_CSS = '#fde047'
+export const BATTLE_GLOBE_ORBIT_PATH_COLOR_CSS = readThemeColor('--swatch-fde047')
 
 /**
  * 创建态势地球卫星轨道发光材质（选中 path / 推演折线共用）。

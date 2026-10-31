@@ -107,8 +107,8 @@ const handleTabChange = (tabName: string) => {
   }
 
   :deep(.atlas-app-tabs__item) {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
   }
 }
 

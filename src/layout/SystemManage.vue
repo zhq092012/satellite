@@ -66,8 +66,8 @@ const handleTabChange = (tabName: string) => {
   color: var(--text-color-strong);
 
   :deep(.atlas-app-tabs__item) {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
   }
 }
 
@@ -78,7 +78,7 @@ const handleTabChange = (tabName: string) => {
 
   h2 {
     margin: 0;
-    font-size: 22px;
+    font-size: var(--font-size-2xl);
   }
 
   p {

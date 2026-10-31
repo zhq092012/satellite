@@ -47,19 +47,19 @@ const emit = defineEmits<{
   padding: 4px 4px 4px 8px;
   box-sizing: border-box;
   border-radius: 4px;
-  border: 1px solid rgba(100, 116, 139, 0.35);
-  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--swatch-rgba-100-116-139-0_35);
+  background: var(--swatch-rgba-15-23-42-0_65);
   user-select: none;
   transition: border-color 0.18s ease, background 0.18s ease;
 
   &.task-config-checkbox--selected {
-    border-color: rgba(0, 225, 255, 0.55);
-    background: rgba(0, 225, 255, 0.1);
+    border-color: rgba(var(--accent-cyan-rgb), 0.55);
+    background: rgba(var(--accent-cyan-rgb), 0.1);
   }
 
   &.task-config-checkbox--analysis-focus {
-    border-color: rgba(250, 204, 21, 0.75);
-    box-shadow: inset 0 0 0 1px rgba(250, 204, 21, 0.35);
+    border-color: var(--swatch-rgba-250-204-21-0_75);
+    box-shadow: inset 0 0 0 1px var(--swatch-rgba-250-204-21-0_35);
   }
 }
 
@@ -75,9 +75,9 @@ const emit = defineEmits<{
 
 .task-config-checkbox__label {
   min-width: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: #94a3b8;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-color-muted);
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -86,7 +86,7 @@ const emit = defineEmits<{
 }
 
 .task-config-checkbox--selected .task-config-checkbox__label {
-  color: #e0f2fe;
+  color: var(--swatch-e0f2fe);
 }
 
 .task-config-checkbox__detail {
@@ -99,17 +99,17 @@ const emit = defineEmits<{
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: #64748b;
+  color: var(--text-color-subtle);
   cursor: pointer;
   flex-shrink: 0;
 
   &:hover {
-    color: #7dd3fc;
-    background: rgba(0, 225, 255, 0.1);
+    color: var(--color-info-soft);
+    background: rgba(var(--accent-cyan-rgb), 0.1);
   }
 
   .el-icon {
-    font-size: 14px;
+    font-size: var(--font-size-base);
   }
 }
 

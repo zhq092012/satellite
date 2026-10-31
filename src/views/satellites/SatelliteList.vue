@@ -294,7 +294,7 @@ onMounted(async () => {
   border: 1px solid var(--surface-border-color);
   border-radius: 24px;
   background: linear-gradient(180deg, var(--surface-bg-color-soft) 0%, var(--surface-bg-color) 100%);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 18px 36px var(--swatch-rgba-0-0-0-0_28);
 }
 
 .toolbar-card,
@@ -341,8 +341,8 @@ onMounted(async () => {
   --el-table-header-bg-color: var(--surface-bg-color-strong);
   --el-table-bg-color: var(--surface-bg-color);
   --el-table-tr-bg-color: var(--surface-bg-color);
-  --el-table-row-hover-bg-color: rgba(79, 147, 221, 0.18);
-  --el-fill-color-lighter: rgba(79, 147, 221, 0.14);
+  --el-table-row-hover-bg-color: var(--accent-border);
+  --el-fill-color-lighter: var(--accent-bg);
   --el-text-color-regular: var(--text-color-primary);
   --el-text-color-primary: var(--text-color-strong);
   border-radius: 16px;
@@ -351,8 +351,8 @@ onMounted(async () => {
 
 .table-card :deep(.atlas-app-table th.el-table__cell) {
   color: var(--accent-color-active);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-heavy);
 }
 
 .table-card :deep(.atlas-app-table td.el-table__cell) {

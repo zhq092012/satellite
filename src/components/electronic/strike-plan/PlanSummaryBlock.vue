@@ -43,8 +43,8 @@ const weaponTypes = computed(() => {
   box-sizing: border-box;
   padding: 14px 16px;
   border-radius: 8px;
-  background: rgba(14, 28, 48, 0.75);
-  border: 1px solid rgba(79, 147, 221, 0.25);
+  background: var(--swatch-rgba-14-28-48-0_75);
+  border: 1px solid var(--accent-border-strong);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -56,32 +56,32 @@ const weaponTypes = computed(() => {
   }
 
   .summary-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: #7dd3fc;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-info-soft);
     margin-bottom: 8px;
     flex-shrink: 0;
   }
 
   .summary-text {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     line-height: 1.6;
-    color: #cbd5e1;
+    color: var(--text-color-soft);
     word-break: break-word;
     overflow-wrap: break-word;
   }
 
   .weapon-types {
     margin-top: 8px;
-    font-size: 12px;
-    color: #94a3b8;
+    font-size: var(--font-size-sm);
+    color: var(--text-color-muted);
     word-break: break-word;
     overflow-wrap: break-word;
 
     .weapon-type-chip {
-      color: #fca5a5;
-      font-weight: 600;
+      color: var(--color-danger-soft);
+      font-weight: var(--font-weight-semibold);
     }
   }
 }

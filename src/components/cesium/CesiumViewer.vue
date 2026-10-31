@@ -10,6 +10,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { readThemeColor } from '@/styles/themeColor'
 import { getAllWeapons, getSatelliteDetail } from '@/api/dashboard'
 import type { MatrixResult } from '@/api/electronic'
 import type { ChainNode, SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
@@ -299,7 +300,7 @@ let transmissionLinkPolylineCollection: Cesium.PolylineCollection | null = null
 /** 当前选中的传输链路包含的节点匹配 Key（用于高亮该链路上的天基/地面实体） */
 const selectedTransmissionLinkNodeKeys = ref<Set<string>>(new Set())
 /** 传输链路高亮线颜色：淡黄色虚线 */
-const TRANSMISSION_LINK_LINE_COLOR = Cesium.Color.fromCssColorString('#F5E6A3').withAlpha(0.92)
+const TRANSMISSION_LINK_LINE_COLOR = Cesium.Color.fromCssColorString(readThemeColor('--swatch-f5e6a3')).withAlpha(0.92)
 /** 卫星标签近距离 LOD 上限（米），此距离内显示完整标签 */
 const SAT_LABEL_LOD_NEAR = 6000000
 /** 卫星标签远距离 LOD 上限（米），超过后隐藏标签 */
@@ -765,8 +766,8 @@ const loadSatelliteAndStations = () => {
       const resolveLabelColor = () => (isNodeHighlighted() ? highlightColor : Cesium.Color.CYAN)
 
       const defaultShapeColor = isReceive
-        ? Cesium.Color.fromCssColorString('#38bdf8')
-        : Cesium.Color.fromCssColorString('#c084fc')
+        ? Cesium.Color.fromCssColorString(readThemeColor('--color-info'))
+        : Cesium.Color.fromCssColorString(readThemeColor('--swatch-c084fc'))
       const resolveShapeColor = () => (isNodeHighlighted() ? highlightColor : defaultShapeColor)
 
       // 单一实体：近距离显示真实图标 Billboard (<= 8,000 km)，远距离切换显示 Point 点 (> 8,000 km)
@@ -1058,8 +1059,8 @@ interface OurWeaponEntityStyle {
 }
 
 const ourWeaponStyleCache = new Map<string, OurWeaponEntityStyle>()
-const OUR_WEAPON_DEFAULT_COLOR = Cesium.Color.fromCssColorString('#ef6b73')
-const OUR_WEAPON_DEFAULT_LABEL_COLOR = Cesium.Color.fromCssColorString('#ff9e9e')
+const OUR_WEAPON_DEFAULT_COLOR = Cesium.Color.fromCssColorString(readThemeColor('--color-danger'))
+const OUR_WEAPON_DEFAULT_LABEL_COLOR = Cesium.Color.fromCssColorString(readThemeColor('--swatch-ff9e9e'))
 
 /**
  * 更新我方武器图层的可见性
@@ -1193,8 +1194,8 @@ const renderWeaponsOnCesium = () => {
         show: false,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, WEAPON_LABEL_LOD_NEAR),
       },
-      description: `<div style="padding: 12px; font-family: sans-serif; background-color: #1a2233; color: #e6f7ff; border-radius: 8px; border: 1px solid #ef6b73;">
-        <h3 style="margin: 0 0 10px 0; color: #ef6b73; font-size: 16px;">🛩️ 我方武器资产</h3>
+      description: `<div style="padding: 12px; font-family: sans-serif; background-color: #1a2233; color: #e6f7ff; border-radius: 8px; border: 1px solid var(--color-danger);">
+        <h3 style="margin: 0 0 10px 0; color: var(--color-danger); font-size: var(--font-size-lg);">🛩️ 我方武器资产</h3>
         <p style="margin: 4px 0;"><strong>武器名称:</strong> ${weapon.name}</p>
         <p style="margin: 4px 0;"><strong>所属国家/地区:</strong> ${weapon.country}</p>
         <p style="margin: 4px 0;"><strong>武器类型:</strong> ${weapon.type}</p>
@@ -2182,7 +2183,7 @@ defineExpose({
     z-index: 3000;
     display: grid;
     place-items: center;
-    background: rgba(2, 8, 16, 0.55);
+    background: var(--swatch-rgba-2-8-16-0_55);
     backdrop-filter: blur(2px);
     pointer-events: all;
   }
@@ -2194,10 +2195,10 @@ defineExpose({
     gap: 12px;
     padding: 18px 22px;
     border-radius: 12px;
-    background: rgba(8, 14, 22, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
-    color: #dbe8ff;
+    background: var(--swatch-rgba-8-14-22-0_92);
+    border: 1px solid var(--swatch-rgba-255-255-255-0_08);
+    box-shadow: 0 16px 36px var(--mask-color);
+    color: var(--swatch-dbe8ff);
     min-width: 180px;
   }
 
@@ -2205,13 +2206,13 @@ defineExpose({
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    border: 3px solid rgba(255, 255, 255, 0.18);
-    border-top-color: #55bbff;
+    border: 3px solid var(--swatch-rgba-255-255-255-0_18);
+    border-top-color: var(--swatch-55bbff);
     animation: render-spin 0.8s linear infinite;
   }
 
   .render-loading__text {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     letter-spacing: 0.5px;
   }
 
@@ -2242,10 +2243,10 @@ defineExpose({
     gap: 5px;
     padding: 5px;
     box-sizing: border-box;
-    border: 1px solid rgba(66, 143, 220, 0.22);
+    border: 1px solid var(--swatch-rgba-66-143-220-0_22);
     border-radius: 10px;
-    background: linear-gradient(180deg, rgba(8, 14, 22, 0.94) 0%, rgba(8, 17, 30, 0.84) 100%);
-    box-shadow: 0 16px 30px rgba(0, 0, 0, 0.36);
+    background: linear-gradient(180deg, var(--swatch-rgba-8-14-22-0_94) 0%, var(--swatch-rgba-8-17-30-0_84) 100%);
+    box-shadow: 0 16px 30px var(--swatch-rgba-0-0-0-0_36);
     backdrop-filter: blur(4px);
     pointer-events: auto;
 
@@ -2254,18 +2255,18 @@ defineExpose({
       align-items: center;
       justify-content: space-between;
       padding: 0 4px 4px;
-      border-bottom: 1px solid rgba(79, 140, 220, 0.18);
+      border-bottom: 1px solid var(--swatch-rgba-79-140-220-0_18);
 
       .situation-panel__title {
-        font-size: 18px;
-        font-weight: 700;
+        font-size: var(--font-size-xl);
+        font-weight: var(--font-weight-bold);
         letter-spacing: 1px;
-        color: #dbe8ff;
+        color: var(--swatch-dbe8ff);
       }
 
       .situation-panel__subtitle {
-        font-size: 12px;
-        color: #7aa7ff;
+        font-size: var(--font-size-sm);
+        color: var(--swatch-7aa7ff);
       }
     }
 
@@ -2283,26 +2284,26 @@ defineExpose({
       gap: 10px;
       padding: 10px;
       border-radius: 10px;
-      background: rgba(15, 22, 33, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      background: var(--swatch-rgba-15-22-33-0_92);
+      border: 1px solid var(--swatch-rgba-255-255-255-0_06);
+      box-shadow: inset 0 0 0 1px var(--swatch-rgba-255-255-255-0_02);
 
       &.is-red {
 
         .camp-card__header,
         .section-title {
-          color: #ff7f7f;
+          color: var(--swatch-ff7f7f);
         }
 
         .camp-card__badge {
-          background: rgba(255, 77, 79, 0.18);
-          color: #ffb0b0;
+          background: var(--swatch-rgba-255-77-79-0_18);
+          color: var(--swatch-ffb0b0);
         }
 
         .camp-stats__value,
         .weapon-row__value,
         .tag-item strong {
-          color: #ffb0b0;
+          color: var(--swatch-ffb0b0);
         }
       }
 
@@ -2310,18 +2311,18 @@ defineExpose({
 
         .camp-card__header,
         .section-title {
-          color: #55bbff;
+          color: var(--swatch-55bbff);
         }
 
         .camp-card__badge {
-          background: rgba(42, 166, 255, 0.18);
-          color: #b2dcff;
+          background: var(--swatch-rgba-42-166-255-0_18);
+          color: var(--swatch-b2dcff);
         }
 
         .camp-stats__value,
         .weapon-row__value,
         .tag-item strong {
-          color: #b2dcff;
+          color: var(--swatch-b2dcff);
         }
       }
     }
@@ -2330,8 +2331,8 @@ defineExpose({
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 15px;
-      font-weight: 700;
+      font-size: var(--font-size-subtitle);
+      font-weight: var(--font-weight-bold);
     }
 
     .camp-card__name {
@@ -2343,7 +2344,7 @@ defineExpose({
       min-width: 62px;
       padding: 2px 8px;
       border-radius: 999px;
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       text-align: center;
     }
 
@@ -2364,31 +2365,31 @@ defineExpose({
       box-sizing: border-box;
       display: grid;
       place-items: center;
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+      box-shadow: 0 0 0 1px var(--swatch-rgba-255-255-255-0_06) inset;
     }
 
     .camp-ring__inner {
       width: 100%;
       height: 100%;
       border-radius: 50%;
-      background: rgba(8, 12, 18, 0.98);
+      background: var(--swatch-rgba-8-12-18-0_98);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 2px;
       text-align: center;
-      color: #fff;
+      color: var(--color-white);
     }
 
     .camp-ring__label {
-      font-size: 12px;
-      color: #c9d6e9;
+      font-size: var(--font-size-sm);
+      color: var(--swatch-c9d6e9);
     }
 
     .camp-ring__value {
-      font-size: 22px;
-      font-weight: 800;
+      font-size: var(--font-size-2xl);
+      font-weight: var(--font-weight-heavy);
       line-height: 1;
     }
 
@@ -2404,17 +2405,17 @@ defineExpose({
       align-items: center;
       padding: 6px 8px;
       border-radius: 6px;
-      background: rgba(255, 255, 255, 0.03);
+      background: var(--swatch-rgba-255-255-255-0_03);
     }
 
     .camp-stats__label {
-      color: #aeb6c2;
-      font-size: 12px;
+      color: var(--swatch-aeb6c2);
+      font-size: var(--font-size-sm);
     }
 
     .camp-stats__value {
-      font-size: 14px;
-      font-weight: 700;
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-bold);
     }
 
     .camp-card__section,
@@ -2428,8 +2429,8 @@ defineExpose({
     .section-title {
       position: relative;
       padding-left: 12px;
-      font-size: 13px;
-      font-weight: 700;
+      font-size: var(--font-size-md);
+      font-weight: var(--font-weight-bold);
       text-align: left;
     }
 
@@ -2444,7 +2445,7 @@ defineExpose({
       min-height: 190px;
       height: 190px;
       border-radius: 8px;
-      background: rgba(255, 255, 255, 0.02);
+      background: var(--swatch-rgba-255-255-255-0_02);
     }
 
     .chart-box--pie {
@@ -2466,20 +2467,20 @@ defineExpose({
       gap: 8px;
       padding: 8px 10px;
       border-radius: 6px;
-      background: rgba(255, 255, 255, 0.04);
-      border-left: 2px solid rgba(255, 255, 255, 0.12);
+      background: var(--swatch-rgba-255-255-255-0_04);
+      border-left: 2px solid var(--swatch-rgba-255-255-255-0_12);
     }
 
     .weapon-row__name {
-      color: #dfe7f3;
-      font-size: 12px;
+      color: var(--swatch-dfe7f3);
+      font-size: var(--font-size-sm);
       line-height: 1.35;
     }
 
     .weapon-row__value {
       flex: 0 0 auto;
-      font-size: 15px;
-      font-weight: 800;
+      font-size: var(--font-size-subtitle);
+      font-weight: var(--font-weight-heavy);
     }
 
     .camp-card__grid {
@@ -2499,18 +2500,18 @@ defineExpose({
       gap: 6px;
       padding: 5px 8px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.04);
-      color: #c6cfdb;
-      font-size: 12px;
+      background: var(--swatch-rgba-255-255-255-0_04);
+      color: var(--swatch-c6cfdb);
+      font-size: var(--font-size-sm);
 
       strong {
-        font-weight: 800;
+        font-weight: var(--font-weight-heavy);
       }
     }
 
     .empty-text {
-      color: #7f8996;
-      font-size: 12px;
+      color: var(--swatch-7f8996);
+      font-size: var(--font-size-sm);
       padding: 6px 2px;
     }
   }
@@ -2522,8 +2523,8 @@ defineExpose({
     height: 96%;
     z-index: 996;
     width: 400px;
-    font-size: 14px;
-    background: rgba($color: #000000, $alpha: 1);
+    font-size: var(--font-size-base);
+    background: rgba($color: var(--swatch-000000), $alpha: 1);
 
     .legend-title {
       padding: 8px;
@@ -2543,7 +2544,7 @@ defineExpose({
       width: 95%;
       box-sizing: border-box;
       justify-items: start;
-      color: #ccc;
+      color: var(--swatch-ccc);
       background: var(--nav-bar-background);
       border-radius: 2px;
       cursor: pointer;
@@ -2568,7 +2569,7 @@ defineExpose({
       }
 
       .sat-name {
-        font-size: 18px;
+        font-size: var(--font-size-xl);
       }
 
       .score-row {
@@ -2582,8 +2583,8 @@ defineExpose({
 
         .score {
           color: yellow;
-          font-size: 16px;
-          font-weight: bold;
+          font-size: var(--font-size-lg);
+          font-weight: var(--font-weight-bold);
         }
       }
     }
@@ -2614,18 +2615,18 @@ defineExpose({
     gap: 6px;
     padding: 4px 10px;
     border-radius: 999px;
-    background: rgba(4, 18, 30, 0.76);
+    background: var(--swatch-rgba-4-18-30-0_76);
     backdrop-filter: blur(8px);
 
     .constellation-toolbar__badge {
-      color: #d8efff;
-      font-size: 12px;
+      color: var(--swatch-d8efff);
+      font-size: var(--font-size-sm);
       white-space: nowrap;
     }
   }
 
   .timeline-panel {
-    background: rgba($color: #000000, $alpha: 0.8);
+    background: rgba($color: var(--swatch-000000), $alpha: 0.8);
     z-index: 1;
     position: absolute;
     bottom: 10px;
@@ -2649,10 +2650,10 @@ defineExpose({
     position: absolute;
     top: 40px;
     left: 10px;
-    background: rgba(19, 19, 19, 0.9);
+    background: var(--swatch-rgba-19-19-19-0_9);
     padding: 12px;
     border-radius: 4px;
-    font-size: 14px;
+    font-size: var(--font-size-base);
     pointer-events: auto;
     z-index: 999;
     width: 320px;
@@ -2668,7 +2669,7 @@ defineExpose({
 
       &>div {
         text-align: left;
-        color: #dfdfdf;
+        color: var(--swatch-dfdfdf);
         padding: 2px;
       }
 
@@ -2678,7 +2679,7 @@ defineExpose({
       }
 
       .desc {
-        font-size: 12px;
+        font-size: var(--font-size-sm);
         line-height: 20px;
       }
     }

@@ -1,3 +1,4 @@
+import { readThemeColor } from '@/styles/themeColor'
 /**
  * 统一 HTTP 客户端：Axios 实例、Token 注入、401 登出与 Loading 封装。
  * 业务模块应通过导出的 `requestAPI` 发起请求，勿直接 new Axios。
@@ -205,7 +206,7 @@ class HttpRequest {
       loadingInstance = ElLoading.service({
         lock: true,
         text: loadingText || '加载中...',
-        background: 'rgba(0, 0, 0, 0.35)',
+        background: readThemeColor('--swatch-rgba-0-0-0-0_35'),
       })
     }
 

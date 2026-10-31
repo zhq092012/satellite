@@ -5,6 +5,7 @@
 import { nextTick, ref, type ShallowRef } from 'vue'
 import * as Cesium from 'cesium'
 import type { BlueSatelliteRecord, HistoricalPlanCard } from '@/types/strike'
+import { readThemeColor } from '@/styles/themeColor'
 import { createSatelliteStrikeStarDataUri } from '@/utils/tools/cesiumEntityIcon'
 
 // ─── 常量 ───
@@ -178,7 +179,7 @@ export function useCompareViewers(
         position,
         billboard: isStruck
           ? new Cesium.BillboardGraphics({
-            image: createSatelliteStrikeStarDataUri(Cesium.Color.fromCssColorString('#ef6b73'), 0.88),
+            image: createSatelliteStrikeStarDataUri(Cesium.Color.fromCssColorString(readThemeColor('--color-danger')), 0.88),
             scale: 0.88,
             width: 24.64,
             height: 24.64,
@@ -189,14 +190,14 @@ export function useCompareViewers(
           ? undefined
           : new Cesium.PointGraphics({
             pixelSize: 9,
-            color: Cesium.Color.fromCssColorString('#4ea6ff'),
+            color: Cesium.Color.fromCssColorString(readThemeColor('--swatch-4ea6ff')),
             outlineColor: Cesium.Color.WHITE,
             outlineWidth: 2,
           }),
         label: new Cesium.LabelGraphics({
           text: isStruck ? `${satellite.name}（已打击）` : satellite.name,
           font: '11px sans-serif',
-          fillColor: isStruck ? Cesium.Color.fromCssColorString('#ef6b73') : Cesium.Color.WHITE,
+          fillColor: isStruck ? Cesium.Color.fromCssColorString(readThemeColor('--color-danger')) : Cesium.Color.WHITE,
           outlineColor: Cesium.Color.BLACK,
           outlineWidth: 2,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
@@ -237,7 +238,7 @@ export function useCompareViewers(
         position,
         point: new Cesium.PointGraphics({
           pixelSize: 9,
-          color: Cesium.Color.fromCssColorString('#4ea6ff'),
+          color: Cesium.Color.fromCssColorString(readThemeColor('--swatch-4ea6ff')),
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: 2,
         }),
