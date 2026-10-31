@@ -6,42 +6,62 @@ import {
   type MatrixResult,
   type ZhchPlanResp,
 } from '@/api/electronic'
-import { type ChainNode } from '@/utils/satelliteFullChainAnalysis'
 import { prefetchSeriesTransmissionLinks } from '@/utils/prefetchTransmissionLinks'
 import { getTaskMatrix, type SatelliteAnalysisData } from '@/api/task/task'
 import { isTaskProgressComplete, taskProgressMap } from '@/composables/useTaskProgressPolling'
 import type { BattleForm, SatelliteData, TaskCombatArea, TaskForm } from '@/types/dashboard'
+import type {
+  BattleCircleArea,
+  BattlePolygonArea,
+  FocusedStrikeLinkSnapshot,
+  SelectedOurWeapon,
+} from '@/types/layout'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import type { SatelliteDetail } from '@/types/cesium/satellite'
+
+/**
+ * 把旧版布局 store 的持久化字段名换成当前字段名。
+ * 只在新字段还不存在时搬迁，避免覆盖已经写过的新数据。
+ */
+const migrateLayoutStoreFieldNames = () => {
+  if (typeof localStorage === 'undefined') return
+  const storageKey = 'layout-store'
+  const raw = localStorage.getItem(storageKey)
+  if (!raw) return
+  const saved = JSON.parse(raw) as Record<string, unknown>
+  const renames: Array<[string, string]> = [
+    ['activedTask', 'activeTask'],
+    ['allSatelliteOfTask', 'taskSatellites'],
+  ]
+  let changed = false
+  for (const [previousName, currentName] of renames) {
+    if (previousName in saved && !(currentName in saved)) {
+      saved[currentName] = saved[previousName]
+      delete saved[previousName]
+      changed = true
+    }
+  }
+  if (changed) localStorage.setItem(storageKey, JSON.stringify(saved))
+}
+
+migrateLayoutStoreFieldNames()
 
 /** 布局 Store 的全部状态。 */
 interface State {
   /** 当前激活的态势子 Tab */
-  activetab: string
+  activeSceneTab: string
   /** 侧栏是否收起 */
   isCollapse: boolean
   /** 当前激活任务；未选择时为 null */
-  activedTask: TaskForm | null
+  activeTask: TaskForm | null
   /** 当前战场；未选择时为 null */
   battle: BattleForm | null
   /** 战场圆形区域：序号 → 名称、圆心和半径 */
-  battleCircleMap: Map<number, {
-    /** 圆形区域名称 */
-    name: string
-    /** 圆心，[经度, 纬度] */
-    center: [number, number]
-    /** 半径（千米） */
-    radiusKm: number
-  }>
+  battleCircleMap: Map<number, BattleCircleArea>
   /** 当前正在编辑的圆形区域序号 */
   currentCircleIdx: number
   /** 战场多边形区域：序号 → 名称和顶点 */
-  battlePolygonMap: Map<number, {
-    /** 多边形区域名称 */
-    name: string
-    /** 顶点经纬度，按绘制顺序排列 */
-    lonlats: { lon: number; lat: number }[]
-  }>
+  battlePolygonMap: Map<number, BattlePolygonArea>
   /** 当前正在编辑的多边形区域序号 */
   currentPolygonIdx: number
   /** 是否显示卫星列表面板 */
@@ -56,7 +76,7 @@ interface State {
   /** 当前选中的 3D 敌方地面基础设施节点 (地面接收站 / 中心云数据中心) */
   selectedInfrastructureNode: InfrastructureLocation | null
   /** 当前任务下所有过境卫星数据 */
-  allSatelliteOfTask: SatelliteData[]
+  taskSatellites: SatelliteData[]
   /** 当前选中的卫星类型 */
   selectedSatType: string
   /** 当前选中的卫星系列 */
@@ -67,9 +87,9 @@ interface State {
   showNetView: boolean
 
   /** 战场中心位置（笛卡尔坐标），用于恢复俯视相机 */
-  battleCenterCartensian: Cesium.Cartesian3 | null
+  battleCenterCartesian: Cesium.Cartesian3 | null
   /** 战场中心朝向（航向、俯仰、滚转） */
-  battleCenterOritentation: Cesium.HeadingPitchRoll | null
+  battleCenterOrientation: Cesium.HeadingPitchRoll | null
   /** 卫星总数 */
   satelliteTotal: number
 
@@ -77,7 +97,7 @@ interface State {
   matrixData: MatrixResult | null
   /** 当前任务算法分析结果（getTaskMatrix） */
   taskAnalysisData: SatelliteAnalysisData | null
-  /** 左侧面板编辑的任务作战区域（用于地图展示，与 activedTask.combatArea 同步） */
+  /** 左侧面板编辑的任务作战区域（用于地图展示，与 activeTask.combatArea 同步） */
   taskCombatArea: TaskCombatArea | null
   /** 任务算法分析结果加载状态 */
   taskAnalysisLoading: boolean
@@ -112,45 +132,12 @@ interface State {
   /** 整体态势地图上是否显示我方武器图层 */
   showOurWeapons: boolean
   /** 右侧面板选中的我方武器（用于地图定位） */
-  selectedOurWeapon: {
-    /** 武器 ID；旧数据可能缺失 */
-    id?: string
-    /** 武器名称 */
-    name: string
-    /** 纬度（度） */
-    latitude: number
-    /** 经度（度） */
-    longitude: number
-    /** 射程（千米） */
-    range?: number
-  } | null
+  selectedOurWeapon: SelectedOurWeapon | null
   /**
    * 从整体态势链路跳转到打击窗口分析时携带的当前链路快照。
    * 为空表示未聚焦具体链路，打击窗口页展示全部窗口卡片。
    */
   focusedStrikeLink: FocusedStrikeLinkSnapshot | null
-}
-
-/**
- * 打击窗口分析页顶部展示的当前链路快照。
- */
-export interface FocusedStrikeLinkSnapshot {
-  /** 链路唯一标识 */
-  id: string
-  /** 节点路径文案（卫星 → 中继 → 地面站 → 数据中心） */
-  pathText: string
-  /** 链路时长展示 */
-  durationText: string
-  /** 传输时间区间 */
-  transmitTime: string
-  /** 状态文案 */
-  statusText: string
-  /** 是否阻断 */
-  blocked: boolean
-  /** 打击武器名称（多个以顿号分隔） */
-  weaponNames: string
-  /** 链路节点序列，用于匹配相关打击窗口 */
-  nodes: ChainNode[]
 }
 
 /** 综合打击方案可选用途类型（与 StrikePlanGenerator 选项一致） */
@@ -194,12 +181,12 @@ let matrixScopeInflightKey = ''
 export const useLayoutStore = defineStore('layout-store', {
   state: (): State => {
     return {
-      activetab: '战场态势视图',
+      activeSceneTab: '战场态势视图',
       isCollapse: false,
-      activedTask: null,
+      activeTask: null,
       battle: null,
-      battleCircleMap: new Map<number, { name: string; center: [number, number]; radiusKm: number }>(),
-      battlePolygonMap: new Map<number, { name: string; lonlats: { lon: number; lat: number }[] }>(),
+      battleCircleMap: new Map<number, BattleCircleArea>(),
+      battlePolygonMap: new Map<number, BattlePolygonArea>(),
       currentCircleIdx: 0,
       currentPolygonIdx: 0,
       showSatelliteList: false,
@@ -210,11 +197,11 @@ export const useLayoutStore = defineStore('layout-store', {
       selectedSatType: '',
       selectedSatSeries: '',
 
-      allSatelliteOfTask: [],
+      taskSatellites: [],
       effectModel: true,
       showNetView: false,
-      battleCenterCartensian: null,
-      battleCenterOritentation: null,
+      battleCenterCartesian: null,
+      battleCenterOrientation: null,
       satelliteTotal: 0,
 
       matrixData: null,
@@ -262,7 +249,7 @@ export const useLayoutStore = defineStore('layout-store', {
      */
     taskSelectedSeriesList(state): string[] {
       /** 任务已装配资源；从中提取系列并去重 */
-      const resources = state.activedTask?.resources ?? []
+      const resources = state.activeTask?.resources ?? []
       /** 已写入结果的系列，用于保持接口顺序下去重 */
       const seen = new Set<string>()
       const result: string[] = []
@@ -344,10 +331,10 @@ export const useLayoutStore = defineStore('layout-store', {
     /**
      * 设置当前激活任务。
      *
-     * @param activedTask 任务对象；传 null 表示取消选择
+     * @param activeTask 任务对象；传 null 表示取消选择
      */
-    setActivedTask(activedTask: TaskForm | null) {
-      this.activedTask = activedTask
+    setActiveTask(activeTask: TaskForm | null) {
+      this.activeTask = activeTask
     },
     /**
      * 更新当前任务作战区域预览（左侧面板编辑 → 地图渲染）。
@@ -361,7 +348,7 @@ export const useLayoutStore = defineStore('layout-store', {
      *
      * @param battle 战场对象
      */
-    setActivedBattle(battle: BattleForm) {
+    setActiveBattle(battle: BattleForm) {
       this.battle = battle
     },
 
@@ -419,7 +406,7 @@ export const useLayoutStore = defineStore('layout-store', {
      * @param satellites 过境卫星数据
      */
     saveTaskSatellite(satellites: SatelliteData[]) {
-      this.allSatelliteOfTask = satellites
+      this.taskSatellites = satellites
     },
     /**
      * 写入一个战场圆形区域。地图为空时忽略传入序号，从 0 开始。
@@ -474,8 +461,8 @@ export const useLayoutStore = defineStore('layout-store', {
      * @param orientation 航向、俯仰、滚转
      */
     setBattleCenter(cartesian: Cesium.Cartesian3, orientation: Cesium.HeadingPitchRoll) {
-      this.battleCenterCartensian = cartesian
-      this.battleCenterOritentation = orientation
+      this.battleCenterCartesian = cartesian
+      this.battleCenterOrientation = orientation
     },
     /**
      * [功能]
@@ -565,7 +552,7 @@ export const useLayoutStore = defineStore('layout-store', {
      */
     async fetchTaskAnalysis(force = false): Promise<SatelliteAnalysisData | null> {
       /** 当前任务；没有 ID 或算法未完成时清空分析缓存 */
-      const task = this.activedTask
+      const task = this.activeTask
       const taskId = task?.id
       if (!taskId) {
         this.clearTaskAnalysisData()
@@ -612,7 +599,7 @@ export const useLayoutStore = defineStore('layout-store', {
      */
     buildMatrixScopeKey(taskId?: number): string {
       /** 显式任务优先，否则用当前激活任务；都没有时返回空键 */
-      const id = taskId ?? this.activedTask?.id ?? 0
+      const id = taskId ?? this.activeTask?.id ?? 0
       if (!id) return ''
       /** 当前激活用途，系列变化和用途变化都要让缓存失效 */
       const usage = this.activeZhchUsageType
@@ -633,7 +620,7 @@ export const useLayoutStore = defineStore('layout-store', {
       taskId: number
     } {
       /** 发起请求时的任务；没有任务时 ID 为 0 */
-      const taskId = this.activedTask?.id ?? 0
+      const taskId = this.activeTask?.id ?? 0
       /** 自增后的请求代际 */
       const token = ++this.matrixFetchToken
       /** 当前范围键，供调用方校验响应是否仍匹配 */
@@ -687,7 +674,7 @@ export const useLayoutStore = defineStore('layout-store', {
      */
     async fetchMatrixForCurrentScope(force = false): Promise<MatrixResult | null> {
       /** 当前任务；没有任务时清空矩阵 */
-      const taskId = this.activedTask?.id ?? 0
+      const taskId = this.activeTask?.id ?? 0
       if (!taskId) {
         this.clearMatrixData()
         return null
@@ -897,7 +884,7 @@ export const useLayoutStore = defineStore('layout-store', {
      */
     async fetchZhchPlans(types?: string[], force = false): Promise<boolean> {
       /** 当前任务；没有任务时清空方案缓存 */
-      const taskId = this.activedTask?.id
+      const taskId = this.activeTask?.id
       if (!taskId) {
         this.clearZhchPlans()
         return false
@@ -975,10 +962,10 @@ export const useLayoutStore = defineStore('layout-store', {
   persist: {
     storage: localStorage,
     pick: [
-      'activedTask',
+      'activeTask',
       'battle',
       'showBattleList',
-      'allSatelliteOfTask',
+      'taskSatellites',
       'satelliteTotal',
       'selectedSatType',
       'selectedSatSeries',

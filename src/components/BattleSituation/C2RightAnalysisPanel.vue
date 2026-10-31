@@ -171,7 +171,7 @@ const chartDialogSubtitle = ref('')
 const linkDelayThreatMetrics = ref<LinkDelayThreatMetrics | null>(null)
 
 /** 当前任务结束时间，供链路过站计算 */
-const taskEndDate = computed(() => store.activedTask?.endDate ?? '')
+const taskEndDate = computed(() => store.activeTask?.endDate ?? '')
 
 /** 并发请求序号：仅最新一次 `getTargetsThreatLevel` 可写回列表 */
 let strikeRecommendLoadToken = 0
@@ -243,7 +243,7 @@ const resolveThreatInfoFromResponse = (
  * @param row 当前推荐行
  */
 const handleStaticThreatClick = async (row: SatelliteStrikeRecommendItem) => {
-  const taskId = store.activedTask?.id
+  const taskId = store.activeTask?.id
   if (!taskId) {
     ElMessage.warning('请先选择任务')
     return
@@ -338,7 +338,7 @@ watch(
  */
 watch(
   () => {
-    const taskId = store.activedTask?.id
+    const taskId = store.activeTask?.id
     if (!taskId || !props.algorithmComplete || !props.analysisData) return null
     return taskId
   },

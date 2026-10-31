@@ -387,7 +387,7 @@ const store = useLayoutStore()
 
 /** 对抗分析内嵌开关或独立菜单页，任一成立时挂载并加载图谱。 */
 const isNetViewActive = computed(() => standalone || store.showNetView)
-const satelliteList = ref<SatelliteData[]>(store.allSatelliteOfTask)
+const satelliteList = ref<SatelliteData[]>(store.taskSatellites)
 // 其他统计
 const activedIndex = ref(-1)
 /** 右侧面板顶部跨簇列表当前选中行。 */
@@ -419,7 +419,7 @@ const setActiveIndex = (idx: number, norIds: number[] | Set<string>, cluster: st
   focus.forEach((n) => {
     allIds.push(n.getID().split('Satellite-')[1])
   })
-  satelliteList.value = store.allSatelliteOfTask.filter((s) => {
+  satelliteList.value = store.taskSatellites.filter((s) => {
     return allIds.includes(s.norad_id)
   })
   // graph.focusItems(focus, true, true, {
@@ -797,7 +797,7 @@ function setCrossPairIndex(idx: number, row: CrossClusterPairRow) {
   activedIndex.value = -1
   selectedCluster.value = row.label
   highlightNodesByNorad(row.norIds)
-  satelliteList.value = store.allSatelliteOfTask.filter((s) => row.norIds.includes(Number(s.norad_id)))
+  satelliteList.value = store.taskSatellites.filter((s) => row.norIds.includes(Number(s.norad_id)))
 }
 
 /**
@@ -900,12 +900,12 @@ const loadSatelliteRelations = async (norad?: number) => {
     initGraph()
   }
   nextTick(async () => {
-    if (store.activedTask?.id) {
+    if (store.activeTask?.id) {
       let res
       if (norad) {
-        res = await getSatelliteRelationsBySatellite(norad, store.activedTask.id)
+        res = await getSatelliteRelationsBySatellite(norad, store.activeTask.id)
       } else {
-        res = await getSatelliteRelations(store.activedTask.id)
+        res = await getSatelliteRelations(store.activeTask.id)
       }
       if (res.code === 200) {
         allRelationships.length = 0
@@ -993,7 +993,7 @@ function resolveSearchNorad(query: string): number | null {
   const trimmed = query.trim()
   if (!trimmed) return null
 
-  const taskList = store.allSatelliteOfTask
+  const taskList = store.taskSatellites
 
   if (/^\d+$/.test(trimmed)) {
     return Number(trimmed)

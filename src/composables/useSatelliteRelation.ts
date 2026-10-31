@@ -105,7 +105,7 @@ export function useSatelliteRelation(
    */
   const loadSatelliteRelationData = async (norad?: number) => {
     /** 当前激活任务；无任务时清空关系缓存 */
-    const taskId = store.activedTask?.id
+    const taskId = store.activeTask?.id
     if (!taskId) {
       satelliteRelationEdges.value = []
       satelliteRelationTaskId.value = null

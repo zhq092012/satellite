@@ -249,12 +249,12 @@ const taskAnalysisData = computed(() => store.taskAnalysisData)
 const taskAnalysisLoading = computed(() => store.taskAnalysisLoading)
 
 /** 当前任务算法是否已完成 */
-const algorithmComplete = computed(() => store.isTaskAlgorithmComplete(store.activedTask))
+const algorithmComplete = computed(() => store.isTaskAlgorithmComplete(store.activeTask))
 
 /** 当前任务时间范围 */
 const taskTimeRange = computed(() => {
   /** 当前激活任务；缺少起止时间时不渲染时间轴 */
-  const task = store.activedTask
+  const task = store.activeTask
   if (!task?.beginDate || !task?.endDate) return null
   return { start: task.beginDate, end: task.endDate }
 })
@@ -301,7 +301,7 @@ let lastGlobeSatelliteValidationKey = ''
 watch(
   () =>
     [
-      store.activedTask?.id,
+      store.activeTask?.id,
       algorithmComplete.value,
       taskAnalysisLoading.value,
       globeSatellitesBuild.value.errors.map((err) => err.message).join('\n'),
@@ -501,7 +501,7 @@ const handlePlaybackSpeedChange = (speed: number) => {
  */
 const tryStartAutoTimelinePlayback = () => {
   /** 当前任务；无任务、算法未完成或本任务已自动播过则跳过 */
-  const taskId = store.activedTask?.id
+  const taskId = store.activeTask?.id
   if (!taskId || !algorithmComplete.value) return
   if (autoTimelinePlaybackTaskId === taskId) return
   if (taskAnalysisLoading.value) return
@@ -956,7 +956,7 @@ const loadTaskAnalysis = async () => {
  */
 const loadMatrixForCurrentScope = async () => {
   /** 当前任务；没有任务时清空矩阵和地图选中 */
-  const taskId = store.activedTask?.id
+  const taskId = store.activeTask?.id
   if (!taskId) {
     store.clearMatrixData()
     selectedNorad.value = null
@@ -1068,7 +1068,7 @@ watch(
 
 /** 切换任务时作废自动播放标记和 Label 缓存，并重新加载矩阵与分析结果 */
 watch(
-  () => store.activedTask?.id,
+  () => store.activeTask?.id,
   (taskId, prevTaskId) => {
     if (taskId !== prevTaskId) {
       autoTimelinePlaybackTaskId = null
@@ -1090,7 +1090,7 @@ watch(
 watch(
   () =>
     [
-      store.activedTask?.id,
+      store.activeTask?.id,
       algorithmComplete.value,
       taskAnalysisLoading.value,
       taskAnalysisData.value,
@@ -1108,10 +1108,10 @@ watch(
 watch(
   () => {
     /** 当前任务 ID；无任务时不监听进度 */
-    const taskId = store.activedTask?.id
+    const taskId = store.activeTask?.id
     if (!taskId) return ''
     /** 内存进度优先，否则用任务上自带的算法进度 */
-    const progress = taskProgressMap[taskId] ?? store.activedTask?.algorithmProgressEntity
+    const progress = taskProgressMap[taskId] ?? store.activeTask?.algorithmProgressEntity
     return `${taskId}:${progress?.totalStatus}:${progress?.transitStatus}:${progress?.threatAndStrikeStatus}`
   },
   () => {

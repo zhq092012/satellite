@@ -131,8 +131,8 @@ const tooltip = ref({
 const model = computed(() =>
   buildPlanLinkTimelineModel(
     props.plan,
-    store.activedTask?.beginDate,
-    store.activedTask?.endDate
+    store.activeTask?.beginDate,
+    store.activeTask?.endDate
   )
 )
 

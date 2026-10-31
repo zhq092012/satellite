@@ -384,7 +384,7 @@ const emit = defineEmits<{
 
 const store = useLayoutStore()
 /** 当前任务结束毫秒，与过站分段延迟算法共用。 */
-const taskEndMs = computed(() => resolveTaskEndMs(store.activedTask?.endDate))
+const taskEndMs = computed(() => resolveTaskEndMs(store.activeTask?.endDate))
 
 /** 当前激活的面板视图：'priority' 为 TOP 3 优先推荐，'detail' 为详细参数 */
 const activeTab = ref<'priority' | 'detail'>('priority')

@@ -248,7 +248,7 @@ const ruleCards: RuleCard[] = [
   },
 ]
 
-const activeTaskName = computed(() => store.activedTask?.name || '当前任务')
+const activeTaskName = computed(() => store.activeTask?.name || '当前任务')
 const strikeRows = computed<StrikeRow[]>(() => strikeInfo.value?.strikeList ?? [])
 const averageStrikeScore = computed(() => {
   if (!strikeRows.value.length) return 0
@@ -288,7 +288,7 @@ async function setWeight() {
 }
 
 async function loadStrikeInfo() {
-  if (!store.activedTask) {
+  if (!store.activeTask) {
     requestStatus.value = '未选择任务'
     return
   }
@@ -296,7 +296,7 @@ async function loadStrikeInfo() {
   isStrikeLoading.value = true
   requestStatus.value = '正在计算...'
   try {
-    const res = await updateStrikeOfTaskV2(store.activedTask.id!)
+    const res = await updateStrikeOfTaskV2(store.activeTask.id!)
     if (res.code === 200) {
       strikeInfo.value = res.data
       requestStatus.value = ''

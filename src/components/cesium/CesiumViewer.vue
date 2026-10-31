@@ -1664,9 +1664,9 @@ const startTleOrbitAnimation = () => {
  * 根据当前任务初始化 Cesium 时钟范围（不启用默认 UI 时间轴）
  */
 const initTaskClock = () => {
-  if (!viewer || viewer.isDestroyed() || !store.activedTask) return
-  const beginTime = new Date(store.activedTask.beginDate.replace(/-/g, '/'))
-  const endTime = new Date(store.activedTask.endDate.replace(/-/g, '/'))
+  if (!viewer || viewer.isDestroyed() || !store.activeTask) return
+  const beginTime = new Date(store.activeTask.beginDate.replace(/-/g, '/'))
+  const endTime = new Date(store.activeTask.endDate.replace(/-/g, '/'))
   if (Number.isNaN(beginTime.getTime()) || Number.isNaN(endTime.getTime())) return
 
   const startTime = Cesium.JulianDate.fromDate(beginTime)
@@ -1713,7 +1713,7 @@ const setClockPlaying = (playing: boolean, multiplier?: number) => {
 }
 
 watch(
-  () => [store.activedTask?.id, store.activedTask?.beginDate, store.activedTask?.endDate],
+  () => [store.activeTask?.id, store.activeTask?.beginDate, store.activeTask?.endDate],
   () => {
     if (viewer && !viewer.isDestroyed()) {
       initTaskClock()
@@ -1886,8 +1886,8 @@ function markBattle() {
 const flyToBattleView = () => {
   if (!viewer || viewer.isDestroyed()) return
   viewer.camera.cancelFlight()
-  const destination = store.battleCenterCartensian
-  const orientation = store.battleCenterOritentation
+  const destination = store.battleCenterCartesian
+  const orientation = store.battleCenterOrientation
   if (destination) {
     viewer.camera.flyTo({
       destination,

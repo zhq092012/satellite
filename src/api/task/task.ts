@@ -1,7 +1,7 @@
 import type { AxiosResponseType } from '@/types/http'
 
 import { prepareTaskForBattleApi } from '@/utils/c2TaskPanelEditor'
-import type { TaskForm } from '@/types/dashboard'
+import type { TaskAlgorithmProgress, TaskForm, TaskResourceItem } from '@/types/dashboard'
 import { requestAPI } from '@/utils/tools/httpClient'
 import type { Satellite } from '@/types/cesium/satellite'
 
@@ -11,38 +11,6 @@ interface SatelliteSeriesData {
     侦察: string[]
     /** 通信类卫星系列名称 */
     通信: string[]
-}
-
-/** 任务装配资源项（卫星系列 + 地面站/数据中心 ID） */
-export interface TaskResourceItem {
-    /** 卫星系列名称 */
-    series: string
-    /** 接收站 ID 列表 */
-    receiveIds: string[]
-    /** 发射站/数据中心 ID 列表 */
-    stationIds: string[]
-}
-
-/** 任务后台算法计算进度 */
-export interface TaskAlgorithmProgressEntity {
-    /** Mongo 文档 ID */
-    _id: string
-    /** 任务 ID */
-    taskId: number
-    /** 总体计算状态 */
-    totalStatus: string
-    /** 总体耗时（分钟） */
-    totalMin: number | null
-    /** 过境计算状态 */
-    transitStatus: string
-    /** 过境耗时（分钟） */
-    transitMin: number | null
-    /** 威胁与打击计算状态 */
-    threatAndStrikeStatus: string
-    /** 威胁与打击耗时（分钟） */
-    threatAndStrikeMin: number | null
-    /** 进度描述 */
-    mes: string | null
 }
 
 /** 任务关联战场实体（列表接口嵌套返回） */
@@ -143,7 +111,7 @@ export interface TaskFormNew {
     /** 作战步骤 JSON 字符串 */
     steps?: string
     /** 算法计算进度（接口返回） */
-    algorithmProgressEntity?: TaskAlgorithmProgressEntity
+    algorithmProgressEntity?: TaskAlgorithmProgress
     /** 关联战场（接口返回） */
     battleEntity?: TaskBattleEntity
 }

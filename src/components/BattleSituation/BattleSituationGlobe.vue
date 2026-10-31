@@ -419,8 +419,8 @@ const restoreOverviewView = () => {
 
   viewer.camera.cancelFlight()
   /** 进入战场时记下的相机位置与姿态；有位置时优先飞回该俯视 */
-  const destination = store.battleCenterCartensian
-  const orientation = store.battleCenterOritentation
+  const destination = store.battleCenterCartesian
+  const orientation = store.battleCenterOrientation
 
   if (destination) {
     viewer.camera.flyTo({
@@ -601,7 +601,7 @@ const renderBattleLabel = () => {
   if (!viewer || viewer.isDestroyed() || !store.battle?.name) return
 
   // 解析战场区域名称标签经纬度锚点
-  const labelPosition = resolveBattleSpaceLabelPosition(store.battle, store.battleCenterCartensian)
+  const labelPosition = resolveBattleSpaceLabelPosition(store.battle, store.battleCenterCartesian)
   if (!labelPosition) return
 
   // 将标签经纬度锚点转换为 Cartographic 对象
@@ -660,7 +660,7 @@ const renderBattleArea = () => {
       /** 按战场多边形贴地标绘，并飞到约 2400 万米高度 */
       markBattleArea(viewer, store.battle, 24000000, { clampToGround: true })
       renderBattleLabel()
-      if (!store.battleCenterCartensian && !resolveBattleSpaceLabelPosition(store.battle)) {
+      if (!store.battleCenterCartesian && !resolveBattleSpaceLabelPosition(store.battle)) {
         flyToDefaultEarthView()
       }
     } else {
@@ -787,7 +787,7 @@ watch(
 
 /** 战场中心变化后重算名称锚点 */
 watch(
-  () => store.battleCenterCartensian,
+  () => store.battleCenterCartesian,
   () => {
     renderBattleLabel()
   }

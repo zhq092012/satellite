@@ -338,7 +338,7 @@ export function useStrikePlan(
       })
       await deleteStrikePlanByName([planId])
       ElMessage.success(`方案 "${planId}" 已删除`)
-      await preloadHistoricalPlans(store.activedTask?.id, true)
+      await preloadHistoricalPlans(store.activeTask?.id, true)
     } catch (error) {
       if (error !== 'cancel') {
         ElMessage.error(`删除方案失败: ${error}`)
@@ -353,10 +353,10 @@ export function useStrikePlan(
    * 已加载过或无选中任务时直接返回，避免重复请求。
    */
   const loadAllKillChainPlan = async () => {
-    if (allKillChainPlans.value.length > 0 || !store.activedTask?.id) return
+    if (allKillChainPlans.value.length > 0 || !store.activeTask?.id) return
 
     /** 当前任务的杀伤链方案列表 */
-    const res = await getKillChainStrikePlanList(store.activedTask?.id)
+    const res = await getKillChainStrikePlanList(store.activeTask?.id)
     if (res.code !== 200) {
       ElMessage.error(res.msg || '获取杀伤链方案列表失败')
       return

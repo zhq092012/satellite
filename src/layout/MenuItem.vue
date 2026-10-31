@@ -64,7 +64,7 @@ const layoutStore = useLayoutStore()
  */
 const isMenuDisabled = (item: RouteRecordRaw): boolean => {
   if (item.path && item.path.startsWith('/algorithm')) {
-    return !layoutStore.activedTask
+    return !layoutStore.activeTask
   }
   return false
 }

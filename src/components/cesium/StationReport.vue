@@ -754,9 +754,9 @@ const spaceBasedWeapons = ref<string[]>([])
 const electronicJammingWeapons = ref<string[]>([])
 const weapons = ref<Weapon[]>([])
 const weaponCacheByTaskId = new Map<number, Weapon[]>()
-const ourCountries = computed(() => store.activedTask?.meCountry?.split(',') || [])
+const ourCountries = computed(() => store.activeTask?.meCountry?.split(',') || [])
 const loadWeaponList = async () => {
-    const taskId = store.activedTask?.id
+    const taskId = store.activeTask?.id
     if (!taskId) {
         weapons.value = []
         return
@@ -776,7 +776,7 @@ const loadWeaponList = async () => {
     }
 }
 watch(
-    () => store.activedTask?.id,
+    () => store.activeTask?.id,
     () => {
         loadWeaponList()
     },
@@ -786,7 +786,7 @@ watch(
  * 查询军事基地
  */
 const stationDistanceQuery = async () => {
-    const res = await stationQuery(Number(store.activedTask?.id))
+    const res = await stationQuery(Number(store.activeTask?.id))
     if (res.code === 200) {
         stationDistances.value = res.data
     }
@@ -795,7 +795,7 @@ const stationDistanceQuery = async () => {
  * 查询导弹阵地
  */
 const missileBaseQuerys = async () => {
-    const res = await missileBaseQuery(Number(store.activedTask?.id))
+    const res = await missileBaseQuery(Number(store.activeTask?.id))
     if (res.code === 200) {
         missileBaseEntity.value = res.data
     }
@@ -804,7 +804,7 @@ const missileBaseQuerys = async () => {
 const intensityOptions = ref<string[]>([])
 
 const loadTaskIndensity = async () => {
-    const res = await getTaskStageIntensityOptions(Number(store.activedTask?.id))
+    const res = await getTaskStageIntensityOptions(Number(store.activeTask?.id))
     if (res.code === 200) {
         intensityOptions.value = res.data.map(s => s.intensityLevel)
         searchForm.value.intensity = intensityOptions.value[0]
@@ -1165,7 +1165,7 @@ const generateStationPlan = async () => {
             return
         }
         const plan = await stationStrikePlan({
-            taskId: store.activedTask?.id!,
+            taskId: store.activeTask?.id!,
             intensityLevel: searchForm.value.intensity,
             types: searchForm.value.types,
             weaponNames: [...kineticWeapons.value, ...directedEnergyWeapons.value, ...spaceBasedWeapons.value],
@@ -1227,7 +1227,7 @@ const saveStationPlan = async () => {
             inputErrorMessage: '请输入有效的打击方案名称',
         })
         const plan = await saveKillChainStrikePlan({
-            taskId: store.activedTask?.id!,
+            taskId: store.activeTask?.id!,
             intensityLevel: searchForm.value.intensity,
             types: searchForm.value.types,
             weaponNames: [

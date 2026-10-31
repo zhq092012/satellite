@@ -143,8 +143,8 @@ export function useSimulationPlayback(
    */
   const clockWindow = computed(() => {
     /** 任务起止；合法时优先于步骤时间作为时钟范围 */
-    const taskStartDate = new Date(store.activedTask?.beginDate ?? '')
-    const taskStopDate = new Date(store.activedTask?.endDate ?? '')
+    const taskStartDate = new Date(store.activeTask?.beginDate ?? '')
+    const taskStopDate = new Date(store.activeTask?.endDate ?? '')
     if (
       !Number.isNaN(taskStartDate.getTime()) &&
       !Number.isNaN(taskStopDate.getTime()) &&
@@ -284,10 +284,10 @@ export function useSimulationPlayback(
 
   /** 仿真页头部展示的任务与方案摘要 */
   const simulationScenario = computed(() => ({
-    taskId: `T-${store.activedTask?.id ?? '--'}`,
+    taskId: `T-${store.activeTask?.id ?? '--'}`,
     selectedPlanKey: selectedHistoricalPlanLabel.value,
-    startTime: formatDateTime(store.activedTask?.beginDate),
-    endTime: formatDateTime(store.activedTask?.endDate),
+    startTime: formatDateTime(store.activeTask?.beginDate),
+    endTime: formatDateTime(store.activeTask?.endDate),
     stageCount: stageList.value.length,
     missionCount: 0,
     satelliteCount: blueSatellites.value.length,
@@ -296,7 +296,7 @@ export function useSimulationPlayback(
   /** 场景概览键值行 */
   const scenarioOverview = computed(() => [
     { label: '任务编号', value: simulationScenario.value.taskId },
-    { label: '任务名称', value: store.activedTask?.name ?? '未选择任务' },
+    { label: '任务名称', value: store.activeTask?.name ?? '未选择任务' },
     { label: '开始时间', value: simulationScenario.value.startTime },
     { label: '结束时间', value: simulationScenario.value.endTime },
     { label: '阶段数量', value: `${simulationScenario.value.stageCount}` },
@@ -472,8 +472,8 @@ export function useSimulationPlayback(
    */
   const syncTaskProgressFromClock = () => {
     /** 任务开始、结束时刻 */
-    const startDate = new Date(store.activedTask?.beginDate ?? '')
-    const endDate = new Date(store.activedTask?.endDate ?? '')
+    const startDate = new Date(store.activeTask?.beginDate ?? '')
+    const endDate = new Date(store.activeTask?.endDate ?? '')
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate >= endDate) {
       return
     }

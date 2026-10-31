@@ -1278,7 +1278,7 @@ async function initGraph() {
 
   // 加载数据
   if (norad.value) {
-    const res = await getSatelliteRelationsBySatellite(norad.value, store.activedTask?.id)
+    const res = await getSatelliteRelationsBySatellite(norad.value, store.activeTask?.id)
     if (
       res.code === 200 &&
       res.data.nodes &&
@@ -1801,7 +1801,7 @@ const currentThreat = computed(() => satelliteThreat.value[0] ?? null)
  * @param id
  */
 const loadSatelliteThreat = async (id: number) => {
-  const taskId = store.activedTask?.id
+  const taskId = store.activeTask?.id
   if (!id || taskId === undefined) return
   const res = await getAllThreatList(taskId!, 1, 5, undefined, undefined, id)
   if (res.code === 200) {
@@ -1815,7 +1815,7 @@ const loadSatelliteThreat = async (id: number) => {
  */
 const satelliteAttack = ref<StrikeV2>()
 const loadSatelliteAttack = async (id: number) => {
-  const taskId = store.activedTask?.id
+  const taskId = store.activeTask?.id
   if (!id || taskId === undefined) return
   strikeLoading.value = true
   try {

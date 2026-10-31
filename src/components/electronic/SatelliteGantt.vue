@@ -442,7 +442,7 @@ defineOptions({
 })
 const store = useLayoutStore()
 /** 当前任务结束毫秒，用于过站分段延迟。 */
-const taskEndMs = computed(() => resolveTaskEndMs(store.activedTask?.endDate))
+const taskEndMs = computed(() => resolveTaskEndMs(store.activeTask?.endDate))
 // [类型定义]
 // 组件接收的 Props 参数类型
 interface SatelliteGanttProps {
@@ -763,7 +763,7 @@ const handleClearSelectedSatellite = () => {
 }
 
 watch(
-  () => store.activedTask?.id,
+  () => store.activeTask?.id,
   (taskId) => {
     if (!taskId) {
       store.setSelectedSatSeries('')
@@ -792,7 +792,7 @@ watch(
  * 监听 store 中选中的卫星系列和激活的任务改变，自动同步矩阵数据
  */
 watch(
-  [() => store.matrixData, () => store.selectedSatSeries, () => store.activedTask?.id, () => store.activeZhchUsageType],
+  [() => store.matrixData, () => store.selectedSatSeries, () => store.activeTask?.id, () => store.activeZhchUsageType],
   () => {
     if (!props.matrixData && store.selectedSatSeries && !store.matrixData) {
       void loadMatrixData()
@@ -867,7 +867,7 @@ const selectedSatelliteInfo = computed(() => {
  * 任务时间边界（严格使用 beginDate ~ endDate）
  */
 const taskTimeBounds = computed<{ minTs: number; maxTs: number } | null>(() => {
-  const task = store.activedTask
+  const task = store.activeTask
   if (!task?.beginDate || !task?.endDate) return null
   const minTs = parseToTimestamp(task.beginDate)
   const maxTs = parseToTimestamp(task.endDate)

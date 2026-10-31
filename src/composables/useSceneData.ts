@@ -386,7 +386,7 @@ export function useSceneData() {
    */
   const preloadHistoricalPlans = async (taskId?: number, forceReload = false) => {
     /** 显式任务优先，否则使用当前激活任务 */
-    const targetTaskId = taskId ?? store.activedTask?.id
+    const targetTaskId = taskId ?? store.activeTask?.id
     if (!targetTaskId) {
       historicalPlans.value = []
       preloadedHistoricalPlanTaskId.value = null
@@ -421,7 +421,7 @@ export function useSceneData() {
     resetEntities = false,
   ) => {
     /** 当前任务；缺失时清空场景并通知调用方重置实体 */
-    const taskId = store.activedTask?.id
+    const taskId = store.activeTask?.id
     if (!taskId) {
       clearSatelliteTleCache()
       taskSatellites.value = []

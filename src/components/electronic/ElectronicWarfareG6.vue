@@ -42,7 +42,7 @@
       <div class="header-right">
         <div class="header-right-item">
           <span class="label-text">当前任务:</span>
-          <span class="digital-font time-value glow-text-cyan">{{ store.activedTask?.name || '实时推演场景' }}</span>
+          <span class="digital-font time-value glow-text-cyan">{{ store.activeTask?.name || '实时推演场景' }}</span>
         </div>
       </div>
     </div>
@@ -174,13 +174,13 @@ const selectedTimelinePoint = ref<{
 } | null>(null)
 
 const taskTimeRange = computed(() => {
-  const task = store.activedTask
+  const task = store.activeTask
   if (!task?.beginDate || !task?.endDate) return null
   return { start: task.beginDate, end: task.endDate }
 })
 
 /** 当前任务结束毫秒，用于过站分段延迟（末站 = taskEnd − peak）。 */
-const taskEndMs = computed(() => resolveTaskEndMs(store.activedTask?.endDate))
+const taskEndMs = computed(() => resolveTaskEndMs(store.activeTask?.endDate))
 
 /**
  * 收集单星传输链路（带任务结束时间，与左侧列表/详情 delayMin 同口径）。
@@ -662,9 +662,9 @@ const handleSeriesChange = (series: string) => {
 }
 
 watch(
-  () => store.activedTask?.id,
+  () => store.activeTask?.id,
   () => {
-    if (!store.activedTask?.id) {
+    if (!store.activeTask?.id) {
       store.setSelectedSatSeries('')
     }
   }
@@ -1406,7 +1406,7 @@ watch(
 )
 
 watch(
-  () => store.activedTask?.id,
+  () => store.activeTask?.id,
   (taskId, prevTaskId) => {
     if (!taskId || taskId === prevTaskId) return
     if (store.selectedSatSeries) {
@@ -1733,14 +1733,14 @@ const allWindowsList = computed<WindowItemWrapper[]>(() => {
 })
 
 const minTimestamp = computed(() => {
-  const task = store.activedTask
+  const task = store.activeTask
   if (task?.beginDate) return parseToTimestamp(task.beginDate)
   if (allWindowsList.value.length === 0) return Date.now()
   return Math.min(...allWindowsList.value.map((w) => w.startTimestamp))
 })
 
 const maxTimestamp = computed(() => {
-  const task = store.activedTask
+  const task = store.activeTask
   if (task?.endDate) return parseToTimestamp(task.endDate)
   if (allWindowsList.value.length === 0) return Date.now() + 3600 * 1000
   return Math.max(...allWindowsList.value.map((w) => w.endTimestamp))

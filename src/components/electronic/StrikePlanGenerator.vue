@@ -35,7 +35,7 @@
     </div>
 
     <div class="plan-body">
-      <div v-if="!store.activedTask" class="empty-container">
+      <div v-if="!store.activeTask" class="empty-container">
         <div class="empty-icon">📋</div>
         <div class="empty-text">请先在右上角选择战场与任务</div>
       </div>
@@ -144,7 +144,7 @@ const handleToggleSysType = (type: string) => {
 
 /** 生成方案 */
 const handleGenerate = async () => {
-  if (!store.activedTask?.id) {
+  if (!store.activeTask?.id) {
     ElMessage.warning('请先选择战场与任务')
     return
   }
@@ -161,7 +161,7 @@ const handleGenerate = async () => {
 
 /** 清除打击方案缓存 */
 const handleClearCache = async () => {
-  const taskId = store.activedTask?.id
+  const taskId = store.activeTask?.id
   if (!taskId) {
     ElMessage.warning('请先选择战场与任务')
     return
@@ -185,7 +185,7 @@ const handleClearCache = async () => {
 
 /** 任务切换后清空缓存 */
 watch(
-  () => store.activedTask?.id,
+  () => store.activeTask?.id,
   (taskId, prevId) => {
     if (taskId !== prevId) {
       store.clearZhchPlans()

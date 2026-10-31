@@ -391,7 +391,7 @@ const loadMatrixData = async () => {
  * 监听 store 中共享的矩阵数据、卫星系列和激活任务改变，自动同步矩阵数据
  */
 watch(
-  [() => store.matrixData, () => store.selectedSatSeries, () => store.activedTask?.id, () => store.activeZhchUsageType],
+  [() => store.matrixData, () => store.selectedSatSeries, () => store.activeTask?.id, () => store.activeZhchUsageType],
   () => {
     if (!props.matrixData && !store.matrixData) {
       void loadMatrixData()

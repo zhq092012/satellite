@@ -120,7 +120,7 @@ const getWindowEndStr = (win?: WindowTimeLike | Record<string, any> | null): str
 /**
  * 将任务结束时间解析为毫秒。无效时返回 undefined，此时末站无下一窗口则延迟为 0。
  *
- * @param endDate 任务结束时间（activedTask.endDate）
+ * @param endDate 任务结束时间（activeTask.endDate）
  * @returns 任务结束毫秒时间戳；无法解析时为 undefined
  */
 export const resolveTaskEndMs = (endDate?: string | null): number | undefined => {

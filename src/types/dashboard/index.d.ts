@@ -1,5 +1,5 @@
 /** 任务装配资源项 */
-interface TaskResourceItem {
+export interface TaskResourceItem {
   /** 卫星系列名称 */
   series: string
   /** 接收站 ID 列表 */
@@ -9,7 +9,7 @@ interface TaskResourceItem {
 }
 
 /** 任务级圆形作战区域（中心点 + 半径） */
-interface TaskCombatArea {
+export interface TaskCombatArea {
   /** 区域中心经度（度，WGS84） */
   centerLon: number
   /** 区域中心纬度（度，WGS84） */
@@ -20,7 +20,32 @@ interface TaskCombatArea {
   enabled: boolean
 }
 
-interface TaskForm {
+/**
+ * 任务后台算法计算进度。
+ * 列表接口嵌套在任务上，与任务进度轮询使用同一结构。
+ */
+export interface TaskAlgorithmProgress {
+  /** Mongo 文档 ID */
+  _id: string
+  /** 任务 ID */
+  taskId: number
+  /** 总体计算状态 */
+  totalStatus: string
+  /** 总体计算耗时（分钟） */
+  totalMin: number | null
+  /** 过境计算状态 */
+  transitStatus: string
+  /** 过境计算耗时（分钟） */
+  transitMin: number | null
+  /** 威胁与打击计算状态 */
+  threatAndStrikeStatus: string
+  /** 威胁与打击计算耗时（分钟） */
+  threatAndStrikeMin: number | null
+  /** 进度描述信息 */
+  mes: string | null
+}
+
+export interface TaskForm {
   id?: number
   battleId: number
   name: string
@@ -59,19 +84,9 @@ interface TaskForm {
   createTime?: string
   updateTime?: string
   /** 任务进度实体 */
-  algorithmProgressEntity?: {
-    _id: string
-    taskId: number
-    totalStatus: string// 总体计算状态
-    totalMin: number | null// 总体计算耗时（分钟）
-    transitStatus: string// 过境计算状态
-    transitMin: number | null// 过境计算耗时（分钟）
-    threatAndStrikeStatus: string// 威胁与打击计算状态
-    threatAndStrikeMin: number | null// 威胁与打击计算耗时（分钟）
-    mes: string | null// 进度描述信息
-  }
+  algorithmProgressEntity?: TaskAlgorithmProgress
 }
-interface BattleForm {
+export interface BattleForm {
   id?: number
   name: string
   description: string
@@ -83,7 +98,7 @@ interface BattleForm {
   circleJSON?: string
   area?: string
 }
-interface TLEDataResponse {
+export interface TLEDataResponse {
   taskId: number
   battleId: number
   beginDate: string
@@ -99,7 +114,7 @@ interface TLEDataResponse {
     total_visible_passes: number
   }
 }
-interface SatelliteData {
+export interface SatelliteData {
   norad_id: string
   name_en: string
   geoCoordinates: {
@@ -140,7 +155,7 @@ interface SiteDetail {
     sun_altitude: number
   }[]
 }
-interface SatelliteNode {
+export interface SatelliteNode {
   norad: number
   name_en: string
   country: string
@@ -151,7 +166,7 @@ interface SatelliteNode {
   operator: string
   side?: string
 }
-interface SatelliteRelation {
+export interface SatelliteRelation {
   id: number
   source: number
   target: number
@@ -159,7 +174,7 @@ interface SatelliteRelation {
   timestamp: string
   min_distance_km: number
 }
-interface SceneConfig {
+export interface SceneConfig {
   taskId: number
   description?: string
   name?: string
@@ -233,7 +248,7 @@ interface SceneConfig {
 /**
  * 航天器打击实体
  */
-interface SatelliteStrike {
+export interface SatelliteStrike {
   /** 综合打击分数 */
   comprehensive_strike_score: number
   /** 威胁分数 */
@@ -281,7 +296,7 @@ interface StrikeTimeWindow {
   /** 打击窗口 */
   strike_window: string
 }
-interface SatelliteThreat {
+export interface SatelliteThreat {
   rank: number
   satellite_id: number
   country: string

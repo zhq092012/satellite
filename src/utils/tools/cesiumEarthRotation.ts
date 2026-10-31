@@ -45,8 +45,8 @@ export class EarthRotationController {
     try {
       this.viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY)
       this.viewer.camera.flyTo({
-        destination: store.battleCenterCartensian || Cesium.Cartesian3.fromDegrees(0, 0, 10000000),
-        orientation: store.battleCenterOritentation || { heading: 0.0, pitch: -Cesium.Math.toRadians(90.0), roll: 0.0 },
+        destination: store.battleCenterCartesian || Cesium.Cartesian3.fromDegrees(0, 0, 10000000),
+        orientation: store.battleCenterOrientation || { heading: 0.0, pitch: -Cesium.Math.toRadians(90.0), roll: 0.0 },
         duration: 1.5,
       })
     } catch (e) {

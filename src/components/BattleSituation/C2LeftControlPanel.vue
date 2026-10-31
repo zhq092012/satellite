@@ -11,7 +11,7 @@
         <div v-else-if="!taskList.length" class="zone-empty">当前场景暂无任务</div>
         <ul v-else class="task-progress-list">
           <li v-for="task in taskList" :key="task.id" class="task-progress-item" :class="{
-            active: store.activedTask?.id === task.id,
+            active: store.activeTask?.id === task.id,
             disabled: taskSwitching,
             'task-progress-item--done': isTaskCalculationComplete(task),
           }" @click="selectTask(task)">
@@ -374,7 +374,7 @@ const isTaskCalculating = (task: TaskForm): boolean =>
 
 /** 当前选中任务是否正在计算（禁止编辑与保存并重算） */
 const isActiveTaskCalculating = computed(() => {
-  const task = store.activedTask
+  const task = store.activeTask
   if (!task) return false
   return isTaskCalculating(task)
 })
@@ -427,7 +427,7 @@ const centerOptionsLoading = ref(false)
 const sceneSummaryText = computed(() => {
   const scene = store.battle?.name || '未选择'
   const count = taskList.value.length
-  const current = store.activedTask?.name || '未选择'
+  const current = store.activeTask?.name || '未选择'
   return `当前场景：${scene}（${count} 个任务）· 当前任务：${current}`
 })
 /**
@@ -460,7 +460,7 @@ const resolveEnemyCountries = (task: TaskForm | null | undefined): string[] => {
 }
 
 /** 当前任务敌方国家列表 */
-const enemyCountriesList = computed(() => resolveEnemyCountries(store.activedTask))
+const enemyCountriesList = computed(() => resolveEnemyCountries(store.activeTask))
 
 /** 只读任务时间行 */
 const taskTimeRangeText = computed(() =>
@@ -837,7 +837,7 @@ const loadCenterTagOptions = async () => {
  * 切换任务时同步编辑草稿与候选项。
  *
  * @param task 当前任务
- * @param options.reloadTagOptions 是否重新拉取系列/武器/地面站候选项；列表 reconcile 时传 false 避免与 activedTask watch 重复请求
+ * @param options.reloadTagOptions 是否重新拉取系列/武器/地面站候选项；列表 reconcile 时传 false 避免与 activeTask watch 重复请求
  */
 const syncEditorForTask = async (
   task: TaskForm | null | undefined,
@@ -882,9 +882,9 @@ const syncEditorForTask = async (
   ])
 }
 watch(
-  () => store.activedTask?.id,
+  () => store.activeTask?.id,
   () => {
-    void syncEditorForTask(store.activedTask)
+    void syncEditorForTask(store.activeTask)
   },
   { immediate: true }
 )
@@ -901,7 +901,7 @@ watch(
 )
 
 /**
- * 任务列表刷新后，用接口数据覆盖 Pinia 中可能过期的 activedTask（如 localStorage 恢复的旧快照）。
+ * 任务列表刷新后，用接口数据覆盖 Pinia 中可能过期的 activeTask（如 localStorage 恢复的旧快照）。
  */
 /**
  * 保存/重算后从 taskList 取最新任务；列表中不存在则报错，不用提交体冒充接口数据。
@@ -922,13 +922,13 @@ const reconcileActiveTaskWithTaskList = async () => {
   const tasks = taskList.value
   if (!tasks.length) return
   if (store.battle?.id) {
-    store.setActivedBattle({ ...store.battle, tasks })
+    store.setActiveBattle({ ...store.battle, tasks })
   }
-  const activeId = store.activedTask?.id
+  const activeId = store.activeTask?.id
   if (!activeId) return
   const fresh = tasks.find((item) => item.id === activeId)
   if (!fresh) return
-  store.setActivedTask(fresh)
+  store.setActiveTask(fresh)
   await syncEditorForTask(fresh, { reloadTagOptions: false })
 }
 
@@ -969,7 +969,7 @@ const loadBattleTasks = async () => {
 }
 
 /**
- * WS 进度三项均为「完成」时，回写 taskList / activedTask 的 algorithmProgressEntity。
+ * WS 进度三项均为「完成」时，回写 taskList / activeTask 的 algorithmProgressEntity。
  *
  * @param taskId 任务 ID
  */
@@ -997,9 +997,9 @@ const applyCompletedProgressToTaskList = (taskId: number): void => {
   }
 
   taskList.value = taskList.value.map(patchTask)
-  if (store.activedTask?.id === taskId) {
+  if (store.activeTask?.id === taskId) {
     // 回写当前激活任务的进度实体
-    store.setActivedTask(patchTask(store.activedTask))
+    store.setActiveTask(patchTask(store.activeTask))
   }
 }
 
@@ -1021,7 +1021,7 @@ watch(
       applyCompletedProgressToTaskList(task.id)
       if (taskProgressCompleteNotified.has(task.id)) continue
       taskProgressCompleteNotified.add(task.id)
-      if (store.activedTask?.id === task.id) {
+      if (store.activeTask?.id === task.id) {
         emit('task-recalculated', task.id)
       }
     }
@@ -1247,7 +1247,7 @@ const handleTaskSaved = async (updated: TaskForm) => {
   await loadBattleTasks()
   const latest = requireTaskFromList(updated.id)
   if (!latest) return
-  store.setActivedTask(latest)
+  store.setActiveTask(latest)
   store.setSelectedSatSeries('')
   await syncEditorForTask(latest)
   if (isCreate) {
@@ -1263,11 +1263,11 @@ const handleTaskSaved = async (updated: TaskForm) => {
  */
 const selectTask = async (task: TaskForm) => {
   if (taskLoading.value || taskSwitching.value) return
-  if (store.activedTask?.id === task.id) return
+  if (store.activeTask?.id === task.id) return
   taskSwitching.value = true
   try {
     /** 1. 设置当前选中任务 */
-    store.setActivedTask(task)
+    store.setActiveTask(task)
     /** 2. 清除任务分析数据 */
     store.setSelectedSatSeries('')
     /** 3. 同步任务编辑器数据 */
@@ -1290,7 +1290,7 @@ const selectTask = async (task: TaskForm) => {
  * 校验并提交任务修改，触发后台重算。
  */
 const handleSaveAndRecalculate = async () => {
-  const baseTask = store.activedTask
+  const baseTask = store.activeTask
   const draft = editorDraft.value
   if (!baseTask?.id || !draft || draft.taskId !== baseTask.id) {
     ElMessage.warning('请先选择任务')
@@ -1337,7 +1337,7 @@ const handleSaveAndRecalculate = async () => {
     await loadBattleTasks()
     const latest = requireTaskFromList(baseTask.id)
     if (!latest) return
-    store.setActivedTask(latest)
+    store.setActiveTask(latest)
     store.setSelectedSatSeries('')
     store.clearTaskAnalysisData()
     await syncEditorForTask(latest)

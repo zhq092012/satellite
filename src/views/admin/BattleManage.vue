@@ -218,7 +218,7 @@ const editingTask = ref<TaskForm | null>(null)
  * @param battle 所属场景
  */
 const openTaskEditDialog = async (mode: TaskEditDialogMode, task: TaskForm | null, battle: BattleForm) => {
-  store.setActivedBattle(battle)
+  store.setActiveBattle(battle)
   if (taskEditVisible.value) {
     taskEditVisible.value = false
     await nextTick()

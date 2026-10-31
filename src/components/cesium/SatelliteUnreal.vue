@@ -539,7 +539,7 @@ const {
 
 const taskStepsList = computed<TaskSteps[]>(() => {
   try {
-    return store.activedTask?.steps ? (JSON.parse(store.activedTask.steps) as TaskSteps[]) : []
+    return store.activeTask?.steps ? (JSON.parse(store.activeTask.steps) as TaskSteps[]) : []
   } catch {
     return []
   }
@@ -832,7 +832,7 @@ const handleLayerOption = async (layer: string) => {
       } else {
         viewer.value.entities.removeAll()
         viewer.value.clock.currentTime = Cesium.JulianDate.fromDate(
-          parseMissionWindowDate(store.activedTask?.beginDate)
+          parseMissionWindowDate(store.activeTask?.beginDate)
         )
         viewer.value.clock.multiplier = 1
         await loadAllKillChainPlan()
@@ -850,7 +850,7 @@ const { openSatelliteProfile } = useSatelliteProfileDialog()
  * 根据当前图层状态，打开对应的打击方案选择对话框
  */
 const handleViewStrikePlanClick = () => {
-  if (!store.activedTask?.id) {
+  if (!store.activeTask?.id) {
     ElMessage.warning('请先选择任务后再查看打击方案')
     return
   }
@@ -1311,7 +1311,7 @@ const initViewer = async () => {
 }
 
 watch(
-  () => store.activedTask?.id,
+  () => store.activeTask?.id,
   async (taskId) => {
     selectedSatelliteNoradId.value = ''
     satelliteRelationEdges.value = []
@@ -1379,7 +1379,7 @@ watch(
   activeStageName,
   async () => {
     if (consumeStageChangeFromClock()) return
-    if (!viewer.value || !store.activedTask?.id || !activeStageName.value) return
+    if (!viewer.value || !store.activeTask?.id || !activeStageName.value) return
     // 杀伤链图层的时钟跳转已由 setActiveStage 完成，无需重新加载场景数据（会清空实体）
     if (activeLayerOption.value === '杀伤链') return
     await loadSceneData(

@@ -308,7 +308,7 @@ const handleCommand = (command: string) => {
   } else if (command === 'data-manage') {
     router.push('/data-manage')
   } else if (command === 'algorithm') {
-    if (!layoutStore.activedTask) {
+    if (!layoutStore.activeTask) {
       ElMessage.warning('尚未选择战场任务，请先在首页选择战场及任务！')
       return
     }
@@ -382,7 +382,7 @@ const handleSwitchScene = async (battleId: number | string) => {
 
   sceneSwitching.value = true
   try {
-    layoutStore.setActivedBattle(battle)
+    layoutStore.setActiveBattle(battle)
     layoutStore.setSelectedSatSeries('')
 
     const taskRes = await getTaskList(battle.id)
@@ -393,20 +393,20 @@ const handleSwitchScene = async (battleId: number | string) => {
         ElMessage.error({ message, duration: 10000, showClose: true })
       })
     }
-    layoutStore.setActivedBattle({ ...battle, tasks })
+    layoutStore.setActiveBattle({ ...battle, tasks })
 
-    const matchedTask = tasks.find((task) => task.id === layoutStore.activedTask?.id)
+    const matchedTask = tasks.find((task) => task.id === layoutStore.activeTask?.id)
     if (matchedTask) {
-      layoutStore.setActivedTask(matchedTask)
+      layoutStore.setActiveTask(matchedTask)
     } else if (tasks.length > 0) {
-      layoutStore.setActivedTask(tasks[0])
+      layoutStore.setActiveTask(tasks[0])
     } else {
-      layoutStore.setActivedTask(null)
+      layoutStore.setActiveTask(null)
     }
 
     ElMessage.success(`已切换场景：${battle.name}`)
 
-    if (layoutStore.activedTask?.id && layoutStore.selectedSatSeries) {
+    if (layoutStore.activeTask?.id && layoutStore.selectedSatSeries) {
       await layoutStore.fetchMatrixForCurrentScope(true)
     }
   } catch (error) {
@@ -420,7 +420,7 @@ const handleSwitchScene = async (battleId: number | string) => {
 onMounted(async () => {
   await loadBattleList()
 
-  if (layoutStore.activedTask?.id && layoutStore.selectedSatSeries) {
+  if (layoutStore.activeTask?.id && layoutStore.selectedSatSeries) {
     await layoutStore.fetchMatrixForCurrentScope(false)
   }
 })

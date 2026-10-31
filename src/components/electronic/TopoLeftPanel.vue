@@ -192,7 +192,7 @@ const emit = defineEmits<{
 
 const store = useLayoutStore()
 /** 当前任务结束毫秒，与拓扑过站延迟算法共用。 */
-const taskEndMs = computed(() => resolveTaskEndMs(store.activedTask?.endDate))
+const taskEndMs = computed(() => resolveTaskEndMs(store.activeTask?.endDate))
 
 /** 搜索过滤关键词 */
 const searchKeyword = ref<string>('')

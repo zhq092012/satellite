@@ -366,9 +366,9 @@
         <div v-show="timeMode === '按任务总时长计算'" class="date-picker-btn task-time-banner">
           <div class="task-time-info">
             <span class="time-label">⏱️ 任务时间跨度：</span>
-            <span class="time-value">开始时间: <strong>{{ store.activedTask?.beginDate || '未关联任务' }}</strong></span>
+            <span class="time-value">开始时间: <strong>{{ store.activeTask?.beginDate || '未关联任务' }}</strong></span>
             <span class="time-sep">|</span>
-            <span class="time-value">结束时间: <strong>{{ store.activedTask?.endDate || '未关联任务' }}</strong></span>
+            <span class="time-value">结束时间: <strong>{{ store.activeTask?.endDate || '未关联任务' }}</strong></span>
           </div>
           <button type="button" class="sci-btn btn-primary" @click="handleTaskTime">
             <span class="btn-icon">🎯</span>
@@ -772,7 +772,7 @@ const productThreatForm = reactive({
   orbitTypes: [...productOrbitOptions],
   displayCount: 60,
   targetLongitudeDeg: 120,
-  keyCountriesText: store.activedTask?.enemyCountry || '',
+  keyCountriesText: store.activeTask?.enemyCountry || '',
   keyCountryFactor: 1,
   otherCountryFactor: 0.2,
   searchKeyword: '',
@@ -937,7 +937,7 @@ const save = async () => {
       return
     } else {
       await saveTaskThreatWeight({
-        scene_id: String(store.activedTask?.id),
+        scene_id: String(store.activeTask?.id),
         weights: {
           communication,
           missile_early_warning,
@@ -952,7 +952,7 @@ const save = async () => {
   }
   if (timeMode.value === '按任务总时长计算') {
     await saveTaskThreatWeight({
-      scene_id: String(store.activedTask?.id),
+      scene_id: String(store.activeTask?.id),
       weights: {
         communication,
         missile_early_warning,
@@ -969,12 +969,12 @@ const save = async () => {
 // 重置当前权重
 const resetCurrent = async () => {
   if (timeMode.value === '按任务阶段时长计算') {
-    await resetCurrentThreatWeights(store.activedTask?.id!, searchForm.dataSet, currentStep.value!)
+    await resetCurrentThreatWeights(store.activeTask?.id!, searchForm.dataSet, currentStep.value!)
     ElMessage.success('已重置当前权重')
     // 任务权重
     getConfigOfTask()
   } else if (timeMode.value === '按任务总时长计算') {
-    await resetCurrentThreatWeights(store.activedTask?.id!, searchForm.dataSet)
+    await resetCurrentThreatWeights(store.activeTask?.id!, searchForm.dataSet)
     ElMessage.success('已重置当前权重')
     // 任务权重
     getConfigOfTask()
@@ -984,9 +984,9 @@ const resetCurrent = async () => {
 }
 const resetAll = async () => {
   if (timeMode.value === '按任务阶段时长计算') {
-    await resetAllThreatWeights(store.activedTask?.id!, currentStep.value ?? '')
+    await resetAllThreatWeights(store.activeTask?.id!, currentStep.value ?? '')
   } else if (timeMode.value === '按任务总时长计算') {
-    await resetAllThreatWeights(store.activedTask?.id!)
+    await resetAllThreatWeights(store.activeTask?.id!)
   }
 
   ElMessage.success('已重置全部权重')
@@ -994,8 +994,8 @@ const resetAll = async () => {
   getConfigOfTask()
 }
 const steps = computed(() => {
-  if (!store.activedTask) return []
-  const stepJSON = JSON.parse(store.activedTask.steps || '[]') as TaskSteps[]
+  if (!store.activeTask) return []
+  const stepJSON = JSON.parse(store.activeTask.steps || '[]') as TaskSteps[]
   if (stepJSON.length === 0) return []
   return stepJSON.map((item) => item.name)
 })
@@ -1009,8 +1009,8 @@ const handleStepTime = (stepName: string) => {
   if (!stepName) return
   currentStep.value = stepName
   searchForm.step = stepName
-  if (!store.activedTask) return
-  const stepJSON = JSON.parse(store.activedTask.steps || '[]') as TaskSteps[]
+  if (!store.activeTask) return
+  const stepJSON = JSON.parse(store.activeTask.steps || '[]') as TaskSteps[]
   const step = stepJSON.find((item) => item.name === stepName)
   //  切换阶段重新获取权重
   getConfigOfTask()
@@ -1023,8 +1023,8 @@ const handleStepTime = (stepName: string) => {
   }
 }
 const handleTaskTime = () => {
-  if (!store.activedTask) return
-  selectDate.value = [store.activedTask.beginDate, store.activedTask.endDate]
+  if (!store.activeTask) return
+  selectDate.value = [store.activeTask.beginDate, store.activeTask.endDate]
   calcOfTask()
 }
 const timeMode = ref('乘积模型威胁度')
@@ -1033,7 +1033,7 @@ const countCurrent = ref(0)
 const tableData = ref<ThreatTaskWeightsResponse[]>([])
 async function getThreatListOfTask(pageNum = 1, pageSize = 10) {
   const res = await getAllThreatList(
-    store.activedTask?.id!,
+    store.activeTask?.id!,
     pageNum,
     pageSize,
     searchForm.dataSetLabel,
@@ -1050,7 +1050,7 @@ async function getThreatListOfTask(pageNum = 1, pageSize = 10) {
 }
 async function getThreatListOfTaskStep(pageNum = 1, pageSize = 10) {
   const res = await getCurrentThreatList(
-    store.activedTask?.id!,
+    store.activeTask?.id!,
     searchForm.step,
     searchForm.dataSetLabel,
     searchForm.orbit,
@@ -1098,7 +1098,7 @@ const formatProductNullable = (value: number | string | null) => {
 }
 
 async function getCjModelThreatList() {
-  if (!store.activedTask?.id) {
+  if (!store.activeTask?.id) {
     productThreatError.value = '当前未选择任务'
     return
   }
@@ -1108,7 +1108,7 @@ async function getCjModelThreatList() {
 
   try {
     const res = await getThreatByProductModel({
-      taskId: store.activedTask.id,
+      taskId: store.activeTask.id,
       key_countries: productParsedKeyCountries.value,
       key_country_factor: productThreatForm.keyCountryFactor,
       other_country_factor: productThreatForm.otherCountryFactor,
@@ -1231,14 +1231,14 @@ const calcWeight = (str: string) => {
 
 const selectDate = ref<[string, string]>(['2025-07-03', '2025-09-29'])
 
-const fromDT = new Date(store.activedTask?.beginDate!)
+const fromDT = new Date(store.activeTask?.beginDate!)
 const startDT = getDaysAgo(7, fromDT)
 const endDT = getDaysAgo(1, fromDT)
 const defaultTime = ref<[string, string]>([formatDate(startDT), formatDate(endDT)])
 
 //计算自定义时间威胁度
 const calc = async () => {
-  const res = await calThreatAnalysis(store.activedTask?.id!, defaultTime.value[0], defaultTime.value[1])
+  const res = await calThreatAnalysis(store.activeTask?.id!, defaultTime.value[0], defaultTime.value[1])
   if (res.code === 200) {
     ElMessage.success('威胁度计算成功')
     refresh(1, 10)
@@ -1248,7 +1248,7 @@ const calc = async () => {
 }
 //计算任务整体威胁度
 const calcOfTask = async () => {
-  const res = await calThreatAnalysisOfTask(store.activedTask?.id!)
+  const res = await calThreatAnalysisOfTask(store.activeTask?.id!)
   if (res.code === 200) {
     ElMessage.success('威胁度计算成功')
     refresh(1, 10)
@@ -1259,7 +1259,7 @@ const calcOfTask = async () => {
 //计算任务某个阶段威胁度
 const calcOfTaskStep = async () => {
   const res = await calThreatAnalysisOfTaskStep(
-    store.activedTask?.id!,
+    store.activeTask?.id!,
     stepStartTime.value,
     stepEndTime.value,
     currentStep.value ?? ''
@@ -1275,7 +1275,7 @@ const calcOfTaskStep = async () => {
 const searchInput = ref<string | number>(store.selectedSatellite?.norad ?? '')
 
 let config = ref<SceneConfig>({
-  taskId: store.activedTask?.id!,
+  taskId: store.activeTask?.id!,
   weights: {
     static: 0,
     persistent: 0,
@@ -1392,7 +1392,7 @@ const saveConfig = async () => {
   config.value.instant_scoring_rules.close_encounter.distance_scores = String(
     config.value.instant_scoring_rules.close_encounter.distance_scores
   ).split(',') as unknown as number[]
-  config.value.taskId = store.activedTask?.id!
+  config.value.taskId = store.activeTask?.id!
   const res = await saveSceneConfig(config.value)
   if (res.code === 200) {
     getConfig()
@@ -1696,10 +1696,10 @@ async function loadDataAll() {
   store.setSelectedSatellite(null)
 
   const [avg, variation, high, imp] = await Promise.all([
-    avgThreatAnalysis(store.activedTask?.id!),
-    variationThreatAnalysis(store.activedTask?.id!),
-    highThreatAnalysis(store.activedTask?.id!),
-    threatLevelAnalysis(store.activedTask?.id!),
+    avgThreatAnalysis(store.activeTask?.id!),
+    variationThreatAnalysis(store.activeTask?.id!),
+    highThreatAnalysis(store.activeTask?.id!),
+    threatLevelAnalysis(store.activeTask?.id!),
   ])
 
   const avgData = avg.code === 200 ? avg.data : null
@@ -1728,9 +1728,9 @@ async function loadDataBySatelliteId() {
   if (timeMode.value !== '历史时间计算') return
 
   const [avg, high, imp] = await Promise.all([
-    avgThreatAnalysis(store.activedTask?.id!, Number(searchInput.value)),
-    highThreatAnalysis(store.activedTask?.id!, Number(searchInput.value)),
-    threatLevelAnalysis(store.activedTask?.id!, Number(searchInput.value)),
+    avgThreatAnalysis(store.activeTask?.id!, Number(searchInput.value)),
+    highThreatAnalysis(store.activeTask?.id!, Number(searchInput.value)),
+    threatLevelAnalysis(store.activeTask?.id!, Number(searchInput.value)),
   ])
 
   const avgData = avg.code === 200 ? avg.data : null
@@ -1753,10 +1753,10 @@ async function loadDataBySateCountry() {
   if (timeMode.value !== '历史时间计算') return
 
   const [avg, variation, high, imp] = await Promise.all([
-    avgThreatAnalysis(store.activedTask?.id!, undefined, String(searchInput.value)),
-    variationThreatAnalysis(store.activedTask?.id!, String(searchInput.value)),
-    highThreatAnalysis(store.activedTask?.id!, undefined, String(searchInput.value)),
-    threatLevelAnalysis(store.activedTask?.id!, undefined, String(searchInput.value)),
+    avgThreatAnalysis(store.activeTask?.id!, undefined, String(searchInput.value)),
+    variationThreatAnalysis(store.activeTask?.id!, String(searchInput.value)),
+    highThreatAnalysis(store.activeTask?.id!, undefined, String(searchInput.value)),
+    threatLevelAnalysis(store.activeTask?.id!, undefined, String(searchInput.value)),
   ])
 
   const avgData = avg.code === 200 ? avg.data : null
@@ -1788,13 +1788,13 @@ const statistics = reactive({
 })
 const suggestion = ref('')
 async function getSuggestion() {
-  if (store.activedTask?.id) {
-    const res = await getSuggestionOfTask(store.activedTask?.id)
+  if (store.activeTask?.id) {
+    const res = await getSuggestionOfTask(store.activeTask?.id)
     if (res.code === 200) suggestion.value = res.data
   }
 }
 const getConfig = async () => {
-  const r = await getSceneConfig(store.activedTask?.id!)
+  const r = await getSceneConfig(store.activeTask?.id!)
   if (r.code === 200) {
     if (r.data.user_overrides && r.data.user_overrides.weights) {
       r.data.user_overrides.weights.static = r.data.user_overrides.weights.static * 100
@@ -1815,14 +1815,14 @@ const getConfig = async () => {
 }
 const threatList = ref<SatelliteThreat[]>([])
 const getThreatList = async (page: number = 1, satelliteId?: number, country?: string) => {
-  if (store.activedTask?.id) {
+  if (store.activeTask?.id) {
     let res
     if (satelliteId) {
-      res = await getSatelliteThreatList(store.activedTask?.id, page, 10, satelliteId)
+      res = await getSatelliteThreatList(store.activeTask?.id, page, 10, satelliteId)
     } else if (country) {
-      res = await getSatelliteThreatList(store.activedTask?.id, page, 10, undefined, country)
+      res = await getSatelliteThreatList(store.activeTask?.id, page, 10, undefined, country)
     } else {
-      res = await getSatelliteThreatList(store.activedTask?.id, page, 10)
+      res = await getSatelliteThreatList(store.activeTask?.id, page, 10)
     }
 
     if (res.code === 200) {
@@ -1863,7 +1863,7 @@ function calculateThreatLevel() {
 const notSingle = ref(true)
 onMounted(() => {
   nextTick(async () => {
-    const resC = await threatStatisticsCount(store.activedTask?.id!)
+    const resC = await threatStatisticsCount(store.activeTask?.id!)
     if (resC.code === 200) {
       const { avgScore, days, highThreatCount, unitCount } = resC.data
       statistics.avgScore = avgScore
@@ -2302,8 +2302,8 @@ const handleWeightLockChange = (dataset: ThreatDatasetKey, orbit: ThreatOrbitKey
 const getConfigOfTask = async () => {
   let res =
     timeMode.value === '按任务总时长计算'
-      ? await queryTaskThreatWeight(store.activedTask?.id!)
-      : await queryTaskThreatWeight(store.activedTask?.id!, currentStep.value)
+      ? await queryTaskThreatWeight(store.activeTask?.id!)
+      : await queryTaskThreatWeight(store.activeTask?.id!, currentStep.value)
   if (res.code === 200) {
     const resWeight = JSON.parse(res.data) as ThreatWeight
     if (!resWeight) {

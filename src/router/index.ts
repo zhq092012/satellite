@@ -444,7 +444,7 @@ router.beforeEach((to) => {
 
   // 未选择任务时，禁止访问算法管理相关子菜单与路由
   if (to.path.startsWith('/algorithm')) {
-    if (!layoutStore.activedTask) {
+    if (!layoutStore.activeTask) {
       ElMessage.warning('尚未选择战场任务，请先在首页选择战场及任务！')
       return '/home'
     }

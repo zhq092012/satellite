@@ -179,8 +179,8 @@ const syncClockAndStep = (stepName: string, clock: Cesium.Clock) => {
   try {
     // 优先使用已缓存的 taskSteps，否则从 store 中解析
     let steps = taskSteps.value
-    if ((!steps || steps.length === 0) && store.activedTask?.steps) {
-      steps = JSON.parse(store.activedTask.steps) as TaskSteps[]
+    if ((!steps || steps.length === 0) && store.activeTask?.steps) {
+      steps = JSON.parse(store.activeTask.steps) as TaskSteps[]
       taskSteps.value = steps
     }
     if (!steps || steps.length === 0) return
@@ -211,8 +211,8 @@ const normalizeCountries = (raw?: string) =>
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
 
-const ourCountries = ref<string[]>(normalizeCountries(store.activedTask?.meCountry))
-const enemyCountries = ref<string[]>(normalizeCountries(store.activedTask?.enemyCountry))
+const ourCountries = ref<string[]>(normalizeCountries(store.activeTask?.meCountry))
+const enemyCountries = ref<string[]>(normalizeCountries(store.activeTask?.enemyCountry))
 const currentSegment = ref('')
 // 每个 viewer 独立保存一份阶段卫星数据，避免后加载的 viewer 覆盖先加载的 viewer
 const viewerStepSatellites = new WeakMap<Cesium.Viewer, StepSatellite[]>()
@@ -285,7 +285,7 @@ const ensureBattleSegmentSatellites = async (countries: string[], camp: string) 
   }
 
   const promise = (async () => {
-    const res = await getBattleSegmentSatellites(store.activedTask?.id, undefined, countries)
+    const res = await getBattleSegmentSatellites(store.activeTask?.id, undefined, countries)
     if (res.code === 200 && res.data) {
       return res.data
     }
@@ -383,7 +383,7 @@ const loadSatellites = async (view: Cesium.Viewer, countries: string[], camp: st
   }
 
   // 首次渲染时创建全部卫星实体
-  await renderSateliiteOfTask(view, store.activedTask!.id!, camp, norIds, requestId)
+  await renderSateliiteOfTask(view, store.activeTask!.id!, camp, norIds, requestId)
   if (!isLatestSatelliteLoad(view, requestId)) return
   syncSatelliteVisibility(view, currentSegment.value)
 }
@@ -795,7 +795,7 @@ const buildWeaponsTree = () => {
 }
 
 const loadWeaponList = async (view: Cesium.Viewer, countries: string[], camp: string) => {
-  const res = await getTaskWeapons(store.activedTask?.id!, countries)
+  const res = await getTaskWeapons(store.activeTask?.id!, countries)
   if (res.code === 200) {
     weapons.value = res.data.weapons
     buildWeaponsTree()
@@ -892,7 +892,7 @@ const handleWeaponTreeCheckChange = () => {
  * @param weaponNames 武器名称数组
  */
 const loadSelectedWeaponStrike = async (weaponNames?: string[]) => {
-  const taskId = store.activedTask?.id
+  const taskId = store.activeTask?.id
   if (!taskId) return
 
   const names = weaponNames?.filter(Boolean) || selectedWeapons.value.map((w) => w.name).filter(Boolean)
@@ -957,7 +957,7 @@ function handleViewerClickEvent(viewer: Cesium.Viewer) {
     viewer.selectedEntity = entity
     if (entity._id.startsWith('satellite-')) {
       const noradId = entity._id.split('satellite-')[1]
-      const res = await getSatelliteRelationsBySatellite(noradId, store.activedTask?.id!)
+      const res = await getSatelliteRelationsBySatellite(noradId, store.activeTask?.id!)
       if (res.code === 200 && res.data) {
         const satelliteIds = res.data.nodes.map((n) => ({ norad_id: String(n.norad) }))
         if (satelliteIds.length) {
@@ -1223,7 +1223,7 @@ onMounted(() => {
     })
   )
   // 时间控制
-  if (store.activedTask == null) return
+  if (store.activeTask == null) return
   formatTimeLine(view3D)
   formatTimeLine(view4D)
 
@@ -1263,9 +1263,9 @@ onMounted(() => {
   })
   // 获取统计信息
   getStatisticsOfTask()
-  if (store.activedTask) {
+  if (store.activeTask) {
     // 加载作战阶段和当前时间
-    const steps = JSON.parse(store.activedTask.steps) as TaskSteps[]
+    const steps = JSON.parse(store.activeTask.steps) as TaskSteps[]
     if (steps && steps.length) {
       // 作战阶段
       segments.value = steps.map((s) => s.name)
@@ -1283,8 +1283,8 @@ onMounted(() => {
 const statistics = ref<RedBlueStatistics>()
 // 获取当前作战阶段的统计信息
 async function getStatisticsOfTask() {
-  if (!store.activedTask) return
-  const res = await getRedBlueStatistics({ model: selectedMode.value, taskId: store.activedTask.id ?? 0 })
+  if (!store.activeTask) return
+  const res = await getRedBlueStatistics({ model: selectedMode.value, taskId: store.activeTask.id ?? 0 })
   if (res.code === 200 && res.data) {
     statistics.value = res.data
   }
@@ -1292,8 +1292,8 @@ async function getStatisticsOfTask() {
 
 // 设置动画和时间轴
 function formatTimeLine(view: Cesium.Viewer = view3D) {
-  const beginTime = new Date(store.activedTask!.beginDate)
-  const endTime = new Date(store.activedTask!.endDate)
+  const beginTime = new Date(store.activeTask!.beginDate)
+  const endTime = new Date(store.activeTask!.endDate)
 
   const isoUTCStartTime = beginTime.toISOString() // 已经减 8 h 转成 UTC 字符串
   const startTime = Cesium.JulianDate.fromIso8601(isoUTCStartTime)
@@ -1467,7 +1467,7 @@ function resetHighlightSatellite(viewer: Cesium.Viewer, sat: SatelliteStrike) {
 const updateCurrentTimeInfo = (viewer?: Cesium.Viewer) => {
   if (viewer) {
     // 取出steps
-    const stepsJSON = store.activedTask?.steps
+    const stepsJSON = store.activeTask?.steps
     if (stepsJSON) {
       const steps = JSON.parse(stepsJSON) as TaskSteps[]
       taskSteps.value = steps
