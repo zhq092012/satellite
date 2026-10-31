@@ -19,7 +19,7 @@ import {
 import {
   getStrikePlanList,
   type StrikePlanV2Extended,
-} from '@/api/strikePlan/satellite-strikeplan-api'
+} from '@/api/strike-plan/satellite-strike-plan-api'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { BlueSatelliteRecord } from '@/types/strike'
 import type { Weapon } from '@/types/dashboard'

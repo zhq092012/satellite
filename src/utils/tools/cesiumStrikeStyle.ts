@@ -1,12 +1,13 @@
+import type { StrikePlanV2MissionWindowItem } from '@/api/strike-plan/satellite-strike-plan-api'
+import type { StrikePhase, StrikeTypeStyle } from '@/types/strike'
+import * as Cesium from 'cesium'
+import { parseMissionWindowDate } from './dateFormat'
+
 /**
  * 打击样式计算
  * 根据武器类型和打击阶段计算视觉样式（颜色、线宽、材质等）
  */
-import * as Cesium from 'cesium'
 
-import { parseMissionWindowDate } from './dateFormat'
-import type { StrikePlanV2MissionWindowItem } from '@/api/strikePlan/satellite-strikeplan-api'
-import type { StrikePhase, StrikeTypeStyle } from '@/types/strike'
 
 
 /**

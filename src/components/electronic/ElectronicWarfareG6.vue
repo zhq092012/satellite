@@ -445,18 +445,6 @@ const currentSatelliteText = computed(() => {
   return count > 0 ? `系列全部 (${count}颗)` : '未选择'
 })
 
-const handleTopoNodeSelect = (
-  payload: { id: string; layer: 'sat' | 'receive' | 'station'; norad?: number } | null
-) => {
-  if (!payload) {
-    selectedPanelNodeId.value = null
-    selectedPanelNodeLayer.value = null
-    return
-  }
-  selectedPanelNodeId.value = payload.id
-  selectedPanelNodeLayer.value = payload.layer
-}
-
 /**
  * 从传输链路节点序列解析源卫星 NORAD。
  *
@@ -1126,27 +1114,6 @@ const setCurrentTimestamp = (ts: number, refreshGraph = true) => {
   highlightActiveElements()
 }
 
-/**
- * [功能说明]
- * 格式化并去重卫星类型描述字符串
- *
- * [处理规则]
- * 按斜杠 / 拆分字符串，去除两端空白，使用 Set 进行去重，再重新用斜杠拼接。
- * 例: "地球观测/雷达/地球观测" -> "地球观测/雷达"
- *
- * @param typeStr 原始类型字符串
- * @returns 去重后的类型描述字符串
- */
-const formatSatType = (typeStr?: string): string => {
-  if (!typeStr) return ''
-  const parts = typeStr
-    .split('/')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  const uniqueParts = Array.from(new Set(parts))
-  return uniqueParts.join('/')
-}
-
 type TopoNodeKind = 'sat' | 'relay' | 'receive' | 'station' | 'target'
 
 const TOPO_NODE_SHAPE: Record<TopoNodeKind, string> = {
@@ -1478,12 +1445,6 @@ const formatTimeStr = (ts: number): string => {
 }
 
 const currentTimeText = computed(() => formatTimeStr(currentTimestamp.value))
-
-const formatDelayMinutes = (minutes: number): string => {
-  if (!minutes || minutes <= 0) return '0 分钟'
-  const rounded = Number.isInteger(minutes) ? minutes : Number(minutes.toFixed(1))
-  return `${rounded} 分钟`
-}
 
 /**
  * [功能]
@@ -1837,7 +1798,6 @@ const highlightActiveElements = () => {
 const satNodeCount = ref(0)
 const receiveNodeCount = ref(0)
 const stationNodeCount = ref(0)
-const currentTs = () => currentTimestamp.value
 
 /** 正常链路颜色（青色实线） */
 const LINK_COLOR_NORMAL = '#00e1ff'

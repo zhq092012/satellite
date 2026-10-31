@@ -1,4 +1,4 @@
-import { requestAPI } from '@/utils/tools/request'
+import { requestAPI } from '@/utils/tools/httpClient'
 
 import type { AxiosResponseType } from '@/types/http'
 

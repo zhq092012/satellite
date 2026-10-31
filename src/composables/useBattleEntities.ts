@@ -5,22 +5,22 @@
  */
 import { type Ref, type ShallowRef } from 'vue'
 import * as Cesium from 'cesium'
-import type { StrikePlanV2MissionWindowItem } from '@/api/strikePlan/satellite-strikeplan-api'
+import type { StrikePlanV2MissionWindowItem } from '@/api/strike-plan/satellite-strike-plan-api'
+import { buildSatelliteInfoBoxDescription } from '@/utils/tools/cesiumInfoBox'
+import {
+  createSatelliteStrikeStarDataUri,
+  createStationExplosionDiamondDataUri,
+  createWeaponIconDataUri,
+  getWeaponIconScale,
+} from '@/utils/tools/cesiumEntityIcon'
 import {
   getStrikePhase,
   getStrikeTypeStyle,
   mixColor,
   STRIKE_LINK_FADE_MS,
   STRIKE_SATELLITE_BLINK_MS,
-} from '@/utils/tools/strikeStyle'
-import {
-  getWeaponIconScale,
-  createWeaponIconDataUri,
-  createSatelliteStrikeStarDataUri,
-  createStationExplosionDiamondDataUri,
-} from '@/utils/tools/svgIcons'
+} from '@/utils/tools/cesiumStrikeStyle'
 import { parseMissionWindowDate } from '@/utils/tools/dateFormat'
-import { buildSatelliteInfoBoxDescription } from '@/utils/tools/infoBox'
 import type { Weapon } from '@/types/dashboard'
 import type { BlueSatelliteRecord, SatelliteRelationItem } from '@/types/strike'
 import type { SatelliteDetail } from '@/types/cesium/satellite'

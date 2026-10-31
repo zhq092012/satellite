@@ -476,21 +476,22 @@ import { ElMessage } from 'element-plus'
 import * as Cesium from 'cesium'
 
 import { useLayoutStore } from '@/store/modules/layout'
-import { formatTimeLineAndAnimation, markBattleArea } from '@/utils/tools/functionTool'
+import { formatTimeLineAndAnimation, markBattleArea } from '@/utils/tools/cesiumBattleArea'
+import { bindInfoBoxButton, unbindInfoBoxButton } from '@/utils/tools/cesiumInfoBox'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
-import { bindInfoBoxButton, unbindInfoBoxButton } from '@/utils/tools/infoBox'
 import { getSatelliteDetail } from '@/api/dashboard'
 import type {
   StrikePlanV2Extended,
   RespKillChainPlanLow,
   RespKillChainPlanMiddle,
   RespKillChainPlanHigh,
-} from '@/api/strikePlan/satellite-strikeplan-api'
+} from '@/api/strike-plan/satellite-strike-plan-api'
 // 导入首页/装备仪表盘 Weapon 类型定义
 import type { Weapon } from '@/types/dashboard'
 // 导入地面站 BaseStationInfo 类型定义
 import type { BaseStationInfo } from '@/api/system/satellite-system-api'
-import { parseLatLonToCoords, parseMissionWindowDate } from '@/utils/tools/dateFormat'
+import { parseLatLonToCoords } from '@/utils/tools/parseLatLon'
+import { parseMissionWindowDate } from '@/utils/tools/dateFormat'
 
 import { useSceneData } from '../../composables/useSceneData'
 import { useStrikePlan } from '../../composables/useStrikePlan'
@@ -1516,7 +1517,7 @@ onBeforeUnmount(() => {
       viewer.value.clock.shouldAnimate = false
       viewer.value.destroy()
     } catch (e) {
-      console.warn('SatelliteUnReal viewer destroy warning', e)
+      console.warn('SatelliteUnreal viewer destroy warning', e)
     }
   }
   viewer.value = null

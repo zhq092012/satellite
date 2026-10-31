@@ -30,27 +30,30 @@
             <th v-else class="zhch-metrics-table__th zhch-metrics-table__th--value">数值</th>
           </tr>
         </thead>
-        <tbody>
-          <tr v-for="item in verticalMetricRows" :key="item.key" class="zhch-metrics-table__tr">
+        <tbody v-if="isPhaseCompare">
+          <tr v-for="item in verticalCompareRows" :key="item.key" class="zhch-metrics-table__tr">
             <td class="zhch-metrics-table__td zhch-metrics-table__td--label">{{ item.label }}</td>
-            <template v-if="isPhaseCompare">
-              <td class="zhch-metrics-table__td zhch-metrics-table__td--value">
-                <MetricCellContent
-                  :cell="item.beforeCell"
-                  :apply-value-tone="false"
-                  align="end"
-                />
-              </td>
-              <td class="zhch-metrics-table__td zhch-metrics-table__td--value">
-                <MetricCellContent
-                  :cell="item.afterCell"
-                  :apply-value-tone="true"
-                  show-delta
-                  align="end"
-                />
-              </td>
-            </template>
-            <td v-else class="zhch-metrics-table__td zhch-metrics-table__td--value">
+            <td class="zhch-metrics-table__td zhch-metrics-table__td--value">
+              <MetricCellContent
+                :cell="item.beforeCell"
+                :apply-value-tone="false"
+                align="end"
+              />
+            </td>
+            <td class="zhch-metrics-table__td zhch-metrics-table__td--value">
+              <MetricCellContent
+                :cell="item.afterCell"
+                :apply-value-tone="true"
+                show-delta
+                align="end"
+              />
+            </td>
+          </tr>
+        </tbody>
+        <tbody v-else>
+          <tr v-for="item in verticalSummaryRows" :key="item.key" class="zhch-metrics-table__tr">
+            <td class="zhch-metrics-table__td zhch-metrics-table__td--label">{{ item.label }}</td>
+            <td class="zhch-metrics-table__td zhch-metrics-table__td--value">
               <MetricCellContent
                 :cell="item.valueCell"
                 :apply-value-tone="true"
@@ -139,21 +142,22 @@ const isPhaseCompare = computed(
   () => !!props.showPhaseColumn && props.rows.some((r) => r.rowVariant === 'before')
 )
 
-/** 纵向布局：按指标拆行 */
-const verticalMetricRows = computed(() => {
-  if (!props.vertical) return []
+/** 纵向对比表：每个指标一行，单元格分为打击前和打击后。 */
+const verticalCompareRows = computed(() => {
+  if (!props.vertical || !isPhaseCompare.value) return []
+  const beforeRow = props.rows.find((row) => row.rowVariant === 'before')
+  const afterRow = props.rows.find((row) => row.rowVariant === 'after')
+  return props.columns.map((col) => ({
+    key: col.key,
+    label: col.label,
+    beforeCell: beforeRow?.cells[col.key],
+    afterCell: afterRow?.cells[col.key],
+  }))
+})
 
-  if (isPhaseCompare.value) {
-    const beforeRow = props.rows.find((r) => r.rowVariant === 'before')
-    const afterRow = props.rows.find((r) => r.rowVariant === 'after')
-    return props.columns.map((col) => ({
-      key: col.key,
-      label: col.label,
-      beforeCell: beforeRow?.cells[col.key],
-      afterCell: afterRow?.cells[col.key],
-    }))
-  }
-
+/** 纵向概要表：每个指标一行，只有一个数值单元格。 */
+const verticalSummaryRows = computed(() => {
+  if (!props.vertical || isPhaseCompare.value) return []
   const summaryRow = props.rows[0]
   return props.columns.map((col) => ({
     key: col.key,

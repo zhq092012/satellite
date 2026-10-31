@@ -233,7 +233,7 @@ import {
   updateWeapon,
 } from '@/api/dashboard'
 import { getSatelliteBySeries, getSatelliteSeries } from '@/api/task/task'
-import { getOrbitType } from '@/utils/tools/satellite'
+import { getOrbitType } from '@/utils/tools/satelliteStatusLabel'
 import { isDataCenterStationType } from '@/utils/c2TaskPanelEditor'
 import {
   deleteBaseStations,
@@ -492,9 +492,6 @@ const typeFilterOptions = computed(() => {
   const types = new Set(candidatePool[props.kind].map((row) => row.type).filter(Boolean))
   return Array.from(types).sort()
 })
-
-/** 待选资源总数展示文案。 */
-const candidateTotalText = computed(() => String(filteredCandidates.value.length))
 
 /** 新建地面站/数据中心时的默认类型占位。 */
 const stationTypePlaceholder = computed(() =>

@@ -86,7 +86,7 @@
                     <el-col :span="22">
                         <div class="search-item-flex">
                             <el-checkbox-group v-model="searchForm.missileBaseId">
-                                <el-checkbox v-for="(missileBase, index) in missileBaseEntity" :key="missileBase._id"
+                                <el-checkbox v-for="missileBase in missileBaseEntity" :key="missileBase._id"
                                     :value="missileBase._id">{{ missileBase.name }}</el-checkbox>
                             </el-checkbox-group>
                         </div>
@@ -731,7 +731,7 @@ import {
     type StrikePlanV2Metrics,
     type StrikePlanV2MissionWindowItem,
     type StrikePlanV2PlanDetail,
-} from '@/api/strikePlan/satellite-strikeplan-api.ts'
+} from '@/api/strike-plan/satellite-strike-plan-api'
 import { getTaskStageIntensityOptions, getTaskWeapons } from '@/api/dashboard'
 import type { Weapon } from '@/types/dashboard'
 

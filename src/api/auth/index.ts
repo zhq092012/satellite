@@ -1,4 +1,4 @@
-import { requestAPI } from '@/utils/tools/request'
+import { requestAPI } from '@/utils/tools/httpClient'
 import type { AxiosResponseType } from '@/types/http'
 
 /** 菜单节点。树形接口里 children 挂子菜单。 */

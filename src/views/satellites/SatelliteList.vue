@@ -95,7 +95,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { getBattleCountrys, getBattleSateTypes, getSatelliteList } from '@/api/dashboard'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
-import { getOrbitStatus, getOrbitType, getPayloadStatus } from '@/utils/tools/satellite'
+import { getOrbitStatus, getOrbitType, getPayloadStatus } from '@/utils/tools/satelliteStatusLabel'
 import type { Satellite } from '@/types/cesium/satellite'
 
 /** 查询表单中轨道/载荷枚举选项。 */

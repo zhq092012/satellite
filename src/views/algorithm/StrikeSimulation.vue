@@ -1,6 +1,6 @@
 <template>
   <div class="algorithm-view-container">
-    <SatelliteUnReal />
+    <SatelliteUnreal />
   </div>
 </template>
 
@@ -8,7 +8,7 @@
 /**
  * 导入打击方案仿真功能组件
  */
-import SatelliteUnReal from '@/components/cesium/SatelliteUnReal.vue'
+import SatelliteUnreal from '@/components/cesium/SatelliteUnreal.vue'
 </script>
 
 <style scoped lang="scss">

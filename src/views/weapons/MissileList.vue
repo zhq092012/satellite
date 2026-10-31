@@ -191,12 +191,6 @@ const rules = reactive<FormRules<MissileInfo>>({
   country: [{ required: true, message: '请输入所属国家/地区', trigger: 'blur' }],
 })
 
-// const canCreate = computed(() => hasPermission(authStore.permissions, ['system:weapon:add']))
-// const canEdit = computed(() => hasPermission(authStore.permissions, ['system:weapon:edit']))
-// const canDelete = computed(() => hasPermission(authStore.permissions, ['system:weapon:delete']))
-
-const countryCount = computed(() => new Set(missiles.value.map((item) => item.country).filter(Boolean)).size)
-
 const dialogTitle = computed(() => (form._id ? '编辑导弹' : '新增导弹'))
 
 async function loadCountries() {

@@ -1,6 +1,6 @@
 /**
  * 仿真场景组件的共享类型定义
- * 从 SatelliteUnReal.vue 中提取，集中管理以便各子模块引用
+ * 从 SatelliteUnreal.vue 中提取，集中管理以便各子模块引用
  */
 import type * as Cesium from 'cesium'
 export interface Strike {
@@ -303,7 +303,7 @@ import type {
   StrikePlanV2Extended,
   StrikePlanV2MissionWindowItem,
   StrikePlanV2PlanDetail,
-} from '@/api/strikePlan/satellite-strikeplan-api'
+} from '@/api/strike-plan/satellite-strike-plan-api'
 import type { SatelliteRelation } from '@/types/dashboard'
 
 // ─── 重新导出 API 类型，方便子模块统一从此处引入 ───

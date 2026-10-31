@@ -153,12 +153,6 @@ const form = reactive<MissileBaseForm>(createEmptyForm())
 
 const rules = reactive<FormRules<MissileBaseInfo>>({})
 
-// const canCreate = computed(() => hasPermission(authStore.permissions, ['system:weapon:add']))
-// const canEdit = computed(() => hasPermission(authStore.permissions, ['system:weapon:edit']))
-// const canDelete = computed(() => hasPermission(authStore.permissions, ['system:weapon:delete']))
-
-const countryCount = computed(() => new Set(missileBases.value.map((item) => item.country).filter(Boolean)).size)
-
 const dialogTitle = computed(() => (form._id ? '编辑导弹基地' : '新增导弹基地'))
 
 async function loadCountries() {

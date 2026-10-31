@@ -1,5 +1,5 @@
 import type { AxiosResponsePage, AxiosResponseType } from '@/types/http'
-import { requestAPI } from '@/utils/tools/request'
+import { requestAPI } from '@/utils/tools/httpClient'
 
 /** 卫星画像中的认知优势、认知劣势和衍生型号。 */
 export interface SatelliteAdvantageOrDisadvantage {

@@ -658,7 +658,7 @@ import {
   type StrikePlanV2Metrics,
   type StrikePlanV2MissionWindowItem,
   type StrikePlanV2PlanDetail,
-} from '@/api/strikePlan/satellite-strikeplan-api.ts'
+} from '@/api/strike-plan/satellite-strike-plan-api'
 import { getTaskStageIntensityOptions, getTaskWeapons } from '@/api/dashboard'
 import type { Weapon } from '@/types/dashboard'
 

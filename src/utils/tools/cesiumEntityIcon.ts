@@ -1,8 +1,9 @@
+import * as Cesium from 'cesium'
+
 /**
  * SVG 图标生成函数
- * 从 SatelliteUnReal.vue 提取，用于在 Cesium 场景中为不同武器类型和打击状态生成 SVG 图标
+ * 从 SatelliteUnreal.vue 提取，用于在 Cesium 场景中为不同武器类型和打击状态生成 SVG 图标
  */
-import * as Cesium from 'cesium'
 
 /**
  * [功能]

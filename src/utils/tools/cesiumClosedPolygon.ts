@@ -1,9 +1,12 @@
-import * as Cesium from 'cesium'
 import { useLayoutStore } from '@/store/modules/layout'
+import * as Cesium from 'cesium'
+
+/** 多边形绘制结果写入布局 store。 */
+const store = useLayoutStore()
+
 /*******************************************************
  *  Cesium  选点 → 自动首尾闭合 → 绘制多边形
  *******************************************************/
-const store = useLayoutStore()
 class DrawClosedPolygon {
   viewer: Cesium.Viewer
   fillColor: Cesium.Color

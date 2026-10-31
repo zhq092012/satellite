@@ -1,6 +1,6 @@
 /**
  * 日期/时间格式化工具函数
- * 从 SatelliteUnReal.vue 提取的纯函数，不依赖任何 Vue 响应式状态
+ * 从 SatelliteUnreal.vue 提取的纯函数，不依赖任何 Vue 响应式状态
  */
 
 /**
@@ -145,32 +145,22 @@ export const formatFullDateTime = (value?: string): string => {
 }
 
 /**
- * 把逗号分隔的国家字符串拆成去空白后的数组。
+ * 取若干天之前的日期。
  *
- * @param raw 如 `中国,美国`；缺省当空串
- * @returns 非空国家名列表，无内容时为空数组
+ * @param days 向前推的天数，默认 7
+ * @param fromDate 起点，默认当前时间
+ * @returns 起点减去对应毫秒后的日期
  */
-export const normalizeCountries = (raw?: string): string[] =>
-  String(raw ?? '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+export function getDaysAgo(days = 7, fromDate = new Date()) {
+  return new Date(fromDate.getTime() - days * 24 * 60 * 60 * 1000)
+}
 
 /**
- * 解析 `纬度,经度` 字符串。
+ * 将日期格式化为 `YYYY-MM-DD`。
  *
- * @param latLonStr 如 `31.23,121.47`
- * @returns 十进制度坐标；空串、分段不足或非数字时纬度和经度都为 0
+ * @param date 日期对象
+ * @returns 本地时区的日期字符串
  */
-export const parseLatLonToCoords = (latLonStr: string): { latitude: number; longitude: number } => {
-  if (!latLonStr) return { latitude: 0, longitude: 0 }
-  const parts = latLonStr.split(',')
-  if (parts.length === 2) {
-    const lat = parseFloat(parts[0].trim())
-    const lon = parseFloat(parts[1].trim())
-    if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-      return { latitude: lat, longitude: lon }
-    }
-  }
-  return { latitude: 0, longitude: 0 }
+export function formatDate(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
 }

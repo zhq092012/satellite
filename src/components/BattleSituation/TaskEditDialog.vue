@@ -116,7 +116,6 @@ import {
   normalizeTaskDateTime as normalizeDateTime,
   parseTaskPanelTimeMs as parseTaskTimeMs,
   SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI,
-  SHOW_TASK_COMBAT_AREA_IN_UI,
   TaskListItemFromApiError,
   toTaskDatetimeLocalValue as toDatetimeLocalValue,
 } from '@/utils/c2TaskPanelEditor'
@@ -124,8 +123,6 @@ import { formatTaskMinuteDateTime } from '@/utils/tools/dateFormat'
 
 /** 是否展示任务时长 / 链路时延 / 覆盖率表单项（仅 UI） */
 const showTaskDurationDelayCoverageInUi = SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI
-/** 是否展示作战区域 / 启用 / 经纬度 / 半径表单项（仅 UI） */
-const showTaskCombatAreaInUi = SHOW_TASK_COMBAT_AREA_IN_UI
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskAssembleTab, { type TaskAssembleRow } from '@/components/BattleSituation/TaskAssembleTab.vue'
 

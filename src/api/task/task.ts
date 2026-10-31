@@ -2,7 +2,7 @@ import type { AxiosResponseType } from '@/types/http'
 
 import { prepareTaskForBattleApi } from '@/utils/c2TaskPanelEditor'
 import type { TaskForm } from '@/types/dashboard'
-import { requestAPI } from '@/utils/tools/request'
+import { requestAPI } from '@/utils/tools/httpClient'
 import type { Satellite } from '@/types/cesium/satellite'
 
 /** 按系统类型分组的卫星系列名称。侦察、通信各一组。 */

@@ -62,7 +62,7 @@ import G6, { type Graph } from '@antv/g6'
 import type { MatrixResult } from '@/api/electronic'
 import { resolveTaskEndMs } from '@/utils/satelliteFullChainAnalysis'
 import { formatSatelliteThreat } from '@/utils/buildSatelliteAnalysisTable'
-import { formatCoveragePercent } from '@/utils/zhchPlanDisplay'
+import { formatCoveragePercent } from '@/utils/strikePlanDisplayText'
 import {
   RECON_LAYER_LABEL_ITEMS,
   RECON_TOPO_GRAPH_DEFAULT_EDGE,

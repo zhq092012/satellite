@@ -5,7 +5,7 @@
 import { nextTick, ref, type ShallowRef } from 'vue'
 import * as Cesium from 'cesium'
 import type { BlueSatelliteRecord, HistoricalPlanCard } from '@/types/strike'
-import { createSatelliteStrikeStarDataUri } from '@/utils/tools/svgIcons'
+import { createSatelliteStrikeStarDataUri } from '@/utils/tools/cesiumEntityIcon'
 
 // ─── 常量 ───
 /** 对比视口默认俯视中国的经度（度） */

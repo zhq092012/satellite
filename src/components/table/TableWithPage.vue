@@ -35,7 +35,7 @@
  * 带分页的表格卡片：默认前端分页；`count > 0` 时视为服务端分页，翻页触发 `loadPageData`。
  * 通过 slot 注入 `el-table-column`，对外暴露 `clearSelection` / `getSelectionRows`。
  */
-import { getPageData } from '@/utils/tools/funcs'
+import { getPageData } from '@/utils/tools/sliceListPage'
 import type { TableInstance } from 'element-plus'
 import { computed, ref } from 'vue'
 

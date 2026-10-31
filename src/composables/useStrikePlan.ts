@@ -14,7 +14,7 @@ import {
   type StrikePlanV2Extended,
   type StrikePlanV2MissionWindowItem,
   type StrikePlanV2PlanDetail,
-} from '@/api/strikePlan/satellite-strikeplan-api'
+} from '@/api/strike-plan/satellite-strike-plan-api'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { HistoricalPlanCard } from '@/types/strike'
 import { buildHistoricalPlanFromKillChainPlan } from '@/utils/tools/killChainAdapter'

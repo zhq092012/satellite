@@ -115,11 +115,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { createWeapon, deleteWeapon, getAllWeapons, getBattleCountrys, updateWeapon } from '@/api/dashboard'
-import { useAuthStore } from '@/store/modules/auth'
-import { hasPermission } from '@/utils/auth'
 import type { Weapon } from '@/types/dashboard'
-
-const authStore = useAuthStore()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -185,13 +181,6 @@ const rules = reactive<FormRules<Weapon>>({
   longitude: { required: true, message: '请输入正确的经度', trigger: 'blur', type: 'number', min: -180, max: 180 },
   latitude: { required: true, message: '请输入正确的纬度', trigger: 'blur', type: 'number', min: -90, max: 90 },
 })
-
-// const canCreate = computed(() => hasPermission(authStore.permissions, ['system:weapon:add']))
-// const canEdit = computed(() => hasPermission(authStore.permissions, ['system:weapon:edit']))
-// const canDelete = computed(() => hasPermission(authStore.permissions, ['system:weapon:delete']))
-
-const totalCount = computed(() => weapons.value.length)
-const countryCount = computed(() => new Set(weapons.value.map((item) => item.country).filter(Boolean)).size)
 
 /**
  * 根据多条件组合过滤武器列表。

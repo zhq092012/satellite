@@ -82,7 +82,7 @@
 import { computed } from 'vue'
 import type { ZhchPlanResp, ZhchPlanSatelliteMatrix } from '@/api/electronic'
 import { formatPassWindowTime } from '@/utils/tools/dateFormat'
-import { orbitTypeLabel } from '@/utils/zhchPlanDisplay'
+import { orbitTypeLabel } from '@/utils/strikePlanDisplayText'
 
 const props = defineProps<{
   /** 综合打击方案数据 */

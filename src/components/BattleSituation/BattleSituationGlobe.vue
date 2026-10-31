@@ -50,7 +50,7 @@
 <script setup lang="ts">
 import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
-import { markBattleArea, markTaskCombatArea, resolveBattleSpaceLabelPosition } from '@/utils/tools/functionTool'
+import { markBattleArea, markTaskCombatArea, resolveBattleSpaceLabelPosition } from '@/utils/tools/cesiumBattleArea'
 import { useLayoutStore } from '@/store/modules/layout'
 import { useBattleGlobeSatellites } from '@/composables/useBattleGlobeSatellites'
 import { useBattleGlobeWeapons } from '@/composables/useBattleGlobeWeapons'

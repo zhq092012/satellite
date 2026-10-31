@@ -85,7 +85,7 @@
 
 <script setup lang="ts">
 import type { StationRelationList } from '@/api/electronic'
-import { stationStatusLabel } from '@/utils/zhchPlanDisplay'
+import { stationStatusLabel } from '@/utils/strikePlanDisplayText'
 
 defineProps<{
   /** 站间拓扑关联数据 */

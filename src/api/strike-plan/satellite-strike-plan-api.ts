@@ -1,6 +1,6 @@
 import type { StrikePlan } from '@/types/strike'
 import type { AxiosResponseType } from '@/types/http'
-import { requestAPI } from '@/utils/tools/request'
+import { requestAPI } from '@/utils/tools/httpClient'
 import type { Weapon } from '@/types/dashboard'
 /** 生成打击方案 v2 的请求参数，包含任务、烈度、武器和地面目标。 */
 export type GenerateStrikePlanV2Param = {

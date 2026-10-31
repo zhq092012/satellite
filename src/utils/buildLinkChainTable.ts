@@ -6,7 +6,7 @@ import {
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
 import { formatLocalDateTime, parseTimeToMs } from '@/utils/tools/dateFormat'
-import { parseFeedbackTimestamp } from '@/utils/zhchPlanDisplay'
+import { parseFeedbackTimestamp } from '@/utils/strikePlanDisplayText'
 
 /** 链路表格默认展示条数 */
 export const LINK_CHAIN_TOP_COUNT = 10

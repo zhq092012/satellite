@@ -4,7 +4,7 @@ import {
   formatInterferenceDelay,
   parseFeedbackTimeAndLink,
   parseFeedbackTimestamp,
-} from '@/utils/zhchPlanDisplay'
+} from '@/utils/strikePlanDisplayText'
 
 /** 指标差值颜色语义（相对打击效果） */
 export type ZhchPlanMetricDeltaTone = 'neutral' | 'favorable' | 'adverse' | 'warning'

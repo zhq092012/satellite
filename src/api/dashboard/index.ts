@@ -8,7 +8,7 @@ import {
   prepareTaskForBattleApi,
   type TaskListItemFromApiError,
 } from '@/utils/c2TaskPanelEditor'
-import { requestAPI } from '@/utils/tools/request'
+import { requestAPI } from '@/utils/tools/httpClient'
 
 /**
  * 获取首页所有卫星轨道数据

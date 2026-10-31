@@ -1,6 +1,9 @@
 import { useLayoutStore } from '@/store/modules/layout'
 import * as Cesium from 'cesium'
+
+/** 读取战场中心，自转结束后把相机放回该位置。 */
 const store = useLayoutStore()
+
 /**
  * 在三维场景里把地球切到惯性参考系，让地表相对星空转动，并按太阳方向打光。
  */

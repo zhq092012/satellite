@@ -36,7 +36,7 @@
  * 无 el-card 外壳的分页表格，行为与 `TableWithPage` 一致，额外支持 `toggleRowSelection`。
  * 适用于嵌入对话框或嵌套布局，避免双层卡片样式。
  */
-import { getPageData } from '@/utils/tools/funcs'
+import { getPageData } from '@/utils/tools/sliceListPage'
 import type { TableInstance } from 'element-plus'
 import { computed, nextTick, ref } from 'vue'
 
@@ -88,7 +88,7 @@ const getSelectionRows = () => {
  * @param selected 目标选中状态
  * @param ignoreSelectable 是否忽略 selectable 限制（预留，与 Element Plus API 对齐）
  */
-const toggleRowSelection = (row: any, selected?: boolean, ignoreSelectable: boolean = true) => {
+const toggleRowSelection = (row: any, selected?: boolean, _ignoreSelectable: boolean = true) => {
   nextTick(() => {
     tbRef.value?.toggleRowSelection(row, selected)
   })

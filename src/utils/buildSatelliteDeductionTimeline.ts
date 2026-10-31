@@ -8,8 +8,7 @@ import type {
   SatelliteMatrix,
   TimeEffect,
 } from '@/api/task/task'
-import type { MatrixResult } from '@/api/electronic'
-import { formatCoveragePercent } from '@/utils/zhchPlanDisplay'
+import { formatCoveragePercent } from '@/utils/strikePlanDisplayText'
 import {
   formatSatelliteCoverageReduce,
   formatSatelliteDelayIncrease,

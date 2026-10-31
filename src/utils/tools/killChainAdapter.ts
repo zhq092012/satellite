@@ -10,7 +10,7 @@ import type {
   StrikePlanV2Extended,
   StrikePlanV2MissionWindowItem,
   StrikePlanV2PlanDetail,
-} from '@/api/strikePlan/satellite-strikeplan-api'
+} from '@/api/strike-plan/satellite-strike-plan-api'
 
 /**
  * 将任意烈度的杀伤链方案转换为历史方案格式

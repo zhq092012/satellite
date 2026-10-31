@@ -1,6 +1,6 @@
-import * as Cesium from 'cesium'
 import type { SatelliteDetail } from '@/types/cesium/satellite'
 import type { BlueSatelliteRecord } from '@/types/strike'
+import * as Cesium from 'cesium'
 
 type InfoBoxButtonHandler = (payload: { button: HTMLButtonElement; event: MouseEvent }) => void
 

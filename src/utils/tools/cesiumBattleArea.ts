@@ -1,8 +1,11 @@
 import { useLayoutStore } from '@/store/modules/layout'
-import type { BattleForm } from '@/types/dashboard';
+import type { BattleForm, TaskCombatArea } from '@/types/dashboard'
 import { EntityCollection } from 'cesium'
 import * as Cesium from 'cesium'
+
+/** 战场中心等场景状态，供区域标注和相机定位读写。 */
 const store = useLayoutStore()
+
 /**
  * 求多边形面积质心（椭球面）
  * @param {number[][]} lonlats  [[lon,lat], …]  必须闭合（首末点可相同）

@@ -166,12 +166,6 @@ const rules = reactive<FormRules<BaseStationInfo>>({
   introduction: { required: true, message: '请输入基站介绍', trigger: 'blur' },
 })
 
-// const canCreate = computed(() => hasPermission(authStore.permissions, ['system:weapon:add']))
-// const canEdit = computed(() => hasPermission(authStore.permissions, ['system:weapon:edit']))
-// const canDelete = computed(() => hasPermission(authStore.permissions, ['system:weapon:delete']))
-
-const countryCount = computed(() => new Set(stations.value.map((item) => item.country).filter(Boolean)).size)
-
 const dialogTitle = computed(() => (form._id ? `编辑${pageTitle.value}` : `新增${pageTitle.value}`))
 
 /**

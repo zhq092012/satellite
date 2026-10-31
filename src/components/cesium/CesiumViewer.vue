@@ -15,8 +15,8 @@ import type { MatrixResult } from '@/api/electronic'
 import type { ChainNode, SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 import { useElectronicCesiumBridge, type InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import { useLayoutStore } from '@/store/modules/layout'
-import type { SatelliteData, Weapon } from '@/types/dashboard'
-import { markBattleArea } from '@/utils/tools/functionTool'
+import type { Weapon } from '@/types/dashboard'
+import { markBattleArea } from '@/utils/tools/cesiumBattleArea'
 import laserStationIcon from '@/assets/icons/LaserStation.png'
 import groundStationIcon from '@/assets/icons/GroundStation.png'
 import launchPadIcon from '@/assets/icons/LaunchPad.png'
@@ -289,16 +289,6 @@ const satellitePositionPropertyCache = new Map<number, Cesium.SampledPositionPro
  * - 任务切换时会主动清除，防止旧数据污染
  */
 const satelliteTleCache = new Map<number, any>()
-
-/**
- * 当前任务的卫星列表缓存
- *
- * [取值规则]
- * - 首次请求成功后填充，同一任务内不重复请求接口
- * - 任务切换时清空（cachedTaskId 不匹配时）
- */
-let cachedSatelliteList: SatelliteData[] | null = null
-
 
 // 存储电子信息网络基础设施实体 ID (地面站、中心云站)
 const electronicNodeEntityIds = new Set<string>()
@@ -2080,7 +2070,6 @@ onBeforeUnmount(() => {
   satelliteOrbitData.clear()
   satellitePositionPropertyCache.clear()
   satelliteTleCache.clear()
-  cachedSatelliteList = null
   destroyTransmissionLinkPolylineCollection()
 
   if (viewer) {

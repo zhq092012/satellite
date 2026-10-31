@@ -1,5 +1,5 @@
 import type { SatelliteAnalysisData } from '@/api/task/task'
-import { formatCoveragePercent } from '@/utils/zhchPlanDisplay'
+import { formatCoveragePercent } from '@/utils/strikePlanDisplayText'
 
 /** 卫星指标表格行（展示用） */
 export interface SatelliteMetricTableRow {
