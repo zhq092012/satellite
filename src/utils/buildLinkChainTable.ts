@@ -2,10 +2,10 @@ import type { LevelSeriesEntity, SatelliteAnalysisData, VisibilityWindow } from 
 import type { MatrixResult } from '@/api/electronic'
 import {
   collectSeriesTransmissionLinks,
-  parseTimeToMs,
   type ChainNode,
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
+import { formatLocalDateTime, parseTimeToMs } from '@/utils/tools/dateFormat'
 import { parseFeedbackTimestamp } from '@/utils/zhchPlanDisplay'
 
 /** 链路表格默认展示条数 */
@@ -39,10 +39,7 @@ export interface LinkChainTableRow {
  */
 const formatTimestampMs = (ms: number): string => {
   if (!ms) return '--'
-  const date = new Date(ms)
-  /** 数字补成两位。 @param value 非负整数 @returns 至少两位的字符串 */
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  return formatLocalDateTime(ms)
 }
 
 /**

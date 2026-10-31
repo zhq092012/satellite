@@ -434,6 +434,7 @@ import { ref, computed, onMounted, onActivated, onBeforeUnmount, watch, nextTick
 import { type MatrixResult, type SatelliteMatrix, type StationWindow, type Weapon, type CommucationMatrix } from '@/api/electronic'
 import { useLayoutStore } from '@/store/modules/layout'
 import { collectSatelliteTransmissionLinks, listNormalSatelliteNorads, resolveTaskEndMs } from '@/utils/satelliteFullChainAnalysis'
+import { formatLocalDateTime, parseWindowTimestamp } from '@/utils/tools/dateFormat'
 import VirtualScrollList from '@/components/common/VirtualScrollList.vue'
 
 defineOptions({
@@ -952,27 +953,14 @@ const struckSatCount = computed<number>(() => {
 })
 
 /**
- * [功能说明]
  * 解析时间窗字符串为 Unix 秒时间戳 (例 "2026-07-30 08:00:00" 或 "08:00:00")。
+ * 无法解析时回落到当前秒，避免甘特图时间轴落到 1970。
  *
  * @param timeStr 时间字符串
  * @returns Unix 秒时间戳
  */
-const parseToTimestamp = (timeStr: string): number => {
-  if (!timeStr) return Date.now() / 1000
-  const d = new Date(timeStr)
-  if (!isNaN(d.getTime())) {
-    return Math.floor(d.getTime() / 1000)
-  }
-  // 若包含 HH:mm:ss 简写
-  const parts = timeStr.split(':').map(Number)
-  if (parts.length >= 2) {
-    const now = new Date()
-    now.setHours(parts[0], parts[1], parts[2] || 0, 0)
-    return Math.floor(now.getTime() / 1000)
-  }
-  return Math.floor(Date.now() / 1000)
-}
+const parseToTimestamp = (timeStr: string): number =>
+  parseWindowTimestamp(timeStr, Math.floor(Date.now() / 1000))
 
 /**
  * [功能说明]
@@ -1094,16 +1082,7 @@ const tsToPercent = (ts: number): number => {
 const playheadLeftPx = computed(() => tsToLeftPx(snapToGrid(currentPlayTs.value)))
 const playheadPercent = computed(() => tsToPercent(currentPlayTs.value))
 
-const formatPlayTime = (ts: number): string => {
-  const date = new Date(ts * 1000)
-  const y = date.getFullYear()
-  const mo = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  const h = String(date.getHours()).padStart(2, '0')
-  const m = String(date.getMinutes()).padStart(2, '0')
-  const s = String(date.getSeconds()).padStart(2, '0')
-  return `${y}-${mo}-${d} ${h}:${m}:${s}`
-}
+const formatPlayTime = (ts: number): string => formatLocalDateTime(ts * 1000)
 
 /**
  * 判断当前矩阵是否为侦察卫星矩阵（含 initMatrixList / relayRelation）

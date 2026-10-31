@@ -146,6 +146,12 @@ import TopoLeftPanel from '@/components/electronic/TopoLeftPanel.vue'
 import TopoRightPanel from '@/components/electronic/TopoRightPanel.vue'
 import ElectronicMissionTimeline from '@/components/electronic/ElectronicMissionTimeline.vue'
 import { type TimelineChainMarkerType, buildSatellitePassDelayMap, collectRelaySatelliteTransmissionLinks, collectSatelliteTransmissionLinks, collectSeriesTransmissionLinks, findTransmissionLinkById, isRelaySatellite, listNormalSatelliteNorads, listSourceSatelliteNoradsForRelay, lookupStationPassDelayMin, resolveTaskEndMs, type ChainNode, type SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
+import {
+  STARLINK_COVERAGE_BRACKETS,
+  formatHeatmapCoverage,
+  getCoverageBracket,
+} from '@/utils/battleSatelliteCharts/coverageHeatmap'
+import { formatLocalDateTime, formatMonthDayClock, parseTimeToMs } from '@/utils/tools/dateFormat'
 
 defineOptions({
   name: 'ElectronicWarfareG6',
@@ -312,36 +318,6 @@ const starlinkHeatTooltipMap = new Map<
   Array<{ name: string; norad: number; beforeCoverage: number | null; afterCoverage: number | null }>
 >()
 
-/** 覆盖率从高到低划分为 25 个等级，每档 4%。 */
-const STARLINK_COVERAGE_BRACKETS = Array.from({ length: 25 }, (_, index) => {
-  const high = 100 - index * 4
-  const low = Math.max(0, high - 3)
-  return `${low}%~${high}%`
-})
-
-const getCoverageBracket = (coverage: number): string => {
-  const normalized = Math.min(100, Math.max(0, coverage))
-  const index = Math.min(24, Math.floor((100 - normalized) / 4))
-  return STARLINK_COVERAGE_BRACKETS[index]
-}
-
-const formatHeatmapTime = (timestamp: number): string => {
-  const date = new Date(timestamp)
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-/**
- * 将覆盖率格式化为保留三位小数的百分比文案。
- *
- * @param value 覆盖率原始值，可能为空
- * @returns 如 `77.778%`；无效值返回 `--`
- */
-const formatHeatmapCoverage = (value: number | null | undefined): string => {
-  if (value == null || !Number.isFinite(value)) return '--'
-  return `${value.toFixed(3)}%`
-}
-
 /** STARLINK 卫星覆盖率在任务时间片中的梯队分布（打击前/后按过境时刻切换）。 */
 const starlinkCoverageHeatModel = computed<StarlinkCoverageHeatModel>(() => {
   const empty: StarlinkCoverageHeatModel = { cells: [], timeLabels: [], strikeSplitLabel: null }
@@ -353,7 +329,7 @@ const starlinkCoverageHeatModel = computed<StarlinkCoverageHeatModel>(() => {
   const intervalMs = taskEnd - taskStart <= 24 * 60 * 60 * 1000 ? 30 * 60 * 1000 : 60 * 60 * 1000
   const sliceCount = Math.min(48, Math.max(1, Math.ceil((taskEnd - taskStart) / intervalMs)))
   const timeLabels = Array.from({ length: sliceCount }, (_, index) =>
-    formatHeatmapTime(taskStart + index * intervalMs)
+    formatMonthDayClock(new Date(taskStart + index * intervalMs))
   )
   const initMatrixByNorad = new Map((data.initMatrixList || []).map((satellite) => [satellite.norad, satellite]))
   const satellites: StarlinkCoverageSnapshot[] = []
@@ -1486,22 +1462,19 @@ watch(
 // ==================== 时间轴算法与转换函数 ====================
 
 /**
- * 解析时间字符串为 Unix 毫秒时间戳
+ * 解析时间字符串为 Unix 毫秒时间戳。无法解析时用当前时间，避免时间轴落到 1970。
+ *
+ * @param timeStr 时间字符串
+ * @returns 毫秒时间戳
  */
-const parseToTimestamp = (timeStr: string): number => {
-  if (!timeStr) return Date.now()
-  const d = new Date(timeStr.replace(/-/g, '/'))
-  return isNaN(d.getTime()) ? Date.now() : d.getTime()
-}
+const parseToTimestamp = (timeStr: string): number => parseTimeToMs(timeStr) || Date.now()
 
 /**
  * 格式化时间戳为 YY-MM-DD HH:mm:ss
  */
 const formatTimeStr = (ts: number): string => {
   if (!ts) return ''
-  const d = new Date(ts)
-  const pad = (n: number) => (n < 10 ? '0' + n : String(n))
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  return formatLocalDateTime(ts)
 }
 
 const currentTimeText = computed(() => formatTimeStr(currentTimestamp.value))

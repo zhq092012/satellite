@@ -4,7 +4,7 @@ import {
   collectSeriesTransmissionLinks,
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
-import { parseWindowTimestamp } from '@/utils/tools/matrixAdapter'
+import { formatLocalDateTime, parseWindowTimestamp } from '@/utils/tools/dateFormat'
 
 /** 单行时间块在轨道中的布局结果 */
 export interface SeriesLinkTimelineBlock {
@@ -128,13 +128,7 @@ export const formatTimelineMs = (ms: number): string => {
   if (!ms) return '--'
   const date = new Date(ms)
   if (Number.isNaN(date.getTime())) return '--'
-  const y = date.getFullYear()
-  const mo = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  const h = String(date.getHours()).padStart(2, '0')
-  const m = String(date.getMinutes()).padStart(2, '0')
-  const s = String(date.getSeconds()).padStart(2, '0')
-  return `${y}-${mo}-${d} ${h}:${m}:${s}`
+  return formatLocalDateTime(ms)
 }
 
 /**

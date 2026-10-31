@@ -1,7 +1,7 @@
 import { createWebHistory, createRouter, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/store/modules/auth'
 import { ElMessage } from 'element-plus'
-import { hasPermission, hasRole } from '@/utils/permission'
+import { hasPermission, hasRole } from '@/utils/auth'
 
 const routes: Array<RouteRecordRaw> = [
   {

@@ -234,6 +234,7 @@ import {
 } from '@/api/dashboard'
 import { getSatelliteBySeries, getSatelliteSeries } from '@/api/task/task'
 import { getOrbitType } from '@/utils/tools/satellite'
+import { isDataCenterStationType } from '@/utils/c2TaskPanelEditor'
 import {
   deleteBaseStations,
   getGroundStationList,
@@ -571,15 +572,6 @@ const parseLatLon = (latLon: string): { lng: string; lat: string } => {
 }
 
 /**
- * 判断基站类型是否属于数据中心。
- * @param type 基站类型文案
- */
-const isDataCenterType = (type: string): boolean => {
-  const value = type || ''
-  return value.includes('中心') || value.includes('数据') || value.includes('云')
-}
-
-/**
  * 将基站信息映射为装配表格行。
  * @param station 基站原始数据
  */
@@ -851,7 +843,7 @@ const loadStationCandidates = async () => {
   const res = await getGroundStationList({ type: '', name: '', country: '' })
   const list = res.code === 200 ? (res.data ?? []) : []
   const filtered = list.filter((item) =>
-    props.kind === 'center' ? isDataCenterType(item.type) : !isDataCenterType(item.type)
+    props.kind === 'center' ? isDataCenterStationType(item.type) : !isDataCenterStationType(item.type)
   )
   Object.keys(stationRawMap).forEach((key) => delete stationRawMap[key])
   candidatePool.station = []

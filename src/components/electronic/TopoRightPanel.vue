@@ -310,7 +310,6 @@ import {
   collectSeriesTransmissionLinks,
   findTransmissionLinkById,
   lookupStationPassDelayMin,
-  parseTimeToMs,
   rankTransmissionLinksByPriority,
   resolveLinkStrikeTarget,
   resolveTaskEndMs,
@@ -319,6 +318,7 @@ import {
   type PrioritizedTransmissionLink,
   type SatelliteTransmissionLink,
 } from '@/utils/satelliteFullChainAnalysis'
+import { parseTimeToMs } from '@/utils/tools/dateFormat'
 
 /** 节点详情窗口项 */
 interface DetailWindowItem {

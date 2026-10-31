@@ -260,29 +260,27 @@ import { taskProgressMap, useTaskProgressPolling } from '@/composables/useTaskPr
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskEditDialog, { type TaskEditDialogMode } from '@/components/BattleSituation/TaskEditDialog.vue'
 import {
+  buildWeaponTableRow,
   calcTaskDurationHours,
   createDraftFromTask,
+  fetchSeriesNamesByCountry,
+  formatC2LeftPanelTaskTimeRange,
+  groupGroundStationRowsByCountry,
   isDataCenterStationType,
+  mapSatellitePreviewToTableRows,
   mergeTaskFormWithDraft,
   notifyTaskListValidationErrors,
   normalizeTaskWeaponIds,
   parseTaskPanelTimeMs,
+  type C2LeftPanelCountryGroundGroup,
+  type C2LeftPanelGroundStationTableRow,
+  type C2LeftPanelSatellitePreviewItem,
+  type C2LeftPanelSatelliteTableRow,
+  type C2LeftPanelWeaponTableRow,
   type C2TaskEditorDraft,
   type TaskPanelResourceDetailPayload,
   type TaskPanelTagOption,
 } from '@/utils/c2TaskPanelEditor'
-import {
-  buildWeaponTableRow,
-  fetchSeriesNamesByCountry,
-  formatC2LeftPanelTaskTimeRange,
-  groupGroundStationRowsByCountry,
-  mapSatellitePreviewToTableRows,
-  type C2LeftPanelSatellitePreviewItem,
-  type C2LeftPanelCountryGroundGroup,
-  type C2LeftPanelGroundStationTableRow,
-  type C2LeftPanelSatelliteTableRow,
-  type C2LeftPanelWeaponTableRow,
-} from '@/utils/c2LeftPanelResourceTree'
 defineProps<{
   /** 算法矩阵（与父组件兼容） */
   matrixData?: MatrixResult | null

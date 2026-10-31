@@ -153,6 +153,7 @@ import {
   formatSatelliteMetaInline,
   resolveSatelliteDisplayMetaFromAnalysis,
 } from '@/utils/buildSatelliteAnalysisTable'
+import { parseTimeToMs } from '@/utils/tools/dateFormat'
 
 /** 全局布局 Store */
 const store = useLayoutStore()
@@ -259,10 +260,10 @@ const taskTimeRange = computed(() => {
 })
 
 /** 任务开始时间（毫秒） */
-const taskStartMs = computed(() => parseTaskTimeMs(taskTimeRange.value?.start))
+const taskStartMs = computed(() => parseTimeToMs(taskTimeRange.value?.start))
 
 /** 任务结束时间（毫秒） */
-const taskEndMs = computed(() => parseTaskTimeMs(taskTimeRange.value?.end))
+const taskEndMs = computed(() => parseTimeToMs(taskTimeRange.value?.end))
 
 /** 任务分析汇总卫星（含 TLE/名称校验错误，不静默跳过） */
 const globeSatellitesBuild = computed(() => {
@@ -408,19 +409,6 @@ const hasGlobeSelection = (): boolean =>
   selectedNorad.value != null ||
   selectedWeaponId.value != null ||
   selectedGroundTargetKey.value != null
-
-/**
- * 解析任务时间为毫秒。
- *
- * @param value 时间字符串
- * @returns 毫秒时间戳
- */
-const parseTaskTimeMs = (value?: string): number => {
-  if (!value) return 0
-  /** 把 `YYYY-MM-DD` 换成斜杠，避免部分环境把连字符日期解析成 Invalid Date */
-  const ts = new Date(value.replace(/-/g, '/')).getTime()
-  return Number.isFinite(ts) ? ts : 0
-}
 
 /**
  * 时间轴点击跳转：仅更新游标，不联动地图播放。
@@ -1005,7 +993,7 @@ watch(
     wasPlayingBeforeSelection = false
     selectedWeaponId.value = null
     selectedGroundTargetKey.value = null
-    currentTimeMs.value = range ? parseTaskTimeMs(range.start) : 0
+    currentTimeMs.value = range ? parseTimeToMs(range.start) : 0
   },
   { immediate: true }
 )

@@ -3,10 +3,10 @@
     <div class="timeline-header">
       <span class="header-title">{{ isTaskTimelineMode ? '任务时间标尺' : '时间标尺' }}</span>
       <span v-if="!isTaskTimelineMode && currentTimeMs" class="current-time-tag">
-        {{ formatTimelineTime(currentTimeMs) }}
+        {{ formatLocalDateTime(currentTimeMs) }}
       </span>
       <span v-else-if="forceTaskMode && !selectedNorad && currentTimeMs" class="current-time-tag">
-        {{ formatTimelineTime(currentTimeMs) }}
+        {{ formatLocalDateTime(currentTimeMs) }}
       </span>
       <div class="legend-row" v-if="selectedNorad">
         <span class="legend-chip chip-normal">正常通信</span>
@@ -105,8 +105,8 @@
       </div>
 
       <div class="timeline-scale">
-        <span>{{ formatTimelineTime(taskStartMs) }}</span>
-        <span>{{ formatTimelineTime(taskEndMs) }}</span>
+        <span>{{ formatLocalDateTime(taskStartMs) }}</span>
+        <span>{{ formatLocalDateTime(taskEndMs) }}</span>
       </div>
     </div>
   </div>
@@ -117,12 +117,16 @@ import { computed, ref, watch } from 'vue'
 import type { MatrixResult } from '@/api/electronic'
 import {
   buildSatelliteTimelineModel,
-  formatTimelineTime,
+  buildTimelineHourRulerTicks,
+  mapTimelinePositionPercent,
+  getTimelineMarkerAlign,
   msToRatio,
+  TIMELINE_RULER_EDGE_INSET,
   type SatelliteTimelineModel,
   type TimelineMarker,
   type TimelineMarkerType,
 } from '@/utils/satelliteTimelineMarkers'
+import { formatLocalDateTime, parseTimeToMs } from '@/utils/tools/dateFormat'
 
 /** 拓扑分析对抗时间轴组件输入属性 */
 const props = defineProps<{
@@ -158,18 +162,10 @@ const emit = defineEmits<{
 /** 时间轴轨道元素引用 */
 const trackRef = ref<HTMLElement | null>(null)
 
-/** 将任务时间字符串解析为毫秒时间戳 */
-const parseTaskTime = (value: string): number => {
-  if (!value) return 0
-  const normalizedValue = value.replace(/-/g, '/')
-  const ts = new Date(normalizedValue).getTime()
-  return Number.isNaN(ts) ? 0 : ts
-}
-
 /** 任务开始时间的毫秒时间戳 */
-const taskStartMs = computed(() => parseTaskTime(props.taskStart))
+const taskStartMs = computed(() => parseTimeToMs(props.taskStart))
 /** 任务结束时间的毫秒时间戳 */
-const taskEndMs = computed(() => parseTaskTime(props.taskEnd))
+const taskEndMs = computed(() => parseTimeToMs(props.taskEnd))
 
 /** 是否处于任务时间标尺模式（选中卫星或聚焦传输链路） */
 const isTaskTimelineMode = computed(() => !!props.selectedNorad || !!props.forceTaskMode)
@@ -193,23 +189,14 @@ const lastJamEndMs = computed(() => {
   return Math.max(...segs.map((s) => s.endMs))
 })
 
-/** 标尺两端预留的百分比空间 */
-const RULER_EDGE_INSET = 2.8
-
-/** 将时间轴相对比例映射为带两端留白的百分比位置 */
-const mapPositionPercent = (ratio: number): number =>
-  RULER_EDGE_INSET + ratio * (100 - RULER_EDGE_INSET * 2)
-
-/** 将毫秒时间戳转换为时间轴上的百分比位置 */
+/**
+ * 将毫秒时间戳转换为时间轴上的百分比位置。
+ *
+ * @param ms 毫秒时间戳
+ * @returns 带两端留白的百分比
+ */
 const msToPercent = (ms: number): number =>
-  mapPositionPercent(msToRatio(ms, taskStartMs.value, taskEndMs.value))
-
-/** 根据标记位置判断其水平对齐方式 */
-const getMarkerAlign = (percent: number): 'start' | 'center' | 'end' => {
-  if (percent <= RULER_EDGE_INSET + 1) return 'start'
-  if (percent >= 100 - RULER_EDGE_INSET - 1) return 'end'
-  return 'center'
-}
+  mapTimelinePositionPercent(msToRatio(ms, taskStartMs.value, taskEndMs.value))
 
 /** 生成时间轴色段的定位样式 */
 const segmentStyle = (startMs: number, endMs: number) => {
@@ -275,12 +262,12 @@ const displayMarkerItems = computed<DisplayMarkerItem[]>(() => {
       type: marker.type,
       ms: marker.ms,
       percent,
-      align: getMarkerAlign(percent),
+      align: getTimelineMarkerAlign(percent),
       lane: allocLane(percent),
       isMajor: marker.type === 'first_transmit',
       icon: meta.icon,
       title: marker.label || meta.title,
-      timeText: formatTimelineTime(marker.ms),
+      timeText: formatLocalDateTime(marker.ms),
       desc: marker.detail || undefined,
       receiveId: marker.receiveId,
       orderIndex: marker.orderIndex ?? idx,
@@ -292,26 +279,9 @@ const displayMarkerItems = computed<DisplayMarkerItem[]>(() => {
 })
 
 /** 根据任务时长生成时间标尺刻度 */
-const rulerTicks = computed(() => {
-  const ticks: { percent: number; label: string; major: boolean; align: 'start' | 'center' | 'end' }[] = []
-  const start = taskStartMs.value
-  const end = taskEndMs.value
-  const span = end - start
-  if (span <= 0) return ticks
-
-  const hourMs = 3600 * 1000
-  const step = span > 36 * hourMs ? 6 * hourMs : span > 12 * hourMs ? 3 * hourMs : hourMs
-
-  for (let t = start; t <= end; t += step) {
-    const d = new Date(t)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const label = `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:00`
-    const percent = msToPercent(t)
-    ticks.push({ percent, label, major: true, align: getMarkerAlign(percent) })
-  }
-
-  return ticks
-})
+const rulerTicks = computed(() =>
+  buildTimelineHourRulerTicks(taskStartMs.value, taskEndMs.value, msToPercent)
+)
 
 /** 处理时间轴标记点击并向父组件同步时间与标记信息 */
 const handleMarkerClick = (item: DisplayMarkerItem) => {
@@ -329,7 +299,7 @@ const handleTrackClick = (event: MouseEvent) => {
   const rect = trackRef.value.getBoundingClientRect()
   if (rect.width <= 0) return
   const clickX = event.clientX - rect.left
-  const leftInset = (RULER_EDGE_INSET / 100) * rect.width
+  const leftInset = (TIMELINE_RULER_EDGE_INSET / 100) * rect.width
   const usableWidth = rect.width - 2 * leftInset
   const ratio = Math.max(0, Math.min(1, (clickX - leftInset) / usableWidth))
   const targetMs = Math.round(taskStartMs.value + ratio * (taskEndMs.value - taskStartMs.value))

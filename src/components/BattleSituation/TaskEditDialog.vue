@@ -110,12 +110,17 @@ import { addTask } from '@/api/task/task'
 import type { TaskForm } from '@/types/dashboard'
 import {
   combatAreaToApiFields,
+  fromTaskDatetimeLocalValue as fromDatetimeLocalValue,
   materializeTaskListItemFromApi,
   normalizeTaskCombatArea,
+  normalizeTaskDateTime as normalizeDateTime,
+  parseTaskPanelTimeMs as parseTaskTimeMs,
   SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI,
   SHOW_TASK_COMBAT_AREA_IN_UI,
   TaskListItemFromApiError,
+  toTaskDatetimeLocalValue as toDatetimeLocalValue,
 } from '@/utils/c2TaskPanelEditor'
+import { formatTaskMinuteDateTime } from '@/utils/tools/dateFormat'
 
 /** 是否展示任务时长 / 链路时延 / 覆盖率表单项（仅 UI） */
 const showTaskDurationDelayCoverageInUi = SHOW_TASK_DURATION_DELAY_COVERAGE_IN_UI
@@ -330,75 +335,8 @@ watch(visible, (open) => {
 })
 
 /**
- * 规范化时间字符串为任务提交格式（不含秒）。
- *
- * @param value 原始时间
- * @returns `YYYY-MM-DD HH:mm` 或空串
- */
-const normalizeDateTime = (value?: string): string => {
-  if (!value) return ''
-  const trimmed = value.trim()
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(trimmed)) return trimmed
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(trimmed)) return trimmed.slice(0, 16)
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
-    const [datePart, timePart] = trimmed.replace('T', ' ').split(' ')
-    return `${datePart} ${timePart.slice(0, 5)}`
-  }
-  const ts = new Date(trimmed.replace(/-/g, '/')).getTime()
-  if (!Number.isFinite(ts) || Number.isNaN(ts)) return trimmed
-  const d = new Date(ts)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-/**
- * 将任务时间转为 datetime-local 所需的 `YYYY-MM-DDTHH:mm`。
- *
- * @param value 任务时间字符串
- * @returns 可供原生时间输入回填的值
- */
-const toDatetimeLocalValue = (value?: string): string => {
-  const normalized = normalizeDateTime(value)
-  return normalized ? normalized.replace(' ', 'T') : ''
-}
-
-/**
- * 将 datetime-local 值转回任务时间格式。
- *
- * @param value 原生时间输入值
- * @returns `YYYY-MM-DD HH:mm`
- */
-const fromDatetimeLocalValue = (value?: string): string => {
-  if (!value) return ''
-  return normalizeDateTime(value.replace('T', ' '))
-}
-
-/**
- * 解析任务时间为毫秒。无效时返回 0。
- *
- * @param value 任务时间
- * @returns 毫秒时间戳
- */
-const parseTaskTimeMs = (value?: string): number => {
-  const normalized = normalizeDateTime(value)
-  if (!normalized) return 0
-  const ts = new Date(normalized.replace(/-/g, '/')).getTime()
-  return Number.isFinite(ts) ? ts : 0
-}
-
-/**
- * 将 Date 格式化为任务时间字符串。
- *
- * @param date 日期对象
- * @returns `YYYY-MM-DD HH:mm`
- */
-const formatDateToTaskTime = (date: Date): string => {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-/**
  * 根据起止时间计算任务时长（小时，至少 1）。
+ * 时间无效时保持弹窗默认 1 小时，与任务面板「无法计算则为 null」的口径不同。
  *
  * @returns 小时数
  */
@@ -432,7 +370,7 @@ const handleDurationHoursChange = (value: number | undefined) => {
   if (!beginMs) return
   const safeHours = Math.max(1, Math.round(value))
   durationHours.value = safeHours
-  taskForm.endDate = formatDateToTaskTime(new Date(beginMs + safeHours * 3600000))
+  taskForm.endDate = formatTaskMinuteDateTime(new Date(beginMs + safeHours * 3600000))
 }
 
 
@@ -479,7 +417,7 @@ const handleBeginInput = (value: string) => {
   const beginMs = parseTaskTimeMs(taskForm.beginDate)
   const endMs = parseTaskTimeMs(taskForm.endDate)
   if (beginMs && (!endMs || endMs <= beginMs)) {
-    taskForm.endDate = formatDateToTaskTime(new Date(beginMs + keepHours * 3600000))
+    taskForm.endDate = formatTaskMinuteDateTime(new Date(beginMs + keepHours * 3600000))
   }
 }
 
@@ -568,7 +506,7 @@ const splitCsv = (value?: string): string[] =>
 const createDefaultBeginDate = (): string => {
   const now = new Date()
   const begin = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0, 0)
-  return formatDateToTaskTime(begin)
+  return formatTaskMinuteDateTime(begin)
 }
 
 /**
@@ -581,7 +519,7 @@ const createDefaultBeginDate = (): string => {
 const createDefaultEndDate = (beginDate: string, hours: number): string => {
   const beginMs = parseTaskTimeMs(beginDate)
   if (!beginMs) return ''
-  return formatDateToTaskTime(new Date(beginMs + hours * 3600000))
+  return formatTaskMinuteDateTime(new Date(beginMs + hours * 3600000))
 }
 
 /**

@@ -2,11 +2,11 @@ import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
 import { onBeforeUnmount, watch, type ComputedRef, type Ref } from 'vue'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
-import { resolveBattleGlobeOrbitPeriodSec } from '@/utils/buildBattleGlobeSatellites'
 import {
   BATTLE_GLOBE_ORBIT_PATH_WIDTH,
   createBattleGlobeOrbitGlowMaterial,
-} from '@/utils/battleGlobeOrbitPathStyle'
+  resolveBattleGlobeOrbitPeriodSec,
+} from '@/utils/buildBattleGlobeSatellites'
 
 /** 选中卫星 path 轨迹实体 ID 前缀 */
 const SELECTED_ORBIT_ENTITY_PREFIX = 'battle-selected-sat-path-'

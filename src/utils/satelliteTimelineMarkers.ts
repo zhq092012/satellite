@@ -3,6 +3,7 @@ import {
   analyzeSatelliteFullChain,
   collectSatelliteTransmissionLinks,
 } from '@/utils/satelliteFullChainAnalysis'
+import { pad2 } from '@/utils/tools/dateFormat'
 
 export type TimelineMarkerType =
   | 'task_start'
@@ -180,15 +181,76 @@ export const msToRatio = (ms: number, startMs: number, endMs: number): number =>
   return Math.min(1, Math.max(0, (ms - startMs) / span))
 }
 
+/** 时间轴标尺两端预留的百分比，避免首尾刻度贴边被裁切。 */
+export const TIMELINE_RULER_EDGE_INSET = 2.8
+
+/** 时间轴标记或刻度的水平对齐方式。 */
+export type TimelineMarkerAlign = 'start' | 'center' | 'end'
+
+/** 时间轴小时刻度。 */
+export interface TimelineRulerTick {
+  /** 相对轨道的百分比位置 */
+  percent: number
+  /** 刻度文案，形如 `MM/DD HH:00` */
+  label: string
+  /** 是否为主刻度 */
+  major: boolean
+  /** 标签水平对齐，避免贴边溢出 */
+  align: TimelineMarkerAlign
+}
+
 /**
- * 把时间轴时刻格式化为本地时区的 `YYYY-MM-DD HH:mm:ss`。
+ * 把 0~1 的时间比例映射成带两端留白的百分比位置。
  *
- * @param ms 毫秒时间戳
- * @returns 格式化时间
+ * @param ratio 0~1 比例
+ * @param inset 两端预留百分比，默认 {@link TIMELINE_RULER_EDGE_INSET}
+ * @returns 百分比位置
  */
-export const formatTimelineTime = (ms: number): string => {
-  const d = new Date(ms)
-  /** 数字补成两位。 @param n 非负整数 @returns 至少两位的字符串 */
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+export const mapTimelinePositionPercent = (ratio: number, inset = TIMELINE_RULER_EDGE_INSET): number =>
+  inset + ratio * (100 - inset * 2)
+
+/**
+ * 根据百分比判断标签对齐，避免贴在轨道两端时溢出。
+ *
+ * @param percent 百分比位置
+ * @param inset 两端预留百分比，默认 {@link TIMELINE_RULER_EDGE_INSET}
+ * @returns 水平对齐方式
+ */
+export const getTimelineMarkerAlign = (
+  percent: number,
+  inset = TIMELINE_RULER_EDGE_INSET
+): TimelineMarkerAlign => {
+  if (percent <= inset + 1) return 'start'
+  if (percent >= 100 - inset - 1) return 'end'
+  return 'center'
+}
+
+/**
+ * 按任务跨度生成小时刻度。跨度超过 12 小时改为 3 小时一步，超过 36 小时改为 6 小时一步。
+ *
+ * @param startMs 时间轴起点
+ * @param endMs 时间轴终点
+ * @param toPercent 把绝对时刻换成百分比位置
+ * @returns 刻度列表；时长非正时为空数组
+ */
+export const buildTimelineHourRulerTicks = (
+  startMs: number,
+  endMs: number,
+  toPercent: (ms: number) => number
+): TimelineRulerTick[] => {
+  const ticks: TimelineRulerTick[] = []
+  const span = endMs - startMs
+  if (span <= 0) return ticks
+
+  const hourMs = 3600 * 1000
+  const step = span > 36 * hourMs ? 6 * hourMs : span > 12 * hourMs ? 3 * hourMs : hourMs
+
+  for (let timestamp = startMs; timestamp <= endMs; timestamp += step) {
+    const date = new Date(timestamp)
+    const label = `${pad2(date.getMonth() + 1)}/${pad2(date.getDate())} ${pad2(date.getHours())}:00`
+    const percent = toPercent(timestamp)
+    ticks.push({ percent, label, major: true, align: getTimelineMarkerAlign(percent) })
+  }
+
+  return ticks
 }

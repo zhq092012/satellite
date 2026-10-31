@@ -11,11 +11,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ZhchPlanResp } from '@/api/electronic'
-import { toZhchPlanMetricsTableRowsFromCompare } from '@/utils/buildZhchPlanMetricsCompareTable'
 import {
   buildCommCapabilityCompareTable,
   buildReconCapabilityCompareTable,
-} from '@/utils/buildZhchPlanCapabilityCompareTable'
+  toZhchPlanMetricsTableRowsFromCompare,
+} from '@/utils/buildZhchPlanMetricsCompareTable'
 import ZhchPlanMetricsTable from './ZhchPlanMetricsTable.vue'
 
 const props = defineProps<{

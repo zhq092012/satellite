@@ -102,6 +102,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { getBattleCountrys } from '@/api/dashboard'
+import { isDataCenterStationType } from '@/utils/c2TaskPanelEditor'
 import {
   deleteBaseStations,
   getBaseStationList,
@@ -112,17 +113,6 @@ import {
 type StationScope = 'all' | 'ground' | 'center'
 
 const route = useRoute()
-
-/**
- * 判断基站类型是否属于数据中心。
- *
- * @param type 基站类型文案
- * @returns 是否为数据中心
- */
-const isDataCenterType = (type?: string): boolean => {
-  const value = type || ''
-  return value.includes('中心') || value.includes('数据') || value.includes('云')
-}
 
 /** 当前路由对应的基站筛选范围 */
 const stationScope = computed<StationScope>(() => {
@@ -192,10 +182,10 @@ const dialogTitle = computed(() => (form._id ? `编辑${pageTitle.value}` : `新
  */
 const filterStationsByScope = (list: BaseStationInfo[]): BaseStationInfo[] => {
   if (stationScope.value === 'ground') {
-    return list.filter((item) => !isDataCenterType(item.type))
+    return list.filter((item) => !isDataCenterStationType(item.type))
   }
   if (stationScope.value === 'center') {
-    return list.filter((item) => isDataCenterType(item.type))
+    return list.filter((item) => isDataCenterStationType(item.type))
   }
   return list
 }

@@ -1,5 +1,6 @@
 
 import type { MatrixResult, StationRelationList, Weapon, WeaponAttackRecord } from '@/api/electronic'
+import { formatLocalDateTime, parseTimeToMs } from '@/utils/tools/dateFormat'
 export interface ChainNode {
   layer: 'SAT' | 'RELAY' | 'RECEIVE' | 'STATION'
   id: string
@@ -84,19 +85,6 @@ interface ChainCandidate {
   groundStartTs: number
   groundEndTs: number
   nodes: ChainNode[]
-}
-
-/**
- * 把矩阵时间字符串解析为毫秒。横线日期会先换成斜线，以兼容部分浏览器对 `YYYY-MM-DD` 的解析。
- *
- * @param timeStr 时间字符串；空串视为无效
- * @returns 毫秒时间戳；空串或无法解析时为 0
- */
-export const parseTimeToMs = (timeStr: string): number => {
-  if (!timeStr) return 0
-  const normalized = timeStr.replace(/-/g, '/')
-  const ts = new Date(normalized).getTime()
-  return Number.isNaN(ts) ? 0 : ts
 }
 
 export type WindowTimeLike = {
@@ -289,19 +277,6 @@ export const buildSatellitePassDelayMap = (
   })
 
   return map
-}
-
-/**
- * 把毫秒时间戳格式化为本地时区的 `YYYY-MM-DD HH:mm:ss`。
- *
- * @param ts 毫秒时间戳
- * @returns 格式化时间
- */
-const formatTimestampMs = (ts: number): string => {
-  const d = new Date(ts)
-  /** 数字补成两位，用于月日时分秒。 @param n 非负整数 @returns 至少两位的字符串 */
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 /**
@@ -1002,7 +977,7 @@ export const analyzeSatelliteChainAtTime = (
   if (!best) return empty
 
   return {
-    finishTime: formatTimestampMs(best.finishTs),
+    finishTime: formatLocalDateTime(best.finishTs),
     finishTimestamp: best.finishTs,
     nodes: best.nodes,
     blocked: false,
@@ -1103,7 +1078,7 @@ export const analyzeSatelliteFullChain = (
   }
 
   return {
-    finishTime: formatTimestampMs(best.finishTs),
+    finishTime: formatLocalDateTime(best.finishTs),
     finishTimestamp: best.finishTs,
     nodes: best.nodes,
     blocked: false,
@@ -1185,7 +1160,7 @@ export const resolveStationPassChain = (
     chain: emptyChain,
     delayMin: 0,
     delayText: '未造成额外延迟',
-    currentTime: atMs ? formatTimestampMs(atMs) : '',
+    currentTime: atMs ? formatLocalDateTime(atMs) : '',
     struck: false,
   }
   if (!matrix || !norad || !receiveKey) return empty
@@ -1261,7 +1236,7 @@ export const resolveStationPassChain = (
   if (!station) {
     return {
       chain: {
-        finishTime: finishTs ? formatTimestampMs(finishTs) : null,
+        finishTime: finishTs ? formatLocalDateTime(finishTs) : null,
         finishTimestamp: finishTs || null,
         nodes: [
           { layer: 'SAT', id: String(norad), name: satName, icon: '🛰️' },
@@ -1272,7 +1247,7 @@ export const resolveStationPassChain = (
       },
       delayMin,
       delayText: formatDelayText(delayMin, struck),
-      currentTime: formatTimestampMs(atMs || finishTs),
+      currentTime: formatLocalDateTime(atMs || finishTs),
       struck,
     }
   }
@@ -1293,14 +1268,14 @@ export const resolveStationPassChain = (
 
   return {
     chain: {
-      finishTime: finishTs ? formatTimestampMs(finishTs) : null,
+      finishTime: finishTs ? formatLocalDateTime(finishTs) : null,
       finishTimestamp: finishTs || null,
       nodes,
       blocked: false,
     },
     delayMin,
     delayText: formatDelayText(delayMin, struck),
-    currentTime: formatTimestampMs(atMs || finishTs),
+    currentTime: formatLocalDateTime(atMs || finishTs),
     struck,
   }
 }
@@ -1587,7 +1562,7 @@ export const collectSatelliteTransmissionLinks = (
       transmitTime: groundEnd && groundEnd !== groundStart ? `${groundStart} ~ ${groundEnd}` : groundStart,
       transmitStartMs: groundStartTs,
       transmitEndMs: groundEndTs,
-      finishTime: formatTimestampMs(finishTs),
+      finishTime: formatLocalDateTime(finishTs),
       struck,
       satelliteStruck: strikeTarget.satelliteStruck,
       receiveStruck: strikeTarget.receiveStruck,
@@ -1643,8 +1618,8 @@ export const collectSatelliteTransmissionLinks = (
         candidate.groundEndTs
       )
 
-      const groundStart = formatTimestampMs(candidate.groundStartTs)
-      const groundEnd = formatTimestampMs(candidate.groundEndTs)
+      const groundStart = formatLocalDateTime(candidate.groundStartTs)
+      const groundEnd = formatLocalDateTime(candidate.groundEndTs)
       links.push({
         id: `${norad}-relay-${receiveNode.id}-${candidate.groundStartTs}-${idx}`,
         nodes: candidate.nodes,
@@ -1653,7 +1628,7 @@ export const collectSatelliteTransmissionLinks = (
         transmitTime: groundEnd !== groundStart ? `${groundStart} ~ ${groundEnd}` : groundStart,
         transmitStartMs: candidate.groundStartTs,
         transmitEndMs: candidate.groundEndTs,
-        finishTime: formatTimestampMs(candidate.finishTs),
+        finishTime: formatLocalDateTime(candidate.finishTs),
         struck: strikeTarget.struck,
         satelliteStruck: strikeTarget.satelliteStruck,
         receiveStruck: strikeTarget.receiveStruck,
@@ -1759,7 +1734,7 @@ export const collectNetworkChainStats = (matrix: MatrixResult | null): NetworkCh
       const key = chainPathKey(candidate.nodes)
       if (remaining.has(key)) return
       remaining.set(key, {
-        finishTime: formatTimestampMs(candidate.finishTs),
+        finishTime: formatLocalDateTime(candidate.finishTs),
         finishTimestamp: candidate.finishTs,
         nodes: candidate.nodes,
         blocked: false,

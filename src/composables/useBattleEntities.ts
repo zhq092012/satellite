@@ -20,7 +20,7 @@ import {
   createStationExplosionDiamondDataUri,
 } from '@/utils/tools/svgIcons'
 import { parseMissionWindowDate } from '@/utils/tools/dateFormat'
-import { buildSatelliteInfoBoxDescription } from '@/utils/tools/infoBoxBuilder'
+import { buildSatelliteInfoBoxDescription } from '@/utils/tools/infoBox'
 import type { Weapon } from '@/types/dashboard'
 import type { BlueSatelliteRecord, SatelliteRelationItem } from '@/types/strike'
 import type { SatelliteDetail } from '@/types/cesium/satellite'

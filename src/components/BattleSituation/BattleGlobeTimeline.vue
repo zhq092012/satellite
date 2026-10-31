@@ -18,7 +18,7 @@
         </div>
       </div>
       <span v-if="displayTimeMs" class="current-time-tag">
-        {{ formatTimelineTime(displayTimeMs) }}
+        {{ formatLocalDateTime(displayTimeMs) }}
       </span>
     </div>
 
@@ -41,8 +41,8 @@
       </div>
 
       <div class="timeline-scale">
-        <span>{{ formatTimelineTime(taskStartMs) }}</span>
-        <span>{{ formatTimelineTime(taskEndMs) }}</span>
+        <span>{{ formatLocalDateTime(taskStartMs) }}</span>
+        <span>{{ formatLocalDateTime(taskEndMs) }}</span>
       </div>
     </div>
   </div>
@@ -50,7 +50,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { formatTimelineTime, msToRatio } from '@/utils/satelliteTimelineMarkers'
+import { msToRatio, TIMELINE_RULER_EDGE_INSET, buildTimelineHourRulerTicks, mapTimelinePositionPercent } from '@/utils/satelliteTimelineMarkers'
+import { formatLocalDateTime, parseTimeToMs } from '@/utils/tools/dateFormat'
 
 /**
  * 整体态势任务时间轴（纯展示组件，无播放与矩阵业务逻辑）。
@@ -87,40 +88,16 @@ const emit = defineEmits<{
 /** 时间轴轨道 DOM 引用 */
 const trackRef = ref<HTMLElement | null>(null)
 
-/**
- * 将任务时间字符串解析为毫秒时间戳。
- *
- * @param value 时间字符串
- * @returns 毫秒时间戳
- */
-const parseTaskTime = (value: string): number => {
-  if (!value) return 0
-  const ts = new Date(value.replace(/-/g, '/')).getTime()
-  return Number.isNaN(ts) ? 0 : ts
-}
-
 /** 任务开始时间（毫秒） */
-const taskStartMs = computed(() => parseTaskTime(props.taskStart))
+const taskStartMs = computed(() => parseTimeToMs(props.taskStart))
 /** 任务结束时间（毫秒） */
-const taskEndMs = computed(() => parseTaskTime(props.taskEnd))
+const taskEndMs = computed(() => parseTimeToMs(props.taskEnd))
 
 /** 展示用当前时刻，默认落在任务开始 */
 const displayTimeMs = computed(() => {
   if (props.currentTimeMs != null && props.currentTimeMs > 0) return props.currentTimeMs
   return taskStartMs.value
 })
-
-/** 标尺两端预留百分比 */
-const RULER_EDGE_INSET = 2.8
-
-/**
- * 将相对比例映射为百分比位置。
- *
- * @param ratio 0-1 比例
- * @returns 百分比
- */
-const mapPositionPercent = (ratio: number): number =>
-  RULER_EDGE_INSET + ratio * (100 - RULER_EDGE_INSET * 2)
 
 /**
  * 毫秒转时间轴百分比。
@@ -129,18 +106,7 @@ const mapPositionPercent = (ratio: number): number =>
  * @returns 百分比
  */
 const msToPercent = (ms: number): number =>
-  mapPositionPercent(msToRatio(ms, taskStartMs.value, taskEndMs.value))
-
-/**
- * 根据百分比计算标记对齐方式。
- *
- * @param percent 百分比位置
- */
-const getMarkerAlign = (percent: number): 'start' | 'center' | 'end' => {
-  if (percent <= RULER_EDGE_INSET + 1) return 'start'
-  if (percent >= 100 - RULER_EDGE_INSET - 1) return 'end'
-  return 'center'
-}
+  mapTimelinePositionPercent(msToRatio(ms, taskStartMs.value, taskEndMs.value))
 
 /** 游标百分比位置 */
 const playheadPercent = computed<number | null>(() => {
@@ -149,26 +115,9 @@ const playheadPercent = computed<number | null>(() => {
 })
 
 /** 时间标尺刻度 */
-const rulerTicks = computed(() => {
-  const ticks: { percent: number; label: string; major: boolean; align: 'start' | 'center' | 'end' }[] = []
-  const start = taskStartMs.value
-  const end = taskEndMs.value
-  const span = end - start
-  if (span <= 0) return ticks
-
-  const hourMs = 3600 * 1000
-  const step = span > 36 * hourMs ? 6 * hourMs : span > 12 * hourMs ? 3 * hourMs : hourMs
-
-  for (let t = start; t <= end; t += step) {
-    const d = new Date(t)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const label = `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:00`
-    const percent = msToPercent(t)
-    ticks.push({ percent, label, major: true, align: getMarkerAlign(percent) })
-  }
-
-  return ticks
-})
+const rulerTicks = computed(() =>
+  buildTimelineHourRulerTicks(taskStartMs.value, taskEndMs.value, msToPercent)
+)
 
 /**
  * 点击轨道跳转时刻（仅更新游标，不触发播放）。
@@ -180,7 +129,7 @@ const handleTrackClick = (event: MouseEvent) => {
   const rect = trackRef.value.getBoundingClientRect()
   if (rect.width <= 0) return
   const clickX = event.clientX - rect.left
-  const leftInset = (RULER_EDGE_INSET / 100) * rect.width
+  const leftInset = (TIMELINE_RULER_EDGE_INSET / 100) * rect.width
   const usableWidth = rect.width - 2 * leftInset
   const ratio = Math.max(0, Math.min(1, (clickX - leftInset) / usableWidth))
   const targetMs = Math.round(taskStartMs.value + ratio * (taskEndMs.value - taskStartMs.value))

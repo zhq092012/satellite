@@ -1,4 +1,5 @@
 import type { MatrixResult } from '@/api/electronic'
+import { formatMonthDayClock, parseTimeToMs } from '@/utils/tools/dateFormat'
 
 /** 覆盖率从高到低划分为 25 个等级，每档 4%。 */
 export const STARLINK_COVERAGE_BRACKETS = Array.from({ length: 25 }, (_, index) => {
@@ -36,18 +37,6 @@ export interface SingleSatCoverageHeatModel {
 }
 
 /**
- * 解析时间字符串为 Unix 毫秒时间戳。
- *
- * @param timeStr 后端时间字符串
- * @returns 毫秒时间戳；无效时返回 0
- */
-export const parseTimeToMs = (timeStr: string): number => {
-  if (!timeStr) return 0
-  const d = new Date(timeStr.replace(/-/g, '/'))
-  return Number.isNaN(d.getTime()) ? 0 : d.getTime()
-}
-
-/**
  * 根据覆盖率数值映射到热力图 Y 轴梯队。
  *
  * @param coverage 覆盖率 0–100
@@ -57,19 +46,6 @@ export const getCoverageBracket = (coverage: number): string => {
   const normalized = Math.min(100, Math.max(0, coverage))
   const index = Math.min(24, Math.floor((100 - normalized) / 4))
   return STARLINK_COVERAGE_BRACKETS[index]
-}
-
-/**
- * 格式化热力图横轴时间片标签。
- *
- * @param timestamp 毫秒时间戳
- * @returns `MM/DD HH:mm`
- */
-export const formatHeatmapTimeLabel = (timestamp: number): string => {
-  const date = new Date(timestamp)
-  /** 数字补成两位。 @param value 非负整数 @returns 至少两位的字符串 */
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 /**
@@ -126,7 +102,7 @@ export const buildSingleSatelliteCoverageHeatModel = (
   const sliceCount = Math.min(48, Math.max(1, Math.ceil((taskEnd - taskStart) / intervalMs)))
   /** 热力图横轴标签，从早到晚 */
   const timeLabels = Array.from({ length: sliceCount }, (_, index) =>
-    formatHeatmapTimeLabel(taskStart + index * intervalMs)
+    formatMonthDayClock(new Date(taskStart + index * intervalMs))
   )
 
   /** 打击前卫星矩阵按 NORAD 索引 */

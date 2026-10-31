@@ -61,7 +61,7 @@
                     {{ win.strikeStatus === 1 ? '已打击' : '未打击' }}
                   </span>
                 </div>
-                <div class="window-time">过境时间：{{ formatWindowTime(win.peakWindow) }}</div>
+                <div class="window-time">过境时间：{{ formatPassWindowTime(win.peakWindow) }}</div>
                 <div class="window-weapons" v-if="win.weapons?.length">
                   <span class="weapon-label">武器：</span>
                   <span v-for="weapon in win.weapons" :key="weapon.id || weapon.name" class="mini-weapon">
@@ -81,6 +81,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ZhchPlanResp, ZhchPlanSatelliteMatrix } from '@/api/electronic'
+import { formatPassWindowTime } from '@/utils/tools/dateFormat'
+import { orbitTypeLabel } from '@/utils/zhchPlanDisplay'
 
 const props = defineProps<{
   /** 综合打击方案数据 */
@@ -123,28 +125,6 @@ const satelliteList = computed((): ZhchPlanSatelliteMatrix[] => {
  * @param norad 卫星 NORAD
  */
 const isWindowExpanded = (norad: number) => props.expandedWindows.has(`${props.panelKey}-${norad}`)
-
-/**
- * 格式化过境窗口时间
- * @param timeStr 原始时间
- */
-const formatWindowTime = (timeStr?: string): string => {
-  if (!timeStr) return '--'
-  const normalized = timeStr.replace('T', ' ').replace('Z', '')
-  const date = new Date(normalized.includes('-') ? normalized.replace(/-/g, '/') : normalized)
-  if (Number.isNaN(date.getTime())) return timeStr
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-}
-
-/**
- * 轨道类型转中文
- * @param orbitType 轨道类型枚举
- */
-const orbitTypeLabel = (orbitType: number): string => {
-  const map: Record<number, string> = { 1: '低轨', 2: '中轨', 3: '高轨' }
-  return map[orbitType] || `类型${orbitType}`
-}
 </script>
 
 <style lang="scss" scoped>

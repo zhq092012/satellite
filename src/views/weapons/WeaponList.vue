@@ -116,7 +116,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { createWeapon, deleteWeapon, getAllWeapons, getBattleCountrys, updateWeapon } from '@/api/dashboard'
 import { useAuthStore } from '@/store/modules/auth'
-import { hasPermission } from '@/utils/permission'
+import { hasPermission } from '@/utils/auth'
 import type { Weapon } from '@/types/dashboard'
 
 const authStore = useAuthStore()

@@ -1,4 +1,5 @@
 import type { SatelliteAnalysisData } from '@/api/task/task'
+import { formatCoveragePercent } from '@/utils/zhchPlanDisplay'
 
 /** 卫星指标表格行（展示用） */
 export interface SatelliteMetricTableRow {
@@ -172,17 +173,6 @@ const isValidNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value)
 
 /**
- * 将覆盖率格式化为百分比文本。
- *
- * @param value 覆盖率数值
- * @returns 百分比文本；无效时返回 `--`
- */
-export const formatSatelliteCoverage = (value: number | null | undefined): string => {
-  if (!isValidNumber(value)) return EMPTY_TEXT
-  return `${Number(value.toFixed(2))}%`
-}
-
-/**
  * 格式化覆盖率减少量（打击前 - 打击后）。
  *
  * @param before 打击前覆盖率
@@ -304,8 +294,8 @@ const toDisplayRow = (row: SatelliteMetricAccumulator): SatelliteMetricTableRow 
   series: row.series,
   sysType: row.sysType,
   usage: row.usage,
-  coverageBeforeText: formatSatelliteCoverage(row.coverageBefore),
-  coverageAfterText: formatSatelliteCoverage(row.coverageAfter),
+  coverageBeforeText: formatCoveragePercent(row.coverageBefore),
+  coverageAfterText: formatCoveragePercent(row.coverageAfter),
   coverageReduceText: formatSatelliteCoverageReduce(row.coverageBefore, row.coverageAfter),
   delayBeforeText: formatSatelliteDelayMinutes(row.delayBefore),
   delayAfterText: formatSatelliteDelayMinutes(trueDelayAfter),

@@ -1,11 +1,11 @@
 import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
 import { onBeforeUnmount, watch, type ComputedRef, type Ref, ref } from 'vue'
-import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import {
   BATTLE_GLOBE_ORBIT_PATH_WIDTH,
   createBattleGlobeOrbitGlowMaterial,
-} from '@/utils/battleGlobeOrbitPathStyle'
+  type BattleGlobeSatellite,
+} from '@/utils/buildBattleGlobeSatellites'
 import {
   resolveDeductionVisualState,
   type SatelliteDeductionVisualPlan,

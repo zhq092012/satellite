@@ -26,7 +26,6 @@ import launchSiteIcon from '@/assets/icons/LaunchSite.png'
 import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, toRef, useTemplateRef, watch } from 'vue'
-// import { listenCameraLocaion, listenClickPositionCartesian } from '@/utils/tools/cameraTools'
 
 // 全局布局状态管理 store
 const store = useLayoutStore()

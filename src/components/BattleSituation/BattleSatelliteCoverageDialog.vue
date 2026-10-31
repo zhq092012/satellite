@@ -27,9 +27,9 @@ import {
   STARLINK_COVERAGE_BRACKETS,
   buildSingleSatelliteCoverageHeatModel,
   formatHeatmapCoverage,
-  parseTimeToMs,
   type SingleSatCoverageHeatCell,
 } from '@/utils/battleSatelliteCharts/coverageHeatmap'
+import { parseTimeToMs } from '@/utils/tools/dateFormat'
 
 const props = withDefaults(
   defineProps<{

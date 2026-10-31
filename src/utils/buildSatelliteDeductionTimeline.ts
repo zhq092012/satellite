@@ -9,8 +9,8 @@ import type {
   TimeEffect,
 } from '@/api/task/task'
 import type { MatrixResult } from '@/api/electronic'
+import { formatCoveragePercent } from '@/utils/zhchPlanDisplay'
 import {
-  formatSatelliteCoverage,
   formatSatelliteCoverageReduce,
   formatSatelliteDelayIncrease,
   formatSatelliteDelayMinutes,
@@ -178,9 +178,9 @@ const buildCoverageHighlightLine = (
   return {
     segments: [
       seg('覆盖率 ', 'default'),
-      seg(formatSatelliteCoverage(beforeCov), 'coverage'),
+      seg(formatCoveragePercent(beforeCov), 'coverage'),
       seg(' → ', 'default'),
-      seg(formatSatelliteCoverage(afterCov), 'coverage'),
+      seg(formatCoveragePercent(afterCov), 'coverage'),
       seg(`（${formatSatelliteCoverageReduce(beforeCov, afterCov)}）`, 'coverage'),
     ],
   }
