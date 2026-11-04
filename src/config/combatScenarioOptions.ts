@@ -61,7 +61,7 @@ export const COMBAT_PHASE_OPTIONS: CombatPhaseOption[] = [
 export const COMBAT_EXPECTATION_PRIMARY_OPTIONS: CombatExpectationPrimaryOption[] = [
   {
     id: 'deterrence',
-    label: '示威震慑',
+    label: '示强威慑',
     children: [
       { id: 'deterrence_hit_our_comm', label: '打击我方一颗通信卫星' },
       { id: 'deterrence_hit_enemy_comm', label: '打击敌方一颗通信卫星' },

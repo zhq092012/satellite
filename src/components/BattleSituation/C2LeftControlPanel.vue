@@ -494,12 +494,11 @@ const syncEditorForTask = async (task: TaskForm | null | undefined) => {
   editorDraft.value = createDraftFromTask(task)
   if (task && editorDraft.value) {
     stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
-    useWeaponsEnabled.value = editorDraft.value.selectedWeaponIds.length > 0
-    store.setTaskCombatArea({ ...editorDraft.value.combatArea })
+    useWeaponsEnabled.value = false
+    editorDraft.value.selectedWeaponIds = []
   } else {
     stashedWeaponIds.value = []
     useWeaponsEnabled.value = false
-    store.setTaskCombatArea(null)
   }
   if (!task) {
     store.clearC2ResourceSelection()
@@ -556,7 +555,7 @@ const handleUseWeaponsChange = (enabled: boolean) => {
     stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
     editorDraft.value.selectedWeaponIds = []
     weaponTableRef.value?.clearSelection()
-    void handleSaveAndRecalculate()
+    void handleSaveAndRecalculate({ forceWeaponIds: [] })
     return
   }
   editorDraft.value.selectedWeaponIds = [...stashedWeaponIds.value]
@@ -596,8 +595,10 @@ const handleTaskSaved = async (updated: TaskForm) => {
 
 /**
  * 校验并提交任务修改（系列/武器变更），触发后台重算。
+ *
+ * @param options.forceWeaponIds 显式指定 weaponIds（关闭「使用武器」时传 []）
  */
-const handleSaveAndRecalculate = async () => {
+const handleSaveAndRecalculate = async (options?: { forceWeaponIds?: string[] }) => {
   const baseTask = store.activedTask
   const draft = editorDraft.value
   if (!baseTask?.id || !draft || draft.taskId !== baseTask.id) return
@@ -607,6 +608,11 @@ const handleSaveAndRecalculate = async () => {
   if (!draft.selectedSeries.length) return
   if (!draft.targetTypeShow.length) return
   const payload = mergeTaskFormWithDraft(baseTask, draft)
+  if (options?.forceWeaponIds !== undefined) {
+    payload.weaponIds = options.forceWeaponIds
+  } else if (!useWeaponsEnabled.value) {
+    payload.weaponIds = baseTask.weaponIds ? [...baseTask.weaponIds] : []
+  }
   savingRecalc.value = true
   try {
     const res = await updateTask(payload)
@@ -669,7 +675,7 @@ onUnmounted(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   text-align: left;
 }
 
@@ -695,7 +701,44 @@ onUnmounted(() => {
   &--meta {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 4px;
+    padding: 6px 10px;
+
+    .task-panel-row {
+      gap: 6px;
+      line-height: 1.2;
+
+      & + & {
+        padding-top: 4px;
+      }
+    }
+
+    .task-panel-label,
+    .task-panel-value {
+      line-height: 1.2;
+    }
+
+    .task-panel-name {
+      font-size: battleUi.$battle-ui-font-base;
+      font-weight: 700;
+    }
+
+    .task-edit-link {
+      min-height: 28px;
+      padding: 0 10px;
+    }
+
+    .combat-object-options {
+      gap: 4px;
+    }
+
+    .combat-object-chip {
+      padding: 2px 8px;
+    }
+
+    .combat-object-label {
+      line-height: 1.15;
+    }
   }
 
   &--tree {

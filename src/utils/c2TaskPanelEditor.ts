@@ -35,19 +35,16 @@ export interface C2TaskEditorDraft {
   combatArea: TaskCombatArea
 }
 
-/**
- * 后端未返回任务区域时使用的默认假数据（台海附近示例圆，半径 3000km）。
- * 接入接口后应改为仅读取 task.combatArea。
- */
-export const TASK_COMBAT_AREA_MOCK: TaskCombatArea = {
-  centerLon: 121.5,
-  centerLat: 25.0,
-  radiusKm: 3000,
-  enabled: true,
+/** 任务未配置作战区域时的占位（不在地图展示） */
+const TASK_COMBAT_AREA_EMPTY: TaskCombatArea = {
+  centerLon: 0,
+  centerLat: 0,
+  radiusKm: 1,
+  enabled: false,
 }
 
 /**
- * 从任务或假数据解析作战区域草稿。
+ * 从任务解析作战区域草稿；无后端字段时不使用 mock，也不在地图绘制。
  *
  * @param task 任务
  * @returns 作战区域配置
@@ -64,10 +61,10 @@ export const resolveTaskCombatAreaFromTask = (task: TaskForm | null | undefined)
       centerLon: Number(fromTask.centerLon),
       centerLat: Number(fromTask.centerLat),
       radiusKm: Math.max(1, Number(fromTask.radiusKm)),
-      enabled: Boolean(fromTask.enabled),
+      enabled: false,
     }
   }
-  return { ...TASK_COMBAT_AREA_MOCK }
+  return { ...TASK_COMBAT_AREA_EMPTY }
 }
 
 /**
