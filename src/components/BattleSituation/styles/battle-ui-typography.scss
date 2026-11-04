@@ -1,0 +1,151 @@
+/**
+ * 战场态势 C2 面板、任务编辑、首页威胁/攻击度分析统一字号。
+ * - 常规/最小：$battle-ui-font-base（当前 18px）
+ * - 标题/强调（含表格表头）：$battle-ui-font-emphasis（当前 20px）
+ */
+$battle-ui-font-base: 18px;
+$battle-ui-font-emphasis: 18px;
+
+/** Vue scoped：Element Plus 表格表头与单元格 */
+@mixin battle-ui-el-table-typography {
+  :deep(th.atlas-app-table__cell) {
+    font-size: $battle-ui-font-emphasis !important;
+    font-weight: 700;
+  }
+
+  :deep(th.atlas-app-table__cell .cell) {
+    font-size: $battle-ui-font-emphasis !important;
+  }
+
+  :deep(td.atlas-app-table__cell) {
+    font-size: $battle-ui-font-base !important;
+  }
+
+  :deep(.atlas-app-table .cell) {
+    font-size: $battle-ui-font-base !important;
+    line-height: 1.35;
+  }
+
+  :deep(.atlas-app-table__empty-text) {
+    font-size: $battle-ui-font-base !important;
+  }
+}
+
+/**
+ * C2 左右侧窄面板表格：表头完整可见、禁止横向滚动/撑宽，单元格纵向换行。
+ */
+@mixin battle-ui-c2-panel-table-fit {
+  width: 100%;
+  max-width: 100%;
+
+  :deep(.atlas-app-table) {
+    table-layout: fixed !important;
+    width: 100% !important;
+  }
+
+  :deep(.atlas-app-table__inner-wrapper) {
+    width: 100% !important;
+  }
+
+  :deep(.atlas-app-table__header-wrapper),
+  :deep(.atlas-app-table__body-wrapper) {
+    overflow-x: hidden !important;
+  }
+
+  :deep(th.atlas-app-table__cell),
+  :deep(td.atlas-app-table__cell) {
+    overflow: visible;
+  }
+
+  :deep(th.atlas-app-table__cell .cell),
+  :deep(td.atlas-app-table__cell .cell) {
+    white-space: normal !important;
+    word-break: break-word;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.35;
+  }
+}
+
+/** 全局样式块：挂在容器选择器下（任务弹窗等非 scoped） */
+@mixin battle-ui-el-table-typography-under($selector) {
+  #{$selector} th.atlas-app-table__cell {
+    font-size: $battle-ui-font-emphasis !important;
+    font-weight: 700;
+  }
+
+  #{$selector} th.atlas-app-table__cell .cell {
+    font-size: $battle-ui-font-emphasis !important;
+  }
+
+  #{$selector} td.atlas-app-table__cell,
+  #{$selector} .atlas-app-table .cell {
+    font-size: $battle-ui-font-base !important;
+    line-height: 1.35;
+  }
+
+  #{$selector} .atlas-app-table__empty-text {
+    font-size: $battle-ui-font-base !important;
+  }
+}
+
+/** Element Plus 树节点字号 */
+@mixin battle-ui-el-tree-typography {
+  :deep(.atlas-app-tree-node__label) {
+    font-size: $battle-ui-font-base;
+  }
+
+  :deep(.atlas-app-tree-node__content) {
+    min-height: 36px;
+  }
+}
+
+/** 表单标签与输入框（任务编辑弹窗） */
+@mixin battle-ui-el-form-typography-under($selector) {
+  #{$selector} .atlas-app-form-item__label {
+    font-size: $battle-ui-font-base !important;
+  }
+
+  #{$selector} .atlas-app-form-item__error {
+    font-size: $battle-ui-font-base !important;
+  }
+
+  #{$selector} .atlas-app-input__inner,
+  #{$selector} .atlas-app-textarea__inner,
+  #{$selector} .atlas-app-select__wrapper,
+  #{$selector} .atlas-app-select__selected-item,
+  #{$selector} .atlas-app-select__placeholder,
+  #{$selector} .atlas-app-select__input,
+  #{$selector} .atlas-app-input-number .atlas-app-input__inner,
+  #{$selector} .atlas-app-input__count,
+  #{$selector} .atlas-app-input__count-inner,
+  #{$selector} .atlas-app-tag,
+  #{$selector} .atlas-app-tag__content,
+  #{$selector} .atlas-app-checkbox__label,
+  #{$selector} .atlas-app-radio__label {
+    font-size: $battle-ui-font-base !important;
+  }
+
+  #{$selector} .atlas-app-alert__title {
+    font-size: $battle-ui-font-base !important;
+  }
+
+  #{$selector} .atlas-app-alert__description {
+    font-size: $battle-ui-font-base !important;
+  }
+}
+
+/** 任务编辑等 append-to-body 的下拉/日期层 */
+@mixin battle-ui-el-form-popper-typography-under($selector) {
+  #{$selector} .atlas-app-select-dropdown__item {
+    font-size: $battle-ui-font-base !important;
+  }
+
+  #{$selector} .atlas-app-date-picker__header-label,
+  #{$selector} .atlas-app-date-table th,
+  #{$selector} .atlas-app-date-table td .atlas-app-date-table-cell__text,
+  #{$selector} .atlas-app-time-spinner__item,
+  #{$selector} .atlas-app-picker-panel__footer .atlas-app-button {
+    font-size: $battle-ui-font-base !important;
+  }
+}

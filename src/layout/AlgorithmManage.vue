@@ -11,6 +11,7 @@
         <el-tab-pane label="态势拓扑分析" name="electronicWarfare" />
         <el-tab-pane label="甘特图分析" name="satelliteGantt" />
         <el-tab-pane label="打击窗口分析" name="weaponAttack" />
+        <el-tab-pane label="卫星网络管理" name="satelliteNetwork" />
       </el-tabs>
 
       <!-- 拓扑图和甘特图铺满页签下方剩余高度，避免整页出现滚动条 -->
@@ -46,6 +47,7 @@ const tabNameMap: Record<string, string> = {
   ElectronicWarfare: 'electronicWarfare',
   SatelliteGantt: 'satelliteGantt',
   WeaponAttackList: 'weaponAttack',
+  SatelliteNetworkManage: 'satelliteNetwork',
 }
 
 /** 当前激活的选项卡名称，根据当前路由自动匹配 */
@@ -85,6 +87,8 @@ const handleTabChange = (tabName: string) => {
     router.push({ name: 'SatelliteGantt' })
   } else if (tabName === 'weaponAttack') {
     router.push({ name: 'WeaponAttackList' })
+  } else if (tabName === 'satelliteNetwork') {
+    router.push({ name: 'SatelliteNetworkManage' })
   }
 }
 </script>

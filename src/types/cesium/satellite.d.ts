@@ -53,6 +53,12 @@ export interface Satellite {
   power: string
   lifetime: string
   sat_series_id: string
+  /** 系列展示名（catalog 扩展，可选） */
+  series_name?: string
+  /** 卫星用途（catalog 扩展，可选） */
+  usage?: string
+  /** 任务系统类型（catalog 扩展，可选） */
+  mission_sys_type?: string
   create_time: string
   update_time: string
   is_deleted: number

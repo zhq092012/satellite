@@ -7,7 +7,9 @@
         <el-tab-pane label="地面站管理" name="groundStations" />
         <el-tab-pane label="数据中心管理" name="dataCenters" />
         <el-tab-pane label="武器管理" name="weapons" />
-        <el-tab-pane label="卫星网络管理" name="satelliteNetwork" />
+        <el-tab-pane label="基站管理" name="basestations" />
+        <el-tab-pane label="导弹管理" name="missiles" />
+        <el-tab-pane label="导弹基地管理" name="missileBases" />
       </el-tabs>
 
       <div class="data-manage-view">
@@ -33,7 +35,9 @@ const tabNameMap: Record<string, string> = {
   GroundStationManage: 'groundStations',
   DataCenterManage: 'dataCenters',
   WeaponManage: 'weapons',
-  SatelliteNetworkManage: 'satelliteNetwork',
+  BaseStationManage: 'basestations',
+  MissileManage: 'missiles',
+  MissileBaseManage: 'missileBases',
 }
 
 /** 当前激活的页签，由子路由名称反查 */
@@ -44,6 +48,7 @@ const activeTab = computed({
 
 /**
  * 切换数据管理页签并打开对应页面。
+ *
  * @param tabName 页签标识
  */
 const handleTabChange = (tabName: string) => {
@@ -57,8 +62,12 @@ const handleTabChange = (tabName: string) => {
     router.push({ name: 'DataCenterManage' })
   } else if (tabName === 'weapons') {
     router.push({ name: 'WeaponManage' })
-  } else if (tabName === 'satelliteNetwork') {
-    router.push({ name: 'SatelliteNetworkManage' })
+  } else if (tabName === 'basestations') {
+    router.push({ name: 'BaseStationManage' })
+  } else if (tabName === 'missiles') {
+    router.push({ name: 'MissileManage' })
+  } else if (tabName === 'missileBases') {
+    router.push({ name: 'MissileBaseManage' })
   }
 }
 </script>

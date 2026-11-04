@@ -17,6 +17,8 @@ import ElectronicWarfareG6 from '@/components/electronic/ElectronicWarfareG6.vue
 import SatelliteGantt from '@/components/electronic/SatelliteGantt.vue'
 import WeaponAttackList from '@/components/electronic/WeaponAttackList.vue'
 import StrikePlanGenerator from '@/components/electronic/StrikePlanGenerator.vue'
+import HomeThreatAnalysisView from '@/components/BattleSituation/analysis/HomeThreatAnalysisView.vue'
+import HomeAttackAnalysisView from '@/components/BattleSituation/analysis/HomeAttackAnalysisView.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 
 defineOptions({ name: 'Home' })
@@ -57,9 +59,11 @@ const activeTab = computed({
  */
 const menuTabs: MenuTabItem[] = [
   { key: '整体态势分析', name: '整体态势分析', icon: '🌐', path: '/home', component: BattleSituation },
+  { key: '威胁度分析', name: '威胁度分析', icon: '⚠️', path: '/home/threat', component: HomeThreatAnalysisView },
+  { key: '攻击度分析', name: '攻击度分析', icon: '🎯', path: '/home/attack', component: HomeAttackAnalysisView },
   { key: '态势拓扑分析', name: '态势拓扑分析', icon: '🕸️', path: '/home/topo', component: ElectronicWarfareG6 },
   { key: '甘特图分析', name: '甘特图分析', icon: '📊', path: '/home/gantt', component: SatelliteGantt },
-  { key: '打击窗口分析', name: '打击窗口分析', icon: '🎯', path: '/home/windows', component: WeaponAttackList },
+  { key: '打击窗口分析', name: '打击窗口分析', icon: '🔭', path: '/home/windows', component: WeaponAttackList },
   { key: '打击方案管理', name: '打击方案管理', icon: '⚔️', path: '/home/strike-plan', component: StrikePlanGenerator },
 ]
 

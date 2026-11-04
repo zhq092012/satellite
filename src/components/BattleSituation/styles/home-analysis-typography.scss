@@ -1,0 +1,25 @@
+@use './battle-ui-typography.scss' as battleUi;
+
+.home-analysis-page {
+  font-size: battleUi.$battle-ui-font-base;
+}
+
+.home-analysis-title {
+  font-size: battleUi.$battle-ui-font-emphasis;
+}
+
+.home-analysis-desc,
+.home-analysis-empty,
+.formula-note,
+.feedback-kpi-grid,
+.kpi-row,
+.analysis-section p {
+  font-size: battleUi.$battle-ui-font-base;
+}
+
+.analysis-section h2 {
+  font-size: battleUi.$battle-ui-font-emphasis;
+  font-weight: 700;
+}
+
+@include battleUi.battle-ui-el-table-typography-under('.home-analysis-page');

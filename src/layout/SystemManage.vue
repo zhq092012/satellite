@@ -5,9 +5,6 @@
         <el-tab-pane label="用户管理" name="users" />
         <el-tab-pane label="角色管理" name="roles" />
         <el-tab-pane label="菜单管理" name="menus" />
-        <el-tab-pane label="基站管理" name="basestations" />
-        <el-tab-pane label="导弹管理" name="missiles" />
-        <el-tab-pane label="导弹基地管理" name="missileBases" />
       </el-tabs>
 
       <router-view />
@@ -27,9 +24,6 @@ const tabNameMap: Record<string, string> = {
   UserManage: 'users',
   RoleManage: 'roles',
   MenuManage: 'menus',
-  BaseStationManage: 'basestations',
-  MissileManage: 'missiles',
-  MissileBaseManage: 'missileBases',
 }
 
 const activeTab = computed({
@@ -39,6 +33,7 @@ const activeTab = computed({
 
 /**
  * Tab 切换时跳转到对应的系统管理子路由
+ *
  * @param tabName Tab 标识
  */
 const handleTabChange = (tabName: string) => {
@@ -48,12 +43,6 @@ const handleTabChange = (tabName: string) => {
     router.push({ name: 'RoleManage' })
   } else if (tabName === 'menus') {
     router.push({ name: 'MenuManage' })
-  } else if (tabName === 'basestations') {
-    router.push({ name: 'BaseStationManage' })
-  } else if (tabName === 'missiles') {
-    router.push({ name: 'MissileManage' })
-  } else if (tabName === 'missileBases') {
-    router.push({ name: 'MissileBaseManage' })
   }
 }
 </script>

@@ -1,4 +1,5 @@
 import type { TaskForm, TaskResourceItem } from '@/types/dashboard'
+import { TASK_PANEL_SATELLITE_TYPES as MISSION_TASK_TYPES } from '@/constants/missionSatellite'
 
 /** 标签候选项（系列名或资源 ID + 展示名） */
 export interface TaskPanelTagOption {
@@ -28,7 +29,7 @@ export interface C2TaskEditorDraft {
   delayMin: number
   /** 覆盖率（0–100） */
   coverage: number
-  /** 卫星类型（侦察 / 通信） */
+  /** 卫星类型（侦察 / 通信 / 导航 / 导弹预警） */
   targetTypeShow: string[]
   /** 任务作战区域 */
   combatArea: TaskCombatArea
@@ -126,8 +127,8 @@ export const parseTaskPanelTimeMs = (value?: string): number => {
   return Number.isFinite(ts) ? ts : 0
 }
 
-/** 任务卫星类型可选项（与任务编辑弹窗一致） */
-export const TASK_PANEL_SATELLITE_TYPES = ['侦察', '通信'] as const
+/** 任务卫星类型可选项（与 missionSatellite 常量一致） */
+export const TASK_PANEL_SATELLITE_TYPES = MISSION_TASK_TYPES
 
 /**
  * 将 Date 格式化为任务时间字符串。

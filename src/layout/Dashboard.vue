@@ -212,13 +212,31 @@ const filterMenusByPermission = (menus: DashboardMenuNode[]): DashboardMenuNode[
 
 /**
  * 顶栏只保留整体态势分析和方案管理。
- * 场景、卫星、地面站、数据中心、武器、卫星网络已收进右侧「数据管理」页签。
+ * 场景、卫星、地面站、数据中心、武器、基站/导弹等已收进右侧「数据管理」页签；卫星网络在「算法管理」下。
  */
 const homeMenu = computed<DashboardMenuNode[]>(() => [
   {
     path: '/home',
     meta: {
       title: '整体态势分析',
+      icon: 'icon-situation',
+      showInMenu: true,
+    },
+    children: [],
+  },
+  {
+    path: '/home/threat',
+    meta: {
+      title: '威胁度分析',
+      icon: 'icon-situation',
+      showInMenu: true,
+    },
+    children: [],
+  },
+  {
+    path: '/home/attack',
+    meta: {
+      title: '攻击度分析',
       icon: 'icon-situation',
       showInMenu: true,
     },
@@ -233,6 +251,7 @@ const homeMenu = computed<DashboardMenuNode[]>(() => [
     },
     children: [],
   },
+
 ])
 
 /**

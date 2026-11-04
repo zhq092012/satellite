@@ -3,7 +3,8 @@ import type { AxiosResponseType } from '@/types/http'
 import { requestAPI } from '@/utils/tools/request'
 import type { Satellite } from '@/types/cesium/satellite'
 
-interface SatelliteSeriesData {
+/** getSatelliteSeries 接口 data：按任务系统类型分组的系列名列表 */
+export interface SatelliteSeriesData {
     侦察: string[]
     通信: string[]
 }

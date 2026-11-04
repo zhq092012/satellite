@@ -13,6 +13,8 @@ import { isTaskProgressComplete, taskProgressMap } from '@/composables/useTaskPr
 import type { BattleForm, SatelliteData, TaskForm } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import type { SatelliteDetail } from '@/types/cesium/satellite'
+import type { C2ResourceSatelliteRow } from '@/utils/buildC2ResourceCatalog'
+import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
 
 interface State {
   activetab: string //当前激活的Tab页
@@ -89,6 +91,10 @@ interface State {
    * 为空表示未聚焦具体链路，打击窗口页展示全部窗口卡片。
    */
   focusedStrikeLink: FocusedStrikeLinkSnapshot | null
+  /** C2 左侧面板扁卫星资源行（与 taskAnalysis 同步） */
+  c2ResourceSatelliteRows: C2ResourceSatelliteRow[]
+  /** C2 资源树勾选 keys */
+  c2TreeCheckedKeys: string[]
 }
 
 /**
@@ -131,8 +137,8 @@ export function getZhchUsageTypeLabel(type: string): string {
   return ZHCH_USAGE_TYPE_LABELS[type as (typeof ZHCH_USAGE_TYPE_OPTIONS)[number]] ?? type
 }
 
-/** 生成打击方案可选卫星系统类型（侦察 / 通信，单选或不选） */
-export const ZHCH_SYS_TYPE_OPTIONS = ['侦察', '通信'] as const
+/** 生成打击方案可选卫星系统类型（与任务系统类型四分类一致） */
+export const ZHCH_SYS_TYPE_OPTIONS = MISSION_SYS_TYPES
 
 /**
  * 切换综合打击方案卫星系统类型（单选；再次点击同一项则取消选择）。
@@ -194,6 +200,8 @@ export const useLayoutStore = defineStore('layout-store', {
       showOurWeapons: true,
       selectedOurWeapon: null,
       focusedStrikeLink: null,
+      c2ResourceSatelliteRows: [],
+      c2TreeCheckedKeys: [],
     }
   },
   getters: {
@@ -759,6 +767,19 @@ export const useLayoutStore = defineStore('layout-store', {
       } finally {
         this.zhchPlanLoading = false
       }
+    },
+    /** 更新 C2 资源扁平行 */
+    setC2ResourceSatelliteRows(rows: C2ResourceSatelliteRow[]) {
+      this.c2ResourceSatelliteRows = rows
+    },
+    /** 更新 C2 资源树勾选 */
+    setC2TreeCheckedKeys(keys: string[]) {
+      this.c2TreeCheckedKeys = [...keys]
+    },
+    /** 清空 C2 资源选择状态 */
+    clearC2ResourceSelection() {
+      this.c2ResourceSatelliteRows = []
+      this.c2TreeCheckedKeys = []
     },
   },
   persist: {

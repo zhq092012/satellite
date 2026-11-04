@@ -38,6 +38,8 @@ export interface SatelliteMetricTableRow {
   delayBefore: number | null
   /** 打击前威胁度（排序用） */
   threatBefore: number | null
+  /** 打击后威胁度（排序用） */
+  threatAfter: number | null
 }
 
 /** 卫星指标合并过程中的内部行结构 */
@@ -278,6 +280,7 @@ const toDisplayRow = (row: SatelliteMetricAccumulator): SatelliteMetricTableRow 
   coverageBefore: row.coverageBefore,
   delayBefore: row.delayBefore,
   threatBefore: row.threatBefore,
+  threatAfter: row.threatAfter,
   }
 }
 

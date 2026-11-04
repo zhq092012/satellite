@@ -14,8 +14,24 @@
           </el-select>
         </el-form-item>
         <el-form-item label="卫星类型">
-          <el-select v-model="queryForm.sat_type" clearable filterable placeholder="全部" style="width: 160px">
+          <el-select v-model="queryForm.sat_type" clearable filterable placeholder="载荷/平台类型" style="width: 160px">
             <el-option v-for="item in satTypes" :key="item" :label="item" :value="item" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="任务系统类型">
+          <el-select v-model="queryForm.mission_sys_type" clearable placeholder="全部" style="width: 140px"
+            :disabled="!catalogExtendedFieldsAvailable">
+            <el-option v-for="item in missionSysTypeOptions" :key="item" :label="item" :value="item" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="卫星系列">
+          <el-input v-model="queryForm.series_name" clearable placeholder="系列名称" style="width: 140px"
+            :disabled="!catalogExtendedFieldsAvailable" />
+        </el-form-item>
+        <el-form-item label="卫星用途">
+          <el-select v-model="queryForm.usage" clearable placeholder="全部" style="width: 120px"
+            :disabled="!catalogExtendedFieldsAvailable">
+            <el-option v-for="item in usageTypeOptions" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
         <el-form-item label="轨道类型">
@@ -51,7 +67,16 @@
         <el-table-column prop="name_cn" label="中文名称" min-width="140" show-overflow-tooltip />
         <el-table-column prop="int_id" label="国际编号" width="130" show-overflow-tooltip />
         <el-table-column prop="country" label="国家/地区" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="sat_type" label="卫星类型" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="sat_type" label="载荷类型" min-width="120" show-overflow-tooltip />
+        <el-table-column label="任务系统类型" width="110" show-overflow-tooltip>
+          <template #default="scope">{{ formatMissionSysType(scope.row) }}</template>
+        </el-table-column>
+        <el-table-column label="卫星系列" width="120" show-overflow-tooltip>
+          <template #default="scope">{{ formatSeriesName(scope.row) }}</template>
+        </el-table-column>
+        <el-table-column label="卫星用途" width="100" show-overflow-tooltip>
+          <template #default="scope">{{ formatUsage(scope.row) }}</template>
+        </el-table-column>
         <el-table-column label="轨道类型" width="110">
           <template #default="scope">
             {{ getOrbitType(Number(scope.row.orbit_type)) }}
@@ -75,7 +100,9 @@
         </el-table-column>
       </el-table>
       </div>
-
+      <p v-if="!catalogExtendedFieldsAvailable" class="catalog-field-hint">
+        卫星系列、用途、任务系统类型依赖 catalog 接口扩展；当前列表无对应字段时显示为 --，筛选不可用。
+      </p>
       <div class="pager">
         <el-pagination
           v-model:current-page="page.pageNum"
@@ -92,11 +119,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, computed } from 'vue'
 import { getBattleCountrys, getBattleSateTypes, getSatelliteList } from '@/api/dashboard'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import { getOrbitStatus, getOrbitType, getPayloadStatus } from '@/utils/tools/satellite'
 import type { Satellite } from '@/types/cesium/satellite'
+import { MISSION_SYS_TYPES, SATELLITE_USAGE_TYPES } from '@/constants/missionSatellite'
 
 /** 查询表单中轨道/载荷枚举选项。 */
 interface SatelliteEnumOption {
@@ -160,7 +188,50 @@ const queryForm = reactive({
   orbit_status: undefined as number | undefined,
   /** 载荷状态枚举。 */
   payload_status: undefined as number | undefined,
+  /** 任务系统类型（catalog 扩展，仅前端筛选） */
+  mission_sys_type: '',
+  /** 系列名称（catalog 扩展，仅前端筛选） */
+  series_name: '',
+  /** 用途（catalog 扩展，仅前端筛选） */
+  usage: '',
 })
+
+const missionSysTypeOptions = [...MISSION_SYS_TYPES]
+const usageTypeOptions = [...SATELLITE_USAGE_TYPES]
+
+/** 当前页是否已有 catalog 扩展字段（有则启用扩展筛选） */
+const catalogExtendedFieldsAvailable = computed(() =>
+  satellites.value.some(
+    (row) =>
+      Boolean(row.series_name?.trim()) ||
+      Boolean(row.usage?.trim()) ||
+      Boolean(row.mission_sys_type?.trim()),
+  ),
+)
+
+const EMPTY = '--'
+
+/**
+ * 展示任务系统类型。
+ *
+ * @param row 卫星行
+ */
+const formatMissionSysType = (row: Satellite): string => row.mission_sys_type?.trim() || EMPTY
+
+/**
+ * 展示卫星系列名。
+ *
+ * @param row 卫星行
+ */
+const formatSeriesName = (row: Satellite): string =>
+  row.series_name?.trim() || row.sat_series_id?.trim() || EMPTY
+
+/**
+ * 展示卫星用途。
+ *
+ * @param row 卫星行
+ */
+const formatUsage = (row: Satellite): string => row.usage?.trim() || EMPTY
 
 /** 分页参数。 */
 const page = reactive({
@@ -217,6 +288,24 @@ async function loadSatTypes() {
 }
 
 /**
+ * 对 catalog 扩展字段做前端筛选（接口未支持时仅过滤当前页）。
+ *
+ * @param rows 接口返回行
+ */
+function applyClientCatalogFilters(rows: Satellite[]): Satellite[] {
+  const mission = queryForm.mission_sys_type.trim()
+  const series = queryForm.series_name.trim()
+  const usage = queryForm.usage.trim()
+  if (!mission && !series && !usage) return rows
+  return rows.filter((row) => {
+    if (mission && formatMissionSysType(row) !== mission) return false
+    if (series && !formatSeriesName(row).includes(series)) return false
+    if (usage && formatUsage(row) !== usage) return false
+    return true
+  })
+}
+
+/**
  * 按当前查询条件和分页拉取卫星列表。
  */
 async function loadSatellites() {
@@ -235,6 +324,7 @@ async function loadSatellites() {
       toOptionalString(queryForm.sat_type)
     )
     satellites.value = res.code === 200 ? (res.data?.content ?? []) : []
+    satellites.value = applyClientCatalogFilters(satellites.value)
     totalElements.value = res.code === 200 ? (res.data?.totalElements ?? 0) : 0
   } finally {
     loading.value = false
@@ -260,6 +350,9 @@ function resetQuery() {
   queryForm.orbit_type = undefined
   queryForm.orbit_status = undefined
   queryForm.payload_status = undefined
+  queryForm.mission_sys_type = ''
+  queryForm.series_name = ''
+  queryForm.usage = ''
   page.pageNum = 1
   loadSatellites()
 }
@@ -375,5 +468,10 @@ onMounted(async () => {
     width: 100%;
     margin-left: 0;
   }
+}
+.catalog-field-hint {
+  margin: 8px 16px 0;
+  font-size: 12px;
+  color: #64748b;
 }
 </style>

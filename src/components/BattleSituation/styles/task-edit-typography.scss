@@ -1,0 +1,74 @@
+@use './battle-ui-typography.scss' as battleUi;
+
+$dialog-root: '.atlas-app-dialog.task-edit-dialog, .task-edit-dialog .atlas-app-dialog';
+
+#{$dialog-root} {
+  font-size: battleUi.$battle-ui-font-base;
+}
+
+#{$dialog-root} .atlas-app-dialog__title {
+  font-size: battleUi.$battle-ui-font-emphasis !important;
+}
+
+#{$dialog-root} .task-edit-nav-item {
+  font-size: battleUi.$battle-ui-font-base !important;
+}
+
+#{$dialog-root} .task-edit-footer .atlas-app-button {
+  font-size: battleUi.$battle-ui-font-base !important;
+}
+
+#{$dialog-root} .combat-object-label,
+#{$dialog-root} .task-config-tag,
+#{$dialog-root} .enemy-country-empty,
+#{$dialog-root} .metric-input-unit,
+#{$dialog-root} .metric-input-hint {
+  font-size: battleUi.$battle-ui-font-base !important;
+}
+
+#{$dialog-root} .task-edit-form {
+  font-size: battleUi.$battle-ui-font-base;
+}
+
+#{$dialog-root} .task-datetime-input {
+  font-size: battleUi.$battle-ui-font-base !important;
+}
+
+@include battleUi.battle-ui-el-form-typography-under($dialog-root);
+@include battleUi.battle-ui-el-table-typography-under($dialog-root);
+
+$task-edit-popper: '.task-edit-select-popper.atlas-app-popper, .task-edit-date-popper.atlas-app-popper, .atlas-app-popper.task-edit-select-popper, .atlas-app-popper.task-edit-date-popper';
+
+@include battleUi.battle-ui-el-form-popper-typography-under($task-edit-popper);
+
+.task-assemble-tab {
+  font-size: battleUi.$battle-ui-font-base;
+}
+
+.task-assemble-tab .assemble-title {
+  font-size: battleUi.$battle-ui-font-emphasis;
+}
+
+.task-assemble-tab .assemble-desc,
+.task-assemble-tab .assemble-count,
+.task-assemble-tab .assemble-api-tag,
+.task-assemble-tab .assemble-pane-sub,
+.task-assemble-tab .assemble-pane-head,
+.task-assemble-tab .series-empty,
+.task-assemble-tab .series-chip-label {
+  font-size: battleUi.$battle-ui-font-base;
+}
+
+@include battleUi.battle-ui-el-table-typography-under('.task-assemble-tab');
+@include battleUi.battle-ui-el-form-typography-under('.task-assemble-tab');
+$assemble-crud-dialog: '.atlas-app-dialog.assemble-crud-dialog, .assemble-crud-dialog .atlas-app-dialog';
+
+#{$assemble-crud-dialog} {
+  font-size: battleUi.$battle-ui-font-base;
+}
+
+#{$assemble-crud-dialog} .atlas-app-dialog__title {
+  font-size: battleUi.$battle-ui-font-emphasis !important;
+}
+
+@include battleUi.battle-ui-el-form-typography-under($assemble-crud-dialog);

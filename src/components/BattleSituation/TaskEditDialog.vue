@@ -11,7 +11,7 @@
 
       <div class="task-edit-main">
         <div v-show="activeTab === 'basic'" class="task-edit-pane">
-          <el-form ref="formRef" :model="taskForm" :rules="formRules" label-width="96px" class="task-edit-form">
+          <el-form ref="formRef" :model="taskForm" :rules="formRules" label-width="132px" class="task-edit-form">
             <el-form-item label="任务名称" prop="name">
               <el-input v-model="taskForm.name" maxlength="80" show-word-limit placeholder="请输入任务名称" />
             </el-form-item>
@@ -29,49 +29,58 @@
                 :value="toDatetimeLocalValue(taskForm.endDate)"
                 @input="handleEndInput(($event.target as HTMLInputElement).value)" />
             </el-form-item>
-            <el-form-item label="任务时长">
-              <div class="metric-input-row">
-                <el-input-number v-model="durationHours" :min="1" :max="8760" :step="1" :controls="true"
-                  controls-position="right" class="metric-input-number" @change="handleDurationHoursChange" />
-                <span class="metric-input-unit">小时</span>
-              </div>
-            </el-form-item>
-            <el-form-item label="链路时延">
-              <div class="metric-input-row">
-                <el-input-number v-model="linkDelayMin" :min="1" :max="4320" :step="1" :controls="true"
-                  controls-position="right" class="metric-input-number" />
-                <span class="metric-input-unit">分钟</span>
-              </div>
-            </el-form-item>
-            <el-form-item label="覆盖率">
-              <div class="metric-input-row">
-                <el-input-number v-model="taskCoverage" :min="0" :max="100" :step="1" :controls="true"
-                  controls-position="right" class="metric-input-number" />
-                <span class="metric-input-unit">%</span>
-              </div>
-            </el-form-item>
             <el-form-item label="卫星类型" prop="targetTypeShow">
               <el-select v-model="taskForm.targetTypeShow" multiple placeholder="请选择卫星类型"
                 popper-class="task-edit-select-popper" style="width: 100%" @change="handleTargetTypeShowChange">
                 <el-option v-for="item in satelliteTypes" :key="item" :label="item" :value="item" />
               </el-select>
             </el-form-item>
-            <el-form-item label="红方" prop="meCountryShow">
-              <el-checkbox-group v-model="taskForm.meCountryShow" class="country-checkbox-group"
-                @change="handleCountryShowChange">
-                <el-checkbox v-for="item in countryOptions" :key="`me-${item}`" :value="item">{{ item }}</el-checkbox>
-              </el-checkbox-group>
+            <el-form-item label="命令来源">
+              <el-select v-model="combatScenario.commandSourceId" placeholder="请选择命令来源"
+                popper-class="task-edit-select-popper" style="width: 100%">
+                <el-option v-for="item in COMMAND_SOURCE_OPTIONS" :key="item.id" :label="item.label" :value="item.id" />
+              </el-select>
             </el-form-item>
-            <el-form-item label="蓝方" prop="enemyCountryShow">
-              <el-checkbox-group v-model="taskForm.enemyCountryShow" class="country-checkbox-group"
-                @change="handleCountryShowChange">
-                <el-checkbox v-for="item in countryOptions" :key="`enemy-${item}`" :value="item">{{ item
-                  }}</el-checkbox>
-              </el-checkbox-group>
+            <el-form-item label="作战阶段">
+              <el-select v-model="combatScenario.combatPhaseId" placeholder="请选择作战阶段" style="width: 100%"
+                popper-class="task-edit-select-popper" @change="handleCombatPhaseChange">
+                <el-option v-for="item in COMBAT_PHASE_OPTIONS" :key="item.id" :label="item.label" :value="item.id" />
+              </el-select>
             </el-form-item>
-            <el-form-item label="设置关注">
-              <el-switch v-model="taskForm.focusStatus" :active-value="1" :inactive-value="0" />
+            <el-form-item label="作战对象" prop="enemyCountryShow">
+              <div class="combat-object-options" role="group" aria-label="作战对象">
+                <div v-for="country in combatObjectCountryOptions" :key="country" class="combat-object-chip" :class="{
+                  'combat-object-chip--active': isCombatObjectActive(country),
+                  'combat-object-chip--inactive': !isCombatObjectActive(country),
+                }">
+                  <el-checkbox :model-value="isCombatObjectActive(country)" disabled class="combat-object-check" />
+                  <span class="combat-object-label">{{ country }}</span>
+                </div>
+              </div>
             </el-form-item>
+            <el-form-item label="作战背景">
+              <el-select v-model="combatScenario.backgroundId" placeholder="请选择作战背景"
+                popper-class="task-edit-select-popper" style="width: 100%">
+                <el-option v-for="item in COMBAT_BACKGROUND_OPTIONS" :key="item.id" :label="item.label"
+                  :value="item.id" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="作战预期">
+              <div class="expectation-select-row">
+                <el-select v-model="combatScenario.expectationPrimaryId" placeholder="一级预期" style="width: 42%"
+                  popper-class="task-edit-select-popper" @change="handleExpectationPrimaryChange">
+                  <el-option v-for="item in COMBAT_EXPECTATION_PRIMARY_OPTIONS" :key="item.id" :label="item.label"
+                    :value="item.id" />
+                </el-select>
+                <el-select v-model="combatScenario.expectationSecondaryId" placeholder="二级预期" style="width: 56%"
+                  popper-class="task-edit-select-popper" :disabled="!combatScenario.expectationPrimaryId">
+                  <el-option v-for="item in expectationSecondaryOptions" :key="item.id" :label="item.label"
+                    :value="item.id" />
+                </el-select>
+              </div>
+            </el-form-item>
+            <el-alert type="info" :closable="false" show-icon :title="COMBAT_SCENARIO_API_HINT"
+              class="combat-scenario-hint" />
           </el-form>
         </div>
 
@@ -105,6 +114,17 @@ import { ElMessage } from 'element-plus'
 import { getBattleCountrys } from '@/api/dashboard'
 import { addTask } from '@/api/task/task'
 import type { TaskForm } from '@/types/dashboard'
+import { MISSION_SYS_TYPES, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
+import {
+  COMBAT_BACKGROUND_OPTIONS,
+  COMBAT_EXPECTATION_PRIMARY_OPTIONS,
+  COMBAT_PHASE_OPTIONS,
+  COMMAND_SOURCE_OPTIONS,
+  loadCombatScenarioForTask,
+  resolveEnemyCountriesByCombatPhase,
+  saveCombatScenarioForTask,
+  type CombatScenarioSelection,
+} from '@/config/combatScenarioOptions'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskAssembleTab, { type TaskAssembleRow } from '@/components/BattleSituation/TaskAssembleTab.vue'
 
@@ -121,15 +141,15 @@ interface TaskEditMenuItem {
 
 const store = useLayoutStore()
 
-/** 作战目标可选项（与任务创建五大类一致）。 */
-const SATELLITE_TYPES = ['侦察', '通信'] as const
+/** 作战目标可选项（任务系统四分类）。 */
+const SATELLITE_TYPES = MISSION_SYS_TYPES
 
 /** 新建任务默认红方国家 */
 const DEFAULT_ME_COUNTRIES = ['中国'] as const
-/** 新建任务默认蓝方国家 */
+/** 新建任务默认蓝方国家（作战阶段选择后覆盖） */
 const DEFAULT_ENEMY_COUNTRIES = ['美国'] as const
-/** 新建任务默认卫星类型（侦察、通信全选） */
-const DEFAULT_TARGET_TYPES = [...SATELLITE_TYPES] as string[]
+/** 新建任务默认卫星类型（四分类全选） */
+const DEFAULT_TARGET_TYPES = [...MISSION_SYS_TYPES] as string[]
 /** 新建任务默认时长（小时） */
 const DEFAULT_TASK_DURATION_HOURS = 8
 
@@ -155,7 +175,39 @@ const submitting = ref(false)
 /** 红蓝方国家下拉选项。 */
 const countryOptions = ref<string[]>([])
 /** 作战目标下拉选项。 */
-const satelliteTypes = [...SATELLITE_TYPES]
+const satelliteTypes = [...MISSION_SYS_TYPES]
+
+/** 作战场景（仅前端 localStorage，待 saveTask 扩展） */
+const combatScenario = reactive<CombatScenarioSelection>({
+  backgroundId: COMBAT_BACKGROUND_OPTIONS[0]?.id ?? '',
+  commandSourceId: COMMAND_SOURCE_OPTIONS[0]?.id ?? '',
+  combatPhaseId: COMBAT_PHASE_OPTIONS[0]?.id ?? '',
+  expectationPrimaryId: COMBAT_EXPECTATION_PRIMARY_OPTIONS[0]?.id ?? '',
+  expectationSecondaryId: COMBAT_EXPECTATION_PRIMARY_OPTIONS[0]?.children[0]?.id ?? '',
+})
+
+/** 作战对象固定展示顺序（三项始终可见） */
+const combatObjectCountryOptions = [...TASK_ENEMY_COUNTRY_OPTIONS]
+
+/**
+ * 当前作战阶段是否勾选该作战对象（勾选与提交字段 enemyCountryShow 一致）。
+ *
+ * @param country 国家/地区名称
+ */
+const isCombatObjectActive = (country: string): boolean =>
+  (taskForm.enemyCountryShow || []).includes(country)
+
+/** 作战预期二级选项（随一级变化） */
+const expectationSecondaryOptions = computed(() => {
+  const primary = COMBAT_EXPECTATION_PRIMARY_OPTIONS.find(
+    (item) => item.id === combatScenario.expectationPrimaryId,
+  )
+  return primary?.children ?? []
+})
+
+/** 后端未接入作战场景字段的说明 */
+const COMBAT_SCENARIO_API_HINT =
+  '作战背景/预期/阶段当前仅保存至浏览器本地；待 POST /api/battle/saveTask 扩展 combatScenario 字段后同步后端。'
 
 /** 可编辑任务表单。 */
 const taskForm = reactive<TaskForm>({
@@ -191,14 +243,14 @@ const formRules = reactive<FormRules<TaskForm>>({
     type: 'array',
     required: true,
     min: 1,
-    message: '请选择红方国家',
+    message: '红方国家缺失',
     trigger: 'change',
   }],
   enemyCountryShow: [{
     type: 'array',
     required: true,
     min: 1,
-    message: '请选择蓝方国家',
+    message: '请选择作战阶段以确定作战对象',
     trigger: 'change',
   }],
   beginDate: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
@@ -432,23 +484,7 @@ const createPlaceholderRow = (id: string, name?: string): TaskAssembleRow => ({
 })
 
 /**
- * 根据卫星系列创建装配行（编辑回显卫星系列）。
- *
- * @param series 系列名称
- * @returns 卫星系列装配行
- */
-const createSatelliteSeriesRow = (series: string): TaskAssembleRow => ({
-  id: series,
-  name: series,
-  series,
-  type: '--',
-  country: '--',
-  extra1: '--',
-  extra2: '--',
-})
-
-/**
- * 从任务 resources / weaponIds 恢复各装配页已选资源。
+ * 从任务 resources / weaponIds 恢复各装配页已选资源（卫星系列不在弹窗内回显勾选）。
  *
  * @param task 列表接口返回的任务对象
  */
@@ -456,15 +492,11 @@ const restoreAssembleFromTask = (task: TaskForm) => {
   const resources = task.resources ?? []
   const weaponIds = task.weaponIds ?? []
 
-  const satelliteRows = resources
-    .map((item) => item.series)
-    .filter(Boolean)
-    .map((series) => createSatelliteSeriesRow(series))
-
   const receiveIds = [...new Set(resources.flatMap((item) => item.receiveIds ?? []))]
   const stationIds = [...new Set(resources.flatMap((item) => item.stationIds ?? []))]
 
-  satelliteAssembleRef.value?.setAssembledRows(satelliteRows)
+  /** 卫星系列：弹窗内默认不勾选，由用户在「卫星装配」页自行多选 */
+  satelliteAssembleRef.value?.setAssembledRows([])
   stationAssembleRef.value?.setAssembledRows(receiveIds.map((id) => createPlaceholderRow(id)))
   centerAssembleRef.value?.setAssembledRows(stationIds.map((id) => createPlaceholderRow(id)))
   weaponAssembleRef.value?.setAssembledRows(weaponIds.map((id) => createPlaceholderRow(id)))
@@ -523,8 +555,42 @@ const resetCreateForm = () => {
     focusStatus: 0,
     delayMin: DEFAULT_DELAY_MIN,
     coverage: DEFAULT_COVERAGE,
+    weaponIds: [],
+    resources: [],
   })
   durationHours.value = DEFAULT_TASK_DURATION_HOURS
+  initCombatScenarioDefaults()
+  void nextTick(() => {
+    satelliteAssembleRef.value?.setAssembledRows([])
+    stationAssembleRef.value?.setAssembledRows([])
+    centerAssembleRef.value?.setAssembledRows([])
+    weaponAssembleRef.value?.setAssembledRows([])
+  })
+}
+
+/** 初始化作战场景默认值 */
+const initCombatScenarioDefaults = () => {
+  combatScenario.backgroundId = COMBAT_BACKGROUND_OPTIONS[0]?.id ?? ''
+  combatScenario.commandSourceId = COMMAND_SOURCE_OPTIONS[0]?.id ?? ''
+  combatScenario.combatPhaseId = COMBAT_PHASE_OPTIONS[0]?.id ?? ''
+  combatScenario.expectationPrimaryId = COMBAT_EXPECTATION_PRIMARY_OPTIONS[0]?.id ?? ''
+  combatScenario.expectationSecondaryId =
+    COMBAT_EXPECTATION_PRIMARY_OPTIONS[0]?.children[0]?.id ?? ''
+  applyCombatPhaseToEnemyCountries(combatScenario.combatPhaseId)
+}
+
+const loadCombatScenarioIntoForm = (taskId: number) => {
+  const saved = loadCombatScenarioForTask(taskId)
+  if (!saved) {
+    initCombatScenarioDefaults()
+    return
+  }
+  combatScenario.backgroundId = saved.backgroundId
+  combatScenario.commandSourceId = saved.commandSourceId
+  combatScenario.combatPhaseId = saved.combatPhaseId
+  combatScenario.expectationPrimaryId = saved.expectationPrimaryId
+  combatScenario.expectationSecondaryId = saved.expectationSecondaryId
+  applyCombatPhaseToEnemyCountries(saved.combatPhaseId)
 }
 
 /**
@@ -563,14 +629,42 @@ const fillForm = (task: TaskForm | null) => {
   void nextTick(() => {
     restoreAssembleFromTask(task)
   })
+  if (task.id) {
+    loadCombatScenarioIntoForm(task.id)
+  }
 }
 
 /**
  * 将多选国家同步回逗号分隔字段，供提交使用。
  */
 const syncCountryFields = () => {
-  taskForm.meCountry = (taskForm.meCountryShow || []).join(',')
+  taskForm.meCountryShow = [...DEFAULT_ME_COUNTRIES]
+  taskForm.meCountry = DEFAULT_ME_COUNTRIES.join(',')
   taskForm.enemyCountry = (taskForm.enemyCountryShow || []).join(',')
+}
+
+/**
+ * 作战阶段变更：自动设置作战对象（蓝方国家）。
+ *
+ * @param phaseId 作战阶段 ID
+ */
+const applyCombatPhaseToEnemyCountries = (phaseId: string) => {
+  const countries = resolveEnemyCountriesByCombatPhase(phaseId)
+  taskForm.enemyCountryShow = countries
+  syncCountryFields()
+  formRef.value?.validateField('enemyCountryShow').catch(() => undefined)
+}
+
+const handleCombatPhaseChange = (phaseId: string) => {
+  applyCombatPhaseToEnemyCountries(phaseId)
+}
+
+/**
+ * 作战预期一级变更：重置二级为该项首选项。
+ */
+const handleExpectationPrimaryChange = () => {
+  const first = expectationSecondaryOptions.value[0]
+  combatScenario.expectationSecondaryId = first?.id ?? ''
 }
 
 /**
@@ -737,6 +831,15 @@ const handleSubmit = async () => {
         }
         const createdId = resolveCreatedTaskId(res.data)
         if (createdId != null) savedTask.id = createdId
+        if (createdId != null) {
+          saveCombatScenarioForTask(createdId, {
+            backgroundId: combatScenario.backgroundId,
+            commandSourceId: combatScenario.commandSourceId,
+            combatPhaseId: combatScenario.combatPhaseId,
+            expectationPrimaryId: combatScenario.expectationPrimaryId,
+            expectationSecondaryId: combatScenario.expectationSecondaryId,
+          })
+        }
         ElMessage.success('添加任务成功')
         visible.value = false
         emit('saved', savedTask)
@@ -801,7 +904,6 @@ const handleSubmit = async () => {
 
   .atlas-app-dialog__title {
     color: #40f2ff !important;
-    font-size: 15px;
     font-weight: 700;
     text-shadow: 0 0 8px rgba(64, 242, 255, 0.4);
   }
@@ -852,7 +954,6 @@ const handleSubmit = async () => {
     border-radius: 6px;
     background: transparent;
     color: #94a3b8;
-    font-size: 13px;
     text-align: left;
     cursor: pointer;
     transition: all 0.18s ease;
@@ -916,11 +1017,10 @@ const handleSubmit = async () => {
     box-sizing: border-box;
 
     .atlas-app-button {
-      height: 32px;
-      padding: 0 16px;
+      min-height: 40px;
+      padding: 0 18px;
       margin: 0 !important;
-      font-size: 13px;
-      line-height: 32px;
+      line-height: 1.2;
     }
   }
 
@@ -934,11 +1034,92 @@ const handleSubmit = async () => {
     .atlas-app-form-item:last-child {
       margin-bottom: 0;
     }
+
+    .enemy-country-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      min-height: 32px;
+    }
+
+    .combat-object-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .combat-object-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      transition: background 0.15s, border-color 0.15s;
+
+      &--active {
+        border-color: rgba(248, 113, 113, 0.85);
+        background: rgba(127, 29, 29, 0.45);
+
+        .combat-object-label {
+          color: #fecaca;
+          font-weight: 700;
+        }
+
+        :deep(.atlas-app-checkbox__inner) {
+          border-color: #f87171;
+          background-color: #dc2626;
+        }
+
+        :deep(.atlas-app-checkbox__input.is-disabled.is-checked .atlas-app-checkbox__inner) {
+          background-color: #dc2626;
+          border-color: #f87171;
+        }
+      }
+
+      &--inactive {
+        border-color: rgba(250, 204, 21, 0.55);
+        background: rgba(113, 63, 18, 0.35);
+
+        .combat-object-label {
+          color: #fde68a;
+        }
+
+        :deep(.atlas-app-checkbox__inner) {
+          border-color: #eab308;
+          background-color: rgba(30, 27, 10, 0.6);
+        }
+      }
+    }
+
+    .combat-object-check {
+      height: auto;
+      margin: 0;
+    }
+
+    .combat-object-label {
+      line-height: 1.2;
+    }
+
+    .enemy-country-empty {
+      color: #64748b;
+    }
+
+    .expectation-select-row {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .combat-scenario-hint {
+      margin-bottom: 8px;
+    }
   }
 
   .atlas-app-form-item__label {
     color: #7dd3fc !important;
-    font-size: 13px;
   }
 
   .atlas-app-form-item.is-required:not(.is-no-asterisk)>.atlas-app-form-item__label::before {
@@ -1040,8 +1221,8 @@ const handleSubmit = async () => {
 
   .task-datetime-input {
     width: 100%;
-    height: 36px;
-    padding: 0 10px;
+    min-height: 40px;
+    padding: 0 12px;
     box-sizing: border-box;
     color: #e2efff;
     background: rgba(8, 20, 36, 0.9);
@@ -1079,7 +1260,6 @@ const handleSubmit = async () => {
 
     .atlas-app-checkbox__label {
       color: #e2efff;
-      font-size: 13px;
       padding-left: 8px;
     }
 
@@ -1116,7 +1296,6 @@ const handleSubmit = async () => {
 
   .metric-input-unit {
     flex-shrink: 0;
-    font-size: 13px;
     color: #9ecfe8;
     white-space: nowrap;
   }
@@ -1124,7 +1303,6 @@ const handleSubmit = async () => {
   .metric-input-hint {
     flex: 1;
     min-width: 0;
-    font-size: 12px;
     color: #7dd3fc;
     white-space: nowrap;
   }
@@ -1246,4 +1424,8 @@ const handleSubmit = async () => {
     border-top: 1px solid rgba(0, 225, 255, 0.15) !important;
   }
 }
+</style>
+
+<style lang="scss">
+@use '@/components/BattleSituation/styles/task-edit-typography.scss';
 </style>

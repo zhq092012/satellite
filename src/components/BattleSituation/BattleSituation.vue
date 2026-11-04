@@ -59,10 +59,8 @@
     <!-- 3. 悬浮右侧分析面板 -->
     <div class="floating-panel floating-panel--right" :class="{ 'is-collapsed': isRightCollapsed }">
       <div class="panel-inner">
-        <C2RightAnalysisPanel :analysis-data="taskAnalysisData" :algorithm-complete="algorithmComplete"
-          :analysis-loading="taskAnalysisLoading" :selected-norad="selectedNorad" :selected-weapon-id="selectedWeaponId"
-          :selected-ground-target-key="selectedGroundTargetKey" @select-satellite="handleSelectSatellite"
-          @select-weapon="handleSelectWeapon" @select-ground-target="handleSelectGroundTarget" />
+        <C2RightSatelliteListPanel :selected-norad="selectedNorad"
+          @select-satellite="handleSelectSatellite" />
       </div>
       <button type="button" class="toggle-btn toggle-btn--right" :title="isRightCollapsed ? '展开右侧面板' : '收起右侧面板'"
         @click="isRightCollapsed = !isRightCollapsed">
@@ -118,7 +116,7 @@ import {
 import { computed, nextTick, onActivated, onBeforeUnmount, ref, watch } from 'vue'
 import { ArrowDown, ArrowUp, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
-import C2RightAnalysisPanel from '@/components/BattleSituation/C2RightAnalysisPanel.vue'
+import C2RightSatelliteListPanel from '@/components/BattleSituation/C2RightSatelliteListPanel.vue'
 import BattleGlobeTimeline from '@/components/BattleSituation/BattleGlobeTimeline.vue'
 import BattleSituationGlobe from '@/components/BattleSituation/BattleSituationGlobe.vue'
 import BattleGlobeDeductionToast from '@/components/BattleSituation/BattleGlobeDeductionToast.vue'
@@ -692,6 +690,8 @@ onActivated(() => {
 </script>
 
 <style lang="scss" scoped>
+@use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
+
 .battle-situation-container {
   --c2-left-panel-width: 440px;
   --c2-right-panel-width: 500px;
@@ -733,13 +733,13 @@ onActivated(() => {
   }
 
   .globe-selected-label {
-    font-size: 13px;
+    font-size: battleUi.$battle-ui-font-base;
     color: #94a3b8;
     white-space: nowrap;
   }
 
   .globe-selected-name {
-    font-size: 13px;
+    font-size: battleUi.$battle-ui-font-base;
     font-weight: 700;
     color: #fbbf24;
     overflow: hidden;
@@ -774,7 +774,7 @@ onActivated(() => {
     border: 1px solid rgba(0, 225, 255, 0.28);
     background: rgba(0, 225, 255, 0.08);
     color: #7dd3fc;
-    font-size: 12px;
+    font-size: battleUi.$battle-ui-font-base;
     font-weight: 600;
     cursor: pointer;
     user-select: none;
@@ -795,7 +795,7 @@ onActivated(() => {
     border: 1px solid rgba(52, 211, 153, 0.45);
     background: rgba(52, 211, 153, 0.12);
     color: #6ee7b7;
-    font-size: 12px;
+    font-size: battleUi.$battle-ui-font-base;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -828,7 +828,7 @@ onActivated(() => {
     border: 1px solid rgba(248, 113, 113, 0.45);
     background: rgba(248, 113, 113, 0.12);
     color: #fca5a5;
-    font-size: 12px;
+    font-size: battleUi.$battle-ui-font-base;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -879,7 +879,7 @@ onActivated(() => {
       outline: none;
 
       .toggle-icon {
-        font-size: 13px;
+        font-size: battleUi.$battle-ui-font-base;
       }
 
       &:hover {
@@ -979,7 +979,7 @@ onActivated(() => {
       border-bottom: none;
       border-radius: 5px 5px 0 0;
       color: #00e1ff;
-      font-size: 10px;
+      font-size: battleUi.$battle-ui-font-base;
       font-weight: 600;
       cursor: pointer;
       outline: none;

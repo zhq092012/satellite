@@ -34,6 +34,9 @@
       </div>
     </div>
 
+    <el-alert v-if="combatScenarioSummary" type="info" :closable="false" show-icon class="scenario-banner"
+      :title="combatScenarioSummary" description="generateStrikePlanV2 尚未接收作战场景参数；当前生成仍仅按用途/系统类型请求。" />
+
     <div class="plan-body">
       <div v-if="!store.activedTask" class="empty-container">
         <div class="empty-icon">📋</div>
@@ -70,6 +73,14 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ZhchPlanResp } from '@/api/electronic'
 import { refreshZhchPlanCache } from '@/api/electronic'
+import {
+  buildCombatScenarioCompositeKey,
+  loadCombatScenarioForTask,
+  COMBAT_BACKGROUND_OPTIONS,
+  COMBAT_EXPECTATION_PRIMARY_OPTIONS,
+  COMBAT_PHASE_OPTIONS,
+  COMMAND_SOURCE_OPTIONS,
+} from '@/config/combatScenarioOptions'
 import { useLayoutStore, ZHCH_USAGE_TYPE_OPTIONS, ZHCH_SYS_TYPE_OPTIONS, getZhchUsageTypeLabel } from '@/store/modules/layout'
 import ZhchPlanDetailPanel from './strike-plan/ZhchPlanDetailPanel.vue'
 
@@ -115,6 +126,22 @@ const hasVisiblePlans = computed(() =>
   selectedUsageTypes.value.some((type) => !!store.zhchPlanMap[type])
 )
 
+/** 当前任务作战场景摘要（本地配置） */
+const combatScenarioSummary = computed(() => {
+  const taskId = store.activedTask?.id
+  if (!taskId) return ''
+  const selection = loadCombatScenarioForTask(taskId)
+  if (!selection) return ''
+  const bg = COMBAT_BACKGROUND_OPTIONS.find((o) => o.id === selection.backgroundId)?.label ?? selection.backgroundId
+  const cmd = COMMAND_SOURCE_OPTIONS.find((o) => o.id === selection.commandSourceId)?.label ?? selection.commandSourceId
+  const phase = COMBAT_PHASE_OPTIONS.find((o) => o.id === selection.combatPhaseId)?.label ?? selection.combatPhaseId
+  const expPrimary = COMBAT_EXPECTATION_PRIMARY_OPTIONS.find((o) => o.id === selection.expectationPrimaryId)?.label
+  const expSecondary = COMBAT_EXPECTATION_PRIMARY_OPTIONS.flatMap((p) => p.children)
+    .find((o) => o.id === selection.expectationSecondaryId)?.label
+  const key = buildCombatScenarioCompositeKey(selection)
+  return `命令来源=${cmd}；阶段=${phase}；预期=${expPrimary ?? '--'}/${expSecondary ?? '--'}；背景=${bg}（组合键 ${key}）`
+})
+
 /**
  * 根据用途类型读取 store 中的方案
  * @param type 用途类型
@@ -147,6 +174,15 @@ const handleGenerate = async () => {
   if (!store.activedTask?.id) {
     ElMessage.warning('请先选择战场与任务')
     return
+  }
+  const taskId = store.activedTask.id
+  const scenario = loadCombatScenarioForTask(taskId)
+  if (scenario) {
+    console.warn(
+      '[StrikePlan] 作战场景组合尚未传入 generateStrikePlanV2，当前组合键=',
+      buildCombatScenarioCompositeKey(scenario),
+      '；待接口扩展 combatScenario 字段。',
+    )
   }
   store.sanitizeZhchUsageTypes()
   const ok = await store.fetchZhchPlans(selectedUsageTypes.value, true)
@@ -284,6 +320,11 @@ watch(
 .glow-text {
   color: #eaf3ff;
   text-shadow: 0 0 8px rgba(64, 242, 255, 0.35);
+}
+
+.scenario-banner {
+  margin: 0 16px 8px;
+  flex-shrink: 0;
 }
 
 .plan-body {

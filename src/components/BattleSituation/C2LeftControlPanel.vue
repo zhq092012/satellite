@@ -1,252 +1,150 @@
 <template>
   <aside class="c2-panel c2-panel--left dark-theme">
-    <div class="panel-header">
-      <button type="button" class="scene-action-btn" @click="openCreateScene">添加场景</button>
-      <button type="button" class="scene-action-btn" :disabled="!store.battle" title="修改当前选择的场景" @click="openEditScene">
-        修改场景
-      </button>
-      <button type="button" class="scene-action-btn" @click="openCreateTask">添加任务</button>
-    </div>
     <div class="panel-body">
-      <!-- 上：任务名称 + 进度（不滚动） -->
-      <section class="panel-zone panel-zone--top">
-        <p class="scene-summary" :title="sceneSummaryText">{{ sceneSummaryText }}</p>
-        <div v-if="taskLoading && !taskList.length" class="zone-loading">正在加载任务...</div>
-        <div v-else-if="!taskList.length" class="zone-empty">当前场景暂无任务</div>
-        <ul v-else class="task-progress-list">
-          <li v-for="task in taskList" :key="task.id" class="task-progress-item" :class="{
-            active: store.activedTask?.id === task.id,
-            disabled: taskSwitching,
-            'task-progress-item--done': isTaskCalculationComplete(task),
-          }" @click="selectTask(task)">
-            <span class="task-progress-name" :title="task.name">
-              <span class="task-progress-name-tag">任务名称</span>
-              <span class="task-progress-name-text">：{{ task.name }}</span>
-            </span>
-            <div class="task-progress-bar-wrap">
-              <div v-if="isTaskCalculationComplete(task)" class="task-progress-done">
-                <span class="task-progress-done-dot" aria-hidden="true" />
-                <span class="task-progress-done-text">计算完成</span>
-              </div>
-              <template v-else-if="getTaskProgress(task)">
-                <el-progress :percentage="getTaskProgressPercent(getTaskProgress(task))" :stroke-width="5"
-                  class="task-progress-bar" />
-                <span v-if="getTaskProgress(task)?.mes" class="task-progress-mes">{{ getTaskProgress(task)?.mes
-                }}</span>
-              </template>
-              <span v-else class="task-progress-mes is-muted">未开始</span>
-            </div>
-          </li>
-        </ul>
-      </section>
-      <!-- 中：当前任务可编辑项（超出时滚动） -->
-      <section class="panel-zone panel-zone--middle">
-        <div v-if="taskSwitching" class="zone-loading">正在切换任务...</div>
-        <div v-else-if="!editorDraft" class="zone-empty">请选择任务以编辑配置</div>
-        <div v-else class="task-editor">
-          <div class="tag-section task-time-section">
-            <div class="tag-section-head">任务基本信息</div>
-            <div class="task-editor-times">
-              <label class="time-field">
-                <span class="time-label">开始时间</span>
-                <input class="task-datetime-input" type="datetime-local" step="60"
-                  :value="toTaskDatetimeLocalValue(editorDraft.beginDate)"
-                  @input="handleBeginInput(($event.target as HTMLInputElement).value)" />
-              </label>
-              <label class="time-field">
-                <span class="time-label">结束时间</span>
-                <input class="task-datetime-input" type="datetime-local" step="60"
-                  :value="toTaskDatetimeLocalValue(editorDraft.endDate)"
-                  @input="handleEndInput(($event.target as HTMLInputElement).value)" />
-              </label>
-            </div>
-            <div class="task-metric-rows">
-              <div class="metric-row metric-row--readonly">
-                <span class="metric-label">国家/组织</span>
-                <span class="metric-value" :title="enemyCountryDisplayText">{{ enemyCountryDisplayText }}</span>
-              </div>
-              <div class="metric-row">
-                <span class="metric-label">任务时长</span>
-                <el-input-number v-model="durationHours" class="metric-input-number" size="small" :min="1" :max="8760"
-                  :step="1" controls-position="right" @change="handleDurationHoursChange" />
-                <span class="metric-unit">小时</span>
-              </div>
-              <div class="metric-row">
-                <span class="metric-label">链路时延</span>
-                <el-input-number v-model="editorDraft.delayMin" class="metric-input-number" size="small" :min="1"
-                  :max="4320" :step="1" controls-position="right" />
-                <span class="metric-unit">分钟</span>
-              </div>
-              <div class="metric-row">
-                <span class="metric-label">覆盖率</span>
-                <el-input-number v-model="editorDraft.coverage" class="metric-input-number" size="small" :min="0"
-                  :max="100" :step="1" controls-position="right" />
-                <span class="metric-unit">%</span>
-              </div>
-              <div class="metric-row metric-row--types">
-                <span class="metric-label">卫星类型</span>
-                <div class="tag-cloud metric-type-tags">
-                  <el-tag v-for="typeName in TASK_PANEL_SATELLITE_TYPES" :key="typeName" class="task-config-tag"
-                    :class="{ 'is-selected': isTargetTypeSelected(typeName) }"
-                    :closable="isTargetTypeSelected(typeName)" disable-transitions @close="removeTargetType(typeName)"
-                    @click="toggleTargetType(typeName)">
-                    {{ typeName }}
-                  </el-tag>
-                </div>
-              </div>
-              <div class="metric-row metric-row--combat-head">
-                <span class="metric-label">作战区域</span>
-                <label class="combat-area-enable">
-                  <el-checkbox v-model="editorDraft.combatArea.enabled">启用</el-checkbox>
-                </label>
-              </div>
-              <div class="metric-row">
-                <span class="metric-label">经度</span>
-                <el-input-number v-model="editorDraft.combatArea.centerLon" class="metric-input-number" size="small"
-                  :controls="false" :precision="4" :step="0.0001" :min="-180" :max="180" />
-                <span class="metric-unit metric-unit--empty" aria-hidden="true" />
-              </div>
-              <div class="metric-row">
-                <span class="metric-label">纬度</span>
-                <el-input-number v-model="editorDraft.combatArea.centerLat" class="metric-input-number" size="small"
-                  :controls="false" :precision="4" :step="0.0001" :min="-90" :max="90" />
-                <span class="metric-unit metric-unit--empty" aria-hidden="true" />
-              </div>
-              <div class="metric-row">
-                <span class="metric-label">半径</span>
-                <el-input-number v-model="editorDraft.combatArea.radiusKm" class="metric-input-number" size="small"
-                  :controls="false" :precision="0" :step="10" :min="1" :max="20000" />
-                <span class="metric-unit">km</span>
+      <div v-if="taskSwitching" class="zone-loading">正在切换任务...</div>
+      <div v-else-if="!store.activedTask" class="zone-empty">请选择当前任务</div>
+      <div v-else class="task-panel">
+        <section class="task-panel-block task-panel-block--meta">
+          <div class="task-panel-row task-panel-row--name">
+            <span class="task-panel-label">任务名称</span>
+            <span class="task-panel-value task-panel-name" :title="store.activedTask.name">{{ store.activedTask.name
+            }}</span>
+            <button type="button" class="task-edit-link" @click="openEditTask">编辑</button>
+          </div>
+          <div class="task-panel-row">
+            <span class="task-panel-label">作战阶段</span>
+            <span class="task-panel-value" :title="currentCombatPhaseLabel">{{ currentCombatPhaseLabel }}</span>
+          </div>
+          <div class="task-panel-row task-panel-row--objects">
+            <span class="task-panel-label">作战对象</span>
+            <div class="combat-object-options" role="group" aria-label="当前作战对象">
+              <div v-for="country in combatObjectCountryOptions" :key="country" class="combat-object-chip" :class="{
+                'combat-object-chip--active': isTaskCombatObjectActive(country),
+                'combat-object-chip--inactive': !isTaskCombatObjectActive(country),
+              }">
+                <span class="combat-object-label">{{ country }}</span>
               </div>
             </div>
           </div>
-          <div class="tag-section">
-            <div class="tag-section-head">任务卫星</div>
-            <div v-if="seriesOptionsLoading" class="tag-hint">正在加载系列...</div>
-            <div v-else-if="!seriesTagOptions.length" class="tag-hint">暂无系列候选项</div>
-            <div v-else class="tag-cloud">
-              <el-tag v-for="item in seriesTagOptions" :key="item.id" class="task-config-tag"
-                :class="{ 'is-selected': isSeriesSelected(item.id) }" :closable="isSeriesSelected(item.id)"
-                disable-transitions @close="removeSeries(item.id)" @click="toggleSeries(item.id)">
-                {{ item.label }}
-              </el-tag>
+          <div class="task-panel-row task-panel-row--expectation">
+            <span class="task-panel-label">作战预期</span>
+            <div class="task-panel-expectation">
+              <span class="task-panel-value" :title="currentCombatExpectationPrimaryLabel">{{
+                currentCombatExpectationPrimaryLabel }}</span>
+              <span class="task-panel-expectation-sep">/</span>
+              <span class="task-panel-value task-panel-expectation-secondary"
+                :title="currentCombatExpectationSecondaryLabel">{{ currentCombatExpectationSecondaryLabel }}</span>
             </div>
           </div>
-          <div class="tag-section">
-            <div class="tag-section-head">任务武器</div>
+        </section>
+
+        <section class="task-panel-block task-panel-block--tree">
+          <div class="task-panel-section-head">任务资源</div>
+          <p v-if="catalogSourceHint" class="task-panel-hint">{{ catalogSourceHint }}</p>
+          <div v-loading="catalogLoading" class="task-panel-block-body task-panel-block-body--tree">
+            <div v-if="!catalogLoading && !resourceTreeNodes.length" class="task-panel-hint task-panel-hint--center">
+              暂无卫星资源
+            </div>
+            <el-tree v-show="resourceTreeNodes.length > 0" ref="resourceTreeRef" class="c2-resource-tree"
+              :data="resourceTreeNodes" node-key="id" show-checkbox default-expand-all :props="resourceTreeProps"
+              @check="handleResourceTreeCheck" />
+          </div>
+        </section>
+
+        <div class="task-panel-weapon-dock">
+          <section v-if="useWeaponsEnabled" class="task-panel-block task-panel-block--weapons">
+            <div class="task-panel-section-head">武器列表</div>
+            <div class="task-panel-block-body task-panel-block-body--table">
+              <div v-if="weaponOptionsLoading" class="task-panel-hint task-panel-hint--center">正在加载武器...</div>
+              <div v-else-if="!weaponTableRows.length" class="task-panel-hint task-panel-hint--center">暂无武器候选项</div>
+              <el-table v-else ref="weaponTableRef" :data="weaponTableRows" size="small" class="c2-resource-table"
+                max-height="128" empty-text="暂无武器" @selection-change="handleWeaponSelectionChange">
+                <el-table-column type="selection" width="32" />
+                <el-table-column prop="name" label="武器名称" min-width="1" />
+                <el-table-column prop="type" label="武器类型" min-width="1" />
+                <el-table-column label="纬度" min-width="1" align="right">
+                  <template #default="{ row }">{{ formatWeaponCoordinate(row.latitude) }}</template>
+                </el-table-column>
+                <el-table-column label="经度" min-width="1" align="right">
+                  <template #default="{ row }">{{ formatWeaponCoordinate(row.longitude) }}</template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </section>
+
+          <section class="task-panel-block task-panel-block--switch">
             <div class="weapon-use-item">
-              <span class="weapon-use-item-label">使用武器</span>
+              <span class="weapon-use-item-label">是否使用武器</span>
               <el-switch v-model="useWeaponsEnabled" size="small" @change="handleUseWeaponsChange" />
             </div>
-            <template v-if="useWeaponsEnabled">
-              <div v-if="weaponOptionsLoading" class="tag-hint">正在加载武器...</div>
-              <div v-else-if="!weaponTagOptions.length" class="tag-hint">暂无武器候选项</div>
-              <div v-else class="tag-cloud">
-                <el-tag v-for="item in weaponTagOptions" :key="item.id" class="task-config-tag"
-                  :class="{ 'is-selected': isWeaponSelected(item.id) }" :closable="isWeaponSelected(item.id)"
-                  disable-transitions @close="removeWeapon(item.id)" @click="toggleWeapon(item.id)">
-                  {{ item.label }}
-                </el-tag>
-              </div>
-            </template>
-            <div v-else class="tag-hint">已关闭「使用武器」，武器选择已暂存；重新打开可恢复</div>
-          </div>
-          <div class="tag-section">
-            <div class="tag-section-head">任务地面站</div>
-            <div v-if="receiveOptionsLoading" class="tag-hint">正在加载地面站...</div>
-            <div v-else-if="!receiveTagOptions.length" class="tag-hint">暂无地面站候选项</div>
-            <div v-else class="tag-cloud">
-              <el-tag v-for="item in receiveTagOptions" :key="item.id" class="task-config-tag"
-                :class="{ 'is-selected': isReceiveSelected(item.id) }" :closable="isReceiveSelected(item.id)"
-                disable-transitions @close="removeReceive(item.id)" @click="toggleReceive(item.id)">
-                {{ item.label }}
-              </el-tag>
-            </div>
-          </div>
-          <div class="tag-section">
-            <div class="tag-section-head">任务数据中心</div>
-            <div v-if="centerOptionsLoading" class="tag-hint">正在加载数据中心...</div>
-            <div v-else-if="!centerTagOptions.length" class="tag-hint">暂无数据中心候选项</div>
-            <div v-else class="tag-cloud">
-              <el-tag v-for="item in centerTagOptions" :key="item.id" class="task-config-tag"
-                :class="{ 'is-selected': isCenterSelected(item.id) }" :closable="isCenterSelected(item.id)"
-                disable-transitions @close="removeCenter(item.id)" @click="toggleCenter(item.id)">
-                {{ item.label }}
-              </el-tag>
-            </div>
-          </div>
+          </section>
         </div>
-      </section>
-      <!-- 下：保存并重算 -->
-      <footer class="panel-zone panel-zone--bottom">
-        <el-button type="primary" class="save-recalc-btn" :loading="savingRecalc"
-          :disabled="!editorDraft || taskSwitching" @click="handleSaveAndRecalculate">
-          保存并重算
-        </el-button>
-      </footer>
+      </div>
     </div>
     <TaskEditDialog v-model="taskEditVisible" :is-edit="taskEditIsEdit" :task="editingTask" @saved="handleTaskSaved" />
-    <SceneEditDialog v-model="sceneEditVisible" :is-edit="sceneEditIsEdit" :scene="editingScene"
-      @saved="handleSceneSaved" />
   </aside>
 </template>
 <script setup lang="ts">
 /**
- * 战场态势 - C2 左侧场景任务面板（上：任务进度列表，中：任务配置，下：保存并重算）。
+ * 战场态势 - C2 左侧面板：任务摘要、作战阶段/对象、三国资源树、武器配置。
  */
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import type { ElTable } from 'element-plus'
+import type { ElTree } from 'element-plus'
 import { getTaskList, updateTask, getAllWeapons } from '@/api/dashboard'
-import { getSatelliteSeries } from '@/api/task/task'
-import { getGroundStationList } from '@/api/system/satellite-system-api'
-import type { BattleForm, TaskForm } from '@/types/dashboard'
+import { getSatelliteBySeries, getSatelliteSeries } from '@/api/task/task'
+import type { TaskForm, Weapon } from '@/types/dashboard'
 import type { MatrixResult } from '@/api/electronic'
 import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskEditDialog from '@/components/BattleSituation/TaskEditDialog.vue'
-import SceneEditDialog from '@/components/BattleSituation/SceneEditDialog.vue'
 import {
-  applyDurationHoursToDraft,
-  buildSeriesOptionsFromApiData,
-  calcTaskDurationHours,
+  COMBAT_EXPECTATION_PRIMARY_OPTIONS,
+  COMBAT_PHASE_OPTIONS,
+  loadCombatScenarioForTask,
+} from '@/config/combatScenarioOptions'
+import { TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
+import {
   createDraftFromTask,
-  fromTaskDatetimeLocalValue,
-  isDataCenterStationType,
   mergeTaskFormWithDraft,
   parseTaskPanelTimeMs,
-  TASK_PANEL_SATELLITE_TYPES,
-  toTaskDatetimeLocalValue,
   type C2TaskEditorDraft,
-  type TaskPanelTagOption,
 } from '@/utils/c2TaskPanelEditor'
+import {
+  buildC2ResourceTreeNodesForPanel,
+  buildC2SatelliteFlatRowsFromMatrix,
+  buildC2SatelliteFlatRowsFromSeriesFallback,
+  C2_PANEL_TREE_COUNTRIES,
+  expandCheckedKeysToSeriesNames,
+  filterC2ResourceRowsToPanelCountries,
+  mergeMatrixCatalogIntoPanelCatalog,
+  parseSeriesApiBuckets,
+  type C2ResourceSatelliteRow,
+  type C2ResourceTreeNode,
+  type C2SeriesPreviewSatellite,
+} from '@/utils/buildC2ResourceCatalog'
+
 defineProps<{
   /** 算法矩阵（与父组件兼容） */
   matrixData?: MatrixResult | null
   /** 当前选中 NORAD（与父组件兼容） */
   selectedNorad?: number | null
 }>()
+
 const emit = defineEmits<{
   (e: 'select-satellite', norad: number | null): void
   /** 保存并重算已提交，右侧面板应重新等待/拉取分析结果 */
   (e: 'task-recalculated', taskId: number): void
 }>()
+
 const store = useLayoutStore()
 const {
-  getTaskProgress,
-  getTaskProgressPercent,
-  isTaskProgressComplete,
   startTaskProgressPolling,
   stopAllTaskProgressPolling,
   resumeTaskProgressPollingForTasks,
 } = useTaskProgressPolling()
-/**
- * 判断任务后台算法是否已全部计算完成。
- *
- * @param task 任务项
- * @returns 三项进度均为「完成」时为 true
- */
-const isTaskCalculationComplete = (task: TaskForm): boolean =>
-  isTaskProgressComplete(getTaskProgress(task))
+
 const taskList = ref<TaskForm[]>([])
 const taskLoading = ref(false)
 const taskSwitching = ref(false)
@@ -254,33 +152,79 @@ const savingRecalc = ref(false)
 const taskEditVisible = ref(false)
 const taskEditIsEdit = ref(false)
 const editingTask = ref<TaskForm | null>(null)
-const sceneEditVisible = ref(false)
-const sceneEditIsEdit = ref(false)
-const editingScene = ref<BattleForm | null>(null)
-/** 当前选中任务的内联编辑草稿 */
+
+/** 当前选中任务的内联编辑草稿（系列/武器） */
 const editorDraft = ref<C2TaskEditorDraft | null>(null)
-/** 是否启用任务武器配置；关闭时草稿中不携带武器，选择暂存于此 */
+/** 是否启用任务武器配置 */
 const useWeaponsEnabled = ref(false)
-/** 关闭「使用武器」时暂存的武器 ID，重新打开开关时恢复 */
+/** 关闭「使用武器」时暂存的武器 ID */
 const stashedWeaponIds = ref<string[]>([])
-/** 任务时长（小时），与起止时间联动 */
-const durationHours = ref(8)
-const seriesTagOptions = ref<TaskPanelTagOption[]>([])
-const weaponTagOptions = ref<TaskPanelTagOption[]>([])
-const receiveTagOptions = ref<TaskPanelTagOption[]>([])
-const centerTagOptions = ref<TaskPanelTagOption[]>([])
-const seriesOptionsLoading = ref(false)
+
 const weaponOptionsLoading = ref(false)
-const receiveOptionsLoading = ref(false)
-const centerOptionsLoading = ref(false)
-const sceneSummaryText = computed(() => {
-  const scene = store.battle?.name || '未选择'
-  const count = taskList.value.length
-  const current = store.activedTask?.name || '未选择'
-  return `当前场景：${scene}（${count} 个任务）· 当前任务：${current}`
-})
+const resourceTreeRef = ref<InstanceType<typeof ElTree>>()
+const weaponTableRef = ref<InstanceType<typeof ElTable>>()
+const flatCatalogRows = ref<C2ResourceSatelliteRow[]>([])
+const catalogLoading = ref(false)
+const catalogUsesMatrix = ref(false)
+const programmaticTreeSync = ref(false)
+const weaponTableRows = ref<Weapon[]>([])
+const resourceTreeProps = { label: 'label', children: 'children' as const }
+
+/** 作战对象固定三项（只读展示，高亮任务所选国家） */
+const combatObjectCountryOptions = [...TASK_ENEMY_COUNTRY_OPTIONS]
+
+/** 资源树（固定三国根节点） */
+const resourceTreeNodes = computed((): C2ResourceTreeNode[] =>
+  buildC2ResourceTreeNodesForPanel(flatCatalogRows.value),
+)
+
+/** 作战场景展示刷新令牌（任务保存 localStorage 后递增） */
+const combatScenarioDisplayToken = ref(0)
+
 /**
- * 拉取当前场景任务列表。
+ * 读取当前任务的作战场景（localStorage；与添加/编辑任务弹窗一致）。
+ */
+const readActiveCombatScenario = () => {
+  combatScenarioDisplayToken.value
+  const taskId = store.activedTask?.id
+  if (!taskId) return null
+  return loadCombatScenarioForTask(taskId)
+}
+
+/** 资源数据来源提示 */
+const catalogSourceHint = computed(() => {
+  if (catalogLoading.value || !flatCatalogRows.value.length) return ''
+  if (catalogUsesMatrix.value) return ''
+  return '算法未完成：当前为系列预览数据，用途/国际编号/发射时间可能为空。'
+})
+
+/** 当前任务作战阶段文案（来自添加任务 localStorage） */
+const currentCombatPhaseLabel = computed(() => {
+  const scenario = readActiveCombatScenario()
+  if (!scenario?.combatPhaseId) return '--'
+  const phase = COMBAT_PHASE_OPTIONS.find((item) => item.id === scenario.combatPhaseId)
+  return phase?.label ?? '--'
+})
+
+/** 作战预期一级（来自任务保存的 combatScenario） */
+const currentCombatExpectationPrimaryLabel = computed(() => {
+  const scenario = readActiveCombatScenario()
+  if (!scenario?.expectationPrimaryId) return '--'
+  const primary = COMBAT_EXPECTATION_PRIMARY_OPTIONS.find((item) => item.id === scenario.expectationPrimaryId)
+  return primary?.label ?? '--'
+})
+
+/** 作战预期二级（来自任务保存的 combatScenario） */
+const currentCombatExpectationSecondaryLabel = computed(() => {
+  const scenario = readActiveCombatScenario()
+  if (!scenario?.expectationSecondaryId) return '--'
+  const primary = COMBAT_EXPECTATION_PRIMARY_OPTIONS.find((item) => item.id === scenario.expectationPrimaryId)
+  const secondary = primary?.children.find((item) => item.id === scenario.expectationSecondaryId)
+  return secondary?.label ?? '--'
+})
+
+/**
+ * 拉取当前场景任务列表（供任务保存后刷新）。
  */
 const loadBattleTasks = async () => {
   const battleId = store.battle?.id
@@ -305,32 +249,19 @@ const loadBattleTasks = async () => {
     taskLoading.value = false
   }
 }
+
 watch(
   () => store.battle?.id,
   () => {
     void loadBattleTasks()
   },
-  { immediate: true }
+  { immediate: true },
 )
+
 /**
- * 解析任务卫星类型列表。
+ * 解析任务蓝方国家列表。
  *
  * @param task 任务
- * @returns 类型数组
- */
-const resolveTaskTargetTypes = (task: TaskForm | null | undefined): string[] => {
-  if (!task) return []
-  if (task.targetTypeShow?.length) return [...task.targetTypeShow]
-  return (task.targetTypeNew || task.targetType || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-/**
- * 解析系列查询用的蓝方国家列表。
- *
- * @param task 任务
- * @returns 国家列表
  */
 const resolveEnemyCountries = (task: TaskForm | null | undefined): string[] => {
   if (!task) return []
@@ -342,53 +273,178 @@ const resolveEnemyCountries = (task: TaskForm | null | undefined): string[] => {
 }
 
 /**
- * 当前编辑任务蓝方（敌方）国家/组织展示文案。
+ * 解析任务卫星类型列表。
+ *
+ * @param task 任务
  */
-const enemyCountryDisplayText = computed(() => {
-  const countries = resolveEnemyCountries(store.activedTask)
-  return countries.length ? countries.join('、') : '--'
-})
+const resolveTaskTargetTypes = (task: TaskForm | null | undefined): string[] => {
+  if (!task) return []
+  if (task.targetTypeShow?.length) return [...task.targetTypeShow]
+  return (task.targetTypeNew || task.targetType || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 /**
- * 加载卫星系列候选项。
+ * 作战对象是否为当前任务所选蓝方国家。
+ *
+ * @param country 国家/地区名
+ */
+const isTaskCombatObjectActive = (country: string): boolean =>
+  resolveEnemyCountries(store.activedTask).includes(country)
+
+/**
+ * 武器表经纬度展示（保留三位小数）。
+ *
+ * @param value 纬度或经度
+ */
+const formatWeaponCoordinate = (value: number | string | undefined | null): string => {
+  if (value == null || value === '') return '--'
+  const num = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(num)) return '--'
+  return num.toFixed(3)
+}
+
+/**
+ * 拉取三国全量系列预览 catalog（树结构数据源，不受任务已选系列限制）。
  *
  * @param task 当前任务
  */
-const loadSeriesTagOptions = async (task: TaskForm | null | undefined) => {
-  const countries = resolveEnemyCountries(task)
+const fetchSeriesFallbackCatalog = async (task: TaskForm): Promise<C2ResourceSatelliteRow[]> => {
+  const treeCountries = [...C2_PANEL_TREE_COUNTRIES]
   const types = editorDraft.value?.targetTypeShow?.length
     ? [...editorDraft.value.targetTypeShow]
     : resolveTaskTargetTypes(task)
-  if (!countries.length || !types.length) {
-    seriesTagOptions.value = (editorDraft.value?.selectedSeries || []).map((series) => ({
-      id: series,
-      label: series,
-    }))
+  if (!types.length) return []
+  const res = await getSatelliteSeries(treeCountries)
+  const buckets = res.code === 200 ? parseSeriesApiBuckets(res.data, types) : []
+  const previews: Array<{ series: string; sysType: string; satellites: C2SeriesPreviewSatellite[] }> = []
+  for (const bucket of buckets) {
+    const previewRes = await getSatelliteBySeries(bucket.series)
+    const satellites =
+      previewRes.code === 200 && Array.isArray(previewRes.data) ? previewRes.data : []
+    previews.push({ series: bucket.series, sysType: bucket.sysType, satellites })
+  }
+  return filterC2ResourceRowsToPanelCountries(
+    buildC2SatelliteFlatRowsFromSeriesFallback(previews, treeCountries),
+  )
+}
+
+/**
+ * 刷新 C2 卫星资源 catalog（树固定展示三国；matrix 仅覆盖对应系列，不裁剪整树）。
+ *
+ * @param task 当前任务
+ */
+const refreshResourceCatalog = async (task: TaskForm | null | undefined) => {
+  if (!task) {
+    flatCatalogRows.value = []
+    store.setC2ResourceSatelliteRows([])
+    catalogUsesMatrix.value = false
     return
   }
-  seriesOptionsLoading.value = true
+  const taskEnemies = resolveEnemyCountries(task)
+  catalogLoading.value = true
   try {
-    const res = await getSatelliteSeries(countries)
-    if (res.code === 200 && res.data) {
-      const options = buildSeriesOptionsFromApiData(res.data, types)
-      const merged = new Set([...options, ...(editorDraft.value?.selectedSeries || [])])
-      seriesTagOptions.value = [...merged]
-        .sort((a, b) => a.localeCompare(b, 'zh-CN'))
-        .map((series) => ({ id: series, label: series }))
+    const analysis = store.taskAnalysisData
+    const hasMatrix =
+      Boolean(analysis?.levelSeriesEntities?.length) &&
+      store.taskAnalysisTaskId === task.id
+
+    if (hasMatrix && analysis) {
+      const matrixRows = filterC2ResourceRowsToPanelCountries(
+        buildC2SatelliteFlatRowsFromMatrix(analysis, taskEnemies),
+      )
+      let baseRows = flatCatalogRows.value
+      if (!baseRows.length) {
+        baseRows = await fetchSeriesFallbackCatalog(task)
+      }
+      flatCatalogRows.value = mergeMatrixCatalogIntoPanelCatalog(baseRows, matrixRows)
+      catalogUsesMatrix.value = true
     } else {
-      seriesTagOptions.value = (editorDraft.value?.selectedSeries || []).map((series) => ({
-        id: series,
-        label: series,
-      }))
+      catalogUsesMatrix.value = false
+      flatCatalogRows.value = await fetchSeriesFallbackCatalog(task)
     }
-  } catch {
-    seriesTagOptions.value = (editorDraft.value?.selectedSeries || []).map((series) => ({
-      id: series,
-      label: series,
-    }))
+    store.setC2ResourceSatelliteRows(flatCatalogRows.value)
+    await reapplyResourceTreeCheckedKeys()
+  } catch (error) {
+    console.error('加载 C2 资源 catalog 失败:', error)
+    flatCatalogRows.value = []
+    store.setC2ResourceSatelliteRows([])
   } finally {
-    seriesOptionsLoading.value = false
+    catalogLoading.value = false
   }
 }
+
+/** 清空资源树勾选（界面默认不勾选，右侧列表为空） */
+const clearResourceTreeSelection = async () => {
+  await nextTick()
+  const tree = resourceTreeRef.value
+  programmaticTreeSync.value = true
+  tree?.setCheckedKeys([])
+  store.setC2TreeCheckedKeys([])
+  await nextTick()
+  programmaticTreeSync.value = false
+}
+
+/**
+ * catalog 刷新后恢复 store 中的勾选（不从任务 resources 自动回显）。
+ */
+const reapplyResourceTreeCheckedKeys = async () => {
+  await nextTick()
+  const tree = resourceTreeRef.value
+  if (!tree) return
+  programmaticTreeSync.value = true
+  tree.setCheckedKeys([...store.c2TreeCheckedKeys])
+  await nextTick()
+  programmaticTreeSync.value = false
+}
+
+/**
+ * 资源树勾选变更：立即同步 Store 供右侧列表过滤；系列写入草稿后再保存任务。
+ * 仅使用叶子节点 keys（不含半选父节点），避免取消单个系列时仍匹配整国/整类。
+ */
+const handleResourceTreeCheck = () => {
+  if (programmaticTreeSync.value || !editorDraft.value) return
+  const tree = resourceTreeRef.value
+  if (!tree) return
+  const checkedLeafKeys = tree.getCheckedKeys(true) as string[]
+  store.setC2TreeCheckedKeys(checkedLeafKeys)
+  const seriesSet = expandCheckedKeysToSeriesNames(checkedLeafKeys, flatCatalogRows.value)
+  editorDraft.value.selectedSeries = [...seriesSet].sort((a, b) => a.localeCompare(b, 'zh-CN'))
+  if (editorDraft.value.selectedSeries.length > 0) {
+    void handleSaveAndRecalculate()
+  }
+}
+
+/**
+ * 武器表多选变更。
+ *
+ * @param rows 选中武器行
+ */
+const handleWeaponSelectionChange = (rows: Weapon[]) => {
+  if (!useWeaponsEnabled.value || !editorDraft.value) return
+  const ids = rows.map((row) => String(row.id ?? '')).filter(Boolean)
+  editorDraft.value.selectedWeaponIds = ids
+  stashedWeaponIds.value = [...ids]
+  void handleSaveAndRecalculate()
+}
+
+/** 回显武器表勾选 */
+const syncWeaponTableSelection = async () => {
+  await nextTick()
+  const table = weaponTableRef.value
+  if (!table || !useWeaponsEnabled.value || !editorDraft.value) return
+  table.clearSelection()
+  const wanted = new Set(editorDraft.value.selectedWeaponIds)
+  weaponTableRows.value.forEach((row) => {
+    const id = String(row.id ?? '')
+    if (id && wanted.has(id)) {
+      table.toggleRowSelection(row, true)
+    }
+  })
+}
+
 /**
  * 加载武器候选项。
  */
@@ -397,90 +453,24 @@ const loadWeaponTagOptions = async () => {
   try {
     const res = await getAllWeapons()
     const list = res.code === 200 ? (res.data?.weapons ?? []) : []
-    weaponTagOptions.value = list
-      .map((weapon) => ({
-        id: String(weapon.id ?? ''),
-        label: weapon.name || String(weapon.id ?? ''),
-      }))
-      .filter((item) => item.id)
-  } catch {
-    weaponTagOptions.value = (editorDraft.value?.selectedWeaponIds || []).map((id) => ({
-      id,
-      label: id,
-    }))
+    weaponTableRows.value = list.filter((weapon) => weapon.id != null && String(weapon.id).length > 0)
+    await syncWeaponTableSelection()
+  } catch (error) {
+    console.error('加载武器列表失败:', error)
+    weaponTableRows.value = []
   } finally {
     weaponOptionsLoading.value = false
   }
 }
+
 /**
- * 加载地面接收站候选项。
- */
-const loadReceiveTagOptions = async () => {
-  receiveOptionsLoading.value = true
-  try {
-    const res = await getGroundStationList({ type: '', name: '', country: '' })
-    const list = res.code === 200 ? (res.data ?? []) : []
-    receiveTagOptions.value = list
-      .filter((item) => !isDataCenterStationType(item.type || ''))
-      .map((item) => ({
-        id: item._id || item.name,
-        label: item.name || item._id || '',
-      }))
-      .filter((item) => item.id)
-    const knownIds = new Set(receiveTagOptions.value.map((item) => item.id))
-      ; (editorDraft.value?.selectedReceiveIds || []).forEach((id) => {
-        if (!knownIds.has(id)) {
-          receiveTagOptions.value.push({ id, label: id })
-        }
-      })
-  } catch {
-    receiveTagOptions.value = (editorDraft.value?.selectedReceiveIds || []).map((id) => ({
-      id,
-      label: id,
-    }))
-  } finally {
-    receiveOptionsLoading.value = false
-  }
-}
-/**
- * 加载数据中心候选项。
- */
-const loadCenterTagOptions = async () => {
-  centerOptionsLoading.value = true
-  try {
-    const res = await getGroundStationList({ type: '', name: '', country: '' })
-    const list = res.code === 200 ? (res.data ?? []) : []
-    centerTagOptions.value = list
-      .filter((item) => isDataCenterStationType(item.type || ''))
-      .map((item) => ({
-        id: item._id || item.name,
-        label: item.name || item._id || '',
-      }))
-      .filter((item) => item.id)
-    const knownIds = new Set(centerTagOptions.value.map((item) => item.id))
-      ; (editorDraft.value?.stationIds || []).forEach((id) => {
-        if (!knownIds.has(id)) {
-          centerTagOptions.value.push({ id, label: id })
-        }
-      })
-  } catch {
-    centerTagOptions.value = (editorDraft.value?.stationIds || []).map((id) => ({
-      id,
-      label: id,
-    }))
-  } finally {
-    centerOptionsLoading.value = false
-  }
-}
-/**
- * 切换任务时同步编辑草稿与候选项。
+ * 切换任务时同步编辑草稿与资源/武器。
  *
  * @param task 当前任务
  */
 const syncEditorForTask = async (task: TaskForm | null | undefined) => {
   editorDraft.value = createDraftFromTask(task)
   if (task && editorDraft.value) {
-    durationHours.value = calcTaskDurationHours(editorDraft.value.beginDate, editorDraft.value.endDate)
     stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
     useWeaponsEnabled.value = editorDraft.value.selectedWeaponIds.length > 0
     store.setTaskCombatArea({ ...editorDraft.value.combatArea })
@@ -489,105 +479,52 @@ const syncEditorForTask = async (task: TaskForm | null | undefined) => {
     useWeaponsEnabled.value = false
     store.setTaskCombatArea(null)
   }
-  if (!task) return
-  await Promise.all([
-    loadSeriesTagOptions(task),
-    loadWeaponTagOptions(),
-    loadReceiveTagOptions(),
-    loadCenterTagOptions(),
-  ])
+  if (!task) {
+    store.clearC2ResourceSelection()
+    return
+  }
+  store.setC2TreeCheckedKeys([])
+  await Promise.all([refreshResourceCatalog(task), loadWeaponTagOptions()])
+  await clearResourceTreeSelection()
 }
+
+watch(
+  () => store.taskAnalysisData,
+  (analysis) => {
+    const task = store.activedTask
+    if (!task?.id) return
+    // 仅在拉取到新的 matrix 分析时重建树；清空分析（保存后等待重算）时不切到系列预览，避免结构闪变
+    if (
+      analysis?.levelSeriesEntities?.length &&
+      store.taskAnalysisTaskId === task.id
+    ) {
+      void refreshResourceCatalog(task)
+    }
+  },
+  { deep: true },
+)
+
 watch(
   () => store.activedTask?.id,
   () => {
+    combatScenarioDisplayToken.value += 1
     void syncEditorForTask(store.activedTask)
   },
-  { immediate: true }
+  { immediate: true },
 )
 
-/**
- * 作战区域编辑同步到 Store，供地球视图绘制/隐藏。
- */
 watch(
-  () => editorDraft.value?.combatArea,
-  (area) => {
-    store.setTaskCombatArea(area ? { ...area } : null)
+  () => useWeaponsEnabled.value,
+  (enabled) => {
+    if (enabled) {
+      void syncWeaponTableSelection()
+    }
   },
-  { deep: true }
 )
-watch(
-  () =>
-    editorDraft.value
-      ? ([editorDraft.value.beginDate, editorDraft.value.endDate] as const)
-      : null,
-  (range) => {
-    if (!range || !editorDraft.value) return
-    durationHours.value = calcTaskDurationHours(range[0], range[1])
-  }
-)
-const isTargetTypeSelected = (typeName: string) =>
-  editorDraft.value?.targetTypeShow.includes(typeName) ?? false
-/**
- * 选中卫星类型并刷新系列候选项。
- *
- * @param typeName 类型名
- */
-const toggleTargetType = (typeName: string) => {
-  if (!editorDraft.value || editorDraft.value.targetTypeShow.includes(typeName)) return
-  editorDraft.value.targetTypeShow = [...editorDraft.value.targetTypeShow, typeName]
-  void loadSeriesTagOptions(store.activedTask)
-}
-/**
- * 取消卫星类型；至少保留一种。
- *
- * @param typeName 类型名
- */
-const removeTargetType = (typeName: string) => {
-  if (!editorDraft.value) return
-  if (editorDraft.value.targetTypeShow.length <= 1) {
-    ElMessage.warning('请至少保留一种卫星类型')
-    return
-  }
-  editorDraft.value.targetTypeShow = editorDraft.value.targetTypeShow.filter((item) => item !== typeName)
-  void loadSeriesTagOptions(store.activedTask)
-}
-/**
- * 修改任务时长时联动结束时间。
- *
- * @param value 小时数
- */
-const handleDurationHoursChange = (value: number | undefined) => {
-  if (!editorDraft.value || value == null || Number.isNaN(value)) return
-  applyDurationHoursToDraft(editorDraft.value, value)
-  durationHours.value = Math.max(1, Math.round(value))
-}
-const isSeriesSelected = (series: string) => editorDraft.value?.selectedSeries.includes(series) ?? false
-const isWeaponSelected = (id: string) => editorDraft.value?.selectedWeaponIds.includes(id) ?? false
-const isReceiveSelected = (id: string) => editorDraft.value?.selectedReceiveIds.includes(id) ?? false
-const isCenterSelected = (id: string) => editorDraft.value?.stationIds.includes(id) ?? false
-/**
- * 切换系列选中状态。
- *
- * @param series 系列名
- */
-const toggleSeries = (series: string) => {
-  if (!editorDraft.value) return
-  const list = editorDraft.value.selectedSeries
-  if (list.includes(series)) return
-  editorDraft.value.selectedSeries = [...list, series]
-}
-/**
- * 取消选中系列。
- *
- * @param series 系列名
- */
-const removeSeries = (series: string) => {
-  if (!editorDraft.value) return
-  editorDraft.value.selectedSeries = editorDraft.value.selectedSeries.filter((item) => item !== series)
-}
 
 /**
  * 「使用武器」开关切换：关闭时暂存当前选择并清空草稿；打开时从暂存恢复。
+ *
  * @param enabled 是否使用武器
  */
 const handleUseWeaponsChange = (enabled: boolean) => {
@@ -595,87 +532,28 @@ const handleUseWeaponsChange = (enabled: boolean) => {
   if (!enabled) {
     stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
     editorDraft.value.selectedWeaponIds = []
+    weaponTableRef.value?.clearSelection()
+    void handleSaveAndRecalculate()
     return
   }
   editorDraft.value.selectedWeaponIds = [...stashedWeaponIds.value]
+  void syncWeaponTableSelection()
+  void handleSaveAndRecalculate()
 }
 
-const toggleWeapon = (id: string) => {
-  if (!useWeaponsEnabled.value || !editorDraft.value || editorDraft.value.selectedWeaponIds.includes(id)) return
-  editorDraft.value.selectedWeaponIds = [...editorDraft.value.selectedWeaponIds, id]
-  stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
-}
-const removeWeapon = (id: string) => {
-  if (!useWeaponsEnabled.value || !editorDraft.value) return
-  editorDraft.value.selectedWeaponIds = editorDraft.value.selectedWeaponIds.filter((item) => item !== id)
-  stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
-}
-const toggleReceive = (id: string) => {
-  if (!editorDraft.value || editorDraft.value.selectedReceiveIds.includes(id)) return
-  editorDraft.value.selectedReceiveIds = [...editorDraft.value.selectedReceiveIds, id]
-}
-const removeReceive = (id: string) => {
-  if (!editorDraft.value) return
-  editorDraft.value.selectedReceiveIds = editorDraft.value.selectedReceiveIds.filter((item) => item !== id)
-}
-const toggleCenter = (id: string) => {
-  if (!editorDraft.value || editorDraft.value.stationIds.includes(id)) return
-  editorDraft.value.stationIds = [...editorDraft.value.stationIds, id]
-}
-const removeCenter = (id: string) => {
-  if (!editorDraft.value) return
-  editorDraft.value.stationIds = editorDraft.value.stationIds.filter((item) => item !== id)
-}
 /**
- * 更新开始时间。
- *
- * @param value datetime-local 值
+ * 打开当前任务编辑弹窗。
  */
-const handleBeginInput = (value: string) => {
-  if (!editorDraft.value) return
-  editorDraft.value.beginDate = fromTaskDatetimeLocalValue(value)
-}
-/**
- * 更新结束时间。
- *
- * @param value datetime-local 值
- */
-const handleEndInput = (value: string) => {
-  if (!editorDraft.value) return
-  editorDraft.value.endDate = fromTaskDatetimeLocalValue(value)
-}
-const openCreateScene = () => {
-  sceneEditIsEdit.value = false
-  editingScene.value = null
-  sceneEditVisible.value = true
-}
-const openCreateTask = () => {
-  if (!store.battle?.id) {
-    ElMessage.warning('请先选择当前场景后再添加任务')
+const openEditTask = () => {
+  if (!store.activedTask) {
+    ElMessage.warning('请先选择任务')
     return
   }
-  taskEditIsEdit.value = false
-  editingTask.value = null
+  taskEditIsEdit.value = true
+  editingTask.value = store.activedTask
   taskEditVisible.value = true
 }
-const openEditScene = () => {
-  if (!store.battle) {
-    ElMessage.warning('请先在顶部选择当前场景')
-    return
-  }
-  sceneEditIsEdit.value = true
-  editingScene.value = store.battle
-  sceneEditVisible.value = true
-}
-const handleSceneSaved = async (scene: BattleForm) => {
-  const prevId = store.battle?.id
-  store.setActivedBattle(scene)
-  await loadBattleTasks()
-  if (scene.id !== prevId) {
-    store.setActivedTask(taskList.value[0] ?? null)
-    store.setSelectedSatSeries('')
-  }
-}
+
 const handleTaskSaved = async (updated: TaskForm) => {
   const isCreate = !taskList.value.some((item) => item.id === updated.id)
   await loadBattleTasks()
@@ -686,60 +564,25 @@ const handleTaskSaved = async (updated: TaskForm) => {
   const latest = taskList.value.find((item) => item.id === updated.id) || updated
   store.setActivedTask(latest)
   store.setSelectedSatSeries('')
+  combatScenarioDisplayToken.value += 1
   await syncEditorForTask(latest)
   if (isCreate) {
     ElMessage.success(`已切换到新任务：${latest.name}`)
   }
 }
+
 /**
- * 切换当前任务。
- *
- * @param task 目标任务
- */
-const selectTask = async (task: TaskForm) => {
-  if (taskLoading.value || taskSwitching.value) return
-  if (store.activedTask?.id === task.id) return
-  taskSwitching.value = true
-  try {
-    store.setActivedTask(task)
-    store.setSelectedSatSeries('')
-    await syncEditorForTask(task)
-    ElMessage.success(`已切换当前任务：${task.name}`)
-    if (store.selectedSatSeries) {
-      await store.fetchMatrixForCurrentScope(true)
-    }
-  } catch (err) {
-    console.error('切换任务失败:', err)
-  } finally {
-    taskSwitching.value = false
-  }
-}
-/**
- * 校验并提交任务修改，触发后台重算。
+ * 校验并提交任务修改（系列/武器变更），触发后台重算。
  */
 const handleSaveAndRecalculate = async () => {
   const baseTask = store.activedTask
   const draft = editorDraft.value
-  if (!baseTask?.id || !draft || draft.taskId !== baseTask.id) {
-    ElMessage.warning('请先选择任务')
-    return
-  }
-  if (!draft.beginDate || !draft.endDate) {
-    ElMessage.warning('请填写开始与结束时间')
-    return
-  }
-  if (parseTaskPanelTimeMs(draft.endDate) <= parseTaskPanelTimeMs(draft.beginDate)) {
-    ElMessage.warning('结束时间必须晚于开始时间')
-    return
-  }
-  if (!draft.selectedSeries.length) {
-    ElMessage.warning('请至少保留一个卫星系列')
-    return
-  }
-  if (!draft.targetTypeShow.length) {
-    ElMessage.warning('请至少选择一种卫星类型')
-    return
-  }
+  if (!baseTask?.id || !draft || draft.taskId !== baseTask.id) return
+  if (savingRecalc.value) return
+  if (!draft.beginDate || !draft.endDate) return
+  if (parseTaskPanelTimeMs(draft.endDate) <= parseTaskPanelTimeMs(draft.beginDate)) return
+  if (!draft.selectedSeries.length) return
+  if (!draft.targetTypeShow.length) return
   const payload = mergeTaskFormWithDraft(baseTask, draft)
   savingRecalc.value = true
   try {
@@ -748,27 +591,27 @@ const handleSaveAndRecalculate = async () => {
       ElMessage.error(res.msg || '保存任务失败')
       return
     }
-    ElMessage.success('已保存，任务重新计算中')
     await loadBattleTasks()
     const latest = taskList.value.find((item) => item.id === baseTask.id) || payload
     store.setActivedTask(latest)
-    store.setSelectedSatSeries('')
     store.clearTaskAnalysisData()
     await startTaskProgressPolling(baseTask.id)
-    await syncEditorForTask(latest)
     emit('task-recalculated', baseTask.id)
   } catch (error) {
-    console.error('保存并重算失败:', error)
-    ElMessage.error('保存并重算失败')
+    console.error('保存任务失败:', error)
+    ElMessage.error('保存任务失败')
   } finally {
     savingRecalc.value = false
   }
 }
+
 onUnmounted(() => {
   stopAllTaskProgressPolling()
 })
 </script>
 <style scoped lang="scss">
+@use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
+
 .c2-panel {
   display: flex;
   flex-direction: column;
@@ -781,7 +624,6 @@ onUnmounted(() => {
   backdrop-filter: blur(8px);
   color: #e2efff;
   overflow: hidden;
-  gap: 10px;
 
   &--left {
     border-left: none;
@@ -790,409 +632,290 @@ onUnmounted(() => {
   }
 }
 
-.panel-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(0, 225, 255, 0.15);
-  flex-shrink: 0;
-
-  .scene-action-btn {
-    flex: 1;
-    min-width: 0;
-    height: 32px;
-    padding: 0 8px;
-    font-size: 12px;
-    font-weight: 700;
-    color: #7dd3fc;
-    background: rgba(0, 225, 255, 0.08);
-    border: 1px solid rgba(0, 225, 255, 0.35);
-    border-radius: 6px;
-    cursor: pointer;
-
-    &:hover:not(:disabled) {
-      color: #40f2ff;
-      border-color: #00e1ff;
-      background: rgba(0, 225, 255, 0.18);
-    }
-
-    &:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-  }
-}
-
 .panel-body {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  gap: 8px;
+  overflow: hidden;
 }
 
-.panel-zone {
-  border: 1px dashed rgba(0, 225, 255, 0.22);
-  border-radius: 6px;
-  background: rgba(12, 22, 38, 0.72);
-  box-sizing: border-box;
+.task-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
 
-  &--top {
-    flex-shrink: 0;
-    padding: 8px 10px;
+/** 底部固定区：武器列表（可选）+ 是否使用武器 */
+.task-panel-weapon-dock {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.task-panel-block {
+  flex-shrink: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 225, 255, 0.18);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(14, 26, 44, 0.92) 0%, rgba(10, 20, 36, 0.88) 100%);
+  box-shadow: inset 0 1px 0 rgba(0, 225, 255, 0.06);
+
+  &--meta {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 
-  &--middle {
-    flex: 1;
-    min-height: 0;
+  &--tree {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100px;
+    overflow: hidden;
+  }
+
+  &--switch {
+    flex-shrink: 0;
+    padding: 8px 12px;
+  }
+
+  &--weapons {
+    flex-shrink: 0;
+    max-height: 172px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+}
+
+.task-panel-block-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(0, 225, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(8, 18, 32, 0.65);
+
+  &--tree {
+    overflow: auto;
+    padding: 4px 6px;
+  }
+
+  &--table {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    min-height: 0;
+    max-height: 132px;
+
+    .c2-resource-table {
+      flex: 1;
+      min-height: 0;
+    }
   }
-
-  &--bottom {
-    flex-shrink: 0;
-    padding: 10px;
-    border-style: solid;
-  }
 }
 
-.scene-summary {
-  margin: 0 0 8px;
-  font-size: 11px;
-  line-height: 1.4;
-  color: #7dd3fc;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.task-progress-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.task-progress-item {
-  display: flex;
+.task-panel-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(79, 147, 221, 0.25);
-  background: rgba(18, 36, 62, 0.55);
-  cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease;
 
-  &.active {
-    border-color: #00e1ff;
-    background: rgba(0, 225, 255, 0.1);
+  &--name {
+    grid-template-columns: 88px minmax(0, 1fr) auto;
   }
 
-  &.disabled {
-    pointer-events: none;
-    opacity: 0.55;
+  &--objects {
+    grid-template-columns: 88px minmax(0, 1fr);
+    align-items: start;
   }
 
-  &:hover:not(.disabled) {
-    border-color: rgba(0, 225, 255, 0.55);
+  &--expectation {
+    grid-template-columns: 88px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  &+& {
+    padding-top: 8px;
+    border-top: 1px dashed rgba(0, 225, 255, 0.12);
   }
 }
 
-.task-progress-name {
-  flex: 1;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
+.task-panel-expectation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   gap: 4px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #e2efff;
-  overflow: hidden;
-}
-
-.task-progress-name-tag {
-  flex-shrink: 0;
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid rgba(0, 225, 255, 0.35);
-  background: rgba(0, 225, 255, 0.12);
-  color: #7dd3fc;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.task-progress-name-text {
   min-width: 0;
+}
+
+.task-panel-expectation-sep {
+  font-size: battleUi.$battle-ui-font-base;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.task-panel-expectation-secondary {
+  font-weight: 500;
+  color: #cbd5e1;
+}
+
+.task-panel-label {
+  font-size: battleUi.$battle-ui-font-base;
+  color: #94a3b8;
+}
+
+.task-panel-value {
+  font-size: battleUi.$battle-ui-font-base;
+  font-weight: 600;
+  color: #e2efff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #e2efff;
 }
 
-.task-progress-bar-wrap {
+.task-panel-name {
+  font-size: battleUi.$battle-ui-font-emphasis;
+}
+
+.task-edit-link {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: battleUi.$battle-ui-font-base;
+  font-weight: 700;
+  color: #7dd3fc;
+  background: rgba(0, 225, 255, 0.08);
+  border: 1px solid rgba(0, 225, 255, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:hover {
+    color: #40f2ff;
+    border-color: #00e1ff;
+    background: rgba(0, 225, 255, 0.18);
+  }
+}
+
+.combat-object-options {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 72px;
-  max-width: 168px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.task-progress-item--done .task-progress-bar-wrap {
-  flex: 0 0 auto;
-  min-width: 0;
-  max-width: none;
-}
-
-.task-progress-done {
-  display: flex;
+.combat-object-chip {
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  flex-shrink: 0;
-  white-space: nowrap;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+
+  &--active {
+    border-color: rgba(248, 113, 113, 0.85);
+    background: rgba(127, 29, 29, 0.45);
+
+    .combat-object-label {
+      color: #fecaca;
+      font-weight: 700;
+    }
+  }
+
+  &--inactive {
+    border-color: rgba(250, 204, 21, 0.45);
+    background: rgba(113, 63, 18, 0.3);
+
+    .combat-object-label {
+      color: #fde68a;
+    }
+  }
 }
 
-.task-progress-done-dot {
-  flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #22c55e;
-  box-shadow: 0 0 6px rgba(34, 197, 94, 0.55);
-}
-
-.task-progress-done-text {
-  font-size: 11px;
-  font-weight: 600;
-  color: #86efac;
+.combat-object-label {
+  font-size: battleUi.$battle-ui-font-base;
   line-height: 1.2;
 }
 
-.task-progress-mes {
-  font-size: 10px;
-  color: #7dd3fc;
-  line-height: 1.3;
-
-  &.is-muted {
-    color: #64748b;
-  }
-}
-
-.task-editor {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 10px 12px 12px;
-  text-align: left;
-
-  &::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 225, 255, 0.3);
-    border-radius: 3px;
-  }
-}
-
-.task-time-section .task-editor-times {
-  margin-bottom: 0;
-}
-
-.task-metric-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.metric-row {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 36px;
-  align-items: center;
-  column-gap: 8px;
-}
-
-.metric-row--types {
-  grid-template-columns: 72px minmax(0, 1fr);
-  align-items: start;
-}
-
-.metric-row--combat-head {
-  grid-template-columns: 72px minmax(0, 1fr);
-  align-items: center;
-}
-
-.combat-area-enable {
-  display: inline-flex;
-  align-items: center;
-  margin: 0;
-  cursor: pointer;
-  line-height: 1;
-  justify-self: start;
-}
-
-.combat-area-enable :deep(.atlas-app-checkbox) {
-  height: auto;
-  align-items: center;
-}
-
-.metric-unit--empty {
-  visibility: hidden;
-}
-
-.metric-row--readonly {
-  grid-template-columns: 72px minmax(0, 1fr);
-}
-
-.metric-value {
-  font-size: 13px;
-  font-weight: 600;
-  color: #e2efff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.metric-label {
-  font-size: 12px;
-  color: #94a3b8;
-  text-align: left;
-}
-
-.metric-input-number {
-  width: 100%;
-  max-width: none;
-}
-
-.metric-input-number :deep(.atlas-app-input-number) {
-  width: 100%;
-}
-
-.metric-input-number :deep(.atlas-app-input-number .atlas-app-input__wrapper) {
-  min-height: 28px;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.metric-input-number :deep(.atlas-app-input-number .atlas-app-input__inner) {
-  height: 26px;
-  line-height: 26px;
-}
-
-.metric-unit {
-  font-size: 12px;
-  color: #64748b;
-  width: 36px;
+.task-panel-section-head {
   flex-shrink: 0;
-  text-align: left;
-}
-
-.metric-type-tags {
-  grid-column: 2;
-}
-
-.tag-section-head {
-  margin-bottom: 6px;
-  font-size: 12px;
+  margin: 0 0 8px;
+  padding-bottom: 6px;
+  font-size: battleUi.$battle-ui-font-emphasis;
   font-weight: 700;
   color: #7dd3fc;
-  text-align: left;
+  border-bottom: 1px solid rgba(0, 225, 255, 0.14);
+}
+
+.task-panel-hint {
+  flex-shrink: 0;
+  margin: 0 0 6px;
+  font-size: battleUi.$battle-ui-font-base;
+  color: #64748b;
+  line-height: 1.4;
+
+  &--center {
+    padding: 12px 8px;
+    text-align: center;
+  }
+}
+
+.c2-resource-tree {
+  min-height: 0;
+  background: transparent;
+  @include battleUi.battle-ui-el-tree-typography;
+
+  :deep(.atlas-app-tree-node__label) {
+    color: #cbd5e1;
+  }
+
+  :deep(.atlas-app-checkbox__inner) {
+    border-color: rgba(0, 225, 255, 0.45);
+  }
+}
+
+.c2-resource-table {
+  width: 100%;
+  max-width: 100%;
+  @include battleUi.battle-ui-el-table-typography;
+  @include battleUi.battle-ui-c2-panel-table-fit;
+  --atlas-app-table-border-color: rgba(0, 225, 255, 0.12);
+  --atlas-app-table-header-bg-color: rgba(13, 27, 49, 0.95);
+  --atlas-app-table-bg-color: transparent;
+  --atlas-app-table-tr-bg-color: transparent;
+  --atlas-app-table-row-hover-bg-color: rgba(0, 225, 255, 0.08);
+  --atlas-app-text-color-regular: #cbd5e1;
+
+  :deep(th.atlas-app-table__cell) {
+    color: #00e1ff;
+  }
+}
+
+.weapon-use-item-label {
+  font-size: battleUi.$battle-ui-font-emphasis;
+  font-weight: 700;
+  color: #7dd3fc;
 }
 
 .weapon-use-item {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 10px;
   width: 100%;
-  margin-bottom: 8px;
-  text-align: left;
-}
-
-.weapon-use-item-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #94a3b8;
-  flex-shrink: 0;
-}
-
-.task-editor-times {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.time-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.time-label {
-  font-size: 11px;
-  color: #94a3b8;
-}
-
-.task-datetime-input {
-  width: 100%;
-  height: 32px;
-  padding: 0 10px;
-  box-sizing: border-box;
-  border-radius: 6px;
-  border: 1px solid rgba(0, 225, 255, 0.28);
-  background: rgba(8, 15, 26, 0.85);
-  color: #e2e8f0;
-  font-size: 12px;
-}
-
-.tag-section {
-  margin-bottom: 12px;
-}
-
-.tag-hint {
-  font-size: 11px;
-  color: #64748b;
-}
-
-.tag-cloud {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: flex-start;
-}
-
-.task-config-tag {
-  cursor: pointer;
-  border-color: rgba(100, 116, 139, 0.45);
-  background: rgba(15, 23, 42, 0.8);
-  color: #94a3b8;
-
-  &.is-selected {
-    border-color: rgba(0, 225, 255, 0.65);
-    background: rgba(0, 225, 255, 0.14);
-    color: #e0f2fe;
-  }
-}
-
-.save-recalc-btn {
-  width: 100%;
-  height: 38px;
-  font-weight: 700;
 }
 
 .zone-loading,
 .zone-empty {
-  padding: 16px 12px;
-  font-size: 12px;
+  padding: 24px 12px;
+  font-size: battleUi.$battle-ui-font-base;
   color: #64748b;
   text-align: center;
 }
