@@ -29,7 +29,8 @@
             <el-tag size="small" type="info" round class="battle-desc-tag">
               {{ battle.description || '无概述' }}
             </el-tag>
-            <el-button type="primary" size="small" plain round class="create-task-btn" @click.stop="handleCreateTask(battle)">
+            <el-button type="primary" size="small" plain round class="create-task-btn"
+              @click.stop="handleCreateTask(battle)">
               新建任务
             </el-button>
           </div>
@@ -49,21 +50,21 @@
             <el-table :data="battle.tasks || []" border style="width: 100%" size="small">
               <el-table-column prop="name" label="任务名称" min-width="140" />
               <el-table-column prop="description" label="任务概述" min-width="180" show-overflow-tooltip />
-              <el-table-column label="起止时间" width="300">
+              <el-table-column label="起止时间" width="350">
                 <template #default="scope">
                   <span>{{ scope.row.beginDate || '--' }} ~ {{ scope.row.endDate || '--' }}</span>
                 </template>
               </el-table-column>
               <el-table-column prop="meCountry" label="红方" width="120" show-overflow-tooltip />
               <el-table-column prop="enemyCountry" label="蓝方" width="120" show-overflow-tooltip />
-              <el-table-column label="关注状态" width="100" align="center">
+              <!-- <el-table-column label="关注状态" width="100" align="center">
                 <template #default="scope">
                   <el-tag :type="scope.row.focusStatus === 1 ? 'danger' : 'info'" size="small">
                     {{ scope.row.focusStatus === 1 ? '已关注' : '未关注' }}
                   </el-tag>
                 </template>
-              </el-table-column>
-              <el-table-column label="算法计算进度" width="180">
+              </el-table-column> -->
+              <!-- <el-table-column label="算法计算进度" width="180">
                 <template #default="scope">
                   <div v-if="getTaskProgress(scope.row)" class="progress-box">
                     <el-progress :percentage="getTaskProgressPercent(getTaskProgress(scope.row))"
@@ -71,12 +72,12 @@
                   </div>
                   <span v-else class="text-muted">未开始或未获取</span>
                 </template>
-              </el-table-column>
+              </el-table-column> -->
               <el-table-column label="操作" width="300" fixed="right" align="center">
                 <template #default="scope">
                   <div class="table-action-group">
                     <el-button type="success" size="small" plain round @click="handleEditTask(scope.row, battle)">
-                      查看任务
+                      编辑任务
                     </el-button>
                     <el-button type="danger" size="small" plain round @click="handleDeleteTask(scope.row)">
                       删除任务

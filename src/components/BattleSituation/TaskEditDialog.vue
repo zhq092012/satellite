@@ -1,6 +1,6 @@
 <template>
-  <el-dialog v-model="visible" :title="dialogTitle" fullscreen append-to-body destroy-on-close class="task-edit-dialog"
-    modal-class="task-edit-dialog-modal" @closed="handleClosed">
+  <el-dialog v-model="visible" :title="dialogTitle" width="1480px" align-center append-to-body destroy-on-close
+    class="task-edit-dialog" modal-class="task-edit-dialog-modal" @closed="handleClosed">
     <div class="task-edit-layout">
       <nav class="task-edit-nav" aria-label="任务配置菜单">
         <button v-for="item in taskEditMenus" :key="item.key" type="button" class="task-edit-nav-item"
@@ -932,12 +932,10 @@ const handleSubmit = async () => {
   backdrop-filter: blur(8px);
   display: flex !important;
   flex-direction: column;
-  width: 100% !important;
-  max-width: 100% !important;
-  height: 100% !important;
-  max-height: 100% !important;
-  margin: 0 !important;
-  border-radius: 0 !important;
+  width: min(1480px, 94vw) !important;
+  max-width: 94vw !important;
+  height: 86vh !important;
+  max-height: 86vh !important;
   overflow: hidden;
 
   .atlas-app-dialog__header {
