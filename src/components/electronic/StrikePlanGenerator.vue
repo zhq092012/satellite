@@ -1,41 +1,29 @@
 <template>
   <div class="strike-plan-generator dark-theme" v-loading="store.zhchPlanLoading">
     <div class="plan-header">
-      <div class="header-left">
-
-      </div>
-
       <div class="header-center">
         <span class="type-label">方案名称：</span>
-        <div class="type-selector">
-          <button v-for="item in usageTypeOptions" :key="item.value" class="type-btn"
-            :class="{ active: store.selectedZhchUsageTypes.includes(item.value) }"
-            @click="handleToggleUsageType(item.value)">
+        <el-checkbox-group v-model="selectedPlanTypes" class="plan-checkbox-group">
+          <el-checkbox v-for="item in usageTypeOptions" :key="item.value" :label="item.value">
             {{ item.label }}
-          </button>
-        </div>
-        <span class="type-label type-label--sys">卫星类型：</span>
-        <div class="type-selector">
-          <button v-for="item in sysTypeOptions" :key="item.value" class="type-btn"
-            :class="{ active: store.selectedZhchSysType === item.value }"
-            @click="handleToggleSysType(item.value)">
-            {{ item.label }}
-          </button>
-        </div>
+          </el-checkbox>
+        </el-checkbox-group>
       </div>
 
       <div class="header-right">
-        <el-button type="primary" size="default" :loading="store.zhchPlanLoading" @click="handleGenerate">
-          <span class="btn-icon">⚡</span> 生成方案
-        </el-button>
-        <el-button type="warning" size="default" :loading="cacheClearing" @click="handleClearCache">
-          <span class="btn-icon">🗑️</span> 清除缓存
-        </el-button>
+        <el-dropdown trigger="click" @command="handleDownload">
+          <el-button type="primary" size="default">
+            下载打击计划
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="csv">下载 CSV</el-dropdown-item>
+              <el-dropdown-item command="xls">下载 XLS</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
-
-    <el-alert v-if="combatScenarioSummary" type="info" :closable="false" show-icon class="scenario-banner"
-      :title="combatScenarioSummary" description="generateStrikePlanV2 尚未接收作战场景参数；当前生成仍仅按用途/系统类型请求。" />
 
     <div class="plan-body">
       <div v-if="!store.activedTask" class="empty-container">
@@ -43,24 +31,22 @@
         <div class="empty-text">请先在右上角选择战场与任务</div>
       </div>
 
-      <div v-else-if="!hasVisiblePlans && !store.zhchPlanLoading" class="empty-container">
+      <div v-else-if="!selectedPlanTypes.length" class="empty-container">
         <div class="empty-icon">🎯</div>
-        <div class="empty-text">勾选用途类型后点击「生成方案」获取综合打击方案</div>
+        <div class="empty-text">请勾选 1～3 个方案名称进行对比展示</div>
       </div>
 
       <div v-else class="plan-columns" :class="{
-        'plan-columns--single': selectedUsageTypes.length === 1,
-        'plan-columns--compare': selectedUsageTypes.length > 1,
-      }" :style="{ gridTemplateColumns: `repeat(${selectedUsageTypes.length}, minmax(0, 1fr))` }">
-        <div v-for="usageType in selectedUsageTypes" :key="usageType" class="plan-column">
-          <div class="column-type-title">{{ getZhchUsageTypeLabel(usageType) }}</div>
-          <div v-if="getPlanByType(usageType)" class="column-content">
-            <ZhchPlanDetailPanel :plan="getPlanByType(usageType)!"
-              :show-series-link-timeline="selectedUsageTypes.length === 1"
-              :align-blocks="selectedUsageTypes.length > 1" />
+        'plan-columns--single': selectedPlanTypes.length === 1,
+        'plan-columns--compare': selectedPlanTypes.length > 1,
+      }" :style="{ gridTemplateColumns: `repeat(${selectedPlanTypes.length}, minmax(0, 1fr))` }">
+        <div v-for="usageType in selectedPlanTypes" :key="usageType" class="plan-column">
+          <div class="column-type-title">{{ getPlanColumnTitle(usageType) }}</div>
+          <div v-if="getSchemeView(usageType)" class="column-content">
+            <StrikePlanSchemePanel :view="getSchemeView(usageType)!" :align-blocks="selectedPlanTypes.length > 1" />
           </div>
           <div v-else class="empty-container small">
-            <div class="empty-text">暂无 {{ getZhchUsageTypeLabel(usageType) }} 方案数据</div>
+            <div class="empty-text">暂无 {{ getPlanColumnTitle(usageType) }} 方案数据</div>
           </div>
         </div>
       </div>
@@ -72,161 +58,155 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ZhchPlanResp } from '@/api/electronic'
-import { refreshZhchPlanCache } from '@/api/electronic'
 import {
-  buildCombatScenarioCompositeKey,
-  loadCombatScenarioForTask,
-  COMBAT_BACKGROUND_OPTIONS,
-  COMBAT_EXPECTATION_PRIMARY_OPTIONS,
-  COMBAT_PHASE_OPTIONS,
-  COMMAND_SOURCE_OPTIONS,
-} from '@/config/combatScenarioOptions'
-import { useLayoutStore, ZHCH_USAGE_TYPE_OPTIONS, ZHCH_SYS_TYPE_OPTIONS, getZhchUsageTypeLabel } from '@/store/modules/layout'
-import ZhchPlanDetailPanel from './strike-plan/ZhchPlanDetailPanel.vue'
+  buildStrikePlanSchemeView,
+  flattenStrikePlanRowsForExport,
+  type StrikePlanSchemeView,
+} from '@/utils/buildStrikePlanSchemeView'
+import { downloadStrikePlanCsv, downloadStrikePlanXls } from '@/utils/exportStrikePlanTable'
+import { buildStrikePlanDisplayName } from '@/config/combatScenarioOptions'
+import {
+  useLayoutStore,
+  ZHCH_USAGE_TYPE_OPTIONS,
+  getZhchUsageTypeLabel,
+} from '@/store/modules/layout'
+import StrikePlanSchemePanel from './strike-plan/StrikePlanSchemePanel.vue'
+import { buildMockZhchPlanResp, isZhchPlanRespEmpty } from '@/utils/mockZhchPlanResp'
 
 defineOptions({ name: 'StrikePlanGenerator' })
 
-/** 卫星用途类型选项 */
 interface UsageTypeOption {
-  /** 展示名称 */
   label: string
-  /** 传给接口的 type 参数 */
   value: string
 }
 
-const usageTypeOptions: UsageTypeOption[] = ZHCH_USAGE_TYPE_OPTIONS.map((value) => ({
-  label: getZhchUsageTypeLabel(value),
-  value,
-}))
-
-/** 卫星系统类型选项（侦察 / 通信，单选或不选） */
-const sysTypeOptions: UsageTypeOption[] = ZHCH_SYS_TYPE_OPTIONS.map((value) => ({
-  label: value,
-  value,
-}))
-
 const store = useLayoutStore()
+
+/**
+ * 顶栏/列标题：作战阶段-作战预期；多方案并存时附加用途类型以区分。
+ *
+ * @param usageType 用途类型键
+ */
+const getPlanColumnTitle = (usageType: string): string => {
+  const taskId = store.activedTask?.id
+  if (!taskId) return getZhchUsageTypeLabel(usageType)
+  const base = buildStrikePlanDisplayName(taskId)
+  return `${base}（${getZhchUsageTypeLabel(usageType)}）`
+}
+
+const usageTypeOptions = computed((): UsageTypeOption[] =>
+  ZHCH_USAGE_TYPE_OPTIONS.map((value) => ({
+    label: getPlanColumnTitle(value),
+    value,
+  })),
+)
+
+/** 勾选对比的方案（最多 3 个） */
+const selectedPlanTypes = ref<string[]>([])
 
 onMounted(() => {
   store.sanitizeZhchUsageTypes()
 })
 
-/** 清除服务端缓存请求中 */
-const cacheClearing = ref(false)
+const priorityCountries = computed(() => store.activedTask?.enemyCountryShow ?? [])
 
-/** 当前勾选的用途类型 */
-const selectedUsageTypes = computed(() =>
-  store.selectedZhchUsageTypes.filter((type) =>
-    (ZHCH_USAGE_TYPE_OPTIONS as readonly string[]).includes(type)
-  )
-)
-
-/** 是否已有可展示的方案 */
-const hasVisiblePlans = computed(() =>
-  selectedUsageTypes.value.some((type) => !!store.zhchPlanMap[type])
-)
-
-/** 当前任务作战场景摘要（本地配置） */
-const combatScenarioSummary = computed(() => {
+/**
+ * 读取展示用方案：优先接口缓存，缺失或空数据时使用演示 Mock。
+ *
+ * @param type 用途类型
+ */
+const getPlanByType = (type: string): ZhchPlanResp | null => {
   const taskId = store.activedTask?.id
-  if (!taskId) return ''
-  const selection = loadCombatScenarioForTask(taskId)
-  if (!selection) return ''
-  const bg = COMBAT_BACKGROUND_OPTIONS.find((o) => o.id === selection.backgroundId)?.label ?? selection.backgroundId
-  const cmd = COMMAND_SOURCE_OPTIONS.find((o) => o.id === selection.commandSourceId)?.label ?? selection.commandSourceId
-  const phase = COMBAT_PHASE_OPTIONS.find((o) => o.id === selection.combatPhaseId)?.label ?? selection.combatPhaseId
-  const expPrimary = COMBAT_EXPECTATION_PRIMARY_OPTIONS.find((o) => o.id === selection.expectationPrimaryId)?.label
-  const expSecondary = COMBAT_EXPECTATION_PRIMARY_OPTIONS.flatMap((p) => p.children)
-    .find((o) => o.id === selection.expectationSecondaryId)?.label
-  const key = buildCombatScenarioCompositeKey(selection)
-  return `命令来源=${cmd}；阶段=${phase}；预期=${expPrimary ?? '--'}/${expSecondary ?? '--'}；背景=${bg}（组合键 ${key}）`
+  if (!taskId) return null
+  const cached = store.zhchPlanMap[type]
+  if (cached && !isZhchPlanRespEmpty(cached)) {
+    return cached
+  }
+  return buildMockZhchPlanResp(type, taskId, priorityCountries.value)
+}
+
+/**
+ * 构建单方案页面视图。
+ *
+ * @param usageType 用途类型
+ */
+const getSchemeView = (usageType: string): StrikePlanSchemeView | null => {
+  const plan = getPlanByType(usageType)
+  const taskId = store.activedTask?.id
+  if (!plan || !taskId) return null
+  return buildStrikePlanSchemeView(
+    usageType,
+    plan,
+    taskId,
+    store.c2ResourceSatelliteRows,
+    priorityCountries.value,
+  )
+}
+
+/** 当前勾选方案的可导出打击行 */
+const exportRows = computed(() => {
+  const views = selectedPlanTypes.value
+    .map((type) => getSchemeView(type))
+    .filter((view): view is StrikePlanSchemeView => view != null)
+  return flattenStrikePlanRowsForExport(views)
 })
 
 /**
- * 根据用途类型读取 store 中的方案
- * @param type 用途类型
- */
-const getPlanByType = (type: string): ZhchPlanResp | null => store.zhchPlanMap[type] ?? null
-
-/**
- * 切换用途类型多选
- * @param type 用途类型
- */
-const handleToggleUsageType = (type: string) => {
-  const before = store.selectedZhchUsageTypes.length
-  store.toggleZhchUsageType(type)
-  if (before === 1 && store.selectedZhchUsageTypes.length === 1) {
-    ElMessage.warning('至少选择一种用途类型')
-  }
-}
-
-/**
- * 切换卫星系统类型（侦察 / 通信）；再次点击已选项则取消，接口传 null。
+ * 拉取全部用途类型方案（不按卫星类型过滤）。
  *
- * @param type 侦察或通信
+ * @param force 是否强制刷新
  */
-const handleToggleSysType = (type: string) => {
-  store.toggleZhchSysType(type)
+const reloadAllPlans = async (force = false) => {
+  if (!store.activedTask?.id) return
+  store.sanitizeZhchUsageTypes()
+  await store.fetchZhchPlans([...ZHCH_USAGE_TYPE_OPTIONS], force, null)
 }
 
-/** 生成方案 */
-const handleGenerate = async () => {
+/**
+ * 初始化默认勾选（优先已有数据的方案，最多 3 个）。
+ */
+const syncDefaultSelectedPlans = () => {
+  selectedPlanTypes.value = [...ZHCH_USAGE_TYPE_OPTIONS]
+}
+
+/** 下载打击计划 */
+const handleDownload = (format: 'csv' | 'xls') => {
   if (!store.activedTask?.id) {
     ElMessage.warning('请先选择战场与任务')
     return
   }
-  const taskId = store.activedTask.id
-  const scenario = loadCombatScenarioForTask(taskId)
-  if (scenario) {
-    console.warn(
-      '[StrikePlan] 作战场景组合尚未传入 generateStrikePlanV2，当前组合键=',
-      buildCombatScenarioCompositeKey(scenario),
-      '；待接口扩展 combatScenario 字段。',
-    )
-  }
-  store.sanitizeZhchUsageTypes()
-  const ok = await store.fetchZhchPlans(selectedUsageTypes.value, true)
-  if (!ok) {
-    ElMessage.warning('获取打击方案失败，请稍后重试')
+  if (!exportRows.value.length) {
+    ElMessage.warning('当前勾选方案无打击计划可导出')
     return
   }
-  if (selectedUsageTypes.value.includes(store.activeZhchUsageType)) {
-    await store.fetchMatrixForCurrentScope(true)
+  const prefix = `打击计划_${store.activedTask.name || store.activedTask.id}`
+  if (format === 'csv') {
+    downloadStrikePlanCsv(exportRows.value, prefix)
+  } else {
+    downloadStrikePlanXls(exportRows.value, prefix)
   }
+  ElMessage.success(format === 'csv' ? 'CSV 已开始下载' : 'XLS 已开始下载')
 }
 
-/** 清除打击方案缓存 */
-const handleClearCache = async () => {
-  const taskId = store.activedTask?.id
-  if (!taskId) {
-    ElMessage.warning('请先选择战场与任务')
-    return
+watch(selectedPlanTypes, (val) => {
+  if (val.length > 3) {
+    selectedPlanTypes.value = val.slice(0, 3)
+    ElMessage.warning('最多选择 3 个方案对比')
   }
+})
 
-  cacheClearing.value = true
-  try {
-    const res = await refreshZhchPlanCache(taskId)
-    if (res.code === 200) {
-      store.clearZhchPlans()
-      ElMessage.success('打击方案缓存已清除')
-    } else {
-      ElMessage.warning(res.msg || '清除缓存失败，请稍后重试')
-    }
-  } catch {
-    ElMessage.error('清除缓存失败，请稍后重试')
-  } finally {
-    cacheClearing.value = false
-  }
-}
-
-/** 任务切换后清空缓存 */
 watch(
   () => store.activedTask?.id,
-  (taskId, prevId) => {
+  async (taskId, prevId) => {
     if (taskId !== prevId) {
       store.clearZhchPlans()
+      selectedPlanTypes.value = []
     }
-  }
+    if (!taskId) return
+    await reloadAllPlans(true)
+    syncDefaultSelectedPlans()
+  },
+  { immediate: true },
 )
 </script>
 
@@ -253,58 +233,27 @@ watch(
   flex-shrink: 0;
   flex-wrap: wrap;
 
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    .header-title {
-      font-size: 18px;
-      font-weight: 700;
-    }
-  }
-
   .header-center {
     display: flex;
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
+    flex: 1;
+    min-width: 0;
 
     .type-label {
-      font-size: 16px;
+      font-size: 18px;
       color: #94a3b8;
-
-      &--sys {
-        margin-left: 8px;
-      }
     }
 
-    .type-selector {
+    .plan-checkbox-group {
       display: flex;
-      gap: 6px;
+      flex-wrap: wrap;
+      gap: 8px 14px;
 
-      .type-btn {
-        padding: 6px 16px;
-        font-size: 14px;
-        color: #8eb3d6;
-        background: rgba(16, 36, 62, 0.7);
-        border: 1px solid rgba(79, 147, 221, 0.3);
-        border-radius: 6px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-
-        &:hover {
-          color: #fff;
-          border-color: rgba(0, 225, 255, 0.5);
-        }
-
-        &.active {
-          color: #fff;
-          font-weight: 600;
-          background: linear-gradient(135deg, rgba(79, 147, 221, 0.85) 0%, rgba(0, 180, 216, 0.9) 100%);
-          border-color: #00e1ff;
-          box-shadow: 0 0 10px rgba(0, 225, 255, 0.35);
-        }
+      :deep(.el-checkbox__label) {
+        color: #cbd5e1;
+        font-size: 18px;
       }
     }
   }
@@ -315,16 +264,6 @@ watch(
     gap: 12px;
     flex-wrap: wrap;
   }
-}
-
-.glow-text {
-  color: #eaf3ff;
-  text-shadow: 0 0 8px rgba(64, 242, 255, 0.35);
-}
-
-.scenario-banner {
-  margin: 0 16px 8px;
-  flex-shrink: 0;
 }
 
 .plan-body {
@@ -347,30 +286,28 @@ watch(
     grid-template-columns: 1fr !important;
   }
 
-  /**
-   * 多方案并排：同一行块（概要 / 指标对比 / TOP5 等）共用三列中的最大高度。
-   * 嵌套 subgrid 必须使用相同 row-gap，否则内层 gap:0 会把父级间距吃掉。
-   */
   &--compare {
-    --plan-compare-row-gap: 10px;
     align-items: stretch;
-    column-gap: 14px;
-    row-gap: var(--plan-compare-row-gap);
 
     .plan-column {
-      display: grid;
-      grid-template-rows: subgrid;
-      grid-row: span 8;
-      row-gap: var(--plan-compare-row-gap);
-      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .column-type-title {
+      flex-shrink: 0;
+      min-height: 76px;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
     }
 
     .column-content {
-      display: grid;
-      grid-template-rows: subgrid;
-      grid-row: span 7;
-      row-gap: var(--plan-compare-row-gap);
-      min-width: 0;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
     }
   }
 }
@@ -384,12 +321,12 @@ watch(
   overflow: hidden;
 
   .column-type-title {
-    padding: 14px;
+    padding: 14px 16px;
     font-size: 22px;
     font-weight: 900;
-    text-align: center;
+    text-align: left;
     color: #40f2ff;
-    letter-spacing: 2px;
+    letter-spacing: 1px;
     text-shadow: 0 0 12px rgba(64, 242, 255, 0.5);
     border-bottom: 1px solid rgba(79, 147, 221, 0.25);
     background: rgba(14, 28, 48, 0.8);
@@ -401,6 +338,10 @@ watch(
     max-width: 100%;
     overflow: hidden;
   }
+}
+
+.plan-columns--compare .column-content {
+  padding-bottom: 8px;
 }
 
 .empty-container {
@@ -423,7 +364,7 @@ watch(
   }
 
   .empty-text {
-    font-size: 16px;
+    font-size: 18px;
   }
 }
 </style>

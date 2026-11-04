@@ -249,15 +249,33 @@ export function filterC2ResourceRowsToPanelCountries(rows: C2ResourceSatelliteRo
 }
 
 /**
+ * 按作战对象点击顺序排列 C2 面板树国家根节点（仅排序，不增删国家）。
+ *
+ * @param priorityCountry 当前聚焦的国家；无效时保持 {@link C2_PANEL_TREE_COUNTRIES} 默认顺序
+ */
+export function orderC2PanelTreeCountries(priorityCountry: string | null | undefined): string[] {
+  const base = [...C2_PANEL_TREE_COUNTRIES]
+  if (!priorityCountry) return base
+  const index = base.indexOf(priorityCountry)
+  if (index <= 0) return base
+  return [priorityCountry, ...base.filter((country) => country !== priorityCountry)]
+}
+
+/**
  * 构建 C2 左侧面板资源树：固定展示「中国台湾 / 日本 / 美国」三国根节点。
  *
  * @param rows 扁平行（会先按国家过滤）
+ * @param priorityCountry 将该国根节点排在树最上方（仅改变顺序）
  */
-export function buildC2ResourceTreeNodesForPanel(rows: C2ResourceSatelliteRow[]): C2ResourceTreeNode[] {
+export function buildC2ResourceTreeNodesForPanel(
+  rows: C2ResourceSatelliteRow[],
+  priorityCountry?: string | null,
+): C2ResourceTreeNode[] {
   const filtered = filterC2ResourceRowsToPanelCountries(rows)
   const built = buildC2ResourceTreeNodes(filtered)
   const byLabel = new Map(built.map((node) => [node.label, node]))
-  return C2_PANEL_TREE_COUNTRIES.map((country) => {
+  const countryOrder = orderC2PanelTreeCountries(priorityCountry ?? null)
+  return countryOrder.map((country) => {
     const existing = byLabel.get(country)
     if (existing) return existing
     return {

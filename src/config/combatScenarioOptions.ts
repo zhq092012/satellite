@@ -120,6 +120,46 @@ export function loadCombatScenarioForTask(taskId: number): CombatScenarioSelecti
 }
 
 /**
+ * 新建任务或未保存作战场景时的默认选项（与任务编辑弹窗初始值一致）。
+ */
+export function getDefaultCombatScenarioSelection(): CombatScenarioSelection {
+  return {
+    backgroundId: COMBAT_BACKGROUND_OPTIONS[0]?.id ?? '',
+    commandSourceId: COMMAND_SOURCE_OPTIONS[0]?.id ?? '',
+    combatPhaseId: COMBAT_PHASE_OPTIONS[0]?.id ?? '',
+    expectationPrimaryId: COMBAT_EXPECTATION_PRIMARY_OPTIONS[0]?.id ?? '',
+    expectationSecondaryId: COMBAT_EXPECTATION_PRIMARY_OPTIONS[0]?.children[0]?.id ?? '',
+  }
+}
+
+/**
+ * 读取任务作战场景；无本地记录时使用默认选项，避免页面展示全部为 `--`。
+ *
+ * @param taskId 任务 ID
+ */
+export function loadCombatScenarioForTaskOrDefault(taskId: number): CombatScenarioSelection {
+  return loadCombatScenarioForTask(taskId) ?? getDefaultCombatScenarioSelection()
+}
+
+/**
+ * 打击方案展示名称：作战阶段-作战预期（一级），如「对日作战阶段-信息孤困」。
+ *
+ * @param taskId 任务 ID
+ */
+export function buildStrikePlanDisplayName(taskId: number): string {
+  const selection = loadCombatScenarioForTaskOrDefault(taskId)
+  const phase =
+    COMBAT_PHASE_OPTIONS.find((item) => item.id === selection.combatPhaseId)?.label ?? ''
+  const expectationPrimary =
+    COMBAT_EXPECTATION_PRIMARY_OPTIONS.find((item) => item.id === selection.expectationPrimaryId)
+      ?.label ?? ''
+  if (!phase && !expectationPrimary) return '--'
+  if (!expectationPrimary) return phase
+  if (!phase) return expectationPrimary
+  return `${phase}-${expectationPrimary}`
+}
+
+/**
  * 兼容旧版 localStorage 结构。
  */
 function migrateLegacyCombatScenario(legacy: Record<string, unknown>): CombatScenarioSelection | null {

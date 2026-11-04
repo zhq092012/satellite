@@ -17,14 +17,16 @@
         style="width: 200px" @keyup.enter="handleSatelliteSearch" @clear="handleSatelliteSearch" />
       <el-select v-if="typeFilterOptions.length && !isSatelliteKind" v-model="typeFilter" size="small" clearable
         :placeholder="config.typePlaceholder" class="assemble-filter" style="width: 160px"
-        popper-class="task-edit-select-popper" @change="handleSatelliteSearch" @clear="handleSatelliteSearch" filterable>
+        popper-class="task-edit-select-popper" @change="handleSatelliteSearch" @clear="handleSatelliteSearch"
+        filterable>
         <el-option v-for="item in typeFilterOptions" :key="item" :label="item" :value="item" />
       </el-select>
       <el-button v-if="apiEnabled" class="task-edit-btn task-edit-btn--ghost" size="small" :loading="listLoading"
         @click="loadCandidatePool">
         刷新
       </el-button>
-      <span class="assemble-count">{{ isSatelliteKind ? `已选系列 ${assembledSeriesIds.size} 个` : `已装配 ${assembledRows.length} 项` }}</span>
+      <span class="assemble-count">{{ isSatelliteKind ? `已选系列 ${assembledSeriesIds.size} 个` : `已装配
+        ${assembledRows.length} 项` }}</span>
     </div>
 
     <!-- 卫星：系列栏 + 卫星列表（无穿梭框） -->
@@ -35,22 +37,25 @@
           <span class="assemble-pane-sub">勾选即装配系列</span>
         </div>
         <div v-loading="listLoading" class="assemble-pane-body series-pane-body">
-          <div v-if="!seriesTableRows.length" class="series-empty">
+          <div v-if="!seriesGroupsByType.length" class="series-empty">
             请先配置作战对象与卫星类型
           </div>
-          <div v-else class="series-chip-list" role="list" aria-label="卫星系列">
-            <div v-for="row in seriesTableRows" :key="row.id" class="series-chip" role="listitem" :class="{
-              'series-chip--preview': previewFocusSeries === row.series,
-              'series-chip--assembled': isSeriesAssembled(row.id),
-            }">
-              <label class="series-chip-check" @click.stop @mousedown.stop>
-                <input type="checkbox" class="series-chip-native-check" :checked="isSeriesAssembled(row.id)"
-                  @change="onSeriesNativeCheckChange(row, $event)" />
-              </label>
-              <span class="series-chip-label" role="button" tabindex="0"
-                @click.stop="handleSeriesChipClick(row)"
-                @keydown.enter.prevent="handleSeriesChipClick(row)">{{ row.name }}</span>
-            </div>
+          <div v-else class="series-group-list">
+            <section v-for="group in seriesGroupsByType" :key="group.typeLabel" class="series-type-group"
+              :aria-label="`${group.typeLabel}卫星系列`">
+              <div class="series-type-head">{{ group.typeLabel }}</div>
+              <div class="series-chip-list" role="list">
+                <div v-for="row in group.rows" :key="row.id" class="series-chip" role="listitem" tabindex="0" :class="{
+                  'series-chip--preview': previewFocusSeries === row.series,
+                  'series-chip--assembled': isSeriesAssembled(row.id),
+                }" @click="handleSeriesChipToggle(row)" @keydown.enter.prevent="handleSeriesChipToggle(row)"
+                  @keydown.space.prevent="handleSeriesChipToggle(row)">
+                  <input type="checkbox" class="series-chip-native-check" :checked="isSeriesAssembled(row.id)"
+                    :aria-label="`装配系列 ${row.name}`" @click.stop @change="onSeriesNativeCheckChange(row, $event)" />
+                  <span class="series-chip-label">{{ row.name }}</span>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </section>
@@ -59,11 +64,12 @@
           <span>卫星列表</span>
           <span class="assemble-pane-sub">{{ previewSeriesLabel }}</span>
         </div>
-        <div class="assemble-pane-body">
-          <el-table v-loading="listLoading" :data="displaySatellitePreview" size="small" height="100%" row-key="id"
-            class="assemble-table" empty-text="请勾选系列以加载卫星">
+        <div class="assemble-pane-body assemble-pane-body--satellite-list">
+          <el-table v-loading="listLoading" :data="displaySatellitePreview" size="small" row-key="id"
+            class="assemble-table assemble-table--satellite-preview" empty-text="请勾选系列以加载卫星" :max-height="520" fit
+            style="width: 100%">
             <el-table-column v-for="col in tableColumns" :key="col.prop" :prop="col.prop" :label="col.label"
-              :min-width="col.minWidth" :width="col.width" show-overflow-tooltip />
+              v-bind="assembleColumnTableProps(col)" show-overflow-tooltip />
           </el-table>
         </div>
       </section>
@@ -77,11 +83,11 @@
       </div>
       <div class="assemble-pane-body assemble-pane-body--tall">
         <el-table ref="candidateTableRef" v-loading="listLoading" :data="displayCandidates" size="small" height="100%"
-          row-key="id" class="assemble-table" :empty-text="apiEnabled ? '暂无资源' : '暂无候选资源'"
+          row-key="id" class="assemble-table" :empty-text="apiEnabled ? '暂无资源' : '暂无候选资源'" fit style="width: 100%"
           @selection-change="onDirectAssemblySelection">
           <el-table-column type="selection" width="42" :reserve-selection="true" />
           <el-table-column v-for="col in tableColumns" :key="col.prop" :prop="col.prop" :label="col.label"
-            :min-width="col.minWidth" :width="col.width" show-overflow-tooltip />
+            v-bind="assembleColumnTableProps(col)" show-overflow-tooltip />
           <el-table-column v-if="crudEnabled" label="修改" width="64" fixed="right" align="center">
             <template #default="{ row }">
               <el-button link type="primary" class="assemble-edit-btn" @click="openEditDialog(row)">修改</el-button>
@@ -238,7 +244,7 @@ import {
   updateWeapon,
 } from '@/api/dashboard'
 import { getSatelliteBySeries, getSatelliteSeries } from '@/api/task/task'
-import { getOrbitType } from '@/utils/tools/satellite'
+import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
 import {
   deleteBaseStations,
   getGroundStationList,
@@ -262,9 +268,9 @@ export interface TaskAssembleRow {
   type: string
   /** 国家或所属方 */
   country: string
-  /** 额外字段：NORAD、经度、适用卫星等 */
+  /** 额外字段：卫星体系 / 经度 / 适用目标等（依装配类型复用） */
   extra1: string
-  /** 额外字段：轨道、纬度、射程/间隔等 */
+  /** 额外字段：发射日期 / 纬度 / 射程高度等（依装配类型复用） */
   extra2: string
   /** 额外字段：武器经度等 */
   extra3?: string
@@ -284,6 +290,8 @@ interface AssembleColumn {
   minWidth?: number
   /** 固定宽度 */
   width?: number
+  /** 为 true 时不设固定 width，列占满表格剩余宽度 */
+  flex?: boolean
 }
 
 /** 某一类装配页的文案与列定义。 */
@@ -377,18 +385,18 @@ const candidatePool = reactive<Record<TaskAssembleKind, TaskAssembleRow[]>>({
 const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
   satellite: {
     title: '卫星装配',
-    description: '系列按蓝方国家查询，并按任务卫星类型（侦察/通信）过滤；选择系列后可预览卫星，装配的是系列本身。',
-    searchPlaceholder: '名称 / NORAD',
+    description: '系列按蓝方国家查询，并按任务卫星类型（侦察/通信）分组展示；勾选系列后可预览卫星，装配的是系列本身。',
+    searchPlaceholder: '国家 / 名称 / 系列',
     typePlaceholder: '卫星类型',
     typeOptions: [],
     seriesOptions: [],
     columns: [
-      { prop: 'name', label: '名称', minWidth: 110 },
-      { prop: 'series', label: '系列', minWidth: 96 },
-      { prop: 'extra1', label: 'NORAD', width: 88 },
-      { prop: 'type', label: '类型', width: 80 },
-      { prop: 'extra2', label: '轨道', width: 72 },
-      { prop: 'country', label: '所属', minWidth: 72 },
+      { prop: 'country', label: '国家', width: 90 },
+      { prop: 'name', label: '卫星名称', minWidth: 96, flex: true },
+      { prop: 'type', label: '卫星类型', minWidth: 120 },
+      { prop: 'series', label: '卫星系列', minWidth: 120 },
+      { prop: 'extra1', label: '卫星体系', minWidth: 120 },
+      { prop: 'extra2', label: '发射日期', minWidth: 120 },
     ],
   },
   station: {
@@ -399,11 +407,11 @@ const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
     typeOptions: [],
     seriesOptions: [],
     columns: [
-      { prop: 'name', label: '名称', minWidth: 120 },
-      { prop: 'type', label: '类型', width: 80 },
-      { prop: 'country', label: '国家', width: 80 },
-      { prop: 'extra1', label: '经度', width: 80 },
-      { prop: 'extra2', label: '纬度', width: 80 },
+      { prop: 'country', label: '国家', width: 72 },
+      { prop: 'name', label: '名称', minWidth: 112, flex: true },
+      { prop: 'type', label: '类型', minWidth: 120 },
+      { prop: 'extra1', label: '经度', minWidth: 120 },
+      { prop: 'extra2', label: '纬度', minWidth: 120 },
     ],
   },
   center: {
@@ -414,11 +422,11 @@ const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
     typeOptions: [],
     seriesOptions: [],
     columns: [
-      { prop: 'name', label: '名称', minWidth: 120 },
-      { prop: 'type', label: '类型', width: 88 },
-      { prop: 'country', label: '国家', width: 80 },
-      { prop: 'extra1', label: '经度', width: 80 },
-      { prop: 'extra2', label: '纬度', width: 80 },
+      { prop: 'country', label: '国家', width: 72 },
+      { prop: 'name', label: '名称', minWidth: 112, flex: true },
+      { prop: 'type', label: '类型', minWidth: 120 },
+      { prop: 'extra1', label: '经度', minWidth: 120 },
+      { prop: 'extra2', label: '纬度', minWidth: 120 },
     ],
   },
   weapon: {
@@ -429,14 +437,14 @@ const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
     typeOptions: [],
     seriesOptions: [],
     columns: [
-      { prop: 'name', label: '名称', minWidth: 100 },
-      { prop: 'type', label: '类型', width: 72 },
-      { prop: 'country', label: '所属', width: 72 },
-      { prop: 'extra1', label: '适用目标', minWidth: 88 },
-      { prop: 'extra2', label: '射程/高度', width: 80 },
-      { prop: 'extra3', label: '经度', width: 72 },
-      { prop: 'extra4', label: '纬度', width: 72 },
-      { prop: 'extra5', label: '打击间隔', width: 80 },
+      { prop: 'country', label: '国家', width: 72 },
+      { prop: 'name', label: '名称', minWidth: 100, flex: true },
+      { prop: 'type', label: '类型', minWidth: 120 },
+      { prop: 'extra1', label: '适用目标', minWidth: 120 },
+      { prop: 'extra2', label: '射程/高度', minWidth: 120 },
+      { prop: 'extra3', label: '经度', minWidth: 120 },
+      { prop: 'extra4', label: '纬度', minWidth: 120 },
+      { prop: 'extra5', label: '打击间隔', minWidth: 120 },
     ],
   },
 }
@@ -447,13 +455,22 @@ const config = computed(() => KIND_CONFIG[props.kind])
 /** 左侧预览/待选表列：卫星为卫星详情列，其余为各类型配置列。 */
 const tableColumns = computed(() => config.value.columns)
 
-/** 右侧已装配表列：卫星仅展示系列名。 */
-const assembledTableColumns = computed(() => {
-  if (isSatelliteKind.value) {
-    return [{ prop: 'name' as keyof TaskAssembleRow, label: '系列', minWidth: 160 }]
+/**
+ * 绑定 el-table-column 宽度：flex 列仅 minWidth；固定列仅 width，避免 minWidth 累加触发横向滚动。
+ *
+ * @param col 列配置
+ */
+const assembleColumnTableProps = (col: AssembleColumn): { width?: number; minWidth?: number } => {
+  if (col.flex) {
+    return { minWidth: col.minWidth ?? 96 }
   }
-  return config.value.columns
-})
+  if (col.width != null) {
+    return { width: col.width }
+  }
+  return { minWidth: col.minWidth ?? 72 }
+}
+
+
 
 /** 是否已接入增删改查（地面站 / 数据中心 / 武器）。 */
 const crudEnabled = computed(() => props.kind === 'station' || props.kind === 'center' || props.kind === 'weapon')
@@ -574,12 +591,30 @@ const weaponRules = reactive<FormRules<Weapon>>({
 const weaponDialogTitle = computed(() => (weaponForm.id ? '修改武器' : '添加武器'))
 
 /**
- * 解析经纬度字符串。
+ * 将经度或纬度格式化为保留三位小数的展示文本。
+ *
+ * @param value 原始坐标（数字或字符串）
+ * @returns 三位小数文本；无效时为 `--`
+ */
+const formatCoordinateDisplay = (value: string | number | null | undefined): string => {
+  if (value == null || value === '' || value === '--') return '--'
+  const numeric = typeof value === 'number' ? value : Number(String(value).trim())
+  if (!Number.isFinite(numeric)) return '--'
+  return numeric.toFixed(3)
+}
+
+/**
+ * 解析经纬度字符串，展示时保留三位小数。
+ *
  * @param latLon 格式为 "经度,纬度"
+ * @returns 经度、纬度展示文案
  */
 const parseLatLon = (latLon: string): { lng: string; lat: string } => {
   const parts = (latLon || '').split(',').map((item) => item.trim())
-  return { lng: parts[0] || '--', lat: parts[1] || '--' }
+  return {
+    lng: parts[0] ? formatCoordinateDisplay(parts[0]) : '--',
+    lat: parts[1] ? formatCoordinateDisplay(parts[1]) : '--',
+  }
 }
 
 /**
@@ -622,6 +657,109 @@ interface SatellitePreviewItem {
   sat_type?: string
   country?: string
   orbit_type?: number
+  /** catalog 扩展：任务系统类型（卫星体系） */
+  mission_sys_type?: string
+  /** catalog 扩展：发射日期 */
+  launch_date?: string
+}
+
+/**
+ * 根据系列在 getSeries 缓存中的归属推断任务系统类型。
+ *
+ * @param seriesName 系列名称
+ * @returns 侦察 / 通信等；无法推断时为 null
+ */
+const resolveMissionSysTypeFromSeriesCache = (seriesName: string): string | null => {
+  const cache = seriesDataCache.value
+  const name = seriesName.trim()
+  if (!cache || !name) return null
+  if (cache.侦察?.includes(name)) return '侦察'
+  if (cache.通信?.includes(name)) return '通信'
+  return null
+}
+
+/**
+ * catalog 未返回发射日期时，按 NORAD 生成稳定演示日期（仅展示用）。
+ *
+ * @param norad NORAD 编号
+ * @returns `YYYY-MM-DD` 或 `--`
+ */
+const mockLaunchDateFromNorad = (norad: number): string => {
+  if (!Number.isFinite(norad) || norad <= 0) return '--'
+  const year = 1985 + (Math.abs(Math.trunc(norad)) % 35)
+  const month = (Math.abs(Math.trunc(norad)) % 12) + 1
+  const day = (Math.abs(Math.trunc(norad)) % 27) + 1
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${year}-${pad(month)}-${pad(day)}`
+}
+
+/**
+ * 将未知类型字段规范为展示用字符串。
+ *
+ * @param value 原始字段
+ * @returns 去空白后的字符串
+ */
+const toAssembleDisplayText = (value: unknown): string => {
+  if (value == null) return ''
+  if (typeof value === 'string') return value.trim()
+  return String(value).trim()
+}
+
+/**
+ *
+ * @param satellite 卫星预览数据
+ * @param seriesName 所属系列
+ * @returns 任务系统类型文案
+ */
+const resolveSatelliteMissionSysType = (satellite: SatellitePreviewItem, seriesName: string): string => {
+  const fromApi = toAssembleDisplayText(satellite.mission_sys_type)
+  if (fromApi) return fromApi
+  const fromSeries = resolveMissionSysTypeFromSeriesCache(seriesName)
+  if (fromSeries) return fromSeries
+  const norad = Number(satellite.norad)
+  const idx = Number.isFinite(norad) ? Math.abs(Math.trunc(norad)) % MISSION_SYS_TYPES.length : 0
+  return MISSION_SYS_TYPES[idx] ?? '侦察'
+}
+
+/**
+ * 将接口返回的发射时间规范为 `YYYY-MM-DD` 展示。
+ *
+ * @param raw 原始发射时间（可能为逗号分隔或 ISO 字符串）
+ * @returns 展示用日期；无法解析时返回原文或 `--`
+ */
+const normalizeLaunchDateDisplay = (raw: string): string => {
+  const text = raw.trim()
+  if (!text) return '--'
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10)
+  const commaParts = text.split(',').map((part) => part.trim())
+  if (commaParts.length >= 3) {
+    const year = Number(commaParts[0])
+    const month = Number(commaParts[1])
+    const day = Number(commaParts[2])
+    if (Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
+      const pad = (n: number) => String(n).padStart(2, '0')
+      return `${year}-${pad(month)}-${pad(day)}`
+    }
+  }
+  const parsed = Date.parse(text.replace(/-/g, '/'))
+  if (Number.isFinite(parsed)) {
+    const d = new Date(parsed)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  }
+  return text
+}
+
+/**
+ * 解析发射日期展示值：优先接口字段，缺失时使用 mock。
+ *
+ * @param satellite 卫星预览数据
+ * @returns 发射日期文案
+ */
+const resolveSatelliteLaunchDate = (satellite: SatellitePreviewItem): string => {
+  const fromApi = toAssembleDisplayText(satellite.launch_date)
+  if (fromApi) return normalizeLaunchDateDisplay(fromApi)
+  return mockLaunchDateFromNorad(Number(satellite.norad))
 }
 
 /**
@@ -630,15 +768,30 @@ interface SatellitePreviewItem {
  * @param satellite 卫星原始数据
  * @param seriesName 所属系列（接口未返回 series 时使用）
  */
-const satelliteToRow = (satellite: SatellitePreviewItem, seriesName?: string): TaskAssembleRow => ({
-  id: satellite._id || String(satellite.norad),
-  name: satellite.name_en || satellite.name_cn || String(satellite.norad),
-  series: satellite.series || seriesName || '--',
-  type: satellite.sat_type || '--',
-  country: satellite.country || '--',
-  extra1: String(satellite.norad),
-  extra2: getOrbitType(Number(satellite.orbit_type)),
-})
+const satelliteToRow = (satellite: SatellitePreviewItem, seriesName?: string): TaskAssembleRow => {
+  const series = toAssembleDisplayText(satellite.series) || seriesName || '--'
+  const countryFromApi = toAssembleDisplayText(satellite.country)
+  const fallbackCountry =
+    props.enemyCountries?.length === 1
+      ? toAssembleDisplayText(props.enemyCountries[0])
+      : ''
+  const norad = Number(satellite.norad)
+  const id =
+    toAssembleDisplayText(satellite._id) ||
+    (Number.isFinite(norad) && norad > 0 ? String(norad) : `${series}-${toAssembleDisplayText(satellite.name_en) || toAssembleDisplayText(satellite.name_cn) || 'unknown'}`)
+  return {
+    id,
+    name:
+      toAssembleDisplayText(satellite.name_en) ||
+      toAssembleDisplayText(satellite.name_cn) ||
+      (Number.isFinite(norad) ? String(norad) : '--'),
+    series,
+    type: toAssembleDisplayText(satellite.sat_type) || '--',
+    country: countryFromApi || fallbackCountry || '--',
+    extra1: resolveSatelliteMissionSysType(satellite, series),
+    extra2: resolveSatelliteLaunchDate(satellite),
+  }
+}
 
 /**
  * 格式化武器坐标展示。
@@ -646,10 +799,7 @@ const satelliteToRow = (satellite: SatellitePreviewItem, seriesName?: string): T
  * @param value 经度或纬度
  * @returns 坐标文本；无效时为 `--`
  */
-const formatWeaponCoord = (value?: number | null): string => {
-  if (value == null || !Number.isFinite(value)) return '--'
-  return String(value)
-}
+const formatWeaponCoord = (value?: number | null): string => formatCoordinateDisplay(value)
 
 /**
  * 格式化武器打击间隔展示。
@@ -717,17 +867,53 @@ const filteredCandidates = computed(() => {
   })
 })
 
-/** 卫星系列候选项表行（横向 chip 数据源） */
+/** 按任务卫星类型分组的系列 chip 数据（侦察 / 通信）。 */
+interface SeriesTypeGroup {
+  /** 类型标题（侦察、通信） */
+  typeLabel: '侦察' | '通信'
+  /** 该类型下的系列行 */
+  rows: TaskAssembleRow[]
+}
+
+/**
+ * 从系列接口缓存构建分组列表（顺序：侦察 → 通信，与任务已选类型一致）。
+ */
+const seriesGroupsByType = computed((): SeriesTypeGroup[] => {
+  const cache = seriesDataCache.value
+  const selectedTypes = seriesQueryTargetTypes.value
+  if (!cache || !selectedTypes.length) return []
+
+  const countryText = seriesQueryCountries.value.join('、') || '--'
+  const groups: SeriesTypeGroup[] = []
+
+  const appendGroup = (typeLabel: '侦察' | '通信', rawList: string[] | undefined) => {
+    if (!selectedTypes.includes(typeLabel)) return
+    const names = Array.from(new Set((rawList || []).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b, 'zh-CN'),
+    )
+    if (!names.length) return
+    groups.push({
+      typeLabel,
+      rows: names.map((series) => ({
+        id: series,
+        name: series,
+        series,
+        type: typeLabel,
+        country: countryText,
+        extra1: '--',
+        extra2: '--',
+      })),
+    })
+  }
+
+  appendGroup('侦察', cache.侦察)
+  appendGroup('通信', cache.通信)
+  return groups
+})
+
+/** 卫星系列候选项表行（分组扁平化，供装配同步与校验使用）。 */
 const seriesTableRows = computed((): TaskAssembleRow[] =>
-  seriesOptions.value.map((series) => ({
-    id: series,
-    name: series,
-    series,
-    type: '--',
-    country: seriesQueryCountries.value.join('、') || '--',
-    extra1: '--',
-    extra2: '--',
-  })),
+  seriesGroupsByType.value.flatMap((group) => group.rows),
 )
 
 /** 卫星预览列表（关键字 + 可选单系列收窄） */
@@ -784,14 +970,14 @@ const isSeriesAssembled = (seriesId: string): boolean => assembledSeriesIds.valu
  * @param row 系列行
  * @param event change 事件
  */
-const onSeriesNativeCheckChange = (row: TaskAssembleRow, event: Event) => {
+const onSeriesNativeCheckChange = async (row: TaskAssembleRow, event: Event) => {
   const input = event.target as HTMLInputElement | null
   if (!input) return
-  void handleSeriesAssemblyToggle(row, input.checked)
+  await handleSeriesAssemblyToggle(row, input.checked)
 }
 
 /**
- * 勾选/取消系列装配；勾选时加载该系列卫星预览，取消时按需清空预览。
+ * 勾选/取消系列装配；按全部已勾选系列合并加载下方卫星列表。
  *
  * @param row 系列行
  * @param checked 是否勾选
@@ -811,18 +997,13 @@ const handleSeriesAssemblyToggle = async (row: TaskAssembleRow, checked: boolean
 }
 
 /**
- * 点击系列名称：未勾选时装载单系列预览；已勾选时仅收窄表格到该系列。
+ * 点击系列 chip（含文字与边框内空白）：与 checkbox 一致，切换装配并刷新卫星列表。
  *
  * @param row 系列行
  */
-const handleSeriesChipClick = async (row: TaskAssembleRow) => {
+const handleSeriesChipToggle = async (row: TaskAssembleRow) => {
   if (!row.series) return
-  previewFocusSeries.value = row.series
-  if (assembledSeriesIds.value.size === 0) {
-    await reloadSatellitePreview()
-    return
-  }
-  satelliteTableSeriesFilter.value = row.series
+  await handleSeriesAssemblyToggle(row, !isSeriesAssembled(row.id))
 }
 
 /** 当前预览系列标题 */
@@ -845,7 +1026,7 @@ const loadSatelliteCandidatesForSeriesList = async (seriesList: string[]) => {
         const res = await getSatelliteBySeries(series)
         const raw = res.code === 200 ? res.data : null
         const list = Array.isArray(raw) ? raw : raw ? [raw] : []
-        return list.map((item) => satelliteToRow(item, series))
+        return list.map((item) => satelliteToRow(item as SatellitePreviewItem, series))
       }),
     )
     const byId = new Map<string, TaskAssembleRow>()
@@ -858,7 +1039,8 @@ const loadSatelliteCandidatesForSeriesList = async (seriesList: string[]) => {
       (a, b) =>
         a.series.localeCompare(b.series, 'zh-CN') || a.name.localeCompare(b.name, 'zh-CN'),
     )
-  } catch {
+  } catch (error) {
+    console.error('加载系列卫星预览失败:', error)
     candidatePool.satellite = []
   } finally {
     listLoading.value = false
@@ -1305,6 +1487,7 @@ const setAssembledRows = (rows: TaskAssembleRow[]) => {
     assembledSeriesIds.value = new Set(rows.map((row) => row.id).filter(Boolean))
     syncAssembledRowsFromSeriesIds()
     void restoreSeriesAssemblySelection()
+    void reloadSatellitePreview()
     return
   }
   assembledRows.value = rows.map((row) => ({ ...row }))
@@ -1320,12 +1503,16 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
+@use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
+
 .task-assemble-tab {
   display: flex;
   flex-direction: column;
   gap: 10px;
   height: 100%;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
   box-sizing: border-box;
   padding-bottom: 8px;
 }
@@ -1398,7 +1585,7 @@ defineExpose({
 
 .series-pane-body {
   flex: 0 1 auto;
-  max-height: 140px;
+  max-height: 280px;
   overflow-y: auto;
   padding: 10px;
 }
@@ -1406,6 +1593,27 @@ defineExpose({
 .series-empty {
   color: #64748b;
   line-height: 1.5;
+}
+
+.series-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.series-type-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.series-type-head {
+  font-size: 18px;
+  font-weight: 700;
+  color: #40f2ff;
+  line-height: 1.35;
+  border-left: 3px solid rgba(0, 225, 255, 0.55);
+  padding-left: 8px;
 }
 
 .series-chip-list {
@@ -1443,17 +1651,11 @@ defineExpose({
   }
 }
 
-.series-chip-check {
-  display: inline-flex;
-  align-items: center;
-  margin: 0;
-  cursor: pointer;
-}
-
 .series-chip-native-check {
   width: 18px;
   height: 18px;
   margin: 0;
+  flex-shrink: 0;
   cursor: pointer;
   accent-color: #00e1ff;
 }
@@ -1472,6 +1674,32 @@ defineExpose({
 .satellite-list-pane {
   flex: 1;
   min-height: 0;
+}
+
+.assemble-pane-body--satellite-list {
+  flex: 1;
+  min-height: 240px;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.assemble-table--satellite-preview {
+  flex: 0 1 auto;
+  height: auto;
+  min-height: 120px;
+  width: 100%;
+  max-width: 100%;
+  @include battleUi.battle-ui-c2-panel-table-fit;
+
+  :deep(.atlas-app-table),
+  :deep(.atlas-app-table__inner-wrapper) {
+    height: auto !important;
+  }
+
+  :deep(.atlas-app-table__body-wrapper) {
+    overflow-x: hidden !important;
+  }
 }
 
 .assemble-single-pane {
@@ -1532,6 +1760,8 @@ defineExpose({
   flex: 1;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
   overflow: hidden;
 }
 
@@ -1576,8 +1806,10 @@ defineExpose({
 .assemble-table {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   height: 100%;
-  width: 100%;
+  width: 100% !important;
+  max-width: 100%;
   --atlas-app-table-border-color: rgba(0, 225, 255, 0.12);
   --atlas-app-table-header-bg-color: rgba(13, 27, 49, 0.95);
   --atlas-app-table-bg-color: transparent;
@@ -1594,6 +1826,25 @@ defineExpose({
   :deep(.atlas-app-table),
   :deep(.atlas-app-table__inner-wrapper) {
     height: 100%;
+    width: 100% !important;
+  }
+
+  :deep(.atlas-app-table__header-wrapper),
+  :deep(.atlas-app-table__body-wrapper),
+  :deep(.atlas-app-table__footer-wrapper) {
+    width: 100% !important;
+  }
+
+  :deep(.atlas-app-table__header table),
+  :deep(.atlas-app-table__body table) {
+    table-layout: fixed;
+    width: 100% !important;
+  }
+
+  :deep(th.atlas-app-table__cell),
+  :deep(td.atlas-app-table__cell) {
+    padding-left: 6px;
+    padding-right: 6px;
   }
 
   :deep(th.atlas-app-table__cell) {

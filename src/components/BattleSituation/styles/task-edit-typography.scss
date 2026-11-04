@@ -4,14 +4,22 @@ $dialog-root: '.atlas-app-dialog.task-edit-dialog, .task-edit-dialog .atlas-app-
 
 #{$dialog-root} {
   font-size: battleUi.$battle-ui-font-base;
+  --el-font-size-base: #{battleUi.$battle-ui-font-base};
+  --el-form-label-font-size: #{battleUi.$battle-ui-font-base};
+}
+
+#{$dialog-root} .task-edit-nav-item,
+#{$dialog-root} .task-edit-nav-label {
+  font-size: battleUi.$battle-ui-font-base !important;
+  line-height: 1.35;
 }
 
 #{$dialog-root} .atlas-app-dialog__title {
   font-size: battleUi.$battle-ui-font-emphasis !important;
 }
 
-#{$dialog-root} .task-edit-nav-item {
-  font-size: battleUi.$battle-ui-font-base !important;
+#{$dialog-root} .task-edit-form .atlas-app-form-item__content {
+  font-size: battleUi.$battle-ui-font-base;
 }
 
 #{$dialog-root} .task-edit-footer .atlas-app-button {

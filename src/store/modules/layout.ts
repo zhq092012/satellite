@@ -711,7 +711,12 @@ export const useLayoutStore = defineStore('layout-store', {
      * @param types 用途类型列表
      * @param force 是否强制重新请求
      */
-    async fetchZhchPlans(types?: string[], force = false): Promise<boolean> {
+    async fetchZhchPlans(
+      types?: string[],
+      force = false,
+      /** 指定请求用的卫星系统类型；传入 null 表示不按类型过滤 */
+      sysTypeForFetch?: string | null,
+    ): Promise<boolean> {
       const taskId = this.activedTask?.id
       if (!taskId) {
         this.clearZhchPlans()
@@ -729,7 +734,8 @@ export const useLayoutStore = defineStore('layout-store', {
         this.clearZhchPlans()
       }
 
-      const sysType = this.selectedZhchSysType
+      const sysType =
+        sysTypeForFetch !== undefined ? sysTypeForFetch : this.selectedZhchSysType
       if (this.zhchPlanFetchSysType !== (sysType ?? null)) {
         this.zhchPlanMap = {}
         this.zhchPlanFetchSysType = sysType ?? null

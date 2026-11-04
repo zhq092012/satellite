@@ -11,7 +11,7 @@
 
       <div class="task-edit-main">
         <div v-show="activeTab === 'basic'" class="task-edit-pane">
-          <el-form ref="formRef" :model="taskForm" :rules="formRules" label-width="132px" class="task-edit-form">
+          <el-form ref="formRef" :model="taskForm" :rules="formRules" label-width="148px" class="task-edit-form">
             <el-form-item label="任务名称" prop="name">
               <el-input v-model="taskForm.name" maxlength="80" show-word-limit placeholder="请输入任务名称" />
             </el-form-item>
@@ -98,9 +98,9 @@
     <template #footer>
       <div class="task-edit-footer">
         <el-button class="task-edit-btn task-edit-btn--ghost" @click="visible = false">取 消</el-button>
-        <el-button v-if="!isEdit" class="task-edit-btn task-edit-btn--primary" type="primary" :loading="submitting"
+        <el-button class="task-edit-btn task-edit-btn--primary" type="primary" :loading="submitting"
           @click="handleSubmit">
-          保 存
+          {{ isEdit ? '修 改' : '保 存' }}
         </el-button>
       </div>
     </template>
@@ -111,7 +111,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { getBattleCountrys } from '@/api/dashboard'
+import { getBattleCountrys, updateTask } from '@/api/dashboard'
 import { addTask } from '@/api/task/task'
 import type { TaskForm } from '@/types/dashboard'
 import { MISSION_SYS_TYPES, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
@@ -141,8 +141,6 @@ interface TaskEditMenuItem {
 
 const store = useLayoutStore()
 
-/** 作战目标可选项（任务系统四分类）。 */
-const SATELLITE_TYPES = MISSION_SYS_TYPES
 
 /** 新建任务默认红方国家 */
 const DEFAULT_ME_COUNTRIES = ['中国'] as const
@@ -395,20 +393,6 @@ watch(
   { immediate: true }
 )
 
-/**
- * 手动修改任务时长时，联动更新结束时间。
- *
- * @param value 小时数
- */
-const handleDurationHoursChange = (value: number | undefined) => {
-  if (value == null || Number.isNaN(value)) return
-  const beginMs = parseTaskTimeMs(taskForm.beginDate)
-  if (!beginMs) return
-  const safeHours = Math.max(1, Math.round(value))
-  durationHours.value = safeHours
-  taskForm.endDate = formatDateToTaskTime(new Date(beginMs + safeHours * 3600000))
-}
-
 
 
 /** 任务指标默认值：链路时延（分钟）、覆盖率（%）。 */
@@ -495,8 +479,10 @@ const restoreAssembleFromTask = (task: TaskForm) => {
   const receiveIds = [...new Set(resources.flatMap((item) => item.receiveIds ?? []))]
   const stationIds = [...new Set(resources.flatMap((item) => item.stationIds ?? []))]
 
-  /** 卫星系列：弹窗内默认不勾选，由用户在「卫星装配」页自行多选 */
-  satelliteAssembleRef.value?.setAssembledRows([])
+  const seriesNames = [...new Set(resources.map((item) => item.series).filter(Boolean))]
+  satelliteAssembleRef.value?.setAssembledRows(
+    seriesNames.map((series) => createPlaceholderRow(series, series)),
+  )
   stationAssembleRef.value?.setAssembledRows(receiveIds.map((id) => createPlaceholderRow(id)))
   centerAssembleRef.value?.setAssembledRows(stationIds.map((id) => createPlaceholderRow(id)))
   weaponAssembleRef.value?.setAssembledRows(weaponIds.map((id) => createPlaceholderRow(id)))
@@ -674,13 +660,7 @@ const handleTargetTypeShowChange = () => {
   formRef.value?.validateField('targetTypeShow').catch(() => undefined)
 }
 
-/**
- * 国家勾选变化：同步提交字段并刷新对应表单项校验状态。
- */
-const handleCountryShowChange = () => {
-  syncCountryFields()
-  formRef.value?.validateField(['meCountryShow', 'enemyCountryShow']).catch(() => undefined)
-}
+
 
 /**
  * 加载红蓝方可选国家列表。
@@ -770,14 +750,52 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
 }
 
 /**
- * 校验并提交任务：目前仅支持新增（addTask），修改接口未就绪。
+ * 在编辑模式下合并表单与装配数据，构建 updateTask 请求体。
+ *
+ * @returns 完整任务对象；校验失败或缺少任务 ID 时返回 null
+ */
+const buildUpdateTaskPayload = (): TaskForm | null => {
+  const base = props.task
+  if (!base?.id) {
+    ElMessage.warning('缺少任务 ID，无法修改任务')
+    return null
+  }
+  const assembled = buildAddTaskPayload()
+  if (!assembled) return null
+  const targetTypeValue = (taskForm.targetTypeShow || []).join(',')
+  return {
+    ...base,
+    id: base.id,
+    battleId: base.battleId,
+    name: taskForm.name,
+    description: taskForm.description,
+    beginDate: assembled.beginDate,
+    endDate: assembled.endDate,
+    meCountry: assembled.meCountry,
+    enemyCountry: assembled.enemyCountry,
+    meCountryShow: [...(assembled.meCountryShow ?? [])],
+    enemyCountryShow: [...(assembled.enemyCountryShow ?? [])],
+    targetType: targetTypeValue,
+    targetTypeNew: targetTypeValue,
+    targetTypeShow: [...(taskForm.targetTypeShow || [])],
+    steps: taskForm.steps || base.steps || '',
+    focusStatus: taskForm.focusStatus ?? base.focusStatus ?? 0,
+    delayMin: assembled.delayMin,
+    coverage: assembled.coverage,
+    weaponIds: [...assembled.weaponIds],
+    resources: assembled.resources.map((item) => ({
+      series: item.series,
+      receiveIds: [...item.receiveIds],
+      stationIds: [...item.stationIds],
+    })),
+  }
+}
+
+/**
+ * 校验并提交任务：新增走 addTask，编辑走 updateTask。
  */
 const handleSubmit = async () => {
   if (!formRef.value) return
-  if (props.isEdit) {
-    ElMessage.warning('任务修改接口暂未开放，请新建任务')
-    return
-  }
   syncCountryFields()
   await formRef.value.validate(async (valid) => {
     if (!valid) {
@@ -795,16 +813,42 @@ const handleSubmit = async () => {
       ElMessage.warning('结束时间必须晚于开始时间')
       return
     }
-    if (!store.battle?.id) {
+    if (props.isEdit) {
+      if (!props.task?.id) {
+        ElMessage.warning('缺少任务 ID，无法修改任务')
+        return
+      }
+    } else if (!store.battle?.id) {
       ElMessage.warning('请先选择当前场景后再添加任务')
       return
     }
 
-    const taskPayload = buildAddTaskPayload()
-    if (!taskPayload) return
-
     submitting.value = true
     try {
+      if (props.isEdit) {
+        const updatePayload = buildUpdateTaskPayload()
+        if (!updatePayload) return
+        const res = await updateTask(updatePayload)
+        if (res.code === 200) {
+          saveCombatScenarioForTask(updatePayload.id as number, {
+            backgroundId: combatScenario.backgroundId,
+            commandSourceId: combatScenario.commandSourceId,
+            combatPhaseId: combatScenario.combatPhaseId,
+            expectationPrimaryId: combatScenario.expectationPrimaryId,
+            expectationSecondaryId: combatScenario.expectationSecondaryId,
+          })
+          ElMessage.success('修改任务成功')
+          visible.value = false
+          emit('saved', updatePayload)
+        } else {
+          ElMessage.error(res.msg || '修改任务失败')
+        }
+        return
+      }
+
+      const taskPayload = buildAddTaskPayload()
+      if (!taskPayload) return
+
       const res = await addTask(taskPayload)
       if (res.code === 200) {
         const savedTask: TaskForm = {
@@ -866,6 +910,8 @@ const handleSubmit = async () => {
 .atlas-app-dialog.task-edit-dialog,
 .task-edit-dialog .atlas-app-dialog {
   --el-dialog-bg-color: rgba(8, 15, 26, 0.96);
+  --el-font-size-base: 18px;
+  --el-form-label-font-size: 18px;
   --el-color-primary: #00e1ff;
   --el-color-primary-light-3: #40f2ff;
   --el-color-primary-light-5: rgba(0, 225, 255, 0.55);
@@ -929,7 +975,7 @@ const handleSubmit = async () => {
 
   .task-edit-layout {
     display: grid;
-    grid-template-columns: 168px minmax(0, 1fr);
+    grid-template-columns: 220px minmax(0, 1fr);
     flex: 1;
     min-height: 0;
     height: 100%;
@@ -948,12 +994,14 @@ const handleSubmit = async () => {
     display: flex;
     align-items: center;
     width: 100%;
-    min-height: 40px;
+    min-height: 44px;
     padding: 8px 12px;
     border: 1px solid transparent;
     border-radius: 6px;
     background: transparent;
     color: #94a3b8;
+    font-size: 18px !important;
+    line-height: 1.35;
     text-align: left;
     cursor: pointer;
     transition: all 0.18s ease;
@@ -972,7 +1020,9 @@ const handleSubmit = async () => {
   }
 
   .task-edit-nav-label {
+    font-size: 18px !important;
     font-weight: 600;
+    line-height: 1.35;
   }
 
   .task-edit-main {
@@ -1026,6 +1076,7 @@ const handleSubmit = async () => {
 
   .task-edit-form {
     --el-form-item-margin-bottom: 16px;
+    font-size: 18px;
 
     .atlas-app-form-item {
       margin-bottom: 16px;
@@ -1100,7 +1151,8 @@ const handleSubmit = async () => {
     }
 
     .combat-object-label {
-      line-height: 1.2;
+      font-size: 18px !important;
+      line-height: 1.35;
     }
 
     .enemy-country-empty {
@@ -1120,6 +1172,8 @@ const handleSubmit = async () => {
 
   .atlas-app-form-item__label {
     color: #7dd3fc !important;
+    font-size: 18px !important;
+    line-height: 1.35;
   }
 
   .atlas-app-form-item.is-required:not(.is-no-asterisk)>.atlas-app-form-item__label::before {

@@ -89,14 +89,19 @@ $battle-ui-font-emphasis: 18px;
   }
 }
 
-/** Element Plus 树节点字号 */
+/** Element Plus 树节点字号（最小 18px） */
 @mixin battle-ui-el-tree-typography {
   :deep(.atlas-app-tree-node__label) {
-    font-size: $battle-ui-font-base;
+    font-size: $battle-ui-font-base !important;
+    line-height: 1.35;
   }
 
   :deep(.atlas-app-tree-node__content) {
-    min-height: 36px;
+    min-height: 40px;
+  }
+
+  :deep(.atlas-app-tree) {
+    font-size: $battle-ui-font-base;
   }
 }
 
@@ -110,9 +115,12 @@ $battle-ui-font-emphasis: 18px;
     font-size: $battle-ui-font-base !important;
   }
 
+  #{$selector} .atlas-app-input__wrapper,
   #{$selector} .atlas-app-input__inner,
   #{$selector} .atlas-app-textarea__inner,
   #{$selector} .atlas-app-select__wrapper,
+  #{$selector} .atlas-app-select__selection,
+  #{$selector} .atlas-app-select__selection-text,
   #{$selector} .atlas-app-select__selected-item,
   #{$selector} .atlas-app-select__placeholder,
   #{$selector} .atlas-app-select__input,
@@ -124,6 +132,7 @@ $battle-ui-font-emphasis: 18px;
   #{$selector} .atlas-app-checkbox__label,
   #{$selector} .atlas-app-radio__label {
     font-size: $battle-ui-font-base !important;
+    line-height: 1.35;
   }
 
   #{$selector} .atlas-app-alert__title {

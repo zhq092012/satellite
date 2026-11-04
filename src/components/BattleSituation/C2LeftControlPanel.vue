@@ -18,12 +18,14 @@
           <div class="task-panel-row task-panel-row--objects">
             <span class="task-panel-label">作战对象</span>
             <div class="combat-object-options" role="group" aria-label="当前作战对象">
-              <div v-for="country in combatObjectCountryOptions" :key="country" class="combat-object-chip" :class="{
-                'combat-object-chip--active': isTaskCombatObjectActive(country),
-                'combat-object-chip--inactive': !isTaskCombatObjectActive(country),
-              }">
+              <button v-for="country in combatObjectCountryOptions" :key="country" type="button"
+                class="combat-object-chip" :class="{
+                  'combat-object-chip--active': isTaskCombatObjectActive(country),
+                  'combat-object-chip--inactive': !isTaskCombatObjectActive(country),
+                  'combat-object-chip--tree-focus': treeSortFocusCountry === country,
+                }" @click="handleCombatObjectCountryClick(country)">
                 <span class="combat-object-label">{{ country }}</span>
-              </div>
+              </button>
             </div>
           </div>
           <div class="task-panel-row task-panel-row--expectation">
@@ -47,7 +49,14 @@
             </div>
             <el-tree v-show="resourceTreeNodes.length > 0" ref="resourceTreeRef" class="c2-resource-tree"
               :data="resourceTreeNodes" node-key="id" show-checkbox default-expand-all :props="resourceTreeProps"
-              @check="handleResourceTreeCheck" />
+              @check="handleResourceTreeCheck">
+              <template #default="{ node, data }">
+                <span class="c2-resource-tree-node-label" :class="{
+                  'c2-resource-tree-node-label--focus':
+                    data.kind === 'country' && data.label === treeSortFocusCountry,
+                }">{{ node.label }}</span>
+              </template>
+            </el-tree>
           </div>
         </section>
 
@@ -173,9 +182,12 @@ const resourceTreeProps = { label: 'label', children: 'children' as const }
 /** 作战对象固定三项（只读展示，高亮任务所选国家） */
 const combatObjectCountryOptions = [...TASK_ENEMY_COUNTRY_OPTIONS]
 
-/** 资源树（固定三国根节点） */
+/** 点击作战对象后用于资源树排序 / 高亮的国家（不改变任务数据） */
+const treeSortFocusCountry = ref<string | null>(null)
+
+/** 资源树（固定三国根节点，顺序随 treeSortFocusCountry 调整） */
 const resourceTreeNodes = computed((): C2ResourceTreeNode[] =>
-  buildC2ResourceTreeNodesForPanel(flatCatalogRows.value),
+  buildC2ResourceTreeNodesForPanel(flatCatalogRows.value, treeSortFocusCountry.value),
 )
 
 /** 作战场景展示刷新令牌（任务保存 localStorage 后递增） */
@@ -293,6 +305,16 @@ const resolveTaskTargetTypes = (task: TaskForm | null | undefined): string[] => 
  */
 const isTaskCombatObjectActive = (country: string): boolean =>
   resolveEnemyCountries(store.activedTask).includes(country)
+
+/**
+ * 点击作战对象：将该国家排到资源树顶部，并高亮对应根节点（仅 UI 排序）。
+ *
+ * @param country 国家/地区名
+ */
+const handleCombatObjectCountryClick = (country: string) => {
+  if (!(TASK_ENEMY_COUNTRY_OPTIONS as readonly string[]).includes(country)) return
+  treeSortFocusCountry.value = country
+}
 
 /**
  * 武器表经纬度展示（保留三位小数）。
@@ -507,6 +529,7 @@ watch(
 watch(
   () => store.activedTask?.id,
   () => {
+    treeSortFocusCountry.value = null
     combatScenarioDisplayToken.value += 1
     void syncEditorForTask(store.activedTask)
   },
@@ -818,6 +841,14 @@ onUnmounted(() => {
   padding: 4px 10px;
   border-radius: 6px;
   border: 1px solid transparent;
+  cursor: pointer;
+  font: inherit;
+  appearance: none;
+  background: transparent;
+
+  &--tree-focus {
+    box-shadow: 0 0 0 2px rgba(0, 225, 255, 0.55);
+  }
 
   &--active {
     border-color: rgba(248, 113, 113, 0.85);
@@ -872,8 +903,22 @@ onUnmounted(() => {
   background: transparent;
   @include battleUi.battle-ui-el-tree-typography;
 
+  .c2-resource-tree-node-label {
+    font-size: battleUi.$battle-ui-font-base !important;
+    line-height: 1.35;
+    color: #cbd5e1;
+  }
+
   :deep(.atlas-app-tree-node__label) {
     color: #cbd5e1;
+  }
+
+  .c2-resource-tree-node-label--focus {
+    display: inline-block;
+    padding: 0 4px;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px rgba(0, 225, 255, 0.55);
+    background: rgba(0, 225, 255, 0.08);
   }
 
   :deep(.atlas-app-checkbox__inner) {
