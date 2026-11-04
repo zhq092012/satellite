@@ -114,11 +114,6 @@ const handleTabChange = (tabName: string) => {
   :deep(.atlas-app-tabs__header) {
     margin-bottom: 8px;
   }
-
-  :deep(.atlas-app-tabs__item) {
-    font-size: 16px;
-    font-weight: 600;
-  }
 }
 
 .data-manage-view {
@@ -137,4 +132,10 @@ const handleTabChange = (tabName: string) => {
     box-sizing: border-box;
   }
 }
+</style>
+
+<style lang="scss">
+@use '@/components/BattleSituation/styles/admin-manage-typography.scss' as adminManage;
+
+@include adminManage.admin-manage-page-typography('.data-manage-page');
 </style>

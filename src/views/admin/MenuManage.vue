@@ -26,7 +26,8 @@
       </div>
     </el-form>
 
-    <el-table :data="list" v-loading="loading" border row-key="id" stripe default-expand-all :tree-props="treeProps">
+    <div class="menu-table-scroll">
+      <el-table :data="list" v-loading="loading" border row-key="id" stripe default-expand-all :tree-props="treeProps">
       <el-table-column prop="menuName" label="菜单名称" min-width="180" />
       <el-table-column prop="path" label="路径" min-width="180" />
       <el-table-column prop="component" label="组件" min-width="220" />
@@ -52,7 +53,8 @@
           <el-button link type="danger" @click="handleDelete(scope.row.id)">删除</el-button>
         </template>
       </el-table-column>
-    </el-table>
+      </el-table>
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="720px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
@@ -358,7 +360,17 @@ onMounted(fetchList)
 
 <style scoped lang="scss">
 .page-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: min-content;
   padding-top: 16px;
+  padding-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.menu-table-scroll {
+  width: 100%;
+  overflow-x: auto;
 }
 
 .toolbar {

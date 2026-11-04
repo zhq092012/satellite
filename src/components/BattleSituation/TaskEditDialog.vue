@@ -264,7 +264,7 @@ const visible = ref(false)
 const isEdit = computed(() => !!props.isEdit)
 
 /** 弹窗标题：添加与修改分开展示。 */
-const dialogTitle = computed(() => (isEdit.value ? '查看任务（暂不支持修改）' : '添加任务'))
+const dialogTitle = computed(() => (isEdit.value ? '修改任务' : '添加任务'))
 
 /** 各装配页组件引用，用于提交时汇总已选资源。 */
 const satelliteAssembleRef = ref<InstanceType<typeof TaskAssembleTab> | null>(null)
@@ -1263,7 +1263,7 @@ const handleSubmit = async () => {
       padding-left: 8px;
     }
 
-    .atlas-app-checkbox__input.is-checked + .atlas-app-checkbox__label {
+    .atlas-app-checkbox__input.is-checked+.atlas-app-checkbox__label {
       color: #7dd3fc;
     }
 

@@ -1,0 +1,34 @@
+@use './battle-ui-typography.scss' as battleUi;
+
+/**
+ * 数据管理 / 系统管理布局下表格、表单、分页与按钮字号（与态势 C2 一致）。
+ *
+ * @param $root 页面根选择器，如 `.data-manage-page`
+ */
+@mixin admin-manage-page-typography($root) {
+  #{$root} {
+    font-size: battleUi.$battle-ui-font-base;
+  }
+
+  #{$root} .atlas-app-tabs__item {
+    font-size: battleUi.$battle-ui-font-base !important;
+    font-weight: 600;
+  }
+
+  @include battleUi.battle-ui-el-table-typography-under($root);
+  @include battleUi.battle-ui-el-form-typography-under($root);
+
+  #{$root} .atlas-app-button,
+  #{$root} .atlas-app-pagination,
+  #{$root} .atlas-app-pagination button,
+  #{$root} .atlas-app-pager li,
+  #{$root} .atlas-app-pagination__total {
+    font-size: battleUi.$battle-ui-font-base !important;
+  }
+
+  #{$root} .atlas-app-input__inner,
+  #{$root} .atlas-app-select__wrapper,
+  #{$root} .atlas-app-select__selected-item {
+    font-size: battleUi.$battle-ui-font-base !important;
+  }
+}

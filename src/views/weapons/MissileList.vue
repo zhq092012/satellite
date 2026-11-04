@@ -401,9 +401,9 @@ onMounted(async () => {
   overflow: hidden;
 }
 
+.table-card :deep(.atlas-app-table th.atlas-app-table__cell),
 .table-card :deep(.atlas-app-table th.el-table__cell) {
   color: var(--accent-color-active);
-  font-size: 13px;
   font-weight: 800;
 }
 

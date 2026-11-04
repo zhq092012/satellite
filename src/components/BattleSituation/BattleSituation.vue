@@ -5,10 +5,9 @@
       <BattleSituationGlobe ref="globeRef" :satellites="globeSatellites" :weapons="globeWeapons"
         :ground-targets="globeGroundTargets" :current-time-ms="currentTimeMs" :selected-norad="selectedNorad"
         :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
-        :task-start-ms="taskStartMs" :task-end-ms="taskEndMs"         :follow-selected-satellite="!isDeductionPlaying"
-        :follow-deduction-satellite="followDeductionSatellite"
-        :is-deduction-playing="isDeductionPlaying" :is-timeline-playing="isTimelinePlaying"
-        :deduction-visual-plan="deductionVisualPlan" />
+        :task-start-ms="taskStartMs" :task-end-ms="taskEndMs" :follow-selected-satellite="!isDeductionPlaying"
+        :follow-deduction-satellite="followDeductionSatellite" :is-deduction-playing="isDeductionPlaying"
+        :is-timeline-playing="isTimelinePlaying" :deduction-visual-plan="deductionVisualPlan" />
 
       <div v-if="selectedNorad" class="globe-selected-bar">
         <span class="globe-selected-label">选中卫星：</span>
@@ -59,8 +58,7 @@
     <!-- 3. 悬浮右侧分析面板 -->
     <div class="floating-panel floating-panel--right" :class="{ 'is-collapsed': isRightCollapsed }">
       <div class="panel-inner">
-        <C2RightSatelliteListPanel :selected-norad="selectedNorad"
-          @select-satellite="handleSelectSatellite" />
+        <C2RightSatelliteListPanel :selected-norad="selectedNorad" @select-satellite="handleSelectSatellite" />
       </div>
       <button type="button" class="toggle-btn toggle-btn--right" :title="isRightCollapsed ? '展开右侧面板' : '收起右侧面板'"
         @click="isRightCollapsed = !isRightCollapsed">
@@ -979,7 +977,7 @@ onActivated(() => {
       border-bottom: none;
       border-radius: 5px 5px 0 0;
       color: #00e1ff;
-      font-size: battleUi.$battle-ui-font-base;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       outline: none;

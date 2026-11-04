@@ -149,7 +149,7 @@ const getIcon = (item: RouteRecordRaw): string => {
 
   .nav-icon {
     margin-right: 8px;
-    font-size: 16px;
+    font-size: 20px;
   }
 
   .disabled-menu-wrapper {
@@ -169,7 +169,7 @@ const getIcon = (item: RouteRecordRaw): string => {
     padding: 0 20px !important;
     border-radius: 0 !important;
     color: #cbd5e1 !important;
-    font-size: 15px !important;
+    font-size: 22px !important;
     font-weight: 600 !important;
     background: rgba(0, 225, 255, 0.06) !important;
     border: none !important;
@@ -223,7 +223,7 @@ const getIcon = (item: RouteRecordRaw): string => {
   display: flex !important;
   justify-content: center !important;
   text-align: center !important;
-  font-size: 16px !important;
+  font-size: 22px !important;
   font-weight: 600 !important;
 }
 </style>
