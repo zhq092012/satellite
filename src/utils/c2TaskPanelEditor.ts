@@ -1,4 +1,4 @@
-import type { TaskForm, TaskResourceItem } from '@/types/dashboard'
+import type { TaskCombatArea, TaskForm, TaskResourceItem } from '@/types/dashboard'
 import { TASK_PANEL_SATELLITE_TYPES as MISSION_TASK_TYPES } from '@/constants/missionSatellite'
 
 /** 标签候选项（系列名或资源 ID + 展示名） */

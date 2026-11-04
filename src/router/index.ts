@@ -128,11 +128,11 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'data-manage/satellite-network',
-        redirect: '/algorithm/satellite-network',
+        redirect: '/data-manage/satellites',
       },
       {
         path: 'system/satellite-network',
-        redirect: '/algorithm/satellite-network',
+        redirect: '/data-manage/satellites',
       },
       {
         path: 'system/basestations',
@@ -328,138 +328,6 @@ const routes: Array<RouteRecordRaw> = [
           },
         ],
       },
-      {
-        path: 'algorithm',
-        name: 'AlgorithmManage',
-        component: () => import('@/layout/AlgorithmManage.vue'),
-        redirect: '/algorithm/threat',
-        beforeEnter: (to: { path: string }) => {
-          if (to.path === '/algorithm') {
-            return '/algorithm/threat'
-          }
-          return true
-        },
-        meta: {
-          title: '算法分析管理',
-          icon: 'icon-layer',
-          showInMenu: true,
-          requiresAuth: true,
-        },
-        children: [
-          {
-            path: 'threat',
-            name: 'SatelliteThreat',
-            component: () => import('@/views/algorithm/SatelliteThreat.vue'),
-            meta: {
-              title: '卫星威胁分析',
-              icon: 'icon-situation',
-              showInMenu: true,
-              requiresAuth: true,
-            },
-          },
-          {
-            path: 'attackability',
-            name: 'SatelliteAttackability',
-            component: () => import('@/views/algorithm/SatelliteAttackability.vue'),
-            meta: {
-              title: '可打击度分析',
-              icon: 'icon-situation',
-              showInMenu: true,
-              requiresAuth: true,
-            },
-          },
-          {
-            path: 'killchain',
-            name: 'KillChainPlan',
-            component: () => import('@/views/algorithm/KillChainPlan.vue'),
-            meta: {
-              title: '杀伤链方案',
-              icon: 'icon-situation',
-              showInMenu: true,
-              requiresAuth: true,
-            },
-          },
-
-          {
-            path: 'simulation',
-            name: 'StrikeSimulation',
-            component: () => import('@/views/algorithm/StrikeSimulation.vue'),
-            meta: {
-              title: '打击方案仿真',
-              icon: 'icon-situation',
-              showInMenu: true,
-              requiresAuth: true,
-            },
-          },
-          {
-            path: 'confrontation',
-            name: 'ConfrontationAnalysis',
-            component: () => import('@/components/cesium/ConfrontationAnalysis.vue'),
-            meta: {
-              title: '对抗分析',
-              icon: 'icon-situation',
-              showInMenu: true,
-              requiresAuth: true,
-            },
-          },
-          {
-            path: 'station-report',
-            name: 'StationReport',
-            component: () => import('@/components/cesium/StationReport.vue'),
-            meta: {
-              title: '打击方案',
-              icon: 'icon-situation',
-              showInMenu: true,
-              requiresAuth: true,
-            },
-          },
-          {
-            path: 'electronic-warfare',
-            name: 'ElectronicWarfare',
-            component: () => import('@/components/electronic/ElectronicWarfareG6.vue'),
-            meta: {
-              title: '态势拓扑分析',
-              icon: 'icon-situation',
-              showInMenu: true,
-              requiresAuth: true,
-            },
-          },
-          {
-            path: 'satellite-gantt',
-            name: 'SatelliteGantt',
-            component: () => import('@/components/electronic/SatelliteGantt.vue'),
-            meta: {
-              title: '甘特图分析',
-              icon: 'icon-situation',
-              showInMenu: true,
-              requiresAuth: true,
-            },
-          },
-          {
-            path: 'weapon-attack',
-            name: 'WeaponAttackList',
-            component: () => import('@/components/electronic/WeaponAttackList.vue'),
-            meta: {
-              title: '打击窗口分析',
-              icon: 'icon-situation',
-              showInMenu: true,
-              requiresAuth: true,
-            },
-          },
-          {
-            path: 'satellite-network',
-            name: 'SatelliteNetworkManage',
-            component: () => import('@/views/satellites/SatelliteNetworkManage.vue'),
-            meta: {
-              title: '卫星网络管理',
-              icon: 'icon-situation',
-              showInMenu: false,
-              requiresAuth: true,
-              roles: ['admin'],
-            },
-          },
-        ],
-      },
     ],
   },
 ]
@@ -469,22 +337,11 @@ const router = createRouter({
   routes,
 })
 
-import { useLayoutStore } from '@/store/modules/layout'
-
 router.beforeEach((to) => {
   const authStore = useAuthStore()
-  const layoutStore = useLayoutStore()
   const requiredRoles = (to.meta.roles as string[] | undefined) ?? []
   const routeMeta = to.meta as { permission?: string; permissions?: string[] }
   const isAdmin = authStore.roles.includes('admin')
-
-  // 未选择任务时，禁止访问算法管理相关子菜单与路由
-  if (to.path.startsWith('/algorithm')) {
-    if (!layoutStore.activedTask) {
-      ElMessage.warning('尚未选择战场任务，请先在首页选择战场及任务！')
-      return '/home'
-    }
-  }
 
   if (requiredRoles.length > 0 && !hasRole(authStore.roles, requiredRoles)) {
     ElMessage.warning('您没有权限访问该页面')

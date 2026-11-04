@@ -17,7 +17,6 @@ import type { C2ResourceSatelliteRow } from '@/utils/buildC2ResourceCatalog'
 import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
 
 interface State {
-  activetab: string //当前激活的Tab页
   isCollapse: boolean
   activedTask: TaskForm | null
   battle: BattleForm | null
@@ -25,9 +24,6 @@ interface State {
   currentCircleIdx: number
   battlePolygonMap: Map<number, { name: string; lonlats: { lon: number; lat: number }[] }>
   currentPolygonIdx: number
-  showSatelliteList: boolean //卫星列表面板
-  showAnalysisPanel: boolean //分析面板
-  showSatelliteMsgBox: boolean
   selectedSatellite: SatelliteDetail | null
 
   /** 当前选中的 3D 敌方地面基础设施节点 (地面接收站 / 中心云数据中心) */
@@ -156,7 +152,6 @@ let matrixScopeInflightKey = ''
 export const useLayoutStore = defineStore('layout-store', {
   state: (): State => {
     return {
-      activetab: '战场态势视图',
       isCollapse: false,
       activedTask: null,
       battle: null,
@@ -164,9 +159,6 @@ export const useLayoutStore = defineStore('layout-store', {
       battlePolygonMap: new Map<number, { name: string; lonlats: { lon: number; lat: number }[] }>(),
       currentCircleIdx: 0,
       currentPolygonIdx: 0,
-      showSatelliteList: false,
-      showSatelliteMsgBox: false,
-      showAnalysisPanel: true,
       selectedSatellite: null,
       selectedInfrastructureNode: null,
       selectedSatType: '',
@@ -288,14 +280,6 @@ export const useLayoutStore = defineStore('layout-store', {
     toggleEffectModel(show: boolean) {
       this.effectModel = show
     },
-    toggleShowSatelliteList(show: boolean) {
-      this.showSatelliteList = show
-      this.showAnalysisPanel = !show
-    },
-    toggleShowAnalysisList(show: boolean) {
-      this.showAnalysisPanel = show
-      this.showSatelliteList = !show
-    },
     setSelectedSatellite(satellite: SatelliteDetail | null) {
       this.selectedSatellite = satellite
     },
@@ -307,11 +291,6 @@ export const useLayoutStore = defineStore('layout-store', {
      */
     setSelectedInfrastructureNode(node: InfrastructureLocation | null) {
       this.selectedInfrastructureNode = node
-    },
-    /* 关闭面板 */
-    closeSatPanel() {
-      this.showSatelliteMsgBox = false
-      this.showSatelliteList = false
     },
     // 保存任务下的所有卫星
     saveTaskSatellite(satellites: SatelliteData[]) {
@@ -793,7 +772,6 @@ export const useLayoutStore = defineStore('layout-store', {
     pick: [
       'activedTask',
       'battle',
-      'showBattleList',
       'allSatelliteOfTask',
       'satelliteTotal',
       'selectedSatType',

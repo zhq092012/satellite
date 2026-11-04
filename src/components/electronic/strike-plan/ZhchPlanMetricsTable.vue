@@ -31,9 +31,13 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in verticalMetricRows" :key="item.key" class="zhch-metrics-table__tr">
-            <td class="zhch-metrics-table__td zhch-metrics-table__td--label">{{ item.label }}</td>
-            <template v-if="isPhaseCompare">
+          <template v-if="isPhaseCompare">
+            <tr
+              v-for="item in verticalCompareMetricRows"
+              :key="item.key"
+              class="zhch-metrics-table__tr"
+            >
+              <td class="zhch-metrics-table__td zhch-metrics-table__td--label">{{ item.label }}</td>
               <td class="zhch-metrics-table__td zhch-metrics-table__td--value">
                 <MetricCellContent
                   :cell="item.beforeCell"
@@ -49,15 +53,24 @@
                   align="end"
                 />
               </td>
-            </template>
-            <td v-else class="zhch-metrics-table__td zhch-metrics-table__td--value">
-              <MetricCellContent
-                :cell="item.valueCell"
-                :apply-value-tone="true"
-                align="end"
-              />
-            </td>
-          </tr>
+            </tr>
+          </template>
+          <template v-else>
+            <tr
+              v-for="item in verticalSummaryMetricRows"
+              :key="item.key"
+              class="zhch-metrics-table__tr"
+            >
+              <td class="zhch-metrics-table__td zhch-metrics-table__td--label">{{ item.label }}</td>
+              <td class="zhch-metrics-table__td zhch-metrics-table__td--value">
+                <MetricCellContent
+                  :cell="item.valueCell"
+                  :apply-value-tone="true"
+                  align="end"
+                />
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
 
@@ -116,10 +129,26 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type {
+  ZhchPlanMetricCell,
   ZhchPlanMetricColumnDef,
   ZhchPlanMetricsTableRowView,
 } from '@/utils/buildZhchPlanMetricsCompareTable'
 import MetricCellContent from './ZhchPlanMetricCellContent.vue'
+
+/** 纵向布局：打击前/后双列一行指标 */
+interface VerticalCompareMetricRow {
+  key: string
+  label: string
+  beforeCell: ZhchPlanMetricCell | undefined
+  afterCell: ZhchPlanMetricCell | undefined
+}
+
+/** 纵向布局：概要单行数值 */
+interface VerticalSummaryMetricRow {
+  key: string
+  label: string
+  valueCell: ZhchPlanMetricCell | undefined
+}
 
 const props = defineProps<{
   /** 表格标题 */
@@ -139,20 +168,23 @@ const isPhaseCompare = computed(
   () => !!props.showPhaseColumn && props.rows.some((r) => r.rowVariant === 'before')
 )
 
-/** 纵向布局：按指标拆行 */
-const verticalMetricRows = computed(() => {
-  if (!props.vertical) return []
+/** 纵向布局：打击前/后对比行（仅 isPhaseCompare 时使用） */
+const verticalCompareMetricRows = computed((): VerticalCompareMetricRow[] => {
+  if (!props.vertical || !isPhaseCompare.value) return []
 
-  if (isPhaseCompare.value) {
-    const beforeRow = props.rows.find((r) => r.rowVariant === 'before')
-    const afterRow = props.rows.find((r) => r.rowVariant === 'after')
-    return props.columns.map((col) => ({
-      key: col.key,
-      label: col.label,
-      beforeCell: beforeRow?.cells[col.key],
-      afterCell: afterRow?.cells[col.key],
-    }))
-  }
+  const beforeRow = props.rows.find((r) => r.rowVariant === 'before')
+  const afterRow = props.rows.find((r) => r.rowVariant === 'after')
+  return props.columns.map((col) => ({
+    key: col.key,
+    label: col.label,
+    beforeCell: beforeRow?.cells[col.key],
+    afterCell: afterRow?.cells[col.key],
+  }))
+})
+
+/** 纵向布局：概要单行（非 phase 对比时使用） */
+const verticalSummaryMetricRows = computed((): VerticalSummaryMetricRow[] => {
+  if (!props.vertical || isPhaseCompare.value) return []
 
   const summaryRow = props.rows[0]
   return props.columns.map((col) => ({

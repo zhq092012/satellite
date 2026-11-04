@@ -2,7 +2,6 @@ import * as Cesium from 'cesium'
 import * as satellitejs from 'satellite.js'
 import { onBeforeUnmount, watch, type ComputedRef, type Ref, ref } from 'vue'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
-import { createOctagonStarExplosionDataUrl } from '@/utils/battleGlobeOctStar'
 import {
   BATTLE_GLOBE_ORBIT_PATH_WIDTH,
   createBattleGlobeOrbitGlowMaterial,
@@ -367,10 +366,6 @@ export const useBattleGlobeDeductionEffects = (
       return
     }
 
-    // 如果八角星图标 Data URL 为空，则创建八角星图标 Data URL
-    if (!octStarDataUrl) {
-      octStarDataUrl = createOctagonStarExplosionDataUrl(80)
-    }
 
     // 计算当前时刻毫秒
     const currentMs = currentTimeMsRef.value > 0 ? currentTimeMsRef.value : Date.now()
@@ -394,7 +389,7 @@ export const useBattleGlobeDeductionEffects = (
       id: DEDUCTION_EXPLOSION_ENTITY_ID,
       position: new Cesium.ConstantPositionProperty(position),
       billboard: {
-        image: octStarDataUrl,
+        image: '',
         scale: new Cesium.ConstantProperty(scale),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },

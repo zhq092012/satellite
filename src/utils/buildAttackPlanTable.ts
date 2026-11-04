@@ -7,6 +7,7 @@ export const ATTACK_PLAN_TOP_COUNT = 10
 
 /** 打击计划表格行 */
 export interface AttackPlanTableRow {
+  weaponType: string
   /** 行唯一标识 */
   id: string
   /** 目标名称（卫星或地面站） */
@@ -49,6 +50,7 @@ const toAttackPlanRow = (
     target: plan.target || '--',
     targetType: plan.targetType || '',
     weaponName: plan.weaponName || '--',
+    weaponType: plan.weaponType || '--',
     weaponId,
     beginTime,
     endTime,
@@ -72,12 +74,12 @@ export const buildAttackPlanTableRows = (
   const rows: AttackPlanTableRow[] = []
   let index = 0
 
-  ;(data.levelSeriesEntities || []).forEach((entity) => {
-    ;(entity?.attackPlanList || []).forEach((plan) => {
-      rows.push(toAttackPlanRow(plan, index, resolveWeaponIdByName(globeWeapons, plan.weaponName)))
-      index += 1
+    ; (data.levelSeriesEntities || []).forEach((entity) => {
+      ; (entity?.attackPlanList || []).forEach((plan) => {
+        rows.push(toAttackPlanRow(plan, index, resolveWeaponIdByName(globeWeapons, plan.weaponName)))
+        index += 1
+      })
     })
-  })
 
   return rows.sort((a, b) => {
     if (a.beginTimeMs !== b.beginTimeMs) return a.beginTimeMs - b.beginTimeMs
