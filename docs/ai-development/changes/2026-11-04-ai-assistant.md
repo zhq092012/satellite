@@ -14,7 +14,7 @@
 | `src/mock/ai/service.ts` | 新增 | 关键词识别和基于 Store 的回答组装 |
 | `src/api/ai/index.ts` | 新增 | `askAi` 门面，内部调用 Mock |
 | `src/composables/useAiAssistant.ts` | 新增 | 面板、会话、发送、停止、新建、清空 |
-| `src/components/ai-assistant/AiAssistant.vue` | 新增 | 悬浮按钮、右侧面板、提示词、输入框 |
+| `src/components/ai-assistant/AiAssistant.vue` | 新增 | 悬浮按钮、右侧面板、输入框上方的推荐问题按钮 |
 | `src/components/ai-assistant/renderers/MarkdownRenderer.vue` | 新增 | Markdown 渲染 |
 | `src/components/ai-assistant/renderers/TableRenderer.vue` | 新增 | 动态表格 |
 | `src/components/ai-assistant/renderers/ChartRenderer.vue` | 新增 | ECharts 柱状、折线、饼图 |
@@ -62,7 +62,7 @@
 
 1. `Dashboard.vue` 挂载 `AiAssistant`，组件把按钮和面板传送到 `body`。
 2. 用户打开面板。没有消息时展示 `AI_PROMPTS`。
-3. 点击提示词或按 Enter 调用 `sendMessage`。
+3. 点击输入框上方的推荐问题，或按 Enter 调用 `sendMessage`。
 4. `askAi` 调用 `buildAiAnswer`。
 5. Mock 用 `router.currentRoute` 写页面名，用 `activedTask` 写任务名。
 6. 威胁问题调用 `buildHomeThreatAnalysisRowsFromMatrix`。攻击问题调用 `buildHomeAttackAnalysisRowsFromMatrix`。方案问题读 `activeZhchPlan`。

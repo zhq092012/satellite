@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { AI_PROMPTS } from '@/mock/ai/prompts'
 import { useAiAssistant } from '@/composables/useAiAssistant'
-import type { AiContentBlock, AiMessage, AiPrompt } from '@/types/ai'
+import type { AiContentBlock, AiMessage } from '@/types/ai'
 import ChartRenderer from './renderers/ChartRenderer.vue'
 import MarkdownRenderer from './renderers/MarkdownRenderer.vue'
 import MetricRenderer from './renderers/MetricRenderer.vue'
@@ -33,25 +33,13 @@ const messages = computed(() => conversation.value.messages)
 const canSend = computed(() => draft.value.trim().length > 0 && !generating.value)
 
 /**
- * 悬浮按钮位置。面板打开时移到面板左侧，避免被 460px 面板盖住。
+ * 助手面板宽度。右侧卫星列表面板是 500px，这里略宽，打开后盖住它的左边框。
+ * 悬浮按钮在面板打开时移到面板左侧。
  */
+const AI_PANEL_WIDTH = 528
 const fabStyle = computed(() => ({
-  right: visible.value ? '484px' : '24px',
+  right: visible.value ? `${AI_PANEL_WIDTH + 24}px` : '24px',
 }))
-
-/**
- * 按分类整理提示词。分类缺失时归到「其他」，数据本身仍来自提示词文件。
- */
-const promptGroups = computed(() => {
-  const groups = new Map<string, AiPrompt[]>()
-  AI_PROMPTS.forEach((prompt) => {
-    const category = prompt.category ?? '其他'
-    const list = groups.get(category) ?? []
-    list.push(prompt)
-    groups.set(category, list)
-  })
-  return [...groups.entries()]
-})
 
 /**
  * 用户消息按纯文本展示，不把用户输入送进 Markdown 渲染。
@@ -97,15 +85,6 @@ function handleEnter() {
   void sendMessage()
 }
 
-/**
- * 点击提示词后直接发送，不先填进输入框。
- *
- * @param prompt 提示词
- */
-function handlePrompt(prompt: AiPrompt) {
-  void sendMessage(prompt.prompt)
-}
-
 watch(
   () => messages.value.map((message) => `${message.id}:${message.status}:${message.content.length}`).join('|'),
   () => {
@@ -126,7 +105,7 @@ watch(visible, (open) => {
         <span>AI</span>
       </button>
 
-      <section v-if="visible" class="ai-panel" aria-label="AI 助手">
+      <section v-if="visible" class="ai-panel" :style="{ width: `${AI_PANEL_WIDTH}px` }" aria-label="AI 助手">
         <header class="ai-header">
           <div class="ai-header-title">
             <strong>AI 助手</strong>
@@ -142,24 +121,6 @@ watch(visible, (open) => {
         </header>
 
         <div ref="messageScroller" class="ai-messages">
-          <div v-if="messages.length === 0" class="ai-prompts">
-            <p class="ai-prompts-lead">可以选择一个问题，或在下方直接输入。</p>
-            <section v-for="[category, prompts] in promptGroups" :key="category" class="ai-prompt-group">
-              <h3>{{ category }}</h3>
-              <button
-                v-for="prompt in prompts"
-                :key="prompt.id"
-                type="button"
-                class="ai-prompt"
-                :disabled="generating"
-                @click="handlePrompt(prompt)"
-              >
-                <span class="ai-prompt-title">{{ prompt.title }}</span>
-                <span v-if="prompt.description" class="ai-prompt-desc">{{ prompt.description }}</span>
-              </button>
-            </section>
-          </div>
-
           <article
             v-for="message in messages"
             :key="message.id"
@@ -198,6 +159,18 @@ watch(visible, (open) => {
         </div>
 
         <footer class="ai-footer">
+          <div class="ai-prompt-row">
+            <button
+              v-for="prompt in AI_PROMPTS"
+              :key="prompt.id"
+              type="button"
+              class="ai-prompt-chip"
+              :disabled="generating"
+              @click="sendMessage(prompt.prompt)"
+            >
+              {{ prompt.prompt }}
+            </button>
+          </div>
           <textarea
             v-model="draft"
             class="ai-input"
@@ -247,10 +220,10 @@ watch(visible, (open) => {
   z-index: 100010;
   display: flex;
   flex-direction: column;
-  width: 460px;
   height: calc(100vh - 60px);
   border-left: 1px solid rgba(125, 211, 252, 0.28);
-  background: #0b1528;
+  background: rgba(11, 21, 40, 0.86);
+  backdrop-filter: blur(8px);
   color: #e2e8f0;
   box-shadow: -12px 0 32px rgba(2, 6, 23, 0.45);
   pointer-events: auto;
@@ -296,53 +269,28 @@ watch(visible, (open) => {
   padding: 16px;
 }
 
-.ai-prompts-lead {
-  margin: 0 0 12px;
-  color: #94a3b8;
-  font-size: 13px;
-}
-
-.ai-prompt-group {
-  margin-bottom: 14px;
-
-  h3 {
-    margin: 0 0 8px;
-    color: #7dd3fc;
-    font-size: 13px;
-    font-weight: 600;
-  }
-}
-
-.ai-prompt {
+.ai-prompt-row {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 8px;
-  padding: 10px 12px;
-  border: 1px solid rgba(56, 189, 248, 0.28);
-  border-radius: 8px;
+}
+
+.ai-prompt-chip {
+  padding: 4px 8px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 6px;
   background: rgba(15, 23, 42, 0.65);
-  color: inherit;
+  color: #e2e8f0;
+  font-size: 12px;
+  line-height: 1.4;
   text-align: left;
   cursor: pointer;
 }
 
-.ai-prompt:disabled {
+.ai-prompt-chip:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.ai-prompt-title {
-  color: #f8fafc;
-  font-size: 13px;
-}
-
-.ai-prompt-desc {
-  margin-top: 4px;
-  color: #94a3b8;
-  font-size: 12px;
-  line-height: 1.4;
+  opacity: 0.55;
 }
 
 .ai-message {
