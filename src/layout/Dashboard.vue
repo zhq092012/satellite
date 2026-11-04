@@ -89,7 +89,7 @@
         </el-main>
       </el-scrollbar>
     </el-container>
-
+    <AiAssistant />
   </el-container>
 </template>
 
@@ -99,6 +99,7 @@ import { type RouteRecordRaw, useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowDown, Folder, Setting, SwitchButton } from '@element-plus/icons-vue'
 import MenuTree from './MenuTree.vue'
+import AiAssistant from '@/components/ai-assistant/AiAssistant.vue'
 import { logout as logoutApi, type MenuItem } from '@/api/auth'
 import { useAuthStore } from '@/store/modules/auth'
 import { useLayoutStore } from '@/store/modules/layout'
