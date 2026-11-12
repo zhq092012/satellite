@@ -122,6 +122,23 @@ export function useAiAssistant() {
 }
 
 /**
+ * 生成会话或消息 ID。
+ *
+ * `crypto.randomUUID` 只在 localhost 和 HTTPS 上存在。用 IP 以 HTTP 打开时它是 undefined，
+ * 模块加载就会抛错，路由无法启动。`getRandomValues` 在这种地址上仍然可用。
+ *
+ * @returns UUID 字符串
+ */
+function createId(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
+/**
  * 创建一条空会话。
  *
  * @returns 标题为「新会话」的会话
@@ -129,7 +146,7 @@ export function useAiAssistant() {
 function createConversation(): AiConversation {
   const time = nowText()
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     title: '新会话',
     messages: [],
     createTime: time,
@@ -146,7 +163,7 @@ function createConversation(): AiConversation {
  */
 function createUserMessage(question: string, createTime: string): AiMessage {
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     role: 'user',
     status: 'completed',
     createTime,
@@ -162,7 +179,7 @@ function createUserMessage(question: string, createTime: string): AiMessage {
  */
 function createLoadingMessage(createTime: string): AiMessage {
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     role: 'assistant',
     status: 'loading',
     createTime,

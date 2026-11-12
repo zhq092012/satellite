@@ -145,7 +145,6 @@ const tablePayload = computed((): { rows: HomeThreatAnalysisTableRow[]; source: 
 })
 
 const tableRows = computed(() => tablePayload.value.rows)
-const dataSource = computed(() => tablePayload.value.source)
 </script>
 
 <style scoped lang="scss">

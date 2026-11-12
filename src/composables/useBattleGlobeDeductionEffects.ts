@@ -27,8 +27,6 @@ const DEDUCTION_CAMERA_RANGE = 12_000_000
 /** 推演跟随相机俯仰角：正俯视（与战场初始俯视一致） */
 const DEDUCTION_CAMERA_PITCH = Cesium.Math.toRadians(-90)
 
-/** 八角星图标 Data URL（懒加载） */
-let octStarDataUrl: string | null = null
 
 /**
  * 推演播放期间的 Cesium 特效：一轨轨迹、过站虚线、星打击爆炸。

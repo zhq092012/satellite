@@ -94,7 +94,7 @@ const tablePayload = computed((): { rows: HomeAttackAnalysisTableRow[]; source: 
   if (analysisReady.value && analysisData.value) {
     const fromMatrix = buildHomeAttackAnalysisRowsFromMatrix(
       analysisData.value,
-      task.id,
+      task.id!,
       priorityCountries.value,
       store.c2ResourceSatelliteRows,
     )
