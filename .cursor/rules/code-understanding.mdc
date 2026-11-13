@@ -207,3 +207,39 @@ Cesium 渲染
 4. 不确定的内容必须明确标记。
 5. 不得将推测写成已经验证的事实。
 6. 代码与文档不一致时，以实际代码为准，并修正文档。
+
+## 13. 类型声明必须写注释
+
+本次新增或修改到的 `type`、`interface`、`enum` 必须带注释。不要为了补注释去改这次没有涉及的声明。
+
+1. 声明本身用块注释说明它代表的业务概念。
+2. 字符串字面量联合类型的每个取值单独注释，说明这个取值在业务上是什么。
+3. `interface` 和对象型 `type` 的每个字段单独注释。
+4. `enum` 的每个成员单独注释。
+5. 注释写业务含义。不要只重复类型名或字段名。
+
+```ts
+// 不允许：联合类型和每个取值都没有注释
+export type TimelineChainMarkerType =
+  | 'task_start'
+  | 'first_transmit'
+  | 'jam'
+  | 'post_chain_finish'
+  | 'all_blocked'
+  | 'task_end'
+
+/** 时间轴上用于切换全链路展示的关键点 */
+export type TimelineChainMarkerType =
+  /** 任务开始 */
+  | 'task_start'
+  /** 最早开始传输 */
+  | 'first_transmit'
+  /** 遭受干扰 */
+  | 'jam'
+  /** 打击后最早全链路完成 */
+  | 'post_chain_finish'
+  /** 全部链路被阻断 */
+  | 'all_blocked'
+  /** 任务结束 */
+  | 'task_end'
+```
