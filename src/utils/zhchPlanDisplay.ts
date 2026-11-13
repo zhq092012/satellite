@@ -94,14 +94,6 @@ export function splitDateTimeDisplay(timeText?: string | null): DateTimeDisplayP
 }
 
 /**
- * 计算打击前后最早回传时间造成的延迟时长（打击后 - 打击前）
- * 格式为 xx时xx分xx秒
- *
- * @param beforeTime 打击前最早回传时间
- * @param afterTime 打击后最早回传时间
- * @returns 格式化后的延迟文本（如 "31时54分0秒"、"15分10秒"、"0秒" 或 "--"）
- */
-/**
  * 从回传时间字段中解析展示用时间与链路描述。
  * 示例：`2026-09-17 09:28:09(starshield122->威尔克斯巴里站)`
  *
@@ -204,7 +196,14 @@ export function formatCoverageReduction(beforeCoverage?: number | null, afterCov
   const reduction = Number(beforeCoverage) - Number(afterCoverage)
   return `${reduction.toFixed(2)}%`
 }
-
+/**
+ * 计算打击前后最早回传时间造成的延迟时长（打击后 - 打击前）
+ * 格式为 xx时xx分xx秒
+ *
+ * @param beforeTime 打击前最早回传时间
+ * @param afterTime 打击后最早回传时间
+ * @returns 格式化后的延迟文本（如 "31时54分0秒"、"15分10秒"、"0秒" 或 "--"）
+ */
 export function formatInterferenceDelay(beforeTime?: string | null, afterTime?: string | null): string {
   if (!beforeTime || !afterTime) return '--'
   const beforeMs = parseFeedbackTimestamp(beforeTime)
