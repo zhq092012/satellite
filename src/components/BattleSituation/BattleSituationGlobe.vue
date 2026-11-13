@@ -576,12 +576,18 @@ const initViewer = async () => {
     })
 
     viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
-    viewer.imageryLayers.addImageryProvider(
-      new Cesium.UrlTemplateImageryProvider({
-        url: `${MATERIAL_URL}/{z}/{x}/{y}.png`,
-        credit: 'credit',
-      })
-    )
+    /**
+     * 仅生产构建加载自定义地球影像瓦片。
+     * 开发模式不请求 VITE_MATERIAL_URL，配合 baseLayer: false 使用无贴图地球，加快本地启动并避免代理未就绪时报错。
+     */
+    if (import.meta.env.PROD) {
+      viewer.imageryLayers.addImageryProvider(
+        new Cesium.UrlTemplateImageryProvider({
+          url: `${MATERIAL_URL}/{z}/{x}/{y}.png`,
+          credit: 'credit',
+        })
+      )
+    }
     // 不参与地球深度检测
     viewer.scene.globe.depthTestAgainstTerrain = false
     // 不显示地球边缘
