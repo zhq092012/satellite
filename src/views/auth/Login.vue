@@ -4,8 +4,8 @@
       <div class="brand-block">
         <div class="brand-badge">C4</div>
         <p class="brand-kicker">SECURE ACCESS</p>
-        <h1>卫星态势指挥平台</h1>
-        <p class="brand-subtitle">保密环境登录 · 态势感知与任务协同</p>
+        <h1>目标选择推荐系统</h1>
+        <p class="brand-subtitle">保密环境登录 · 目标选择推荐与任务协同</p>
       </div>
 
       <el-card class="login-card" shadow="always">
@@ -16,15 +16,8 @@
           </el-form-item>
 
           <el-form-item label="密码" prop="password">
-            <el-input
-              v-model="form.password"
-              type="password"
-              placeholder="请输入密码"
-              size="large"
-              show-password
-              autocomplete="current-password"
-              @keyup.enter="handleLogin"
-            />
+            <el-input v-model="form.password" type="password" placeholder="请输入密码" size="large" show-password
+              autocomplete="current-password" @keyup.enter="handleLogin" />
           </el-form-item>
 
           <el-button :loading="loading" type="primary" size="large" class="login-button" @click="handleLogin">
