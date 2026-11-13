@@ -28,6 +28,11 @@ const tabNameMap: Record<string, string> = {
   MenuManage: 'menus',
 }
 
+/**
+ * 计算系统管理当前页签。
+ * 返回子路由名称对应的 users、roles 或 menus，无法识别时返回 users。setter 不改状态。
+ * 作用：页签高亮跟随当前子路由。
+ */
 const activeTab = computed({
   get: () => tabNameMap[String(route.name ?? '')] ?? 'users',
   set: () => undefined,

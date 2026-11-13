@@ -243,3 +243,59 @@ export type TimelineChainMarkerType =
   /** 任务结束 */
   | 'task_end'
 ```
+
+## 14. watch 和 computed 必须写注释
+
+每一个 `watch`、`watchEffect`、`computed` 都必须有块注释。注释写业务含义，不要只重复变量名。
+
+本次新增或修改到的必须补齐。不要为了补注释去改这次没有涉及的 `watch` 或 `computed`。
+
+### watch
+
+注释必须说明：
+
+1. 监听什么。
+2. 回调返回什么。没有返回值或清理函数时写明不返回。
+3. 作用是什么。
+
+```ts
+// 不允许
+watch(() => store.activedTask?.id, (taskId) => {
+  loadTaskAnalysis(taskId)
+})
+
+/**
+ * 监听当前任务 ID。
+ * 回调不返回清理函数。
+ * 作用：任务切换后重新拉取该任务的威胁矩阵。
+ */
+watch(() => store.activedTask?.id, (taskId) => {
+  loadTaskAnalysis(taskId)
+})
+```
+
+`watchEffect` 没有单独的监听源。注释改为说明依赖哪些响应式数据、回调返回什么、作用是什么。
+
+### computed
+
+注释必须说明：
+
+1. 计算什么。
+2. 返回什么。
+3. 作用是什么。
+
+```ts
+// 不允许
+const analysisReady = computed(
+  () => store.taskAnalysisTaskId === store.activedTask?.id && !!store.taskAnalysisData,
+)
+
+/**
+ * 计算当前任务的分析矩阵是否已经就绪。
+ * 返回 boolean。矩阵属于当前任务且有数据时为 true。
+ * 作用：威胁度表格据此决定展示矩阵行还是空状态。
+ */
+const analysisReady = computed(
+  () => store.taskAnalysisTaskId === store.activedTask?.id && !!store.taskAnalysisData,
+)
+```

@@ -79,8 +79,9 @@ const resolveItemHeight = (item: T, index: number): number => {
 }
 
 /**
- * 前缀高度表：offsets[i] 为前 i 条的累计高度，长度为 n+1。
- * 固定行高时不构建完整表，仅在取值函数中按乘法计算。
+ * 计算：存在 getItemHeight 时为 props.items 构建前缀累计高度表 offsets[i]。
+ * 返回：number[] | null；固定行高时为 null。
+ * 作用：支持变高列表的 getOffsetTop 与可视窗口起止索引计算。
  */
 const itemOffsets = computed(() => {
   if (!props.getItemHeight) return null
@@ -105,7 +106,11 @@ const getOffsetTop = (index: number): number => {
   return Math.max(0, index) * Math.max(1, props.itemHeight)
 }
 
-/** 列表总高度，撑开滚动条。 */
+/**
+ * 计算：列表内容总高度（前缀表末项或 items.length × itemHeight）。
+ * 返回：number。
+ * 作用：撑开滚动容器占位高度。
+ */
 const totalHeight = computed(() => {
   const offsets = itemOffsets.value
   if (offsets) return offsets[offsets.length - 1] || 0
@@ -145,7 +150,11 @@ const findStartIndex = (offsets: number[], top: number): number => {
   return low
 }
 
-/** 当前需要挂载的可视窗口条目。 */
+/**
+ * 计算：根据 scrollTop、viewportHeight、overscan 与行高模式确定应渲染的列表项窗口。
+ * 返回：VirtualScrollEntry<T>[]；items 为空时 []。
+ * 作用：虚拟列表实际挂载的子项与 key/高度元数据。
+ */
 const visibleEntries = computed<VirtualScrollEntry<T>[]>(() => {
   const count = props.items.length
   if (!count) return []
@@ -180,7 +189,11 @@ const visibleEntries = computed<VirtualScrollEntry<T>[]>(() => {
   return entries
 })
 
-/** 可视窗口相对列表顶部的偏移。 */
+/**
+ * 计算：当前可视窗口首条 visibleEntries 相对列表顶部的 Y 偏移。
+ * 返回：number；无可见条目时为 0。
+ * 作用：通过 translateY 定位虚拟内容层。
+ */
 const offsetY = computed(() => {
   if (!visibleEntries.value.length) return 0
   return getOffsetTop(visibleEntries.value[0].index)
@@ -217,6 +230,11 @@ const scrollToKey = (key: string | number | null | undefined) => {
 
 let resizeObserver: ResizeObserver | null = null
 
+/**
+ * 监听：props.items.length。
+ * 返回：回调不返回清理函数。
+ * 作用：列表长度变化后在 nextTick 同步视口高度，滚动越界时重置 scrollTop。
+ */
 watch(
   () => props.items.length,
   () => {

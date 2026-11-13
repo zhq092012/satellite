@@ -25,7 +25,21 @@ import {
 type LayoutStore = ReturnType<typeof useLayoutStore>
 
 /** 问题意图。更具体的规则在 detectIntent 里优先匹配。 */
-type AiIntent = 'threat-top' | 'threat-distribution' | 'attack' | 'plan' | 'task' | 'satellite' | 'fallback'
+type AiIntent =
+  /** 威胁度最高的卫星 */
+  | 'threat-top'
+  /** 威胁度按国家分布 */
+  | 'threat-distribution'
+  /** 攻击能力 */
+  | 'attack'
+  /** 当前打击方案 */
+  | 'plan'
+  /** 任务整体或综合分析 */
+  | 'task'
+  /** 指定卫星或当前选中卫星 */
+  | 'satellite'
+  /** 无法对应到以上意图 */
+  | 'fallback'
 
 /** 当前任务是否已经有可引用的分析矩阵 */
 interface AnalysisRead {

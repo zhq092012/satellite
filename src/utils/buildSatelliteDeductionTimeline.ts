@@ -25,25 +25,39 @@ import * as satellitejs from 'satellite.js'
 // 本函数主要用于构建推演时间轴，将推演事件按照时间顺序排列，并构建推演提示文本。
 //-----------------------------------------------------------------------
 
-/** 推演事件类型（用于同刻排序） */
+/** 推演事件类型。同一时刻按 battlePass、stationPass、satelliteStrike、receiveStrike、metricChange 的顺序排列。 */
 export type SatelliteDeductionEventKind =
-  | 'battlePass'// 经过战场
-  | 'stationPass'// 经过接收站
-  | 'satelliteStrike'// 打击卫星
-  | 'receiveStrike'// 打击接收站
-  | 'metricChange'// 指标变化
+  /** 经过战场 */
+  | 'battlePass'
+  /** 经过接收站 */
+  | 'stationPass'
+  /** 打击卫星 */
+  | 'satelliteStrike'
+  /** 打击接收站 */
+  | 'receiveStrike'
+  /** 威胁度、时延或覆盖率发生变化 */
+  | 'metricChange'
 
-/** 推演提示高亮类型 */
+/** 推演提示中一段文字的高亮类别 */
 export type DeductionHighlightKind =
-  | 'satellite'// 卫星
-  | 'event'// 事件
-  | 'threat'// 威胁度
-  | 'delay'// 链路时延
-  | 'coverage'// 覆盖率
-  | 'time'// 时间
-  | 'weapon'// 武器
-  | 'station'// 接收站
-  | 'default'// 默认
+  /** 卫星名称 */
+  | 'satellite'
+  /** 事件动作，例如经过战场、被打击 */
+  | 'event'
+  /** 威胁度数值 */
+  | 'threat'
+  /** 链路时延数值 */
+  | 'delay'
+  /** 覆盖率数值 */
+  | 'coverage'
+  /** 时刻 */
+  | 'time'
+  /** 武器名称 */
+  | 'weapon'
+  /** 接收站名称 */
+  | 'station'
+  /** 其余说明文字 */
+  | 'default'
 
 /** 推演提示片段（单段可高亮） */
 export interface DeductionToastSegment {

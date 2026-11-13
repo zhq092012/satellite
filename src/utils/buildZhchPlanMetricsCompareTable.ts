@@ -1,5 +1,13 @@
-/** 指标差值颜色语义（相对打击效果） */
-export type ZhchPlanMetricDeltaTone = 'neutral' | 'favorable' | 'adverse' | 'warning'
+/** 指标差值的颜色语义，相对打击效果 */
+export type ZhchPlanMetricDeltaTone =
+  /** 打击前后没有差别，或该指标不比较优劣 */
+  | 'neutral'
+  /** 打击后变化对己方有利 */
+  | 'favorable'
+  /** 打击后变化对己方不利 */
+  | 'adverse'
+  /** 警示色，界面为黄色。当前比较逻辑不赋值这个取值。 */
+  | 'warning'
 
 /** 单个单元格展示 */
 export interface ZhchPlanMetricCell {
@@ -15,7 +23,11 @@ export interface ZhchPlanMetricCell {
 
 /** 对比表一行（打击前 / 打击后） */
 export interface ZhchPlanMetricCompareRow {
-  /** 行标识 */
+  /**
+   * 行标识。
+   * before：打击前。
+   * after：打击后。
+   */
   phase: 'before' | 'after'
   /** 行标题 */
   phaseLabel: string
@@ -45,7 +57,12 @@ export interface ZhchPlanMetricsTableRowView {
   rowKey: string
   /** 首列标签（可选） */
   rowLabel?: string
-  /** 行样式：打击前 / 打击后 / 概要 */
+  /**
+   * 行样式。
+   * before：打击前。
+   * after：打击后。
+   * summary：概要。
+   */
   rowVariant?: 'before' | 'after' | 'summary'
   /** 是否展示单元格差值子行 */
   showDelta?: boolean

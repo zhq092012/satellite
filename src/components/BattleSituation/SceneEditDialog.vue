@@ -136,7 +136,11 @@ const formRules = reactive<FormRules<BattleForm>>({
   description: [{ required: true, message: '请输入场景概述', trigger: 'blur' }],
 })
 
-/** 对话框显隐双向绑定。 */
+/**
+ * 计算：场景编辑弹窗是否显示。
+ * 返回：getter 为 `props.modelValue`；setter 通过 `update:modelValue` 写入父组件。
+ * 作用：`v-model` 双向绑定弹窗开合。
+ */
 const visible = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value),
@@ -376,6 +380,11 @@ const handleClosed = () => {
   committed.value = false
 }
 
+/**
+ * 监听：弹窗 `modelValue` 开合。
+ * 返回：回调不返回清理函数。
+ * 作用：打开弹窗时用当前场景或空白模板填充表单。
+ */
 watch(
   () => props.modelValue,
   (open) => {

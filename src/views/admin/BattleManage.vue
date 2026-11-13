@@ -240,7 +240,9 @@ const toggleBattleExpand = (id?: number) => {
 }
 
 /**
- * 监视 activeNames 展开项并自动加载对应的任务列表
+ * 监听：战役折叠面板展开项 `activeNames`（`deep: true`）。
+ * 返回：回调不返回清理函数。
+ * 作用：展开某战役时为该 `battleId` 拉取任务列表、恢复轮询并写回 `battleList` 对应项。
  */
 watch(
   activeNames,

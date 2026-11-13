@@ -60,8 +60,12 @@ export interface HomeThreatAnalysisTableRow {
   compositeThreatSort: number | null
 }
 
-/** 表格数据来源说明 */
-export type HomeThreatAnalysisDataSource = 'matrix' | 'mock'
+/** 威胁度分析表的数据来源 */
+export type HomeThreatAnalysisDataSource =
+  /** 当前任务分析矩阵 */
+  | 'matrix'
+  /** 矩阵为空时使用的演示行 */
+  | 'mock'
 
 const EMPTY = '--'
 

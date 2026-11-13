@@ -330,6 +330,11 @@ export const useBattleGlobeWeapons = (
     postUpdateRemover = null
   }
 
+  /**
+   * 监听：Cesium Viewer 引用。
+   * 返回：回调不返回清理函数。
+   * 作用：Viewer 可用时注册 postUpdate 并重建武器点位。
+   */
   watch(
     () => viewerRef.value,
     (viewer) => {
@@ -342,6 +347,11 @@ export const useBattleGlobeWeapons = (
     { immediate: true }
   )
 
+  /**
+   * 监听：武器列表 Ref（深度）。
+   * 返回：回调不返回清理函数。
+   * 作用：武器数据变化时重建地球点位。
+   */
   watch(
     weaponsRef,
     () => {
@@ -350,6 +360,11 @@ export const useBattleGlobeWeapons = (
     { deep: true }
   )
 
+  /**
+   * 监听：选中武器 ID Ref。
+   * 返回：回调不返回清理函数。
+   * 作用：选中时飞行到武器并更新高亮 visual。
+   */
   watch(selectedWeaponIdRef, (weaponId) => {
     if (weaponId) flyToWeapon(weaponId)
     updateWeaponVisuals()

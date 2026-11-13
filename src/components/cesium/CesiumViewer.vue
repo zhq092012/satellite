@@ -343,7 +343,11 @@ const scratchCameraDir = new Cesium.Cartesian3()
 const scratchSatelliteDir = new Cesium.Cartesian3()
 const scratchSatPosition = new Cesium.Cartesian3()
 
-/** 敌方矩阵卫星 NORAD 快速索引映射（O(1) 查找，彻底消除每帧 N 次数组 find 线性遍历） */
+/**
+ * 计算：由 props.matrixData.initMatrixList 构建 NORAD → 矩阵卫星项的索引映射。
+ * 返回：Map<number, initMatrixList 单项类型>。
+ * 作用：渲染与查询时对敌方矩阵卫星做 O(1) 查找，避免每帧线性遍历列表。
+ */
 const matrixSatMap = computed(() => {
   const map = new Map<number, NonNullable<typeof props.matrixData>['initMatrixList'][number]>()
   const list = props.matrixData?.initMatrixList || []
@@ -676,7 +680,11 @@ const flyToInfrastructureNode = (node: InfrastructureLocation) => {
 
 
 
-// 监听 store 中选中的地面基础设施节点，如果外部选择变更则定位相机
+/**
+ * 监听：store.selectedInfrastructureNode。
+ * 返回：回调不返回清理函数。
+ * 作用：外部选中地面基础设施节点时调用 flyToInfrastructureNode 定位相机。
+ */
 watch(
   () => store.selectedInfrastructureNode,
   (newNode) => {
@@ -1599,8 +1607,9 @@ const scheduleInfrastructureRender = () => {
 }
 
 /**
- * [功能]
- * 监听矩阵数据变化，触发 3D 电子信息网络与连线更新
+ * 监听：props.matrixData。
+ * 返回：回调不返回清理函数。
+ * 作用：矩阵数据变化时调用 scheduleInfrastructureRender 更新地面站、卫星与连线渲染。
  */
 watch(
   () => props.matrixData,
@@ -1723,6 +1732,11 @@ const setClockPlaying = (playing: boolean, multiplier?: number) => {
   viewer.scene.requestRender()
 }
 
+/**
+ * 监听：store.activedTask 的 id、beginDate、endDate。
+ * 返回：回调不返回清理函数。
+ * 作用：任务或任务时间范围变化时重新初始化 Cesium 时钟并同步轨道动画/定格模式。
+ */
 watch(
   () => [store.activedTask?.id, store.activedTask?.beginDate, store.activedTask?.endDate],
   () => {
@@ -1993,7 +2007,11 @@ const highlightSatellite = (sate: { norad_id: string }, skipFlyTo = false) => {
 
 
 
-// 监听 selectedNorad 属性，联动更新时钟模式（相机飞赴由父组件在时间轴同步后触发）
+/**
+ * 监听：props.selectedNorad。
+ * 返回：回调不返回清理函数。
+ * 作用：选中卫星变化时同步时钟播放/定格；未选中时清除卫星高亮（相机飞赴由父组件触发）。
+ */
 watch(
   () => props.selectedNorad,
   (newNorad) => {

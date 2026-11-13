@@ -44,7 +44,11 @@ interface MenuTabItem {
   path: string
 }
 
-/** [变量说明] 当前激活的菜单项 Key（与 Store 同步） */
+/**
+ * 计算当前激活的分析页 key。
+ * 返回 store.mainActiveTab。setter 写回 store.setMainActiveTab。
+ * 作用：顶栏选中项与 Store 中的分析页保持一致。
+ */
 const activeTab = computed({
   get: () => store.mainActiveTab,
   set: (key: string) => store.setMainActiveTab(key),
@@ -67,7 +71,9 @@ const tabKeyByPath = Object.fromEntries(menuTabs.map((item) => [item.path, item.
 const pathByTabKey = Object.fromEntries(menuTabs.map((item) => [item.key, item.path])) as Record<string, string>
 
 /**
- * 根据当前路由同步激活的分析页。
+ * 监听当前路由 path。immediate 为 true，进入页面时也会执行。
+ * 回调不返回清理函数。
+ * 作用：路由对应某个分析页且与 Store 不一致时，把激活页改成该路由。
  */
 watch(
   () => route.path,
@@ -81,7 +87,9 @@ watch(
 )
 
 /**
- * Store 内跳转分析页时，同步顶栏路由。
+ * 监听 Store 中的当前分析页 key。
+ * 回调不返回清理函数。
+ * 作用：分析页 key 对应的路由与当前地址不同时，跳转到该分析页。
  */
 watch(
   () => store.mainActiveTab,
@@ -93,7 +101,11 @@ watch(
   },
 )
 
-/** [计算属性说明] 动态组件引用 */
+/**
+ * 计算当前分析页要渲染的组件。
+ * 返回 menuTabs 中与 activeTab 匹配的组件；找不到时返回 BattleSituation。
+ * 作用：主区域按当前分析页切换态势、威胁、攻击或方案组件。
+ */
 const currentComponent = computed<Component>(() => {
   const targetTab = menuTabs.find((item) => item.key === activeTab.value)
   return targetTab ? targetTab.component : BattleSituation

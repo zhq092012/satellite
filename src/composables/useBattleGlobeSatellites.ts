@@ -420,6 +420,11 @@ export const useBattleGlobeSatellites = (
     postUpdateRemover = null
   }
 
+  /**
+   * 监听：Cesium Viewer 引用。
+   * 返回：回调不返回清理函数。
+   * 作用：Viewer 生命周期内注册 postUpdate 并重建卫星 Point 集合。
+   */
   watch(
     () => viewerRef.value,
     (viewer) => {
@@ -432,6 +437,11 @@ export const useBattleGlobeSatellites = (
     { immediate: true }
   )
 
+  /**
+   * 监听：卫星列表 Ref（深度）。
+   * 返回：回调不返回清理函数。
+   * 作用：卫星数据变更时重建点位 Primitive/Entity。
+   */
   watch(
     satellitesRef,
     () => {
@@ -440,19 +450,39 @@ export const useBattleGlobeSatellites = (
     { deep: true }
   )
 
+  /**
+   * 监听：当前时刻毫秒 Ref。
+   * 返回：回调不返回清理函数。
+   * 作用：时刻推进时更新卫星位置与样式。
+   */
   watch(currentTimeMsRef, () => {
     updateSatelliteVisuals()
   })
 
+  /**
+   * 监听：选中卫星 NORAD Ref。
+   * 返回：回调不返回清理函数。
+   * 作用：选中变化时可选 `flyTo` 并刷新高亮/visual。
+   */
   watch(selectedNoradRef, (norad) => {
     if (norad && followSelectedRef.value) flyToSatellite(norad)
     updateSatelliteVisuals()
   })
 
+  /**
+   * 监听：需隐藏点位的 NORAD（如爆炸）Ref。
+   * 返回：回调不返回清理函数。
+   * 作用：隐藏指定卫星点位显示。
+   */
   watch(hidePointNoradRef, () => {
     updateSatelliteVisuals()
   })
 
+  /**
+   * 监听：任务时间轴是否播放中 Ref。
+   * 返回：回调不返回清理函数。
+   * 作用：播放态变化时调整卫星可视化。
+   */
   watch(timelinePlaybackActiveRef, () => {
     updateSatelliteVisuals()
   })

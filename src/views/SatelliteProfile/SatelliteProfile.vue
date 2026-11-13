@@ -1084,11 +1084,21 @@ const emit = defineEmits<{
   (event: 'update:modelValue', value: boolean): void
 }>()
 
+/**
+ * 计算：卫星详情弹窗可见性，含 getter/setter。
+ * 返回：getter 为 `props.modelValue`；setter 通过 `emit('update:modelValue')` 回写父组件。
+ * 作用：弹窗 v-model 双向绑定与打开状态驱动数据加载 watch。
+ */
 const dialogVisible = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value),
 })
 
+/**
+ * 计算：当前档案对应的 NORAD 编号（数值）。
+ * 返回：可解析为有限数字的 NORAD，否则 `NaN`。
+ * 作用：各类卫星详情、威胁、打击、TLE 等接口请求的主键。
+ */
 const norad = computed(() => {
   const rawNorad = props.norad
   if (rawNorad === null || rawNorad === undefined || rawNorad === '') return NaN
@@ -1463,7 +1473,12 @@ const activeSJ = ref('相关事件')
 const activeZB = ref('装备优势')
 const activeCs1 = ref('成像载荷参数')
 const activeCs2 = ref('遥感载荷参数')
-type CognitionSectionKey = 'cognitionAdvantage' | 'cognitionWeakness'
+/** 卫星画像认知条目所属栏目 */
+type CognitionSectionKey =
+  /** 装备优势 */
+  | 'cognitionAdvantage'
+  /** 装备弱点 */
+  | 'cognitionWeakness'
 type CognitionItem = SatelliteAdvantageOrDisadvantage['cognitionAdvantage'][number]
 
 const createEmptySatelliteProfile = (): SatelliteAdvantageOrDisadvantage => ({
@@ -1507,14 +1522,34 @@ const intelligenceEditorVisible = ref(false)
 const intelligenceSaving = ref(false)
 const intelligenceDraft = ref<SatelliteProfileIntelligence>(createEmptyIntelligence())
 const intelligenceSelectedFile = ref<File | null>(null)
+/**
+ * 计算：情报编辑草稿中媒体字段的可访问 URL。
+ * 返回：`resolveIntelligenceMediaUrl` 解析 `intelligenceDraft.img` 的结果。
+ * 作用：编辑弹窗内预览已保存或回填的媒体地址。
+ */
 const currentIntelligenceMediaUrl = computed(() => resolveIntelligenceMediaUrl(intelligenceDraft.value.img))
+/**
+ * 计算：用户新选情报附件的文件名展示文案。
+ * 返回：所选 `File.name`，无文件时为空字符串。
+ * 作用：上传区提示当前待提交的文件名。
+ */
 const intelligenceSelectedFileName = computed(() => intelligenceSelectedFile.value?.name || '')
+/**
+ * 计算：情报类型对应的文件选择 `accept` 属性。
+ * 返回：图片/视频/音频类型分别为对应 MIME 通配，否则 `*`。
+ * 作用：限制上传控件可选的文件类型与草稿类型一致。
+ */
 const intelligenceFileAccept = computed(() => {
   if (intelligenceDraft.value.type === '图片') return 'image/*'
   if (intelligenceDraft.value.type === '视频') return 'video/*'
   if (intelligenceDraft.value.type === '音频') return 'audio/*'
   return '*'
 })
+/**
+ * 计算：情报警报—QB 集成列表（视频/图片/音频类情报）。
+ * 返回：映射后的展示项数组（含媒体 URL、格式化时间等）。
+ * 作用：QB 集成 Tab 卡片列表数据源。
+ */
 const qbjcList = computed(() => {
   return satelliteIntelligence.value
     .filter((item) => item.type === '视频' || item.type === '图片' || item.type === '音频')
@@ -1529,6 +1564,11 @@ const qbjcList = computed(() => {
       time: dayjs(item.createTime).format('YYYY年MM月DD日'),
     }))
 })
+/**
+ * 计算：分支情报文字类条目列表。
+ * 返回：类型为「文字」的情报映射展示项数组。
+ * 作用：分支情报 Tab 文字卡片数据源。
+ */
 const fzqbList = computed(() => {
   return satelliteIntelligence.value
     .filter((item) => item.type === '文字')
@@ -1655,6 +1695,11 @@ async function initCharts1() {
   }
   option && charts1.setOption(option)
 }
+/**
+ * 监听：档案内一级 Tab 名称 `activeName`。
+ * 返回：回调不返回清理函数。
+ * 作用：切换到特定 Tab 时初始化图表/网络图、分页加载 TLE 或懒加载打击数据。
+ */
 watch(activeName, () => {
   if (activeName.value === '特殊行为分析') {
     nextTick(() => {
@@ -1693,13 +1738,33 @@ const editingCognitionSection = ref<CognitionSectionKey | null>(null)
 const editingCognitionIndex = ref<number | null>(null)
 const selectedDerivativeIndex = ref(0)
 const editingDerivativeIndex = ref<number | null>(null)
+/**
+ * 计算：装备认知编辑区当前对应的 Store 字段键。
+ * 返回：`activeZB` 为「装备优势」时 `cognitionAdvantage`，否则 `cognitionWeakness`。
+ * 作用：读写可编辑档案中优势/弱点认知列表的正确属性。
+ */
 const currentCognitionKey = computed<CognitionSectionKey>(() =>
   activeZB.value === '装备优势' ? 'cognitionAdvantage' : 'cognitionWeakness'
 )
+/**
+ * 计算：当前优势/弱点子 Tab 下的可编辑认知条目列表。
+ * 返回：`editableAdvantageOrDisadvantage` 上 `currentCognitionKey` 对应数组，缺省为空数组。
+ * 作用：模板列表渲染与行内编辑的数据源。
+ */
 const currentCognitionList = computed<CognitionItem[]>(
   () => editableAdvantageOrDisadvantage.value[currentCognitionKey.value] || []
 )
+/**
+ * 计算：可编辑档案中的衍生型号列表。
+ * 返回：`derivativeModels` 字段数组，缺省为空数组。
+ * 作用：衍生型号 Tab 列表与选中索引的数据来源。
+ */
 const derivativeModels = computed(() => editableAdvantageOrDisadvantage.value.derivativeModels || [])
+/**
+ * 计算：当前选中的衍生型号详情对象。
+ * 返回：`derivativeModels` 中 `selectedDerivativeIndex` 对应项，越界时为 `null`。
+ * 作用：衍生型号详情区展示与编辑上下文。
+ */
 const currentDerivativeModel = computed(() => derivativeModels.value[selectedDerivativeIndex.value] || null)
 
 const resetProfileEditingState = () => {
@@ -1795,6 +1860,11 @@ const loadSatelliteAdvantageOrDisadvantage = async (norad: number, name_en: stri
   }
 }
 const satelliteThreat = ref<ThreatTaskWeightsResponse[]>([])
+/**
+ * 计算：作战威胁分析 Tab 展示的单条威胁权重记录。
+ * 返回：`satelliteThreat` 首项，列表为空时为 `null`。
+ * 作用：威胁度指标卡片绑定当前卫星在当前任务下的威胁结果。
+ */
 const currentThreat = computed(() => satelliteThreat.value[0] ?? null)
 /**
  * 加载卫星威胁度数据
@@ -1830,7 +1900,17 @@ const loadSatelliteAttack = async (id: number) => {
   }
 }
 const strikeLoading = ref(false)
+/**
+ * 计算：可打击度接口返回的打击条目列表。
+ * 返回：`satelliteAttack.strikeList`，无数据时为空数组。
+ * 作用：打击窗口与列表展示的原始条目集合。
+ */
 const satelliteStrikeList = computed(() => satelliteAttack.value?.strikeList ?? [])
+/**
+ * 计算：打击时间窗口表格行数据。
+ * 返回：与 `satelliteStrikeList` 相同的数组。
+ * 作用：表格组件绑定可打击度分析中的窗口行。
+ */
 const satelliteStrikeWindowRows = computed(() => satelliteStrikeList.value)
 const satelliteTle = ref<SatelliteTle[]>([])
 const tleLoading = ref(false)
@@ -2105,6 +2185,11 @@ const loadSatelliteNews = async () => {
     satelliteNews.value = []
   }
 }
+/**
+ * 监听：弹窗可见性与 NORAD `[dialogVisible, norad]`（`immediate` 立即执行）。
+ * 返回：回调不返回清理函数。
+ * 作用：弹窗打开且 NORAD 有效时重置状态并并行加载详情、威胁、打击、情报、新闻、图与 TLE。
+ */
 watch(
   () => [dialogVisible.value, norad.value] as const,
   ([visible, currentNorad]) => {

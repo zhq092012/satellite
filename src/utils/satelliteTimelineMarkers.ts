@@ -4,12 +4,19 @@ import {
   collectSatelliteTransmissionLinks,
 } from '@/utils/satelliteFullChainAnalysis'
 
+/** 任务时间轴标记类型。buildSatelliteTimelineModel 写入 markers。 */
 export type TimelineMarkerType =
+  /** 任务开始 */
   | 'task_start'
+  /** 未被打击的传输开始。每条未打击链路各记一个，不是只记最早的一条。 */
   | 'first_transmit'
+  /** 遭受打击的传输 */
   | 'jam'
+  /** 打击后最早全链路完成。界面使用该文案；当前构建函数不把它写入 markers。 */
   | 'post_chain_finish'
+  /** 全部链路阻断。模型用 allBlocked 表示；当前构建函数不把它写入 markers。 */
   | 'all_blocked'
+  /** 任务结束 */
   | 'task_end'
 
 export interface TimelineMarker {

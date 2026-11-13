@@ -39,16 +39,31 @@ const props = defineProps<{
   align?: 'start' | 'center' | 'end'
 }>()
 
+/**
+ * 计算：将 props.align 映射为 CSS flex align-items 取值。
+ * 返回：'flex-start' | 'center' | 'flex-end'；未传 align 时按 center。
+ * 作用：单元格内容垂直对齐样式。
+ */
 const alignItems = computed(() => {
   const map = { start: 'flex-start', center: 'center', end: 'flex-end' } as const
   return map[props.align ?? 'center']
 })
 
+/**
+ * 计算：将 props.align 映射为文本 text-align 取值。
+ * 返回：'left' | 'center' | 'right'；未传 align 时按 center。
+ * 作用：单元格主值与差值文本水平对齐。
+ */
 const textAlign = computed((): 'left' | 'center' | 'right' => {
   const map = { start: 'left', center: 'center', end: 'right' } as const
   return map[props.align ?? 'center']
 })
 
+/**
+ * 计算：将 props.cell.value 按换行拆分为展示行，空值时为 ['--']。
+ * 返回：string[]。
+ * 作用：多行主值文本渲染。
+ */
 const cellLines = computed((): string[] => {
   const value = props.cell?.value
   if (!value) return ['--']
@@ -56,7 +71,9 @@ const cellLines = computed((): string[] => {
 })
 
 /**
- * 主值 tone 样式类。
+ * 计算：在 applyValueTone 且 cell 含 valueTone 时将色调映射为样式类名。
+ * 返回：string | undefined；不应用色调时为 undefined。
+ * 作用：主数值涨跌/中性配色。
  */
 const valueToneClass = computed((): string | undefined => {
   if (!props.applyValueTone || !props.cell?.valueTone) return undefined
@@ -64,7 +81,9 @@ const valueToneClass = computed((): string | undefined => {
 })
 
 /**
- * 差值 tone 样式类。
+ * 计算：根据 props.cell?.deltaTone 映射差值行样式类（缺省为 neutral）。
+ * 返回：string。
+ * 作用：差值文字颜色与语义样式。
  */
 const deltaToneClass = computed((): string => {
   return toneToDeltaClass(props.cell?.deltaTone)

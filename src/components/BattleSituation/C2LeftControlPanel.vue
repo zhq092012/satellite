@@ -185,7 +185,11 @@ const combatObjectCountryOptions = [...TASK_ENEMY_COUNTRY_OPTIONS]
 /** 点击作战对象后用于资源树排序 / 高亮的国家（不改变任务数据） */
 const treeSortFocusCountry = ref<string | null>(null)
 
-/** 资源树（固定三国根节点，顺序随 treeSortFocusCountry 调整） */
+/**
+ * 计算：左侧 C2 资源树节点。
+ * 返回：`C2ResourceTreeNode[]`（三国根节点，顺序受 `treeSortFocusCountry` 影响）。
+ * 作用：ElTree 数据源。
+ */
 const resourceTreeNodes = computed((): C2ResourceTreeNode[] =>
   buildC2ResourceTreeNodesForPanel(flatCatalogRows.value, treeSortFocusCountry.value),
 )
@@ -203,14 +207,22 @@ const readActiveCombatScenario = () => {
   return loadCombatScenarioForTask(taskId)
 }
 
-/** 资源数据来源提示 */
+/**
+ * 计算：卫星 catalog 数据来源提示文案。
+ * 返回：空字符串或算法未完成时的预览说明。
+ * 作用：界面角标提示当前树数据是否仅为系列预览。
+ */
 const catalogSourceHint = computed(() => {
   if (catalogLoading.value || !flatCatalogRows.value.length) return ''
   if (catalogUsesMatrix.value) return ''
   return '算法未完成：当前为系列预览数据，用途/国际编号/发射时间可能为空。'
 })
 
-/** 当前任务作战阶段文案（来自添加任务 localStorage） */
+/**
+ * 计算：当前任务作战阶段展示名。
+ * 返回：阶段 label 或 `--`。
+ * 作用：只读作战场景信息区文案。
+ */
 const currentCombatPhaseLabel = computed(() => {
   const scenario = readActiveCombatScenario()
   if (!scenario?.combatPhaseId) return '--'
@@ -218,7 +230,11 @@ const currentCombatPhaseLabel = computed(() => {
   return phase?.label ?? '--'
 })
 
-/** 作战预期一级（来自任务保存的 combatScenario） */
+/**
+ * 计算：作战预期一级选项展示名。
+ * 返回：一级 label 或 `--`。
+ * 作用：只读作战预期展示。
+ */
 const currentCombatExpectationPrimaryLabel = computed(() => {
   const scenario = readActiveCombatScenario()
   if (!scenario?.expectationPrimaryId) return '--'
@@ -226,7 +242,11 @@ const currentCombatExpectationPrimaryLabel = computed(() => {
   return primary?.label ?? '--'
 })
 
-/** 作战预期二级（来自任务保存的 combatScenario） */
+/**
+ * 计算：作战预期二级选项展示名。
+ * 返回：二级 label 或 `--`。
+ * 作用：在一级场景配置下展示细分类预期。
+ */
 const currentCombatExpectationSecondaryLabel = computed(() => {
   const scenario = readActiveCombatScenario()
   if (!scenario?.expectationSecondaryId) return '--'
@@ -262,6 +282,11 @@ const loadBattleTasks = async () => {
   }
 }
 
+/**
+ * 监听：当前战场场景 ID。
+ * 返回：回调不返回清理函数。
+ * 作用：切换场景时重新加载该场景任务列表。
+ */
 watch(
   () => store.battle?.id,
   () => {
@@ -509,6 +534,11 @@ const syncEditorForTask = async (task: TaskForm | null | undefined) => {
   await clearResourceTreeSelection()
 }
 
+/**
+ * 监听：任务分析数据 `store.taskAnalysisData`（深度）。
+ * 返回：回调不返回清理函数。
+ * 作用：分析矩阵就绪且任务 ID 匹配时用 matrix 合并重建资源 catalog。
+ */
 watch(
   () => store.taskAnalysisData,
   (analysis) => {
@@ -525,6 +555,11 @@ watch(
   { deep: true },
 )
 
+/**
+ * 监听：当前激活任务 ID。
+ * 返回：回调不返回清理函数。
+ * 作用：换任务时重置树排序焦点、刷新作战场景展示令牌并同步编辑草稿与资源。
+ */
 watch(
   () => store.activedTask?.id,
   () => {
@@ -535,6 +570,11 @@ watch(
   { immediate: true },
 )
 
+/**
+ * 监听：「使用武器」开关 `useWeaponsEnabled`。
+ * 返回：回调不返回清理函数。
+ * 作用：开启武器选择时回显武器表勾选行。
+ */
 watch(
   () => useWeaponsEnabled.value,
   (enabled) => {

@@ -199,7 +199,11 @@ const queryForm = reactive({
 const missionSysTypeOptions = [...MISSION_SYS_TYPES]
 const usageTypeOptions = [...SATELLITE_USAGE_TYPES]
 
-/** 当前页是否已有 catalog 扩展字段（有则启用扩展筛选） */
+/**
+ * 计算：当前已加载卫星列表中是否存在 catalog 扩展字段数据。
+ * 返回：任一卫星含非空 `series_name`、`usage` 或 `mission_sys_type` 时为 `true`。
+ * 作用：控制扩展筛选项与列是否在列表页启用。
+ */
 const catalogExtendedFieldsAvailable = computed(() =>
   satellites.value.some(
     (row) =>

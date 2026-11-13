@@ -1,9 +1,20 @@
 
 import type { MatrixResult, StationRelationList, Weapon, WeaponAttackRecord } from '@/api/electronic'
+/** 全链路中的一个节点 */
 export interface ChainNode {
+  /**
+   * 节点层级。
+   * SAT：卫星。
+   * RELAY：中继卫星。
+   * RECEIVE：地面接收站。
+   * STATION：数据中心。
+   */
   layer: 'SAT' | 'RELAY' | 'RECEIVE' | 'STATION'
+  /** 节点 ID。卫星为 NORAD，地面节点为站点 ID。 */
   id: string
+  /** 展示名称 */
   name: string
+  /** 节点图标 */
   icon: string
 }
 
@@ -70,12 +81,31 @@ export interface NetworkChainStats {
   remainingChains: FullChainResult[]
 }
 
+/** 一颗卫星上汇总出的一条干扰武器记录 */
 export interface JamWeaponRecord {
+  /** 武器名称 */
   weaponName: string
+  /** 武器类型。来源没有类型时不填。 */
   weaponType?: string
+  /** 打击目标名称。多个目标用顿号连接。 */
   targetName: string
+  /**
+   * 打击目标类型。
+   * 卫星：卫星本体。
+   * 中继卫星：目标类型文案含「中继」。
+   * 接收站：地面接收站。
+   * 数据中心：目标类型文案含「中心」或「数据」。
+   * 同一武器打到多种目标时，汇总结果写成「接收站」。
+   */
   targetType: '卫星' | '中继卫星' | '接收站' | '数据中心'
+  /** 时间范围展示文案 */
   timeRange: string
+  /**
+   * 记录来源。
+   * attackPlan：矩阵 attackPlanList。
+   * window：被打击过境窗口上的武器。
+   * satellite：卫星本体被打击时挂在卫星上的武器。
+   */
   source: 'attackPlan' | 'window' | 'satellite'
 }
 
@@ -867,12 +897,19 @@ export const analyzeSatelliteChainAtTime = (
   }
 }
 
+/** 时间轴关键点类型。resolveChainForTimelineMarker 按它决定展示打击前还是打击后的全链路。 */
 export type TimelineChainMarkerType =
+  /** 任务开始。该时刻打击后全链路已完成时用打击后链路，否则用打击前链路。 */
   | 'task_start'
+  /** 未被打击的传输开始。按该时刻展示打击前链路。 */
   | 'first_transmit'
+  /** 遭受打击的传输。优先展示该时刻的打击后链路，没有则回退打击前链路。 */
   | 'jam'
+  /** 打击后最早全链路完成。展示打击后全链路。 */
   | 'post_chain_finish'
+  /** 打击后全链路全部阻断。展示打击后全链路。 */
   | 'all_blocked'
+  /** 任务结束。按该时刻展示打击后链路。 */
   | 'task_end'
 
 /** 根据时间轴关键点类型解析应展示的链路 */

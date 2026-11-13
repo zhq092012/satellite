@@ -12,7 +12,13 @@ import {
 } from '@/utils/buildSatelliteDeductionTimeline'
 
 /** 推演播放阶段 */
-export type SatelliteDeductionPhase = 'idle' | 'pausedAtEvent' | 'jumpingToNext'
+export type SatelliteDeductionPhase =
+  /** 未播放或已停止 */
+  | 'idle'
+  /** 停在某个事件点并展示提示 */
+  | 'pausedAtEvent'
+  /** 正在把时钟插值到下一个事件 */
+  | 'jumpingToNext'
 
 /** 事件点停留时长（毫秒） */
 export const DEDUCTION_EVENT_PAUSE_MS = 2000
@@ -42,7 +48,11 @@ export function useSatelliteDeductionPlayback(currentTimeMs: Ref<number>) {
   /** 推演 Cesium 视觉计划 */
   const deductionVisualPlan = ref<SatelliteDeductionVisualPlan | null>(null)
 
-  /** 兼容旧模板：纯文本行 */
+  /**
+   * 计算提示框的纯文本行。
+   * 返回 string[]。每行由高亮片段的 text 拼接而成。
+   * 作用：给仍读取纯文本的旧模板使用。
+   */
   const toastLines = computed(() =>
     toastHighlightLines.value.map((line) => line.segments.map((segment) => segment.text).join(''))
   )

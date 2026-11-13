@@ -120,7 +120,9 @@ export function useSimulationPlayback(
     ElMessage.success('打击已完成')
   }
   /**
-   * 根据任务的开始时间和结束时间来计算时钟的开始结束时间
+   * 计算：仿真 Cesium 时钟起止 `JulianDate` 窗口。
+   * 返回：`{ start, stop }` 或 `null`（优先任务 begin/end，否则首尾阶段时间）。
+   * 作用：配置 Viewer 时钟合法范围。
    */
   const clockWindow = computed(() => {
     const taskStartDate = new Date(store.activedTask?.beginDate ?? '')
@@ -152,8 +154,9 @@ export function useSimulationPlayback(
   // ─── 阶段列表 ───
 
   /**
-   * 阶段列表
-   * @returns 阶段列表
+   * 计算：任务阶段列表（含格式化时间窗）。
+   * 返回：`StageItem[]`（无 `taskSteps` 时为空数组）。
+   * 作用：仿真 UI 阶段导航与 `simulationScenario.stageCount`。
    */
   const stageList = computed<StageItem[]>(() => {
     if (!taskSteps.value.length) return []
@@ -168,8 +171,9 @@ export function useSimulationPlayback(
   // ─── 打击列表排序 ───
 
   /**
-   * 打击列表
-   * @returns 打击列表
+   * 计算：当前打击队列的展示顺序。
+   * 返回：按进行中/已完成/待执行优先级排序后的队列项数组。
+   * 作用：打击列表面板数据源。
    */
   const strikeList = computed(() =>
     activeStrikeQueue.value
@@ -185,8 +189,9 @@ export function useSimulationPlayback(
   // ─── 派生指标 ───
 
   /**
-   * 已打击卫星ID集合
-   * @returns 已打击卫星ID集合
+   * 计算：已完成打击窗口涉及的去重卫星 ID 集合。
+   * 返回：`Set<string>`。
+   * 作用：统计与过滤已打击目标星。
    */
   const completedTargetSatelliteIds = computed(
     () =>
@@ -198,24 +203,27 @@ export function useSimulationPlayback(
   )
 
   /**
-   * 选择计划目标卫星数量
-   * @returns 选择计划目标卫星数量
+   * 计算：所选打击方案中的去重目标卫星数量。
+   * 返回：number。
+   * 作用：概览与实体状态展示。
    */
   const selectedPlanTargetSatelliteCount = computed(
     () => new Set(selectedPlanMissionWindows.value.map((item) => String(item.satellite_id))).size
   )
 
   /**
-   * 选择计划武器数量
-   * @returns 选择计划武器数量
+   * 计算：所选打击方案中的去重武器数量。
+   * 返回：number。
+   * 作用：武器利用率分母等指标。
    */
   const selectedPlanWeaponCount = computed(
     () => new Set(selectedPlanMissionWindows.value.map((item) => String(item.weapon_id))).size
   )
 
   /**
-   * 已打击卫星数量
-   * @returns 已打击卫星数量
+   * 计算：已完成打击的去重目标卫星数量。
+   * 返回：number。
+   * 作用：进度、剩余威胁与效果窗口分子。
    */
   const completedTargetSatelliteCount = computed(
     () =>
@@ -227,8 +235,9 @@ export function useSimulationPlayback(
   )
 
   /**
-   * 已打击武器数量
-   * @returns 已打击武器数量
+   * 计算：至少完成一次打击的去重武器数量。
+   * 返回：number。
+   * 作用：武器利用率分子。
    */
   const completedWeaponCount = computed(
     () =>
@@ -240,16 +249,18 @@ export function useSimulationPlayback(
   )
 
   /**
-   * 完成比例
-   * @returns 完成比例
+   * 计算：打击完成比例（已打击卫星数 / 方案输入卫星数）。
+   * 返回：0–1 的 number（分母为 0 时为 0）。
+   * 作用：效果覆盖率等指标。
    */
   const completionRatio = computed(() =>
     selectedPlanInputCount.value > 0 ? completedTargetSatelliteCount.value / selectedPlanInputCount.value : 0
   )
 
   /**
-   * 武器利用率
-   * @returns 武器利用率
+   * 计算：武器利用率（已使用武器数 / 方案武器总数）。
+   * 返回：0–1 的 number（分母为 0 时为 0）。
+   * 作用：指标卡「武器利用率」。
    */
   const weaponUtilizationRatio = computed(() =>
     selectedPlanWeaponCount.value > 0 ? completedWeaponCount.value / selectedPlanWeaponCount.value : 0
@@ -257,6 +268,11 @@ export function useSimulationPlayback(
 
   // ─── UI 数据 ───
 
+  /**
+   * 计算：仿真场景概要对象。
+   * 返回：含任务 ID、方案键、起止时间、阶段数、蓝方卫星数等字段的对象。
+   * 作用：下游 `scenarioOverview` 与面板标题数据。
+   */
   const simulationScenario = computed(() => ({
     taskId: `T-${store.activedTask?.id ?? '--'}`,
     selectedPlanKey: selectedHistoricalPlanLabel.value,
@@ -267,6 +283,11 @@ export function useSimulationPlayback(
     satelliteCount: blueSatellites.value.length,
   }))
 
+  /**
+   * 计算：场景概览键值行列表。
+   * 返回：`{ label, value }[]`（任务编号、名称、时间、阶段数等）。
+   * 作用：仿真侧栏概要 UI。
+   */
   const scenarioOverview = computed(() => [
     { label: '任务编号', value: simulationScenario.value.taskId },
     { label: '任务名称', value: store.activedTask?.name ?? '未选择任务' },
@@ -275,6 +296,11 @@ export function useSimulationPlayback(
     { label: '阶段数量', value: `${simulationScenario.value.stageCount}` },
   ])
 
+  /**
+   * 计算：效果窗口展示行（已打击/总威胁）。
+   * 返回：单元素数组，含 `id`、`label`、`window` 文案。
+   * 作用：效果时间窗面板。
+   */
   const effectWindows = computed(() => [
     {
       id: 'e2',
@@ -286,8 +312,18 @@ export function useSimulationPlayback(
     },
   ])
 
+  /**
+   * 计算：实体状态简要列表。
+   * 返回：含「打击目标」数量的一条 `{ label, value }` 数组。
+   * 作用：实体状态区展示。
+   */
   const entityStateList = computed(() => [{ label: '打击目标', value: `${selectedPlanTargetSatelliteCount.value}` }])
 
+  /**
+   * 计算：仿真指标卡数据（进度、剩余威胁、武器利用率、效果覆盖率）。
+   * 返回：`MetricCard[]`（含 label、value、percent、hint）。
+   * 作用：指标卡组件数据源。
+   */
   const metricCards = computed<MetricCard[]>(() => [
     {
       label: '任务进度',

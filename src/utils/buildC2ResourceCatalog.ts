@@ -6,8 +6,16 @@ import { normalizeSatelliteUsageLabel, TASK_ENEMY_COUNTRY_OPTIONS } from '@/cons
 /** C2 左侧面板资源树固定展示的国家/地区（与作战对象三项一致） */
 export const C2_PANEL_TREE_COUNTRIES: readonly string[] = TASK_ENEMY_COUNTRY_OPTIONS
 
-/** 左侧资源树节点类型 */
-export type C2ResourceTreeNodeKind = 'country' | 'sysType' | 'usage' | 'series'
+/** 左侧资源树节点层级 */
+export type C2ResourceTreeNodeKind =
+  /** 国家或地区 */
+  | 'country'
+  /** 任务系统类型，例如侦察、通信 */
+  | 'sysType'
+  /** 卫星用途，例如军用、民用 */
+  | 'usage'
+  /** 卫星系列。树展示到这一层，不展示 NORAD。 */
+  | 'series'
 
 /**
  * C2 资源树节点（el-tree；界面展示至系列层，不在树中展示 NORAD 叶子）。

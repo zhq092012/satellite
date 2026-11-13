@@ -63,6 +63,7 @@ export type KillType = 'SOFT' | 'HARD';
  * 'TRANSMITTING':'通信中'
  * 'JAMMED':'被干扰'
  * 'DESTROYED':'被摧毁'
+ * 'ENGAGEMENT': 类型中保留的取值。当前前端代码没有赋值，业务含义未在代码中说明。
  */
 export type LinkStatus = 'PENDING' | 'TRANSMITTING' | 'JAMMED' | 'DESTROYED' | 'ENGAGEMENT';
 
@@ -236,6 +237,11 @@ export interface OverheadMatrixItem {
   target_id: string;
   target_name: string;
   target_layer: BattlefieldLayer;
+  /**
+   * 传输链路类型。
+   * SAT_TO_STATION：卫星到地面站。
+   * STATION_TO_CMD：地面站到指挥节点。
+   */
   link_type: 'SAT_TO_STATION' | 'STATION_TO_CMD';
   trans_delay: number;
   proc_delay: number;

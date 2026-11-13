@@ -41,7 +41,12 @@ export interface HomeAttackAnalysisTableRow {
   compositeAttackSort: number | null
 }
 
-export type HomeAttackAnalysisDataSource = 'matrix' | 'mock'
+/** 攻击度分析表的数据来源 */
+export type HomeAttackAnalysisDataSource =
+  /** 当前任务分析矩阵 */
+  | 'matrix'
+  /** 矩阵为空时使用的演示行 */
+  | 'mock'
 
 const MOCK_COUNTRY_POOL = ['美国', '日本', '中国台湾'] as const
 

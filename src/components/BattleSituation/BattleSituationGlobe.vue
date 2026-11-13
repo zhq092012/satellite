@@ -88,7 +88,11 @@ let resizeObserver: ResizeObserver | null = null
 /** 初始化互斥锁 */
 let viewerInitializing = false
 
-/** 推演地面站/卫星视觉状态 */
+/**
+ * 计算：当前推演时刻下的地面站过站/打击与爆炸 NORAD 等视觉状态。
+ * 返回：含 `struckReceiveKeys`、`passHighlightReceiveKeys`、`passHighlightPasses`、`explosionNorad` 等的对象；非推演时各集合为空且 `explosionNorad` 为 null。
+ * 作用：供卫星隐藏点位、地面目标高亮及 composable 入参。
+ */
 const deductionGlobeVisualState = computed(() => {
   if (!props.isDeductionPlaying || !props.deductionVisualPlan) {
     return {
@@ -117,44 +121,132 @@ const deductionGlobeVisualState = computed(() => {
 /** 卫星渲染逻辑 */
 useBattleGlobeSatellites(
   viewerRef,
+  /**
+   * 计算：父组件传入的卫星列表。
+   * 返回：`props.satellites`。
+   * 作用：作为 `useBattleGlobeSatellites` 的数据源 Ref。
+   */
   computed(() => props.satellites),
+  /**
+   * 计算：时间轴/推演当前时刻（毫秒）。
+   * 返回：`props.currentTimeMs`。
+   * 作用：驱动卫星点位时刻位置更新。
+   */
   computed(() => props.currentTimeMs),
+  /**
+   * 计算：当前选中的卫星 NORAD。
+   * 返回：`props.selectedNorad`。
+   * 作用：控制选中高亮与跟随飞行。
+   */
   computed(() => props.selectedNorad),
+  /**
+   * 计算：非推演时选中卫星是否跟随相机。
+   * 返回：`props.followSelectedSatellite`。
+   * 作用：选中 NORAD 变化时是否 `flyTo` 卫星。
+   */
   computed(() => props.followSelectedSatellite),
+  /**
+   * 计算：推演爆炸特效对应的 NORAD。
+   * 返回：`deductionGlobeVisualState.explosionNorad`。
+   * 作用：爆炸时刻隐藏该星点位。
+   */
   computed(() => deductionGlobeVisualState.value.explosionNorad),
+  /**
+   * 计算：底部任务时间轴是否正在播放。
+   * 返回：`props.isTimelinePlaying`。
+   * 作用：播放中调整卫星可视化策略。
+   */
   computed(() => props.isTimelinePlaying)
 )
 
 /** 选中卫星 Entity.path 轨迹（单星推演时由推演模块绘制） */
 useBattleGlobeTimelineSelectedOrbit(
   viewerRef,
+  /**
+   * 计算：卫星列表（供轨道 TLE 查找）。
+   * 返回：`props.satellites`。
+   * 作用：选中星轨迹重建的数据源。
+   */
   computed(() => props.satellites),
+  /**
+   * 计算：当前时刻毫秒。
+   * 返回：`props.currentTimeMs`。
+   * 作用：同步 Cesium 时钟与路径显示时刻。
+   */
   computed(() => props.currentTimeMs),
+  /**
+   * 计算：选中 NORAD。
+   * 返回：`props.selectedNorad`。
+   * 作用：决定是否为该星绘制非推演轨道 path。
+   */
   computed(() => props.selectedNorad),
+  /**
+   * 计算：单星推演是否播放中。
+   * 返回：`props.isDeductionPlaying`。
+   * 作用：推演播放时清理由本模块绘制的选中轨道。
+   */
   computed(() => props.isDeductionPlaying),
+  /**
+   * 计算：任务开始毫秒。
+   * 返回：`props.taskStartMs`。
+   * 作用：轨道 path 时间窗口起点。
+   */
   computed(() => props.taskStartMs),
+  /**
+   * 计算：任务结束毫秒。
+   * 返回：`props.taskEndMs`。
+   * 作用：轨道 path 时间窗口终点。
+   */
   computed(() => props.taskEndMs)
 )
 
 /** 武器渲染逻辑 */
 useBattleGlobeWeapons(
   viewerRef,
+  /**
+   * 计算：武器列表。
+   * 返回：`props.weapons`。
+   * 作用：地球武器点位数据源。
+   */
   computed(() => props.weapons),
+  /**
+   * 计算：选中武器 ID。
+   * 返回：`props.selectedWeaponId`。
+   * 作用：高亮与 `flyTo` 选中武器。
+   */
   computed(() => props.selectedWeaponId)
 )
 
-/** 推演地面站视觉状态（打击变红、过站高亮） */
+/**
+ * 计算：推演中已被打击的接收站键集合。
+ * 返回：`Set<string>`（来自 `deductionGlobeVisualState`）。
+ * 作用：传给地面目标 composable 做打击着色。
+ */
 const deductionStruckReceiveKeys = computed(
   () => deductionGlobeVisualState.value.struckReceiveKeys
 )
+/**
+ * 计算：推演中需过站高亮的接收站键集合。
+ * 返回：`Set<string>`。
+ * 作用：地面目标过站高亮样式。
+ */
 const deductionPassHighlightReceiveKeys = computed(
   () => deductionGlobeVisualState.value.passHighlightReceiveKeys
 )
+/**
+ * 计算：推演过站高亮窗口列表（含坐标）。
+ * 返回：`DeductionStationPassWindow[]`。
+ * 作用：合并补全地面目标点位并绘制高亮。
+ */
 const deductionPassHighlightPasses = computed(
   () => deductionGlobeVisualState.value.passHighlightPasses
 )
 
-/** 推演时补全过站接收站坐标，保证地球上有可高亮点位 */
+/**
+ * 计算：传给地面目标模块的最终目标列表。
+ * 返回：`BattleGlobeGroundTarget[]`（推演时合并过站补点，否则为 `props.groundTargets`）。
+ * 作用：确保过站窗口在地球上有可渲染坐标。
+ */
 const globeGroundTargetsForRender = computed((): BattleGlobeGroundTarget[] => {
   const base = props.groundTargets
   if (!props.isDeductionPlaying || !props.deductionVisualPlan?.stationPasses.length) {
@@ -219,6 +311,11 @@ const restoreOverviewView = () => {
 useBattleGlobeGroundTargets(
   viewerRef,
   globeGroundTargetsForRender,
+  /**
+   * 计算：选中地面目标复合键。
+   * 返回：`props.selectedGroundTargetKey`。
+   * 作用：选中态飞行与高亮。
+   */
   computed(() => props.selectedGroundTargetKey),
   deductionStruckReceiveKeys,
   deductionPassHighlightReceiveKeys,
@@ -228,11 +325,41 @@ useBattleGlobeGroundTargets(
 /** 推演 Cesium 特效 */
 useBattleGlobeDeductionEffects(
   viewerRef,
+  /**
+   * 计算：卫星列表。
+   * 返回：`props.satellites`。
+   * 作用：推演特效定位卫星与 TLE。
+   */
   computed(() => props.satellites),
+  /**
+   * 计算：当前推演/时间轴时刻毫秒。
+   * 返回：`props.currentTimeMs`。
+   * 作用：驱动特效与爆炸时刻。
+   */
   computed(() => props.currentTimeMs),
+  /**
+   * 计算：推演目标卫星 NORAD。
+   * 返回：`props.selectedNorad`。
+   * 作用：绑定单星推演实体与爆炸。
+   */
   computed(() => props.selectedNorad),
+  /**
+   * 计算：单星推演播放开关。
+   * 返回：`props.isDeductionPlaying`。
+   * 作用：开启/清理推演实体与 postUpdate。
+   */
   computed(() => props.isDeductionPlaying),
+  /**
+   * 计算：推演视觉计划。
+   * 返回：`props.deductionVisualPlan`，缺省为 null。
+   * 作用：过站、打击、爆炸时间线数据源。
+   */
   computed(() => props.deductionVisualPlan ?? null),
+  /**
+   * 计算：推演时相机是否跟随卫星。
+   * 返回：`props.followDeductionSatellite`。
+   * 作用：控制推演相机跟随与恢复俯视。
+   */
   computed(() => props.followDeductionSatellite),
   restoreOverviewView
 )
@@ -501,6 +628,11 @@ onActivated(() => {
   refreshAfterActivate()
 })
 
+/**
+ * 监听：当前场景（战场）ID。
+ * 返回：回调不返回清理函数。
+ * 作用：换场景时重绘战场区域与默认视角。
+ */
 watch(
   () => store.battle?.id,
   () => {
@@ -508,6 +640,11 @@ watch(
   }
 )
 
+/**
+ * 监听：当前场景区域几何 `store.battle.area`。
+ * 返回：回调不返回清理函数。
+ * 作用：区域变更时刷新多边形与视角。
+ */
 watch(
   () => store.battle?.area,
   () => {
@@ -515,6 +652,11 @@ watch(
   }
 )
 
+/**
+ * 监听：战场显示名称。
+ * 返回：回调不返回清理函数。
+ * 作用：名称变化时更新贴地标签文本。
+ */
 watch(
   () => store.battle?.name,
   () => {
@@ -522,6 +664,11 @@ watch(
   }
 )
 
+/**
+ * 监听：战场中心笛卡尔坐标。
+ * 返回：回调不返回清理函数。
+ * 作用：中心点变化时重新计算标签位置与遮挡。
+ */
 watch(
   () => store.battleCenterCartensian,
   () => {
@@ -529,6 +676,11 @@ watch(
   }
 )
 
+/**
+ * 监听：当前时刻与任务起止毫秒三元组。
+ * 返回：回调不返回清理函数。
+ * 作用：同步 Cesium Viewer 时钟并请求重绘。
+ */
 watch(
   () => [props.currentTimeMs, props.taskStartMs, props.taskEndMs] as const,
   () => {

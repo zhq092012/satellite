@@ -93,7 +93,11 @@ const props = defineProps<{
   alignBlocks?: boolean
 }>()
 
-/** 概要字段顺序（与需求一致） */
+/**
+ * 计算：按固定顺序从 props.view.meta 组装方案概要字段行。
+ * 返回：{ label: string; value: string }[]。
+ * 作用：渲染单方案概要信息列表。
+ */
 const metaItems = computed(() => {
   const m = props.view.meta
   return [

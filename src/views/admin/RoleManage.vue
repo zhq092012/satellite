@@ -160,6 +160,11 @@ const rules: FormRules = {
   roleCode: [{ required: true, message: '请输入角色编码', trigger: 'blur' }],
 }
 
+/**
+ * 计算：角色新增/编辑弹窗标题。
+ * 返回：`isEdit` 为真时「编辑角色」，否则「新增角色」。
+ * 作用：弹窗标题区分角色维护模式。
+ */
 const dialogTitle = computed(() => (isEdit.value ? '编辑角色' : '新增角色'))
 
 const treeProps = { children: 'children', label: 'menuName' }

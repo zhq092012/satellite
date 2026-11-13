@@ -64,7 +64,11 @@ const emit = defineEmits<{
 
 const store = useLayoutStore()
 
-/** 按左侧勾选过滤后的卫星行 */
+/**
+ * 计算：右侧列表展示的卫星行。
+ * 返回：经资源树勾选过滤后的 `c2ResourceSatelliteRows` 子集。
+ * 作用：表格数据源与选中高亮 NORAD 对应行。
+ */
 const displayRows = computed(() =>
   filterC2SatellitesByTreeSelection(store.c2ResourceSatelliteRows, store.c2TreeCheckedKeys),
 )

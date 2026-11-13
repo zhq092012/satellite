@@ -108,8 +108,14 @@ import {
   saveOrUpdateBaseStation,
   type BaseStationInfo,
 } from '@/api/system/satellite-system-api'
-/** 基站列表页作用域：全部 / 地面站 / 数据中心 */
-type StationScope = 'all' | 'ground' | 'center'
+/** 基站列表页作用域 */
+type StationScope =
+  /** 全部基站 */
+  | 'all'
+  /** 地面站 */
+  | 'ground'
+  /** 数据中心 */
+  | 'center'
 
 const route = useRoute()
 
@@ -124,13 +130,21 @@ const isDataCenterType = (type?: string): boolean => {
   return value.includes('中心') || value.includes('数据') || value.includes('云')
 }
 
-/** 当前路由对应的基站筛选范围 */
+/**
+ * 计算：当前路由 meta 声明的基站列表作用域。
+ * 返回：`ground` | `center` | `all`，非法或未配置时为 `all`。
+ * 作用：决定列表过滤规则与分页总数统计方式。
+ */
 const stationScope = computed<StationScope>(() => {
   const scope = route.meta.stationScope
   return scope === 'ground' || scope === 'center' || scope === 'all' ? scope : 'all'
 })
 
-/** 页面标题前缀（随路由变化） */
+/**
+ * 计算：页面标题前缀（随作用域变化）。
+ * 返回：地面站/数据中心/基站 对应中文名称。
+ * 作用：页头标题与新增编辑弹窗标题中的资源类型文案。
+ */
 const pageTitle = computed(() => {
   if (stationScope.value === 'ground') return '地面站'
   if (stationScope.value === 'center') return '数据中心'
@@ -180,8 +194,18 @@ const rules = reactive<FormRules<BaseStationInfo>>({
 // const canEdit = computed(() => hasPermission(authStore.permissions, ['system:weapon:edit']))
 // const canDelete = computed(() => hasPermission(authStore.permissions, ['system:weapon:delete']))
 
+/**
+ * 计算：当前列表中不重复的国家/地区数量。
+ * 返回：对 `stations` 的 `country` 去空后 Set 的大小。
+ * 作用：统计卡片展示覆盖国家数。
+ */
 const countryCount = computed(() => new Set(stations.value.map((item) => item.country).filter(Boolean)).size)
 
+/**
+ * 计算：基站新增/编辑弹窗标题。
+ * 返回：有 `_id` 时为「编辑{pageTitle}」，否则为「新增{pageTitle}」。
+ * 作用：弹窗标题区分新增与编辑及当前页面资源类型。
+ */
 const dialogTitle = computed(() => (form._id ? `编辑${pageTitle.value}` : `新增${pageTitle.value}`))
 
 /**
@@ -295,6 +319,11 @@ onMounted(async () => {
   await Promise.all([loadStations(), loadCountries()])
 })
 
+/**
+ * 监听：当前路由名称 `route.name`（地面站/数据中心路由切换）。
+ * 返回：回调不返回清理函数。
+ * 作用：切换列表页时重置页码并重新加载基站数据。
+ */
 watch(
   () => route.name,
   () => {

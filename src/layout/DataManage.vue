@@ -34,7 +34,11 @@ const tabNameMap: Record<string, string> = {
   WeaponManage: 'weapons',
 }
 
-/** 当前激活的页签，由子路由名称反查 */
+/**
+ * 计算数据管理当前页签。
+ * 返回子路由名称对应的页签标识，无法识别时返回 battles。setter 不改状态。
+ * 作用：页签高亮跟随当前子路由。
+ */
 const activeTab = computed({
   get: () => tabNameMap[String(route.name ?? '')] ?? 'battles',
   set: () => undefined,

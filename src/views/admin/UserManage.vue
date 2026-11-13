@@ -178,6 +178,11 @@ const rules: FormRules = {
   phone: [{ required: true, message: '请输入手机号', trigger: 'blur' }],
 }
 
+/**
+ * 计算：用户新增/编辑弹窗标题。
+ * 返回：`isEdit` 为真时「编辑用户」，否则「新增用户」。
+ * 作用：用户维护弹窗标题展示。
+ */
 const dialogTitle = computed(() => (isEdit.value ? '编辑用户' : '新增用户'))
 
 const fetchRoles = async () => {

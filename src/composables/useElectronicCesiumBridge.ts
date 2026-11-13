@@ -85,7 +85,9 @@ export function useElectronicCesiumBridge(matrixData: Ref<MatrixResult | null | 
   }
 
   /**
-   * 解析出来的所有地面基础设施 (接收站 + 中心云站)
+   * 计算：从 matrixData 的 initRelationList 或 stationRelationList 解析接收站与中心云站坐标与状态。
+   * 返回：InfrastructureLocation[]；无矩阵数据时为空数组。
+   * 作用：为 Cesium 侧渲染与定位提供地面基础设施点位列表。
    */
   const infrastructureNodes = computed<InfrastructureLocation[]>(() => {
     if (!matrixData.value) return []
@@ -132,7 +134,9 @@ export function useElectronicCesiumBridge(matrixData: Ref<MatrixResult | null | 
   })
 
   /**
-   * 解析中继卫星 NORAD 列表集合
+   * 计算：从 matrixData.relayRelation.relayList 收集中继卫星 NORAD 编号。
+   * 返回：Set<number>。
+   * 作用：快速判断某颗卫星是否属于星间中继节点。
    */
   const relayNoradSet = computed<Set<number>>(() => {
     /** 中继卫星 NORAD 去重集合 */

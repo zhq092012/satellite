@@ -163,12 +163,20 @@ const props = defineProps<{
   vertical?: boolean
 }>()
 
-/** 是否为打击前/后双行对比（纵向三列） */
+/**
+ * 计算：是否展示阶段列且存在 rowVariant 为 before 的数据行。
+ * 返回：boolean。
+ * 作用：在纵向布局下选择打击前/后对比表还是概要指标表。
+ */
 const isPhaseCompare = computed(
   () => !!props.showPhaseColumn && props.rows.some((r) => r.rowVariant === 'before')
 )
 
-/** 纵向布局：打击前/后对比行（仅 isPhaseCompare 时使用） */
+/**
+ * 计算：纵向模式下将 before/after 行按列 key 映射为对比指标行。
+ * 返回：VerticalCompareMetricRow[]；非纵向或非 phase 对比时为空数组。
+ * 作用：渲染纵向三列打击前/后单元格。
+ */
 const verticalCompareMetricRows = computed((): VerticalCompareMetricRow[] => {
   if (!props.vertical || !isPhaseCompare.value) return []
 
@@ -182,7 +190,11 @@ const verticalCompareMetricRows = computed((): VerticalCompareMetricRow[] => {
   }))
 })
 
-/** 纵向布局：概要单行（非 phase 对比时使用） */
+/**
+ * 计算：纵向非 phase 对比时取首行 props.rows[0] 各列单元格组成指标行。
+ * 返回：VerticalSummaryMetricRow[]；处于 phase 对比或非纵向时为空数组。
+ * 作用：渲染纵向概要单行指标表。
+ */
 const verticalSummaryMetricRows = computed((): VerticalSummaryMetricRow[] => {
   if (!props.vertical || isPhaseCompare.value) return []
 

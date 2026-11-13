@@ -112,6 +112,11 @@ onMounted(() => {
   observer.observe(element)
 })
 
+/**
+ * 监听图表内容块。deep 为 true，块内类目和序列变化也会触发。
+ * 回调不返回清理函数。
+ * 作用：内容块更新后重新渲染 ECharts。
+ */
 watch(
   () => props.block,
   () => {

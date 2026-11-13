@@ -166,15 +166,31 @@ const parseTaskTime = (value: string): number => {
   return Number.isNaN(ts) ? 0 : ts
 }
 
-/** 任务开始时间的毫秒时间戳 */
+/**
+ * 计算：将 props.taskStart 解析为毫秒时间戳。
+ * 返回：number。
+ * 作用：作为时间轴起点及百分比换算基准。
+ */
 const taskStartMs = computed(() => parseTaskTime(props.taskStart))
-/** 任务结束时间的毫秒时间戳 */
+/**
+ * 计算：将 props.taskEnd 解析为毫秒时间戳。
+ * 返回：number。
+ * 作用：作为时间轴终点及标尺跨度计算基准。
+ */
 const taskEndMs = computed(() => parseTaskTime(props.taskEnd))
 
-/** 是否处于任务时间标尺模式（选中卫星或聚焦传输链路） */
+/**
+ * 计算：是否选中卫星或处于 forceTaskMode。
+ * 返回：boolean。
+ * 作用：切换「任务时间标尺」与普适时间标尺的标题与展示逻辑。
+ */
 const isTaskTimelineMode = computed(() => !!props.selectedNorad || !!props.forceTaskMode)
 
-/** 链路聚焦模式下任务时刻游标位置（百分比） */
+/**
+ * 计算：链路聚焦模式且未选卫星时，currentTimeMs 在任务区间内的横向百分比。
+ * 返回：number | null；条件不满足时为 null。
+ * 作用：绘制任务时刻游标位置。
+ */
 const taskPlayheadPercent = computed<number | null>(() => {
   if (!props.forceTaskMode || props.selectedNorad || !props.currentTimeMs || !taskStartMs.value || !taskEndMs.value) {
     return null
@@ -182,11 +198,20 @@ const taskPlayheadPercent = computed<number | null>(() => {
   return msToPercent(props.currentTimeMs)
 })
 
-/** 当前选中卫星的时间轴模型（包含对抗打断分析） */
+/**
+ * 计算：基于矩阵数据、选中 NORAD 与任务起止时间构建卫星时间轴模型。
+ * 返回：SatelliteTimelineModel | null。
+ * 作用：提供通信色段、标记点与对抗/干扰分析数据。
+ */
 const timelineModel = computed<SatelliteTimelineModel | null>(() =>
   buildSatelliteTimelineModel(props.matrixData, props.selectedNorad ?? null, taskStartMs.value, taskEndMs.value)
 )
 
+/**
+ * 计算：所有干扰窗口中最晚结束时刻；无干扰时回退 earliest 传输或任务开始。
+ * 返回：number（毫秒时间戳）。
+ * 作用：界定「打击后链路」色段的起始时间（segmentStyle 与模板色带）。
+ */
 const lastJamEndMs = computed(() => {
   const segs = timelineModel.value?.jamSegments || []
   if (!segs.length) return timelineModel.value?.firstTransmitMs || taskStartMs.value
@@ -249,13 +274,21 @@ const MARKER_META: Record<
   task_end: { icon: '■', title: '任务结束', isMajor: true },
 }
 
-/** 从时间轴模型中筛选出的原始标记，不包含任务首尾标记 */
+/**
+ * 计算：从 timelineModel.markers 筛选 type 为 jam 或 first_transmit 的标记。
+ * 返回：TimelineMarker[]；未选卫星或无模型时为空数组。
+ * 作用：作为时间轴事件标记的原始数据源。
+ */
 const rawMarkers = computed<TimelineMarker[]>(() => {
   if (!timelineModel.value || !props.selectedNorad) return []
   return timelineModel.value.markers.filter((m) => m.type === 'jam' || m.type === 'first_transmit')
 })
 
-/** 每个过境站单独展示，不合并相近时间点 */
+/**
+ * 计算：将 rawMarkers 转为带百分比、泳道、图标与文案的 DisplayMarkerItem 并排序。
+ * 返回：DisplayMarkerItem[]。
+ * 作用：驱动时间轴标记按钮渲染、选中态与点击事件。
+ */
 const displayMarkerItems = computed<DisplayMarkerItem[]>(() => {
   const sorted = [...rawMarkers.value].sort((a, b) => a.ms - b.ms)
   const usedLanes = new Map<number, number>()
@@ -291,7 +324,11 @@ const displayMarkerItems = computed<DisplayMarkerItem[]>(() => {
   })
 })
 
-/** 根据任务时长生成时间标尺刻度 */
+/**
+ * 计算：按任务总时长选择步长，在 [taskStartMs, taskEndMs] 上生成主刻度与标签。
+ * 返回：{ percent, label, major, align }[]；跨度无效时为空数组。
+ * 作用：渲染标尺刻度线与时间标签。
+ */
 const rulerTicks = computed(() => {
   const ticks: { percent: number; label: string; major: boolean; align: 'start' | 'center' | 'end' }[] = []
   const start = taskStartMs.value
@@ -362,6 +399,11 @@ const syncSelectedSatelliteTime = () => {
   emit('time-change', taskStartMs.value)
 }
 
+/**
+ * 监听：taskStartMs 与 taskEndMs。
+ * 返回：回调不返回清理函数。
+ * 作用：任务起止时间就绪或变化时，若已选卫星则同步默认时间点与标记。
+ */
 watch([taskStartMs, taskEndMs], () => {
   if (!taskStartMs.value) return
   if (props.selectedNorad) {
@@ -369,6 +411,11 @@ watch([taskStartMs, taskEndMs], () => {
   }
 }, { immediate: true })
 
+/**
+ * 监听：props.selectedNorad。
+ * 返回：回调不返回清理函数。
+ * 作用：切换选中卫星时调用 syncSelectedSatelliteTime 对齐时间轴默认时刻。
+ */
 watch(
   () => props.selectedNorad,
   (norad) => {

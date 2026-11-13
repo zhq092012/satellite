@@ -36,8 +36,9 @@ markdownParser.use({
 })
 
 /**
- * 把 Markdown 转成已过滤的 HTML。
- * 解析器若返回 Promise，说明配置被改成了异步，直接抛出，避免把未完成的结果写进页面。
+ * 计算助手 Markdown 对应的 HTML。
+ * 返回经过 DOMPurify 过滤的字符串。解析器若返回 Promise，说明配置被改成了异步，直接抛出。
+ * 作用：消息区只渲染过滤后的 HTML，不把未完成的解析结果写进页面。
  */
 const html = computed(() => {
   const parsed = markdownParser.parse(props.content)

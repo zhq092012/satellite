@@ -13,8 +13,14 @@ import {
   type ReconCapabilityMetricValues,
 } from '@/utils/mockZhchPlanCapabilityMetrics'
 
-/** 数值差值着色策略（相对打击效果） */
-type CapabilityNumericDeltaPolicy = 'neutral' | 'lower-favorable' | 'higher-favorable'
+/** 数值差值着色策略，相对打击效果 */
+type CapabilityNumericDeltaPolicy =
+  /** 不区分优劣 */
+  | 'neutral'
+  /** 打击后数值变小为有利 */
+  | 'lower-favorable'
+  /** 打击后数值变大为有利 */
+  | 'higher-favorable'
 
 /**
  * 从带百分号的展示串解析数值。

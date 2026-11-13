@@ -474,7 +474,9 @@ export const useBattleGlobeGroundTargets = (
   }
 
   /**
-   * 监听 Viewer 是否有变化。
+   * 监听：Cesium Viewer 引用。
+   * 返回：回调不返回清理函数。
+   * 作用：Viewer 就绪时注册 postUpdate 并重建地面目标点位。
    */
   watch(
     () => viewerRef.value,
@@ -494,7 +496,9 @@ export const useBattleGlobeGroundTargets = (
   )
 
   /**
-   * 监听地面目标列表是否有变化。
+   * 监听：地面目标列表 Ref（深度）。
+   * 返回：回调不返回清理函数。
+   * 作用：目标增删改时重建 Point 集合。
    */
   watch(
     targetsRef,
@@ -505,7 +509,9 @@ export const useBattleGlobeGroundTargets = (
   )
 
   /**
-   * 监听选中目标键是否有变化。
+   * 监听：选中地面目标键 Ref。
+   * 返回：回调不返回清理函数。
+   * 作用：选中时 `flyToGroundTarget` 并刷新 visual。
    */
   watch(selectedTargetKeyRef, (targetKey) => {
     // 如果选中目标键不为空，则飞到目标
@@ -515,15 +521,21 @@ export const useBattleGlobeGroundTargets = (
   })
 
   /**
-   * 监听推演中已被打击的接收站 ID/名称集合是否有变化。
+   * 监听：推演已打击接收站键集合 Ref（深度）。
+   * 返回：回调不返回清理函数。
+   * 作用：打击态变化时更新地面点颜色/图标。
    */
   watch(deductionStruckReceiveKeysRef, () => updateGroundTargetVisuals(), { deep: true })
   /**
-   * 监听推演当前过站窗口内接收站 ID/名称集合是否有变化。
+   * 监听：推演过站高亮接收站键集合 Ref（深度）。
+   * 返回：回调不返回清理函数。
+   * 作用：过站高亮集合变化时刷新 visual。
    */
   watch(deductionPassHighlightReceiveKeysRef, () => updateGroundTargetVisuals(), { deep: true })
   /**
-   * 监听推演高亮过站窗口（含坐标）是否有变化。
+   * 监听：推演过站窗口列表 Ref（深度）。
+   * 返回：回调不返回清理函数。
+   * 作用：过站窗口几何或时刻变化时刷新地面目标样式。
    */
   watch(deductionPassHighlightPassesRef, () => updateGroundTargetVisuals(), { deep: true })
 

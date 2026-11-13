@@ -190,17 +190,23 @@ const rules = reactive<FormRules<Weapon>>({
 // const canEdit = computed(() => hasPermission(authStore.permissions, ['system:weapon:edit']))
 // const canDelete = computed(() => hasPermission(authStore.permissions, ['system:weapon:delete']))
 
+/**
+ * 计算：武器列表总条数。
+ * 返回：`weapons` 数组长度。
+ * 作用：页头或统计区展示武器总量。
+ */
 const totalCount = computed(() => weapons.value.length)
+/**
+ * 计算：武器列表涉及的不重复国家数。
+ * 返回：对 `country` 去空后 Set 大小。
+ * 作用：统计卡片展示国家覆盖数。
+ */
 const countryCount = computed(() => new Set(weapons.value.map((item) => item.country).filter(Boolean)).size)
 
 /**
- * 根据多条件组合过滤武器列表。
- *
- * 支持匹配：
- * - 武器名称模糊匹配 (keyword)
- * - 所属国家全等匹配 (country)
- * - 武器类型模糊匹配 (type)
- * - 适用卫星类型模糊匹配 (satellite_type)
+ * 计算：按查询表单多条件过滤后的武器列表。
+ * 返回：同时满足关键字、国家、类型、适用卫星类型条件的 `Weapon` 数组。
+ * 作用：客户端筛选后的全量结果，供计数与分页切片使用。
  */
 const filteredWeapons = computed(() => {
   const keyword = queryForm.keyword.trim().toLowerCase()
@@ -218,13 +224,28 @@ const filteredWeapons = computed(() => {
   })
 })
 
+/**
+ * 计算：筛选后武器条数。
+ * 返回：`filteredWeapons` 的长度。
+ * 作用：分页组件 `total` 与结果统计展示。
+ */
 const filteredCount = computed(() => filteredWeapons.value.length)
 
+/**
+ * 计算：当前页表格展示的武器行。
+ * 返回：按 `page.current` 与 `page.size` 从 `filteredWeapons` 切片得到的数组。
+ * 作用：`el-table` 绑定的分页后数据源。
+ */
 const displayWeapons = computed(() => {
   const start = (page.current - 1) * page.size
   return filteredWeapons.value.slice(start, start + page.size)
 })
 
+/**
+ * 计算：武器新增/编辑弹窗标题。
+ * 返回：表单含 `id` 时为「编辑武器」，否则为「新增武器」。
+ * 作用：弹窗标题区分新增与编辑模式。
+ */
 const dialogTitle = computed(() => (form.id ? '编辑武器' : '新增武器'))
 
 async function loadCountries() {

@@ -6,10 +6,22 @@
  */
 
 /** 一条聊天消息的生成状态 */
-export type AiMessageStatus = 'loading' | 'streaming' | 'completed' | 'error'
+export type AiMessageStatus =
+  /** 已发出，助手内容尚未写入 */
+  | 'loading'
+  /** 正在逐段写入内容。类型已预留，当前发送完成前不会赋这个状态。 */
+  | 'streaming'
+  /** 内容已写完。用户消息固定为该状态。 */
+  | 'completed'
+  /** 生成失败 */
+  | 'error'
 
 /** 消息角色。第一版只有用户和助手。 */
-export type AiMessageRole = 'user' | 'assistant'
+export type AiMessageRole =
+  /** 用户提问 */
+  | 'user'
+  /** 助手回答 */
+  | 'assistant'
 
 /** 柱状图、折线图的类目数据。categories 与每个 series.values 一一对应。 */
 export interface AiChartCategoryData {
@@ -50,7 +62,13 @@ export interface AiTableColumn {
 }
 
 /** 表格单元格允许的值。空单元格用 null，不把缺失写成 0 或空对象。 */
-export type AiTableCell = string | number | null
+export type AiTableCell =
+  /** 文本 */
+  | string
+  /** 数字 */
+  | number
+  /** 空单元格 */
+  | null
 
 /** 表格中的一行 */
 export type AiTableRow = Record<string, AiTableCell>
@@ -60,12 +78,19 @@ export type AiTableRow = Record<string, AiTableCell>
  * Markdown 负责说明，表格和图表负责可交互展示，两者不要互相解析。
  */
 export type AiContentBlock =
+  /** Markdown 说明 */
   | AiMarkdownBlock
+  /** 动态表格 */
   | AiTableBlock
+  /** 柱状图 */
   | AiBarChartBlock
+  /** 折线图 */
   | AiLineChartBlock
+  /** 饼图 */
   | AiPieChartBlock
+  /** 指标卡片 */
   | AiMetricBlock
+  /** 文件信息 */
   | AiFileBlock
 
 /** Markdown 文本块。渲染前会做 HTML 过滤。 */

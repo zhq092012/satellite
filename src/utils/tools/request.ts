@@ -11,7 +11,16 @@ import {
   markLoginRedirectTriggered,
   shouldRedirectToLogin,
 } from '../auth'
-type RequestMethods = 'get' | 'post' | 'put' | 'delete'
+/** requestAPI 支持的 HTTP 方法 */
+type RequestMethods =
+  /** 查询 */
+  | 'get'
+  /** 提交 */
+  | 'post'
+  /** 更新 */
+  | 'put'
+  /** 删除 */
+  | 'delete'
 
 type RequestExtraOptions = {
   hasLoading?: boolean

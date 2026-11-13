@@ -181,46 +181,86 @@ let lastPlaybackFrameMs = 0
 /** 选中卫星前是否正在播放（清除后用于恢复） */
 let wasPlayingBeforeSelection = false
 
-/** 算法矩阵数据 */
+/**
+ * 计算：当前系列/任务范围内的算法传输矩阵。
+ * 返回：`MatrixResult | null`，与 layout Store 中 `matrixData` 一致。
+ * 作用：供左侧面板与地球态势在无分析全量数据时兜底展示矩阵。
+ */
 const matrixData = computed<MatrixResult | null>(() => store.matrixData)
 
-/** 任务算法分析结果 */
+/**
+ * 计算：当前任务的算法分析全量结果。
+ * 返回：任务分析实体或 null/undefined（与 Store `taskAnalysisData` 一致）。
+ * 作用：驱动地球卫星/武器/地面目标构建及推演数据源。
+ */
 const taskAnalysisData = computed(() => store.taskAnalysisData)
 
-/** 任务分析结果加载状态 */
+/**
+ * 计算：任务分析接口是否正在加载。
+ * 返回：boolean。
+ * 作用：阻止自动时间轴在分析未就绪时启动。
+ */
 const taskAnalysisLoading = computed(() => store.taskAnalysisLoading)
 
-/** 当前任务算法是否已完成 */
+/**
+ * 计算：当前激活任务的三类算法进度是否均已结束。
+ * 返回：boolean。
+ * 作用：控制分析拉取与自动时间轴播放的前置条件。
+ */
 const algorithmComplete = computed(() => store.isTaskAlgorithmComplete(store.activedTask))
 
-/** 当前任务时间范围 */
+/**
+ * 计算：当前任务在界面可用的起止时间字符串。
+ * 返回：`{ start, end }` 或 `null`（缺少 `beginDate`/`endDate` 时）。
+ * 作用：驱动底部时间轴显隐与游标范围。
+ */
 const taskTimeRange = computed(() => {
   const task = store.activedTask
   if (!task?.beginDate || !task?.endDate) return null
   return { start: task.beginDate, end: task.endDate }
 })
 
-/** 任务开始时间（毫秒） */
+/**
+ * 计算：任务开始时刻的毫秒时间戳。
+ * 返回：number（无效或缺失时为 0）。
+ * 作用：传给地球与时间轴作为区间起点。
+ */
 const taskStartMs = computed(() => parseTaskTimeMs(taskTimeRange.value?.start))
 
-/** 任务结束时间（毫秒） */
+/**
+ * 计算：任务结束时刻的毫秒时间戳。
+ * 返回：number（无效或缺失时为 0）。
+ * 作用：传给地球与时间轴作为区间终点。
+ */
 const taskEndMs = computed(() => parseTaskTimeMs(taskTimeRange.value?.end))
 
-/** 地球渲染卫星列表（优先任务分析全量数据，兜底当前系列矩阵） */
+/**
+ * 计算：地球组件所需的卫星列表。
+ * 返回：`BattleGlobeSatellite[]`（优先任务分析，否则当前矩阵）。
+ * 作用：绑定 `BattleSituationGlobe` 的 `satellites`。
+ */
 const globeSatellites = computed(() => {
   const fromAnalysis = buildBattleGlobeSatellites(taskAnalysisData.value)
   if (fromAnalysis.length) return fromAnalysis
   return buildBattleGlobeSatellitesFromMatrix(matrixData.value)
 })
 
-/** 地球渲染武器列表（优先任务分析全量数据，兜底当前系列矩阵） */
+/**
+ * 计算：地球组件所需的武器列表。
+ * 返回：武器行数组（优先任务分析，否则当前矩阵）。
+ * 作用：绑定 `BattleSituationGlobe` 的 `weapons`。
+ */
 const globeWeapons = computed(() => {
   const fromAnalysis = buildBattleGlobeWeapons(taskAnalysisData.value)
   if (fromAnalysis.length) return fromAnalysis
   return buildBattleGlobeWeaponsFromMatrix(matrixData.value)
 })
 
-/** 地球渲染接收站/数据中心列表 */
+/**
+ * 计算：地球组件所需的接收站与数据中心列表。
+ * 返回：地面目标数组（优先任务分析，否则当前矩阵）。
+ * 作用：绑定 `BattleSituationGlobe` 的 `ground-targets`。
+ */
 const globeGroundTargets = computed(() => {
   const fromAnalysis = buildBattleGlobeGroundTargets(taskAnalysisData.value)
   if (fromAnalysis.length) return fromAnalysis
@@ -230,7 +270,11 @@ const globeGroundTargets = computed(() => {
 /** 地球组件引用 */
 const globeRef = ref<{ restoreOverviewView: () => void } | null>(null)
 
-/** 当前选中卫星名称 */
+/**
+ * 计算：顶部选中条展示的卫星名称。
+ * 返回：字符串（无选中或找不到名称时为空或 `Sat-{norad}`）。
+ * 作用：地图选中卫星信息条文案。
+ */
 const selectedSatelliteName = computed(() => {
   if (!selectedNorad.value) return ''
   const fromGlobe = globeSatellites.value.find((sat) => sat.norad === selectedNorad.value)
@@ -254,14 +298,22 @@ const handleStopSatelliteDeduction = () => {
   stopDeduction()
 }
 
-/** 当前选中武器名称 */
+/**
+ * 计算：顶部选中条展示的武器名称。
+ * 返回：字符串（无选中时为空，否则名称或武器 ID）。
+ * 作用：地图选中武器信息条文案。
+ */
 const selectedWeaponName = computed(() => {
   if (!selectedWeaponId.value) return ''
   const fromGlobe = globeWeapons.value.find((weapon) => weapon.id === selectedWeaponId.value)
   return fromGlobe?.name || selectedWeaponId.value
 })
 
-/** 当前选中地面目标名称 */
+/**
+ * 计算：顶部选中条展示的地面目标名称。
+ * 返回：字符串（解析键后从列表取名称，否则回退键或 ID）。
+ * 作用：地图选中接收站/数据中心信息条文案。
+ */
 const selectedGroundTargetName = computed(() => {
   if (!selectedGroundTargetKey.value) return ''
   const parsed = parseGroundTargetKey(selectedGroundTargetKey.value)
@@ -272,7 +324,11 @@ const selectedGroundTargetName = computed(() => {
   return fromGlobe?.name || parsed.id
 })
 
-/** 地图顶部选中条标签（接收站/数据中心） */
+/**
+ * 计算：地面目标选中条前缀标签文案。
+ * 返回：`选中数据中心` 或 `选中接收站`。
+ * 作用：按目标类型区分信息条标题。
+ */
 const selectedGroundTargetBarLabel = computed(() => {
   const parsed = parseGroundTargetKey(selectedGroundTargetKey.value)
   if (parsed?.kind === 'station') return '选中数据中心'
@@ -591,7 +647,11 @@ const loadMatrixForCurrentScope = async () => {
   }
 }
 
-/** 任务时间变化时，游标重置到任务开始 */
+/**
+ * 监听：`taskTimeRange`（任务起止时间字符串）。
+ * 返回：回调不返回清理函数。
+ * 作用：任务时间变更时停止播放与推演、清空武器/地面选中并将游标置为任务开始。
+ */
 watch(
   taskTimeRange,
   (range) => {
@@ -605,6 +665,11 @@ watch(
   { immediate: true }
 )
 
+/**
+ * 监听：选中卫星 NORAD（`selectedNorad`）。
+ * 返回：回调不返回清理函数。
+ * 作用：切换选中卫星时重置推演 UI 状态。
+ */
 watch(selectedNorad, (norad, prevNorad) => {
   if (norad !== prevNorad) {
     resetDeductionUi()
@@ -616,7 +681,11 @@ onBeforeUnmount(() => {
   resetDeductionUi()
 })
 
-/** 系列/任务变化时重新加载矩阵 */
+/**
+ * 监听：左侧系列筛选三元组（系列名、卫星类型、综合用途）。
+ * 返回：回调不返回清理函数。
+ * 作用：筛选变化时按新范围重新拉取矩阵数据。
+ */
 watch(
   () => [store.selectedSatSeries, store.selectedSatType, store.activeZhchUsageType] as const,
   () => {
@@ -625,6 +694,11 @@ watch(
   { immediate: true }
 )
 
+/**
+ * 监听：当前激活任务 ID。
+ * 返回：回调不返回清理函数。
+ * 作用：换任务时重置自动播放标记、无任务时清空分析，否则重拉矩阵与分析。
+ */
 watch(
   () => store.activedTask?.id,
   (taskId, prevTaskId) => {
@@ -642,7 +716,11 @@ watch(
   { immediate: true }
 )
 
-/** 任务加载完成后 10x 自动播放时间轴 */
+/**
+ * 监听：任务 ID、算法完成态、分析加载态及地球各图层数据是否就绪。
+ * 返回：回调不返回清理函数。
+ * 作用：条件满足时调用 `tryStartAutoTimelinePlayback` 以 10 倍速自动播放时间轴。
+ */
 watch(
   () =>
     [
@@ -660,7 +738,11 @@ watch(
   }
 )
 
-/** 算法进度完成后自动拉取分析结果 */
+/**
+ * 监听：当前任务算法进度轮询键（任务 ID 与三类子状态拼接）。
+ * 返回：回调不返回清理函数。
+ * 作用：算法全部完成后自动 `loadTaskAnalysis` 拉取分析结果。
+ */
 watch(
   () => {
     const taskId = store.activedTask?.id

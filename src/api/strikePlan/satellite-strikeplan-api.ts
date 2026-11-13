@@ -687,7 +687,14 @@ export interface Strike2 {
     windowStart: string
   }[]
 }
-export type middlePlanType = '饱和式打击' | '成本最低' | '突防最强'
+/** 中烈度杀伤链方案策略。写入 RespKillChainPlanMiddle 的 plan.planType，取值本身就是策略名称。 */
+export type middlePlanType =
+  /** 饱和式打击 */
+  | '饱和式打击'
+  /** 成本最低 */
+  | '成本最低'
+  /** 突防最强 */
+  | '突防最强'
 export interface RespKillChainPlanMiddle {
   _id: string
   name: string
@@ -749,7 +756,14 @@ export interface RespKillChainPlanHigh {
 
 }
 
-export type KillChainPlanListResp = RespKillChainPlanLow | RespKillChainPlanMiddle | RespKillChainPlanHigh
+/** 杀伤链方案列表中的一条记录。低、中、高烈度各对应一种响应结构。 */
+export type KillChainPlanListResp =
+  /** 低烈度方案 */
+  | RespKillChainPlanLow
+  /** 中烈度方案 */
+  | RespKillChainPlanMiddle
+  /** 高烈度方案 */
+  | RespKillChainPlanHigh
 /**
  * 保存杀伤链打击方案
  */

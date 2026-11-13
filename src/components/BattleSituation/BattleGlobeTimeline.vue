@@ -99,12 +99,24 @@ const parseTaskTime = (value: string): number => {
   return Number.isNaN(ts) ? 0 : ts
 }
 
-/** 任务开始时间（毫秒） */
+/**
+ * 计算：任务开始时刻毫秒。
+ * 返回：number（解析 `props.taskStart`，无效为 0）。
+ * 作用：标尺区间与游标比例换算起点。
+ */
 const taskStartMs = computed(() => parseTaskTime(props.taskStart))
-/** 任务结束时间（毫秒） */
+/**
+ * 计算：任务结束时刻毫秒。
+ * 返回：number（解析 `props.taskEnd`，无效为 0）。
+ * 作用：标尺区间与游标比例换算终点。
+ */
 const taskEndMs = computed(() => parseTaskTime(props.taskEnd))
 
-/** 展示用当前时刻，默认落在任务开始 */
+/**
+ * 计算：时间轴展示的当前时刻。
+ * 返回：毫秒；`props.currentTimeMs` 有效则用其值，否则为任务开始。
+ * 作用：游标位置与刻度相对当前时间的基准。
+ */
 const displayTimeMs = computed(() => {
   if (props.currentTimeMs != null && props.currentTimeMs > 0) return props.currentTimeMs
   return taskStartMs.value
@@ -142,13 +154,21 @@ const getMarkerAlign = (percent: number): 'start' | 'center' | 'end' => {
   return 'center'
 }
 
-/** 游标百分比位置 */
+/**
+ * 计算：播放头在标尺上的水平百分比位置。
+ * 返回：`number | null`（起止或展示时刻无效时为 null）。
+ * 作用：绑定游标 CSS 定位。
+ */
 const playheadPercent = computed<number | null>(() => {
   if (!displayTimeMs.value || !taskStartMs.value || !taskEndMs.value) return null
   return msToPercent(displayTimeMs.value)
 })
 
-/** 时间标尺刻度 */
+/**
+ * 计算：时间标尺主刻度列表。
+ * 返回：含 `percent`、`label`、`major`、`align` 的对象数组（跨度无效时为空数组）。
+ * 作用：渲染刻度线与时间标签。
+ */
 const rulerTicks = computed(() => {
   const ticks: { percent: number; label: string; major: boolean; align: 'start' | 'center' | 'end' }[] = []
   const start = taskStartMs.value

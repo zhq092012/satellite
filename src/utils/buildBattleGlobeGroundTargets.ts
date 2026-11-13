@@ -2,8 +2,12 @@ import type { MatrixResult } from '@/api/electronic'
 import type { ReceiveObject, RelationList, SatelliteAnalysisData, StationObject } from '@/api/task/task'
 import type { DeductionStationPassWindow } from '@/utils/buildSatelliteDeductionTimeline'
 
-/** 地面目标类型：接收站 / 数据中心 */
-export type BattleGlobeGroundTargetKind = 'receive' | 'station'
+/** 整体态势地球上的地面目标类型 */
+export type BattleGlobeGroundTargetKind =
+  /** 地面接收站 */
+  | 'receive'
+  /** 数据中心 */
+  | 'station'
 
 /** 整体态势地球渲染用地面站目标 */
 export interface BattleGlobeGroundTarget {

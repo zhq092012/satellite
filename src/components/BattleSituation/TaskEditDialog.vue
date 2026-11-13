@@ -129,7 +129,17 @@ import { useLayoutStore } from '@/store/modules/layout'
 import TaskAssembleTab, { type TaskAssembleRow } from '@/components/BattleSituation/TaskAssembleTab.vue'
 
 /** 任务弹窗左侧菜单 key。 */
-type TaskEditTabKey = 'basic' | 'satellite' | 'station' | 'center' | 'weapon'
+type TaskEditTabKey =
+  /** 任务基本信息 */
+  | 'basic'
+  /** 卫星装配 */
+  | 'satellite'
+  /** 地面站装配 */
+  | 'station'
+  /** 数据中心装配 */
+  | 'center'
+  /** 武器装配 */
+  | 'weapon'
 
 /** 左侧竖向菜单项。 */
 interface TaskEditMenuItem {
@@ -195,7 +205,11 @@ const combatObjectCountryOptions = [...TASK_ENEMY_COUNTRY_OPTIONS]
 const isCombatObjectActive = (country: string): boolean =>
   (taskForm.enemyCountryShow || []).includes(country)
 
-/** 作战预期二级选项（随一级变化） */
+/**
+ * 计算：当前作战预期一级选项下的二级子选项列表。
+ * 返回：匹配 `combatScenario.expectationPrimaryId` 的 `children`，无匹配时为空数组。
+ * 作用：驱动作战预期二级下拉的可选项。
+ */
 const expectationSecondaryOptions = computed(() => {
   const primary = COMBAT_EXPECTATION_PRIMARY_OPTIONS.find(
     (item) => item.id === combatScenario.expectationPrimaryId,
@@ -258,10 +272,18 @@ const formRules = reactive<FormRules<TaskForm>>({
 /** 对话框可见性与 v-model 同步。 */
 const visible = ref(false)
 
-/** 是否为查看/编辑模式（当前后端仅支持新增，编辑时隐藏保存按钮）。 */
+/**
+ * 计算：任务弹窗是否处于编辑（非纯新增）模式。
+ * 返回：`props.isEdit` 为真时为 `true`。
+ * 作用：控制保存按钮等编辑态 UI 与标题文案分支。
+ */
 const isEdit = computed(() => !!props.isEdit)
 
-/** 弹窗标题：添加与修改分开展示。 */
+/**
+ * 计算：任务编辑弹窗标题文案。
+ * 返回：编辑模式为「修改任务」，否则为「添加任务」。
+ * 作用：弹窗头部展示当前为新增还是修改任务。
+ */
 const dialogTitle = computed(() => (isEdit.value ? '修改任务' : '添加任务'))
 
 /** 各装配页组件引用，用于提交时汇总已选资源。 */
@@ -284,6 +306,11 @@ const activeTab = ref<TaskEditTabKey>('basic')
 /** 装配页重置令牌，弹窗每次打开递增。 */
 const assembleResetKey = ref(0)
 
+/**
+ * 监听：父组件 v-model 绑定的 `props.modelValue`（弹窗开关）。
+ * 返回：回调不返回清理函数。
+ * 作用：同步本地 `visible`，打开时重置装配页、回填表单并加载国家选项。
+ */
 watch(
   () => props.modelValue,
   (open) => {
@@ -297,6 +324,11 @@ watch(
   }
 )
 
+/**
+ * 监听：本地弹窗可见性 `visible`。
+ * 返回：回调不返回清理函数。
+ * 作用：向父组件 `emit('update:modelValue')` 以保持双向绑定一致。
+ */
 watch(visible, (open) => {
   emit('update:modelValue', open)
 })
@@ -384,7 +416,11 @@ const calcDurationHoursFromDates = (): number => {
 /** 任务时长输入值；起止时间变化时自动重算。 */
 const durationHours = ref(DEFAULT_TASK_DURATION_HOURS)
 
-/** 起止时间变动时，同步重算任务时长显示。 */
+/**
+ * 监听：任务表单起止时间 `taskForm.beginDate` 与 `taskForm.endDate`（`immediate` 立即执行）。
+ * 返回：回调不返回清理函数。
+ * 作用：起止时间变化时用 `calcDurationHoursFromDates` 更新 `durationHours` 展示。
+ */
 watch(
   () => [taskForm.beginDate, taskForm.endDate] as const,
   () => {
@@ -399,7 +435,11 @@ watch(
 const DEFAULT_DELAY_MIN = 60
 const DEFAULT_COVERAGE = 50
 
-/** 链路时延（分钟），与 taskForm.delayMin 双向同步。 */
+/**
+ * 计算：任务链路时延（分钟），含 getter/setter。
+ * 返回：getter 为 `taskForm.delayMin`（缺省 `DEFAULT_DELAY_MIN`）；setter 写入 `taskForm.delayMin`。
+ * 作用：表单项与任务表单字段双向绑定链路时延指标。
+ */
 const linkDelayMin = computed({
   get: () => taskForm.delayMin ?? DEFAULT_DELAY_MIN,
   set: (value: number) => {
@@ -407,7 +447,11 @@ const linkDelayMin = computed({
   },
 })
 
-/** 覆盖率（%），与 taskForm.coverage 双向同步。 */
+/**
+ * 计算：任务覆盖率（%），含 getter/setter。
+ * 返回：getter 为 `taskForm.coverage`（缺省 `DEFAULT_COVERAGE`）；setter 写入 `taskForm.coverage`。
+ * 作用：表单项与任务表单字段双向绑定覆盖率指标。
+ */
 const taskCoverage = computed({
   get: () => taskForm.coverage ?? DEFAULT_COVERAGE,
   set: (value: number) => {

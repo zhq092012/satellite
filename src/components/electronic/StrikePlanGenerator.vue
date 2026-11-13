@@ -94,6 +94,11 @@ const getPlanColumnTitle = (usageType: string): string => {
   return `${base}（${getZhchUsageTypeLabel(usageType)}）`
 }
 
+/**
+ * 计算：将 ZHCH 用途类型枚举映射为带任务显示名的下拉选项。
+ * 返回：UsageTypeOption[]。
+ * 作用：方案对比勾选区 usageTypeOptions 数据源。
+ */
 const usageTypeOptions = computed((): UsageTypeOption[] =>
   ZHCH_USAGE_TYPE_OPTIONS.map((value) => ({
     label: getPlanColumnTitle(value),
@@ -108,6 +113,11 @@ onMounted(() => {
   store.sanitizeZhchUsageTypes()
 })
 
+/**
+ * 计算：当前激活任务的敌方展示国家列表。
+ * 返回：string[]；无任务时为 []。
+ * 作用：构建 Mock 综合方案与 buildStrikePlanSchemeView 时的 priorityCountries 入参。
+ */
 const priorityCountries = computed(() => store.activedTask?.enemyCountryShow ?? [])
 
 /**
@@ -143,7 +153,11 @@ const getSchemeView = (usageType: string): StrikePlanSchemeView | null => {
   )
 }
 
-/** 当前勾选方案的可导出打击行 */
+/**
+ * 计算：将 selectedPlanTypes 对应方案视图扁平化为导出行。
+ * 返回：flattenStrikePlanRowsForExport 返回的导出行数组。
+ * 作用：CSV/XLS 导出按钮的数据源。
+ */
 const exportRows = computed(() => {
   const views = selectedPlanTypes.value
     .map((type) => getSchemeView(type))
@@ -188,6 +202,11 @@ const handleDownload = (format: 'csv' | 'xls') => {
   ElMessage.success(format === 'csv' ? 'CSV 已开始下载' : 'XLS 已开始下载')
 }
 
+/**
+ * 监听：selectedPlanTypes。
+ * 返回：回调不返回清理函数。
+ * 作用：勾选超过 3 个方案时截断列表并提示用户上限。
+ */
 watch(selectedPlanTypes, (val) => {
   if (val.length > 3) {
     selectedPlanTypes.value = val.slice(0, 3)
@@ -195,6 +214,11 @@ watch(selectedPlanTypes, (val) => {
   }
 })
 
+/**
+ * 监听：store.activedTask?.id。
+ * 返回：回调不返回清理函数。
+ * 作用：任务切换时清空方案缓存与勾选，拉取新任务方案并恢复默认勾选。
+ */
 watch(
   () => store.activedTask?.id,
   async (taskId, prevId) => {

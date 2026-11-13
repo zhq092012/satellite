@@ -171,6 +171,11 @@ const rules: FormRules = {
   type: [{ required: true, message: '请选择类型', trigger: 'change' }],
 }
 
+/**
+ * 计算：菜单新增/编辑弹窗标题。
+ * 返回：编辑为「编辑菜单」；新增子菜单或根菜单分别为对应文案。
+ * 作用：弹窗头部展示当前菜单操作类型。
+ */
 const dialogTitle = computed(() => {
   if (isEdit.value) {
     return '编辑菜单'
@@ -196,6 +201,11 @@ const flattenMenus = (menus: MenuTreeNode[]) => {
   return result
 }
 
+/**
+ * 计算：菜单树扁平化后的父级候选列表。
+ * 返回：`flattenMenus(list)` 得到的全部节点顺序数组。
+ * 作用：新增/编辑菜单时父级下拉选项数据源。
+ */
 const parentOptions = computed(() => flattenMenus(list.value))
 
 const typeLabel = (type: number) => {

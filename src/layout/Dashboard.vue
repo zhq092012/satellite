@@ -122,6 +122,11 @@ type DashboardMenuNode = Omit<RouteRecordRaw, 'children' | 'meta'> & {
   children?: DashboardMenuNode[]
 }
 
+/**
+ * 计算顶栏当前高亮的菜单路径。
+ * 返回当前路由 path。path 不是字符串时返回 /home。
+ * 作用：菜单组件用它标记当前页。
+ */
 const activeMenu = computed(() => (typeof route.path === 'string' ? route.path : '/home'))
 
 const buildMenuRoutes = (menus: MenuItem[], parentPath = ''): DashboardMenuNode[] => {
@@ -206,8 +211,9 @@ const filterMenusByPermission = (menus: DashboardMenuNode[]): DashboardMenuNode[
 }
 
 /**
- * 顶栏只保留整体态势分析和方案管理。
- * 场景、卫星、地面站、数据中心、武器、基站/导弹等已收进右侧「数据管理」页签。
+ * 计算顶栏展示的菜单。
+ * 返回整体态势、威胁度、攻击度和方案管理四项。场景、卫星、地面站、数据中心、武器已收进数据管理页。
+ * 作用：顶栏只渲染这四项，不直接铺开全部后台菜单。
  */
 const homeMenu = computed<DashboardMenuNode[]>(() => [
   {
@@ -265,6 +271,11 @@ const getRouterViewKey = (viewRoute: { path?: string; name?: string | symbol | n
 
 
 
+/**
+ * 计算当前用户可见的顶栏菜单。
+ * 返回 RouteRecordRaw[]。先按权限过滤后端菜单，再与 homeMenu 合并；顶栏四项去掉子菜单，并排除系统管理、数据管理和算法分析管理。
+ * 作用：顶栏只展示当前用户有权进入的业务菜单。
+ */
 const visibleMenus = computed<RouteRecordRaw[]>(() => {
   const backendMenus = filterMenusByPermission(buildMenuRoutes(authStore.menuTree))
   const mergedMenus = mergeMenus(homeMenu.value, backendMenus)
@@ -292,8 +303,18 @@ const visibleMenus = computed<RouteRecordRaw[]>(() => {
     }) as RouteRecordRaw[]
 })
 
+/**
+ * 计算当前用户是否为管理员。
+ * 返回 boolean。roles 含 admin 时为 true。
+ * 作用：控制仅管理员可见的菜单和操作。
+ */
 const isAdmin = computed(() => authStore.roles.includes('admin'))
 
+/**
+ * 计算顶栏展示的用户名。
+ * 返回昵称；没有昵称时返回用户名；都没有时返回「未登录用户」。
+ * 作用：顶栏用户区显示当前登录身份。
+ */
 const displayUserName = computed(() => {
   return authStore.userInfo?.nickname || authStore.userInfo?.username || '未登录用户'
 })

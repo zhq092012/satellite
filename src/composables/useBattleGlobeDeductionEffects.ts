@@ -475,8 +475,12 @@ export const useBattleGlobeDeductionEffects = (
     effectsPostUpdateRemover = null
   }
 
+  /**
+   * 监听：Cesium Viewer 实例引用。
+   * 返回：回调不返回清理函数。
+   * 作用：Viewer 就绪时注册爆炸 postUpdate，销毁或替换时移除监听。
+   */
   watch(
-    // 监听 viewer 变化
     () => viewerRef.value,
     (viewer) => {
       removeEffectsPostUpdateListener()// 移除爆炸特效 postUpdate 监听器
@@ -486,15 +490,23 @@ export const useBattleGlobeDeductionEffects = (
     { immediate: true }
   )
 
+  /**
+   * 监听：推演开关、视觉计划、选中 NORAD、当前毫秒、是否跟随相机（深度）。
+   * 返回：回调不返回清理函数。
+   * 作用：调用 `syncDeductionEffects` 更新推演实体与相机。
+   */
   watch(
-    // 监听推演状态、推演视觉计划、选中卫星 NORAD、当前时刻毫秒变化
     [isDeductionPlayingRef, visualPlanRef, selectedNoradRef, currentTimeMsRef, followCameraRef],
     () => syncDeductionEffects(),// 同步推演相关特效
     { deep: true }
   )
 
+  /**
+   * 监听：单星推演是否播放中。
+   * 返回：回调不返回清理函数。
+   * 作用：停止推演时清理 Cesium 推演实体并重置不跟随俯视标记。
+   */
   watch(
-    // 监听推演状态变化
     () => isDeductionPlayingRef.value,
     (playing) => {
       const viewer = viewerRef.value

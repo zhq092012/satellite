@@ -114,16 +114,41 @@ const columnWidths = [
 
 const store = useLayoutStore()
 
+/**
+ * 计算：当前任务威胁分析矩阵是否正在加载。
+ * 返回：`store.taskAnalysisLoading` 布尔值。
+ * 作用：表格加载态与空态展示依据。
+ */
 const analysisLoading = computed(() => store.taskAnalysisLoading)
+/**
+ * 计算：布局 Store 中缓存的任务分析矩阵原始数据。
+ * 返回：`store.taskAnalysisData` 或等价 undefined。
+ * 作用：作为矩阵行构建与就绪判断的数据来源。
+ */
 const analysisData = computed(() => store.taskAnalysisData)
+/**
+ * 计算：威胁分析矩阵是否已就绪且属于当前激活任务。
+ * 返回：矩阵含 `levelSeriesEntities` 且 `taskAnalysisTaskId` 与当前任务 id 一致时为 `true`。
+ * 作用：决定使用接口矩阵数据还是回落 mock 行。
+ */
 const analysisReady = computed(
   () =>
     Boolean(analysisData.value?.levelSeriesEntities?.length) &&
     store.taskAnalysisTaskId === store.activedTask?.id,
 )
 
+/**
+ * 计算：当前任务作战对象（蓝方）国家展示列表。
+ * 返回：`activedTask.enemyCountryShow`，缺失时为空数组。
+ * 作用：矩阵行构建与 mock 数据中的优先国家列。
+ */
 const priorityCountries = computed(() => store.activedTask?.enemyCountryShow ?? [])
 
+/**
+ * 计算：首页威胁度表格行及数据来源（矩阵或 mock）。
+ * 返回：`{ rows, source }`，无任务时空行与 mock；就绪且矩阵可解析时用 matrix，否则 mock。
+ * 作用：统一供模板消费的表格载荷与来源标识。
+ */
 const tablePayload = computed((): { rows: HomeThreatAnalysisTableRow[]; source: HomeThreatAnalysisDataSource } => {
   if (!store.activedTask) {
     return { rows: [], source: 'mock' }
@@ -144,6 +169,11 @@ const tablePayload = computed((): { rows: HomeThreatAnalysisTableRow[]; source: 
   }
 })
 
+/**
+ * 计算：威胁度表格当前展示的行列表。
+ * 返回：`tablePayload.rows`。
+ * 作用：`el-table` 直接绑定的数据源。
+ */
 const tableRows = computed(() => tablePayload.value.rows)
 </script>
 

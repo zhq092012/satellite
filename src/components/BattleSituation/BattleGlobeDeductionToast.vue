@@ -51,10 +51,18 @@ const props = defineProps<{
   lines: DeductionToastLine[]
 }>()
 
-/** 左右分栏后的展示数据 */
+/**
+ * 计算：推演 Toast 左右分栏布局数据。
+ * 返回：`layoutDeductionToastLines` 的结构化结果。
+ * 作用：模板渲染主文案区与指标区。
+ */
 const layout = computed(() => layoutDeductionToastLines(props.lines))
 
-/** 右侧是否至少有一项指标可展示 */
+/**
+ * 计算：右侧指标区是否至少有一项非空。
+ * 返回：boolean（威胁/时延/覆盖率任一存在即为 true）。
+ * 作用：控制指标列是否显示。
+ */
 const hasMetrics = computed(
   () =>
     Boolean(layout.value.metrics.threat) ||

@@ -26,10 +26,18 @@ const {
 /** 消息列表滚动容器 */
 const messageScroller = ref<HTMLElement | null>(null)
 
-/** 当前会话消息。关闭面板后仍然保留 */
+/**
+ * 计算当前会话的消息列表。
+ * 返回 AiMessage[]。关闭面板后仍然保留。
+ * 作用：消息区按该列表渲染用户问题和助手回答。
+ */
 const messages = computed(() => conversation.value.messages)
 
-/** 输入框去掉空白后是否可以发送 */
+/**
+ * 计算当前是否允许发送。
+ * 返回 boolean。草稿去掉空白后非空，且没有正在生成的回答时为 true。
+ * 作用：控制发送按钮和 Enter 是否提交问题。
+ */
 const canSend = computed(() => draft.value.trim().length > 0 && !generating.value)
 
 /**
@@ -37,6 +45,11 @@ const canSend = computed(() => draft.value.trim().length > 0 && !generating.valu
  * 悬浮按钮在面板打开时移到面板左侧。
  */
 const AI_PANEL_WIDTH = 528
+/**
+ * 计算悬浮按钮的位置。
+ * 返回包含 right 的样式对象。面板打开时让到面板左侧，关闭时贴在右侧 24px。
+ * 作用：避免按钮被 528px 宽的助手面板挡住。
+ */
 const fabStyle = computed(() => ({
   right: visible.value ? `${AI_PANEL_WIDTH + 24}px` : '24px',
 }))
@@ -85,6 +98,11 @@ function handleEnter() {
   void sendMessage()
 }
 
+/**
+ * 监听消息 ID、状态和内容块数量拼成的字符串。
+ * 回调不返回清理函数。
+ * 作用：消息新增、状态变化或内容块变多时，把消息区滚到最新一条。
+ */
 watch(
   () => messages.value.map((message) => `${message.id}:${message.status}:${message.content.length}`).join('|'),
   () => {
@@ -92,6 +110,11 @@ watch(
   },
 )
 
+/**
+ * 监听助手面板是否打开。
+ * 回调不返回清理函数。
+ * 作用：面板打开时把消息区滚到最新一条。
+ */
 watch(visible, (open) => {
   if (open) void scrollToBottom()
 })

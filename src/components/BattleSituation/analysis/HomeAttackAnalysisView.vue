@@ -76,16 +76,41 @@ const columnWidths = ['8%', '12%', '11%', '7%', '12%', '8%', '16%', '9%', '7%', 
 
 const store = useLayoutStore()
 
+/**
+ * 计算：当前任务攻击分析矩阵是否正在加载。
+ * 返回：`store.taskAnalysisLoading` 布尔值。
+ * 作用：表格加载态展示依据。
+ */
 const analysisLoading = computed(() => store.taskAnalysisLoading)
+/**
+ * 计算：布局 Store 中缓存的任务分析矩阵原始数据。
+ * 返回：`store.taskAnalysisData`。
+ * 作用：攻击度矩阵行构建的数据来源。
+ */
 const analysisData = computed(() => store.taskAnalysisData)
+/**
+ * 计算：攻击分析矩阵是否已就绪且属于当前激活任务。
+ * 返回：矩阵含层级实体且分析任务 id 与当前任务一致时为 `true`。
+ * 作用：在接口矩阵与 mock 行之间切换数据源。
+ */
 const analysisReady = computed(
   () =>
     Boolean(analysisData.value?.levelSeriesEntities?.length) &&
     store.taskAnalysisTaskId === store.activedTask?.id,
 )
 
+/**
+ * 计算：当前任务作战对象国家列表。
+ * 返回：`activedTask.enemyCountryShow`，缺失时为空数组。
+ * 作用：构建矩阵行与 mock 攻击分析表的优先国家。
+ */
 const priorityCountries = computed(() => store.activedTask?.enemyCountryShow ?? [])
 
+/**
+ * 计算：首页攻击度表格行及数据来源。
+ * 返回：`{ rows, source }`；无任务时空行 mock；矩阵可用且解析出行时用 matrix，否则 mock。
+ * 作用：模板绑定攻击度表格数据与来源。
+ */
 const tablePayload = computed((): { rows: HomeAttackAnalysisTableRow[]; source: HomeAttackAnalysisDataSource } => {
   const task = store.activedTask
   if (!task) {
@@ -108,6 +133,11 @@ const tablePayload = computed((): { rows: HomeAttackAnalysisTableRow[]; source: 
   }
 })
 
+/**
+ * 计算：攻击度表格当前展示的行列表。
+ * 返回：`tablePayload.rows`。
+ * 作用：表格组件的数据源。
+ */
 const tableRows = computed(() => tablePayload.value.rows)
 </script>
 

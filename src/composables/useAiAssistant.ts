@@ -24,7 +24,11 @@ let generationId = 0
  * @returns 面板、会话和发送、停止、新建、清空操作
  */
 export function useAiAssistant() {
-  /** 是否有一条助手消息仍在等待 Mock 结果 */
+  /**
+   * 计算当前会话是否仍有助手消息处于 loading。
+   * 返回 boolean。存在 status 为 loading 的消息时为 true。
+   * 作用：发送、停止和输入框据此判断是否正在生成。
+   */
   const generating = computed(() => conversation.value.messages.some((message) => message.status === 'loading'))
 
   /**

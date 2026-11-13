@@ -346,6 +346,11 @@ export interface StageItem {
 export interface HistoricalPlanCard {
   key: string
   plan: StrikePlanV2Extended
+  /**
+   * 该历史方案采用的打击模式，对应 StrikePlanV2IntensityPlans 的两个字段。
+   * threat_first：威胁优先方案。
+   * max_targets：目标数量优先方案。
+   */
   mode: 'threat_first' | 'max_targets'
   detail: StrikePlanV2PlanDetail
 }
@@ -357,8 +362,16 @@ export interface ActiveStrikeQueueItem {
   timeWindow: string
 }
 
-// ─── 打击阶段 ───
-export type StrikePhase = 'idle' | 'active' | 'fading' | 'done'
+/** 打击链路所处阶段。由 getStrikePhase 按任务窗口和当前时间计算。 */
+export type StrikePhase =
+  /** 当前时间在窗口开始之前，或窗口时间无效 */
+  | 'idle'
+  /** 当前时间在窗口内 */
+  | 'active'
+  /** 窗口已结束，打击效果仍在淡出 */
+  | 'fading'
+  /** 淡出结束，打击效果已消失 */
+  | 'done'
 
 // ─── 卫星关系项 ───
 export interface SatelliteRelationItem {

@@ -210,6 +210,11 @@ export const useBattleGlobeTimelineSelectedOrbit = (
     viewer.scene.requestRender()
   }
 
+  /**
+   * 监听：Cesium Viewer 引用。
+   * 返回：回调不返回清理函数。
+   * 作用：清空 TLE 缓存并同步选中星轨道 path。
+   */
   watch(
     () => viewerRef.value,
     (viewer) => {
@@ -221,6 +226,11 @@ export const useBattleGlobeTimelineSelectedOrbit = (
     { immediate: true }
   )
 
+  /**
+   * 监听：选中 NORAD。
+   * 返回：回调不返回清理函数。
+   * 作用：无选中或推演播放时清除 path，否则重建选中轨道。
+   */
   watch(
     () => selectedNoradRef.value,
     (norad) => {
@@ -233,6 +243,11 @@ export const useBattleGlobeTimelineSelectedOrbit = (
     }
   )
 
+  /**
+   * 监听：单星推演播放状态。
+   * 返回：回调不返回清理函数。
+   * 作用：推演开关切换时失效当前 path 并重新同步轨道显示。
+   */
   watch(
     () => isDeductionPlayingRef.value,
     () => {
@@ -241,6 +256,11 @@ export const useBattleGlobeTimelineSelectedOrbit = (
     }
   )
 
+  /**
+   * 监听：任务起止毫秒二元组。
+   * 返回：回调不返回清理函数。
+   * 作用：任务时间窗口变化时重算 path 时间范围。
+   */
   watch(
     () => [taskStartMsRef.value, taskEndMsRef.value] as const,
     () => {
@@ -249,6 +269,11 @@ export const useBattleGlobeTimelineSelectedOrbit = (
     }
   )
 
+  /**
+   * 监听：卫星列表 Ref（深度）。
+   * 返回：回调不返回清理函数。
+   * 作用：列表或 TLE 变更时清缓存并重建轨道。
+   */
   watch(
     satellitesRef,
     () => {
@@ -259,6 +284,11 @@ export const useBattleGlobeTimelineSelectedOrbit = (
     { deep: true }
   )
 
+  /**
+   * 监听：当前时刻毫秒。
+   * 返回：回调不返回清理函数。
+   * 作用：已绘制 path 时推进 Viewer 时钟并重绘场景。
+   */
   watch(
     () => currentTimeMsRef.value,
     () => {

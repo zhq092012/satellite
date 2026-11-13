@@ -253,8 +253,16 @@ import {
 } from '@/api/system/satellite-system-api'
 import type { Weapon } from '@/types/dashboard'
 
-/** 装配资源类型。 */
-export type TaskAssembleKind = 'satellite' | 'station' | 'center' | 'weapon'
+/** 任务装配页的资源类型。 */
+export type TaskAssembleKind =
+  /** 卫星系列 */
+  | 'satellite'
+  /** 地面接收站 */
+  | 'station'
+  /** 数据中心 */
+  | 'center'
+  /** 打击或干扰武器 */
+  | 'weapon'
 
 /** 装配资源行。字段按类型复用，空值用 `--` 展示。 */
 export interface TaskAssembleRow {
@@ -449,10 +457,18 @@ const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
   },
 }
 
-/** 当前种类的页面配置。 */
+/**
+ * 计算：当前装配页种类（`props.kind`）对应的页面配置项。
+ * 返回：`KIND_CONFIG` 中该种类的配置对象。
+ * 作用：驱动列定义、类型选项等同类页面的共性展示。
+ */
 const config = computed(() => KIND_CONFIG[props.kind])
 
-/** 左侧预览/待选表列：卫星为卫星详情列，其余为各类型配置列。 */
+/**
+ * 计算：当前种类配置里的表格列定义。
+ * 返回：配置对象中的 `columns` 数组。
+ * 作用：左侧预览表与待选资源表按种类渲染对应列。
+ */
 const tableColumns = computed(() => config.value.columns)
 
 /**
@@ -472,30 +488,62 @@ const assembleColumnTableProps = (col: AssembleColumn): { width?: number; minWid
 
 
 
-/** 是否已接入增删改查（地面站 / 数据中心 / 武器）。 */
+/**
+ * 计算：当前种类是否为地面站、数据中心或武器（已接入本地增删改查）。
+ * 返回：满足种类时为 `true`，否则为 `false`。
+ * 作用：控制资源弹窗、删除与候选池 CRUD 能力是否可用。
+ */
 const crudEnabled = computed(() => props.kind === 'station' || props.kind === 'center' || props.kind === 'weapon')
 
-/** 是否已接入列表接口（含卫星分页）。 */
+/**
+ * 计算：当前种类是否需要从接口加载候选列表。
+ * 返回：CRUD 种类或卫星种类时为 `true`。
+ * 作用：决定是否调用 `loadCandidatePool` 等列表拉取逻辑。
+ */
 const apiEnabled = computed(() => crudEnabled.value || props.kind === 'satellite')
 
-/** 是否为卫星种类。 */
+/**
+ * 计算：当前是否为卫星装配页。
+ * 返回：`props.kind === 'satellite'`。
+ * 作用：切换系列勾选、卫星预览等与卫星专属流程相关的 UI 与逻辑。
+ */
 const isSatelliteKind = computed(() => props.kind === 'satellite')
 
-/** 是否为地面站或数据中心种类。 */
+/**
+ * 计算：当前是否为地面站或数据中心装配页。
+ * 返回：种类为 `station` 或 `center` 时为 `true`。
+ * 作用：共用基站表单与编辑弹窗时区分资源类型。
+ */
 const isStationKind = computed(() => props.kind === 'station' || props.kind === 'center')
 
-/** 是否为武器种类。 */
+/**
+ * 计算：当前是否为武器装配页。
+ * 返回：`props.kind === 'weapon'`。
+ * 作用：控制武器表单、武器弹窗及相关校验的展示。
+ */
 const isWeaponKind = computed(() => props.kind === 'weapon')
 
-/** 查询卫星系列使用的蓝方国家（来自任务基本信息）。 */
+/**
+ * 计算：任务基本信息中的蓝方国家列表（去空）。
+ * 返回：非空国家名称字符串数组。
+ * 作用：查询卫星系列接口与系列分组展示时的国家条件。
+ */
 const seriesQueryCountries = computed(() => (props.enemyCountries || []).filter(Boolean))
 
-/** 参与系列过滤的卫星类型（仅侦察、通信与接口字段一致）。 */
+/**
+ * 计算：任务已选卫星类型中可用于系列查询的类型。
+ * 返回：仅包含「侦察」「通信」的字符串数组。
+ * 作用：与后端系列字段对齐，过滤系列分组与接口请求类型。
+ */
 const seriesQueryTargetTypes = computed(() =>
   (props.targetTypes || []).filter((type) => type === '侦察' || type === '通信')
 )
 
-/** 卫星预览区副标题。 */
+/**
+ * 计算：卫星预览区副标题文案（系列勾选、预览焦点与任务条件提示）。
+ * 返回：描述当前系列状态或引导补全国家/类型的单行字符串。
+ * 作用：在预览区向用户说明下一步操作或当前所选系列概况。
+ */
 const satellitePreviewSubText = computed(() => {
   const assembled = [...assembledSeriesIds.value]
   if (assembled.length === 1) return `当前系列：${assembled[0]}`
@@ -508,7 +556,9 @@ const satellitePreviewSubText = computed(() => {
 })
 
 /**
- * 类型筛选项：卫星使用 satType 接口，其余从已加载数据动态提取。
+ * 计算：类型筛选下拉的可选项。
+ * 返回：卫星页为 `satTypes`；无 CRUD 时为配置静态选项；否则从候选池去重排序的类型列表。
+ * 作用：驱动「类型」筛选与表格过滤条件。
  */
 const typeFilterOptions = computed(() => {
   if (isSatelliteKind.value) {
@@ -521,10 +571,18 @@ const typeFilterOptions = computed(() => {
   return Array.from(types).sort()
 })
 
-/** 待选资源总数展示文案。 */
+/**
+ * 计算：当前关键字与类型筛选后的待选资源条数。
+ * 返回：条数的字符串形式。
+ * 作用：待选表标题或统计区展示候选总量。
+ */
 const candidateTotalText = computed(() => String(filteredCandidates.value.length))
 
-/** 新建地面站/数据中心时的默认类型占位。 */
+/**
+ * 计算：新建地面站/数据中心表单中类型字段的占位提示。
+ * 返回：数据中心为示例云类型文案，地面站为示例接收/测控站文案。
+ * 作用：引导用户填写与当前种类相符的类型说明。
+ */
 const stationTypePlaceholder = computed(() =>
   props.kind === 'center' ? '例如 中心云 / 区域中心' : '例如 接收站 / 测控站'
 )
@@ -556,7 +614,11 @@ const stationRules = reactive<FormRules<BaseStationInfo>>({
   function: { required: true, message: '请输入功能', trigger: 'blur' },
 })
 
-/** 地面站/数据中心弹窗标题。 */
+/**
+ * 计算：地面站/数据中心编辑弹窗标题。
+ * 返回：表单含 `_id` 时为「修改资源」，否则为「添加资源」。
+ * 作用：区分新增与编辑模式的弹窗标题展示。
+ */
 const stationDialogTitle = computed(() => (stationForm._id ? '修改资源' : '添加资源'))
 
 /**
@@ -587,7 +649,11 @@ const weaponRules = reactive<FormRules<Weapon>>({
   latitude: { required: true, message: '请输入纬度', trigger: 'blur', type: 'number', min: -90, max: 90 },
 })
 
-/** 武器弹窗标题。 */
+/**
+ * 计算：武器编辑弹窗标题。
+ * 返回：表单含 `id` 时为「修改武器」，否则为「添加武器」。
+ * 作用：区分武器新增与编辑时的弹窗标题。
+ */
 const weaponDialogTitle = computed(() => (weaponForm.id ? '修改武器' : '添加武器'))
 
 /**
@@ -848,7 +914,9 @@ const buildRowSearchText = (row: TaskAssembleRow): string =>
   `${row.name} ${row.series} ${row.type} ${row.country} ${row.extra1} ${row.extra2} ${row.extra3 ?? ''} ${row.extra4 ?? ''} ${row.extra5 ?? ''}`.toLowerCase()
 
 /**
- * 尚未装配、且匹配关键字与类型筛选的候选行（非卫星种类使用客户端过滤）。
+ * 计算：候选池中未装配且匹配关键字与类型筛选的行。
+ * 返回：经 `typeFilter` 与 `keyword` 过滤后的 `TaskAssembleRow` 数组（卫星与非卫星逻辑一致）。
+ * 作用：作为待选表与下游展示/计数的数据源。
  */
 const filteredCandidates = computed(() => {
   const key = keyword.value.trim().toLowerCase()
@@ -876,7 +944,9 @@ interface SeriesTypeGroup {
 }
 
 /**
- * 从系列接口缓存构建分组列表（顺序：侦察 → 通信，与任务已选类型一致）。
+ * 计算：按任务已选类型（侦察/通信）从系列缓存构建的分组列表。
+ * 返回：`SeriesTypeGroup[]`，含类型标题与系列行；无缓存或未选类型时为空数组。
+ * 作用：系列 chip 区按类型分组展示并可勾选装配。
  */
 const seriesGroupsByType = computed((): SeriesTypeGroup[] => {
   const cache = seriesDataCache.value
@@ -911,12 +981,20 @@ const seriesGroupsByType = computed((): SeriesTypeGroup[] => {
   return groups
 })
 
-/** 卫星系列候选项表行（分组扁平化，供装配同步与校验使用）。 */
+/**
+ * 计算：系列分组扁平化后的全部系列行。
+ * 返回：各 `SeriesTypeGroup.rows` 合并后的 `TaskAssembleRow` 数组。
+ * 作用：同步已勾选装配行、裁剪无效系列 id 等逻辑的统一系列候选项来源。
+ */
 const seriesTableRows = computed((): TaskAssembleRow[] =>
   seriesGroupsByType.value.flatMap((group) => group.rows),
 )
 
-/** 卫星预览列表（关键字 + 可选单系列收窄） */
+/**
+ * 计算：卫星预览表实际展示的行（可在筛选结果上按单系列收窄）。
+ * 返回：无系列收窄时为 `filteredCandidates`；有收窄时仅保留 `series` 匹配的行。
+ * 作用：控制下方卫星列表在预览某一系列时的展示范围。
+ */
 const displaySatellitePreview = computed(() => {
   const rows = filteredCandidates.value
   const narrow = satelliteTableSeriesFilter.value
@@ -1006,7 +1084,11 @@ const handleSeriesChipToggle = async (row: TaskAssembleRow) => {
   await handleSeriesAssemblyToggle(row, !isSeriesAssembled(row.id))
 }
 
-/** 当前预览系列标题 */
+/**
+ * 计算：预览区当前系列/状态标题文案。
+ * 返回：与 `satellitePreviewSubText` 相同的字符串。
+ * 作用：模板中绑定预览标题，与副标题逻辑保持一致。
+ */
 const previewSeriesLabel = computed(() => satellitePreviewSubText.value)
 
 /**
@@ -1064,7 +1146,11 @@ const reloadSatellitePreview = async () => {
   candidatePool.satellite = []
 }
 
-/** 左侧待选表实际展示数据。 */
+/**
+ * 计算：左侧待选表绑定的行数据。
+ * 返回：与 `filteredCandidates` 相同的数组引用结果。
+ * 作用：非卫星种类待选 `el-table` 的数据源。
+ */
 const displayCandidates = computed(() => filteredCandidates.value)
 
 /**
@@ -1391,7 +1477,9 @@ const handleDeleteWeapon = async () => {
 }
 
 /**
- * 弹窗重新打开时清空本页本地状态。
+ * 监听：`props.resetKey`（任务编辑弹窗每次打开递增）。
+ * 返回：回调不返回清理函数。
+ * 作用：重置筛选、系列、勾选与候选池，并在需要时重新加载列表。
  */
 watch(
   () => props.resetKey,
@@ -1416,7 +1504,11 @@ watch(
   }
 )
 
-/** 切换装配种类时重新加载候选数据。 */
+/**
+ * 监听：装配页种类 `props.kind` 变化。
+ * 返回：回调不返回清理函数。
+ * 作用：种类切换且接口可用时重新拉取对应候选资源池。
+ */
 watch(
   () => props.kind,
   () => {
@@ -1426,7 +1518,11 @@ watch(
   }
 )
 
-/** 蓝方国家变化时，重新查询系列并清空当前系列与预览。 */
+/**
+ * 监听：卫星系列查询用的蓝方国家列表 `seriesQueryCountries`（含深度变更）。
+ * 返回：回调不返回清理函数。
+ * 作用：卫星页国家变化时清空装配/预览并重新加载系列选项。
+ */
 watch(
   seriesQueryCountries,
   async () => {
@@ -1437,7 +1533,11 @@ watch(
   { deep: true }
 )
 
-/** 卫星类型变化时，按类型重算系列候选项并清空无效预览与装配勾选。 */
+/**
+ * 监听：参与系列过滤的任务卫星类型 `seriesQueryTargetTypes`（含深度变更）。
+ * 返回：回调不返回清理函数。
+ * 作用：类型变化时清空卫星装配状态，并按缓存或接口刷新系列候选项。
+ */
 watch(
   seriesQueryTargetTypes,
   async () => {
