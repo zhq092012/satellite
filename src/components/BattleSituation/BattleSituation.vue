@@ -511,41 +511,7 @@ const handleSelectSatellite = async (norad: number | null) => {
   store.setSelectedAnalysisNorad(norad)
 }
 
-/**
- * 选中武器并定位地球。
- *
- * @param weaponId 武器 ID
- */
-const handleSelectWeapon = (weaponId: string | null) => {
-  if (!weaponId) return
 
-  const hadSelection = hasGlobeSelection()
-  if (selectedWeaponId.value === weaponId) return
-
-  handleSelectionPlayback(hadSelection, true)
-  selectedNorad.value = null
-  store.setSelectedAnalysisNorad(null)
-  selectedGroundTargetKey.value = null
-  selectedWeaponId.value = weaponId
-}
-
-/**
- * 选中接收站/数据中心并定位地球。
- *
- * @param targetKey 目标键 receive: / station:
- */
-const handleSelectGroundTarget = (targetKey: string | null) => {
-  if (!targetKey) return
-
-  const hadSelection = hasGlobeSelection()
-  if (selectedGroundTargetKey.value === targetKey) return
-
-  handleSelectionPlayback(hadSelection, true)
-  selectedNorad.value = null
-  store.setSelectedAnalysisNorad(null)
-  selectedWeaponId.value = null
-  selectedGroundTargetKey.value = targetKey
-}
 
 /**
  * 清除选中卫星并恢复战场初始俯视视角。

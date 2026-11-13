@@ -36,36 +36,7 @@ const routes: Array<RouteRecordRaw> = [
           showInMenu: true,
         },
       },
-      {
-        path: 'home/topo',
-        name: 'HomeTopo',
-        component: () => import('@/layout/Home.vue'),
-        meta: {
-          title: '态势拓扑分析',
-          icon: 'icon-situation',
-          showInMenu: false,
-        },
-      },
-      {
-        path: 'home/gantt',
-        name: 'HomeGantt',
-        component: () => import('@/layout/Home.vue'),
-        meta: {
-          title: '甘特图分析',
-          icon: 'icon-situation',
-          showInMenu: false,
-        },
-      },
-      {
-        path: 'home/windows',
-        name: 'HomeWindows',
-        component: () => import('@/layout/Home.vue'),
-        meta: {
-          title: '打击窗口分析',
-          icon: 'icon-situation',
-          showInMenu: false,
-        },
-      },
+
       {
         path: 'home/strike-plan',
         name: 'HomeStrikePlan',
@@ -106,46 +77,7 @@ const routes: Array<RouteRecordRaw> = [
           showInMenu: true,
         },
       },
-      {
-        path: 'system/battles',
-        redirect: '/data-manage/battles',
-      },
-      {
-        path: 'system/satellites',
-        redirect: '/data-manage/satellites',
-      },
-      {
-        path: 'system/ground-stations',
-        redirect: '/data-manage/ground-stations',
-      },
-      {
-        path: 'system/data-centers',
-        redirect: '/data-manage/data-centers',
-      },
-      {
-        path: 'system/weapons',
-        redirect: '/data-manage/weapons',
-      },
-      {
-        path: 'data-manage/satellite-network',
-        redirect: '/data-manage/satellites',
-      },
-      {
-        path: 'system/satellite-network',
-        redirect: '/data-manage/satellites',
-      },
-      {
-        path: 'system/basestations',
-        redirect: '/data-manage/ground-stations',
-      },
-      {
-        path: 'system/missiles',
-        redirect: '/data-manage/weapons',
-      },
-      {
-        path: 'system/missileBases',
-        redirect: '/data-manage/weapons',
-      },
+
       {
         path: 'data-manage',
         name: 'DataManage',
