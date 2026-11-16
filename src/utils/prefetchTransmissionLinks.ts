@@ -9,8 +9,11 @@ import {
 /** 卫星数量达到该阈值时改走 Worker，避免 STARLINK 规模阻塞首屏。 */
 const WORKER_PREFETCH_SAT_THRESHOLD = 80
 
+/** 链路 Worker 实例 */
 let linkWorker: Worker | null = null
+/** 链路 Worker 请求 ID */
 let workerRequestId = 0
+/** 链路 Worker 请求队列 */
 const pendingWorkerRequests = new Map<
   number,
   { resolve: (links: SatelliteTransmissionLink[]) => void; reject: (error: Error) => void }
