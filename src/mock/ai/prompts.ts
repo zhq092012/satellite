@@ -2,7 +2,8 @@ import type { AiPrompt } from '@/types/ai'
 
 /**
  * AI 助手的初始推荐提示词。
- * 点击后发送 prompt 字段，不在组件里写死问题文案。
+ * 点击后发送 prompt 字段，不在组件里写硬编码问题文案。
+ * 每条 prompt 与 `src/mock/ai/demoAnswers.ts` 中同名 id 的演示回答一一对应。
  */
 export const AI_PROMPTS: AiPrompt[] = [
   {

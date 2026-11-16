@@ -4,7 +4,7 @@ import type { AiContentBlock } from '@/types/ai'
 /**
  * 向 AI 助手提问。
  *
- * 当前实现只调用前端 Mock，不经过 requestAPI，也不会访问大模型。
+ * 当前实现只调用前端 Mock 演示数据，不经过 requestAPI，也不会访问大模型或 layout Store。
  * 以后接入真实服务时，替换本函数内部实现，保持返回 AiContentBlock[]。
  *
  * @param question 用户问题。空白问题会拒绝，避免把空消息送给分析逻辑

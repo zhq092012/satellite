@@ -132,7 +132,7 @@ watch(visible, (open) => {
         <header class="ai-header">
           <div class="ai-header-title">
             <strong>AI 助手</strong>
-            <span>本地模拟 · 读取当前任务</span>
+            <span>演示模式 · 内置 Mock 数据</span>
           </div>
           <div class="ai-header-actions">
             <el-button size="small" text native-type="button" @click="newConversation">新建会话</el-button>
@@ -152,7 +152,7 @@ watch(visible, (open) => {
           >
             <div v-if="message.role === 'user'" class="ai-user-text">{{ userText(message) }}</div>
             <div v-else class="ai-assistant-body" :class="{ 'is-error': message.status === 'error' }">
-              <div v-if="message.status === 'loading'" class="ai-loading">正在根据当前任务数据分析...</div>
+              <div v-if="message.status === 'loading'" class="ai-loading">正在生成演示回答...</div>
               <div v-else class="ai-blocks">
                 <template v-for="(block, index) in message.content" :key="`${message.id}-${index}`">
                   <MarkdownRenderer
