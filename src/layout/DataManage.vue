@@ -5,7 +5,7 @@
         <el-tab-pane label="场景管理" name="battles" />
         <el-tab-pane label="卫星管理" name="satellites" />
         <el-tab-pane label="地面站管理" name="groundStations" />
-        <el-tab-pane label="数据中心管理" name="dataCenters" />
+       
         <el-tab-pane label="武器管理" name="weapons" />
       </el-tabs>
 
@@ -30,7 +30,6 @@ const tabNameMap: Record<string, string> = {
   BattleManage: 'battles',
   SatelliteManage: 'satellites',
   GroundStationManage: 'groundStations',
-  DataCenterManage: 'dataCenters',
   WeaponManage: 'weapons',
 }
 
@@ -56,8 +55,6 @@ const handleTabChange = (tabName: string) => {
     router.push({ name: 'SatelliteManage' })
   } else if (tabName === 'groundStations') {
     router.push({ name: 'GroundStationManage' })
-  } else if (tabName === 'dataCenters') {
-    router.push({ name: 'DataCenterManage' })
   } else if (tabName === 'weapons') {
     router.push({ name: 'WeaponManage' })
   }

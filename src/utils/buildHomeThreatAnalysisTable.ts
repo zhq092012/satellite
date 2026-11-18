@@ -404,7 +404,7 @@ function buildMockThreatRow(
     firstFeedbackTimeHint:
       feedbackTime === '无'
         ? '打击后链路中断，无首次回传时刻'
-        : '首条 卫星→地面站→数据中心 过站完成时刻',
+        : '首条卫星→地面站过站完成时刻',
     coverageRateText: `${coveragePct.toFixed(2)}%`,
     coverageRateHint: '任务窗口内目标区域被该星覆盖的时间占比',
     dynamicThreatText: dynamicRatio.toFixed(4),

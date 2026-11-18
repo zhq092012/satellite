@@ -329,11 +329,7 @@ const selectedGroundTargetName = computed(() => {
  * 返回：`选中数据中心` 或 `选中接收站`。
  * 作用：按目标类型区分信息条标题。
  */
-const selectedGroundTargetBarLabel = computed(() => {
-  const parsed = parseGroundTargetKey(selectedGroundTargetKey.value)
-  if (parsed?.kind === 'station') return '选中数据中心'
-  return '选中接收站'
-})
+const selectedGroundTargetBarLabel = computed(() => '选中接收站')
 
 /**
  * 当前是否存在任意地图选中目标。

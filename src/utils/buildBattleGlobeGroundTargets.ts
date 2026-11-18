@@ -1,5 +1,5 @@
 import type { MatrixResult } from '@/api/electronic'
-import type { ReceiveObject, RelationList, SatelliteAnalysisData, StationObject } from '@/types/task/task'
+import type { ReceiveObject, RelationList, SatelliteAnalysisData } from '@/types/task/task'
 import type { DeductionStationPassWindow } from '@/utils/buildSatelliteDeductionTimeline'
 
 /** 整体态势地球上的地面目标类型 */
@@ -96,27 +96,7 @@ const toReceiveGroundTarget = (receive: ReceiveObject): BattleGlobeGroundTarget 
 }
 
 /**
- * 将数据中心转为地球渲染目标。
- *
- * @param station 数据中心对象
- * @returns 渲染目标或 null
- */
-const toStationGroundTarget = (station: StationObject): BattleGlobeGroundTarget | null => {
-  if (!station?.stationId) return null
-  const coords = parseReceiveLatLonString(station.stationLatLon)
-  if (!coords) return null
-  return {
-    kind: 'station',
-    id: station.stationId,
-    name: station.stationName || station.stationId,
-    latitude: coords.latitude,
-    longitude: coords.longitude,
-    status: station.stationStatus ?? 0,
-  }
-}
-
-/**
- * 从关系列表汇总接收站与数据中心（按 ID 去重）。
+ * 从关系列表汇总接收站（按 ID 去重）。
  *
  * @param relation 打击前关系列表
  * @returns 去重后的地面目标
@@ -130,13 +110,6 @@ export const buildBattleGlobeGroundTargetsFromRelationList = (
 
   ;(relation.receiveObjList || []).forEach((receive) => {
     const item = toReceiveGroundTarget(receive)
-    if (!item) return
-    const key = buildGroundTargetKey(item.kind, item.id)
-    if (!targetMap.has(key)) targetMap.set(key, item)
-  })
-
-  ;(relation.stationObjList || []).forEach((station) => {
-    const item = toStationGroundTarget(station)
     if (!item) return
     const key = buildGroundTargetKey(item.kind, item.id)
     if (!targetMap.has(key)) targetMap.set(key, item)

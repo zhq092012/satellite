@@ -68,7 +68,6 @@ const getIcon = (item: RouteRecordRaw): string => {
   if (title.includes('场景管理')) return '🗺️'
   if (title.includes('卫星管理')) return '🛰️'
   if (title.includes('地面站')) return '📡'
-  if (title.includes('数据中心')) return '🗄️'
   if (title.includes('武器管理')) return '🚀'
   if (title.includes('武器')) return '⚔️'
   if (title.includes('基站')) return '📡'

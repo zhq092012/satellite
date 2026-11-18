@@ -213,7 +213,7 @@ const filterMenusByPermission = (menus: DashboardMenuNode[]): DashboardMenuNode[
 
 /**
  * 计算顶栏展示的菜单。
- * 返回整体态势、威胁度、攻击度和方案管理四项。场景、卫星、地面站、数据中心、武器已收进数据管理页。
+ * 返回整体态势、威胁度、攻击度和方案管理四项。场景、卫星、地面站、武器已收进数据管理页。
  * 作用：顶栏只渲染这四项，不直接铺开全部后台菜单。
  */
 const homeMenu = computed<DashboardMenuNode[]>(() => [

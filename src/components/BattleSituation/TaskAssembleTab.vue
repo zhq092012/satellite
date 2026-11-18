@@ -113,39 +113,56 @@
             <el-form-item label="所属国家/地区" prop="country">
               <el-select v-model="stationForm.country" filterable placeholder="请选择国家/地区" class="full-width"
                 popper-class="task-edit-select-popper">
-                <el-option v-for="item in countries" :key="item" :label="item" :value="item" />
+                <el-option
+                  v-for="item in groundStationCountryOptions"
+                  :key="item"
+                  :label="item"
+                  :value="item"
+                />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="类型" prop="type">
-              <el-input v-model.trim="stationForm.type" :placeholder="stationTypePlaceholder" />
+            <el-form-item label="站号编码" prop="code">
+              <el-input v-model.trim="stationForm.code" placeholder="例如 KS-01" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="位置" prop="location">
-              <el-input v-model.trim="stationForm.location" placeholder="请输入位置" />
+            <el-form-item label="高度(m)" prop="altitude">
+              <el-input-number v-model="stationForm.altitude" class="full-width" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="经纬度" prop="latLon">
-              <el-input v-model.trim="stationForm.latLon" placeholder="经度,纬度" />
+            <el-form-item label="经度" prop="longitude">
+              <el-input-number
+                v-model="stationForm.longitude"
+                :precision="6"
+                :min="-180"
+                :max="180"
+                class="full-width"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="功能" prop="function">
-              <el-input v-model.trim="stationForm.function" placeholder="请输入功能" />
+            <el-form-item label="纬度" prop="latitude">
+              <el-input-number
+                v-model="stationForm.latitude"
+                :precision="6"
+                :min="-90"
+                :max="90"
+                class="full-width"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="介绍" prop="introduction">
-              <el-input v-model.trim="stationForm.introduction" type="textarea" :rows="3" placeholder="请输入介绍" />
+            <el-form-item label="描述" prop="description">
+              <el-input v-model.trim="stationForm.description" type="textarea" :rows="3" placeholder="请输入描述" />
             </el-form-item>
           </el-col>
         </el-row>
       </el-form>
       <template #footer>
-        <el-button v-if="stationForm._id" class="task-edit-btn task-edit-btn--ghost" type="danger" :loading="deleting"
+        <el-button v-if="stationForm.id" class="task-edit-btn task-edit-btn--ghost" type="danger" :loading="deleting"
           @click="handleDeleteStation">
           删除
         </el-button>
@@ -244,13 +261,18 @@ import {
   updateWeapon,
 } from '@/api/dashboard'
 import { getSatelliteBySeries, getSatelliteSeries } from '@/api/task/task'
+import { GROUND_STATION_COUNTRY_OPTIONS } from '@/constants/groundStationCountries'
 import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
 import {
-  deleteBaseStations,
+  createGroundStation,
+  deleteGroundStation,
   getGroundStationList,
-  saveOrUpdateBaseStation,
-  type BaseStationInfo,
-} from '@/api/system/satellite-system-api'
+  updateGroundStation,
+} from '@/api/ground-station/ground-station'
+import type { GroundStation, GroundStationUpsertPayload } from '@/types/ground-station/groundstation'
+
+/** 地面站弹窗表单。 */
+type GroundStationFormModel = GroundStationUpsertPayload & { id?: number }
 import type { Weapon } from '@/types/dashboard'
 
 /** 任务装配页的资源类型。 */
@@ -259,8 +281,6 @@ export type TaskAssembleKind =
   | 'satellite'
   /** 地面接收站 */
   | 'station'
-  /** 数据中心 */
-  | 'center'
   /** 打击或干扰武器 */
   | 'weapon'
 
@@ -364,9 +384,12 @@ const saving = ref(false)
 /** 删除中。 */
 const deleting = ref(false)
 /** 国家下拉选项。 */
+/** 武器等国家下拉（接口）；地面站使用 `groundStationCountryOptions`。 */
 const countries = ref<string[]>([])
+/** 地面站国家选项（写死，后期改字典）。 */
+const groundStationCountryOptions = GROUND_STATION_COUNTRY_OPTIONS
 /** 地面站/数据中心原始数据缓存，供编辑回填。 */
-const stationRawMap = reactive<Record<string, BaseStationInfo>>({})
+const stationRawMap = reactive<Record<string, GroundStation>>({})
 /** 武器原始数据缓存，供编辑回填。 */
 const weaponRawMap = reactive<Record<string, Weapon>>({})
 
@@ -385,7 +408,6 @@ const weaponFormRef = ref<FormInstance>()
 const candidatePool = reactive<Record<TaskAssembleKind, TaskAssembleRow[]>>({
   satellite: [],
   station: [],
-  center: [],
   weapon: [],
 })
 
@@ -417,22 +439,7 @@ const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
     columns: [
       { prop: 'country', label: '国家', width: 72 },
       { prop: 'name', label: '名称', minWidth: 112, flex: true },
-      { prop: 'type', label: '类型', minWidth: 120 },
-      { prop: 'extra1', label: '经度', minWidth: 120 },
-      { prop: 'extra2', label: '纬度', minWidth: 120 },
-    ],
-  },
-  center: {
-    title: '数据中心装配',
-    description: '选择本任务回传与处理使用的数据中心，可在此新增或修改数据中心资源。',
-    searchPlaceholder: '名称 / 国家',
-    typePlaceholder: '中心类型',
-    typeOptions: [],
-    seriesOptions: [],
-    columns: [
-      { prop: 'country', label: '国家', width: 72 },
-      { prop: 'name', label: '名称', minWidth: 112, flex: true },
-      { prop: 'type', label: '类型', minWidth: 120 },
+      { prop: 'type', label: '站号', minWidth: 100 },
       { prop: 'extra1', label: '经度', minWidth: 120 },
       { prop: 'extra2', label: '纬度', minWidth: 120 },
     ],
@@ -493,7 +500,7 @@ const assembleColumnTableProps = (col: AssembleColumn): { width?: number; minWid
  * 返回：满足种类时为 `true`，否则为 `false`。
  * 作用：控制资源弹窗、删除与候选池 CRUD 能力是否可用。
  */
-const crudEnabled = computed(() => props.kind === 'station' || props.kind === 'center' || props.kind === 'weapon')
+const crudEnabled = computed(() => props.kind === 'station' || props.kind === 'weapon')
 
 /**
  * 计算：当前种类是否需要从接口加载候选列表。
@@ -510,11 +517,11 @@ const apiEnabled = computed(() => crudEnabled.value || props.kind === 'satellite
 const isSatelliteKind = computed(() => props.kind === 'satellite')
 
 /**
- * 计算：当前是否为地面站或数据中心装配页。
- * 返回：种类为 `station` 或 `center` 时为 `true`。
+ * 计算：当前是否为地面站装配页。
+ * 返回：种类为 `station` 时为 `true`。
  * 作用：共用基站表单与编辑弹窗时区分资源类型。
  */
-const isStationKind = computed(() => props.kind === 'station' || props.kind === 'center')
+const isStationKind = computed(() => props.kind === 'station')
 
 /**
  * 计算：当前是否为武器装配页。
@@ -579,39 +586,31 @@ const typeFilterOptions = computed(() => {
 const candidateTotalText = computed(() => String(filteredCandidates.value.length))
 
 /**
- * 计算：新建地面站/数据中心表单中类型字段的占位提示。
- * 返回：数据中心为示例云类型文案，地面站为示例接收/测控站文案。
- * 作用：引导用户填写与当前种类相符的类型说明。
+ * 创建空白地面站表单。
+ * @returns 默认地面站信息对象
  */
-const stationTypePlaceholder = computed(() =>
-  props.kind === 'center' ? '例如 中心云 / 区域中心' : '例如 接收站 / 测控站'
-)
-
-/**
- * 创建空白地面站/数据中心表单。
- * @returns 默认基站信息对象
- */
-const createEmptyStationForm = (): BaseStationInfo => ({
+const createEmptyStationForm = (): GroundStationFormModel => ({
   name: '',
-  type: props.kind === 'center' ? '中心云' : '接收站',
+  code: '',
   country: '',
-  latLon: '',
-  location: '',
-  function: '',
-  introduction: '',
+  longitude: 0,
+  latitude: 0,
+  altitude: 0,
+  description: '',
 })
 
 /** 地面站/数据中心编辑表单。 */
-const stationForm = reactive<BaseStationInfo>(createEmptyStationForm())
+const stationForm = reactive<GroundStationFormModel>(createEmptyStationForm())
 
 /** 地面站/数据中心表单校验规则。 */
-const stationRules = reactive<FormRules<BaseStationInfo>>({
+const stationRules = reactive<FormRules<GroundStationFormModel>>({
   name: { required: true, message: '请输入名称', trigger: 'blur' },
-  type: { required: true, message: '请输入类型', trigger: 'blur' },
+  code: { required: true, message: '请输入站号编码', trigger: 'blur' },
   country: { required: true, message: '请选择所属国家/地区', trigger: 'change' },
-  latLon: { required: true, message: '请输入经纬度', trigger: 'blur' },
-  location: { required: true, message: '请输入位置', trigger: 'blur' },
-  function: { required: true, message: '请输入功能', trigger: 'blur' },
+  longitude: { required: true, message: '请输入经度', trigger: 'blur', type: 'number' },
+  latitude: { required: true, message: '请输入纬度', trigger: 'blur', type: 'number' },
+  altitude: { required: true, message: '请输入高度', trigger: 'blur', type: 'number' },
+  description: { required: true, message: '请输入描述', trigger: 'blur' },
 })
 
 /**
@@ -619,7 +618,7 @@ const stationRules = reactive<FormRules<BaseStationInfo>>({
  * 返回：表单含 `_id` 时为「修改资源」，否则为「添加资源」。
  * 作用：区分新增与编辑模式的弹窗标题展示。
  */
-const stationDialogTitle = computed(() => (stationForm._id ? '修改资源' : '添加资源'))
+const stationDialogTitle = computed(() => (stationForm.id ? '修改资源' : '添加资源'))
 
 /**
  * 创建空白武器表单。
@@ -670,46 +669,20 @@ const formatCoordinateDisplay = (value: string | number | null | undefined): str
 }
 
 /**
- * 解析经纬度字符串，展示时保留三位小数。
- *
- * @param latLon 格式为 "经度,纬度"
- * @returns 经度、纬度展示文案
+ * 将地面站信息映射为装配表格行。
+ * @param station 地面站原始数据
  */
-const parseLatLon = (latLon: string): { lng: string; lat: string } => {
-  const parts = (latLon || '').split(',').map((item) => item.trim())
-  return {
-    lng: parts[0] ? formatCoordinateDisplay(parts[0]) : '--',
-    lat: parts[1] ? formatCoordinateDisplay(parts[1]) : '--',
-  }
-}
-
-/**
- * 判断基站类型是否属于数据中心。
- * @param type 基站类型文案
- */
-const isDataCenterType = (type: string): boolean => {
-  const value = type || ''
-  return value.includes('中心') || value.includes('数据') || value.includes('云')
-}
-
-/**
- * 将基站信息映射为装配表格行。
- * @param station 基站原始数据
- */
-const stationToRow = (station: BaseStationInfo): TaskAssembleRow => {
-  const { lng, lat } = parseLatLon(station.latLon)
-  const id = station._id || station.name
-  if (station._id) {
-    stationRawMap[station._id] = station
-  }
+const stationToRow = (station: GroundStation): TaskAssembleRow => {
+  const id = String(station.id)
+  stationRawMap[id] = station
   return {
     id,
     name: station.name,
     series: '',
-    type: station.type,
+    type: station.code,
     country: station.country,
-    extra1: lng,
-    extra2: lat,
+    extra1: formatCoordinateDisplay(station.longitude),
+    extra2: formatCoordinateDisplay(station.latitude),
   }
 }
 
@@ -1241,16 +1214,11 @@ const loadSeriesOptions = async () => {
  * 从接口加载地面站或数据中心候选列表。
  */
 const loadStationCandidates = async () => {
-  const res = await getGroundStationList({ type: '', name: '', country: '' })
-  const list = res.code === 200 ? (res.data ?? []) : []
-  const filtered = list.filter((item) =>
-    props.kind === 'center' ? isDataCenterType(item.type) : !isDataCenterType(item.type)
-  )
+  const res = await getGroundStationList({ status: 1 })
+  const filtered = res.code === 200 ? (res.data ?? []).filter((item) => item.status === 1) : []
   Object.keys(stationRawMap).forEach((key) => delete stationRawMap[key])
-  candidatePool.station = []
-  candidatePool.center = []
   const rows = filtered.map(stationToRow)
-  candidatePool[props.kind] = rows
+  candidatePool.station = rows
 }
 
 /**
@@ -1270,12 +1238,7 @@ const enrichAssembledFromPool = () => {
     return
   }
   const poolById = new Map<string, TaskAssembleRow>()
-  const pools =
-    props.kind === 'center'
-      ? candidatePool.center
-      : props.kind === 'station'
-        ? candidatePool.station
-        : candidatePool.weapon
+  const pools = props.kind === 'station' ? candidatePool.station : candidatePool.weapon
   pools.forEach((row) => poolById.set(row.id, row))
   assembledRows.value = assembledRows.value.map((row) => {
     const matched = poolById.get(row.id)
@@ -1408,7 +1371,9 @@ const submitStationForm = async () => {
     if (!valid) return
     saving.value = true
     try {
-      const res = await saveOrUpdateBaseStation({ ...stationForm })
+      const res = stationForm.id
+        ? await updateGroundStation({ ...stationForm, id: stationForm.id })
+        : await createGroundStation({ ...stationForm })
       if (res.code === 200) {
         ElMessage.success(`${stationDialogTitle.value}成功`)
         stationDialogVisible.value = false
@@ -1422,15 +1387,15 @@ const submitStationForm = async () => {
 
 /** 删除当前编辑中的地面站/数据中心。 */
 const handleDeleteStation = async () => {
-  if (!stationForm._id) return
+  if (!stationForm.id) return
   await ElMessageBox.confirm(`确定删除「${stationForm.name}」吗？`, '提示', { type: 'warning' })
   deleting.value = true
   try {
-    const res = await deleteBaseStations([stationForm._id])
+    const res = await deleteGroundStation(stationForm.id)
     if (res.code === 200) {
       ElMessage.success('删除成功')
       stationDialogVisible.value = false
-      assembledRows.value = assembledRows.value.filter((row) => row.id !== stationForm._id)
+      assembledRows.value = assembledRows.value.filter((row) => row.id !== String(stationForm.id))
       await loadCandidatePool()
     }
   } finally {
@@ -1558,7 +1523,11 @@ onMounted(async () => {
     return
   }
   if (crudEnabled.value) {
-    await Promise.all([loadCountries(), loadCandidatePool()])
+    const tasks: Promise<void>[] = [loadCandidatePool()]
+    if (isWeaponKind.value) {
+      tasks.push(loadCountries())
+    }
+    await Promise.all(tasks)
   }
 })
 

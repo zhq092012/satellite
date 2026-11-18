@@ -124,7 +124,7 @@ const routes: Array<RouteRecordRaw> = [
           {
             path: 'ground-stations',
             name: 'GroundStationManage',
-            component: () => import('@/views/basestations/BaseStationList.vue'),
+            component: () => import('@/views/ground-stations/GroundStations.vue'),
             meta: {
               title: '地面站管理',
               icon: 'icon-basestation',
@@ -133,20 +133,6 @@ const routes: Array<RouteRecordRaw> = [
               roles: ['admin'],
               permission: 'system:basestations:list',
               stationScope: 'ground',
-            },
-          },
-          {
-            path: 'data-centers',
-            name: 'DataCenterManage',
-            component: () => import('@/views/basestations/BaseStationList.vue'),
-            meta: {
-              title: '数据中心管理',
-              icon: 'icon-basestation',
-              showInMenu: false,
-              requiresAuth: true,
-              roles: ['admin'],
-              permission: 'system:basestations:list',
-              stationScope: 'center',
             },
           },
           {

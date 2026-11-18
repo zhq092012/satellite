@@ -24,8 +24,6 @@ export interface C2TaskEditorDraft {
   selectedWeaponIds: string[]
   /** 已选地面接收站 ID */
   selectedReceiveIds: string[]
-  /** 已选数据中心 ID */
-  stationIds: string[]
   /** 链路时延（分钟） */
   delayMin: number
   /** 覆盖率（0–100） */
@@ -191,7 +189,6 @@ export const createDraftFromTask = (task: TaskForm | null | undefined): C2TaskEd
   const resources = task.resources ?? []
   const selectedSeries = resources.map((item) => item.series).filter(Boolean)
   const selectedReceiveIds = [...new Set(resources.flatMap((item) => item.receiveIds ?? []))]
-  const stationIds = [...new Set(resources.flatMap((item) => item.stationIds ?? []))]
   return {
     taskId: task.id,
     beginDate: normalizeTaskDateTime(task.beginDate),
@@ -199,7 +196,6 @@ export const createDraftFromTask = (task: TaskForm | null | undefined): C2TaskEd
     selectedSeries,
     selectedWeaponIds: [...(task.weaponIds ?? [])],
     selectedReceiveIds,
-    stationIds,
     delayMin: Number.isFinite(task.delayMin) ? Number(task.delayMin) : 60,
     coverage: Number.isFinite(task.coverage) ? Number(task.coverage) : 50,
     targetTypeShow: resolveTaskTargetTypesFromForm(task),
@@ -208,7 +204,7 @@ export const createDraftFromTask = (task: TaskForm | null | undefined): C2TaskEd
 }
 
 /**
- * 构建 updateTask 所需的 resources 列表（各系列共享同一组地面站/数据中心）。
+ * 构建 updateTask 所需的 resources 列表（各系列共享同一组地面接收站）。
  *
  * @param draft 编辑草稿
  * @returns resources 数组
@@ -217,7 +213,7 @@ export const buildTaskResourcesFromDraft = (draft: C2TaskEditorDraft): TaskResou
   draft.selectedSeries.map((series) => ({
     series,
     receiveIds: [...draft.selectedReceiveIds],
-    stationIds: [...draft.stationIds],
+    stationIds: [],
   }))
 
 /**
@@ -261,13 +257,3 @@ export const buildSeriesOptionsFromApiData = (
   return Array.from(new Set(merged.filter(Boolean))).sort((a, b) => a.localeCompare(b, 'zh-CN'))
 }
 
-/**
- * 判断基站类型是否属于数据中心（与 TaskAssembleTab 一致）。
- *
- * @param type 基站类型文案
- * @returns 是否为数据中心
- */
-export const isDataCenterStationType = (type: string): boolean => {
-  const value = type || ''
-  return value.includes('中心') || value.includes('数据') || value.includes('云')
-}

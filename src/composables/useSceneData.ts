@@ -10,12 +10,9 @@ import {
   getSatelliteTLEData,
   getTaskWeapons,
 } from '@/api/dashboard'
-import {
-  getGroundStationList,
-  getMissileBaseListAll,
-  type BaseStationInfo,
-  type MissileBaseInfo,
-} from '@/api/system/satellite-system-api'
+import { getGroundStationList } from '@/api/ground-station/ground-station'
+import { getMissileBaseListAll, type MissileBaseInfo } from '@/api/system/satellite-system-api'
+import type { GroundStation } from '@/types/ground-station/groundstation'
 import {
   getStrikePlanList,
   type StrikePlanV2Extended,
@@ -32,7 +29,7 @@ export function useSceneData() {
   const taskSatellites = ref<BlueSatelliteRecord[]>([])
   const taskWeapons = ref<Weapon[]>([])
   const missileBases = ref<MissileBaseInfo[]>([])
-  const baseStations = ref<BaseStationInfo[]>([])
+  const baseStations = ref<GroundStation[]>([])
   const historicalPlans = ref<StrikePlanV2Extended[]>([])
   const preloadedHistoricalPlanTaskId = ref<number | null>(null)
   const loadingScene = ref(false)
@@ -260,7 +257,7 @@ export function useSceneData() {
           blueCountries.length ? blueCountries : undefined
         ),
         getTaskWeapons(taskId, redCountries.length ? redCountries : undefined),
-        getGroundStationList({ type: '', name: '', country: '' }),
+        getGroundStationList({ status: 1 }),
         getMissileBaseListAll({ country: '', name: '' }),
       ])
 
