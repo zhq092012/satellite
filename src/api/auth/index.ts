@@ -53,7 +53,7 @@ export interface PermissionInfo {
 }
 export interface LoginResponse {
   userInfo: UserInfo
-  role: RoleInfo[]
+  roles: RoleInfo[]
   permissions: PermissionInfo[]
   menuTree: MenuItem[]
   token: string

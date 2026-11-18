@@ -64,7 +64,7 @@ export default defineConfig(({ mode }) => {
         },
         '/api': {
           // target: 'http://192.168.100.12:32180',
-          target: 'http://192.168.52.72:34126',
+          target: 'http://192.168.52.72:34127',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },

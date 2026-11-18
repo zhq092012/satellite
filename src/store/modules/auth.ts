@@ -47,7 +47,7 @@ export const useAuthStore = defineStore('auth', {
     setAuth(data: LoginResponse) {
       this.token = data.token
       this.userInfo = data.userInfo
-      this.roles = normalizeRoles(data.role)
+      this.roles = normalizeRoles(data.roles)
       this.permissions = data.permissions.map((permission) => permission.permission).filter(Boolean)
       this.menuTree = data.menuTree
       resetRequestGuard()
