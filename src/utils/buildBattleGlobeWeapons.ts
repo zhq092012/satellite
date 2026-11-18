@@ -1,4 +1,5 @@
-import type { SatelliteAnalysisData } from '@/api/task/task'
+import type { SatelliteAnalysisData } from "@/types/task/task"
+
 
 /** 武器提取所需的最小武器字段（兼容 task / electronic 两套 Weapon） */
 export interface BattleGlobeWeaponSource {
@@ -96,21 +97,21 @@ export const buildBattleGlobeWeaponsFromSatelliteMatrices = (
   const weaponMap = new Map<string, BattleGlobeWeapon>()
 
   matrices.forEach((matrix) => {
-    ;(matrix.weapons || []).forEach((weapon) => {
+    ; (matrix.weapons || []).forEach((weapon) => {
       const item = toBattleGlobeWeapon(weapon)
       if (item && !weaponMap.has(item.id)) {
         weaponMap.set(item.id, item)
       }
     })
 
-    ;(matrix.stationWindows || []).forEach((window) => {
-      ;(window.weapons || []).forEach((weapon) => {
-        const item = toBattleGlobeWeapon(weapon)
-        if (item && !weaponMap.has(item.id)) {
-          weaponMap.set(item.id, item)
-        }
+      ; (matrix.stationWindows || []).forEach((window) => {
+        ; (window.weapons || []).forEach((weapon) => {
+          const item = toBattleGlobeWeapon(weapon)
+          if (item && !weaponMap.has(item.id)) {
+            weaponMap.set(item.id, item)
+          }
+        })
       })
-    })
   })
 
   return Array.from(weaponMap.values())

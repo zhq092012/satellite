@@ -1,4 +1,4 @@
-import type { SatelliteAnalysisData } from '@/api/task/task'
+
 import type { C2ResourceSatelliteRow } from '@/utils/buildC2ResourceCatalog'
 import { buildC2SatelliteFlatRowsFromMatrix } from '@/utils/buildC2ResourceCatalog'
 import { TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
@@ -8,6 +8,7 @@ import {
   buildCombatScenarioCompositeKey,
   loadCombatScenarioForTask,
 } from '@/config/combatScenarioOptions'
+import type { SatelliteAnalysisData } from '@/types/task/task'
 
 /** 目标攻击度分析表格行（展示用） */
 export interface HomeAttackAnalysisTableRow {
@@ -145,9 +146,9 @@ export function buildHomeAttackAnalysisRowsFromMatrix(
 
   const catalogByName = new Map<string, C2ResourceSatelliteRow>()
   const matrixRows = buildC2SatelliteFlatRowsFromMatrix(data, enemyCountries)
-  ;[...matrixRows, ...catalogRows].forEach((row) => {
-    if (row.name) catalogByName.set(row.name.trim(), row)
-  })
+    ;[...matrixRows, ...catalogRows].forEach((row) => {
+      if (row.name) catalogByName.set(row.name.trim(), row)
+    })
 
   const bg = resolveBackgroundWeightForTask(taskId)
   const fallbackCountry = enemyCountries.length === 1 ? enemyCountries[0] : '--'

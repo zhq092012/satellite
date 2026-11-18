@@ -123,6 +123,7 @@ import {
   type C2TaskEditorDraft,
 } from '@/utils/c2TaskPanelEditor'
 import {
+  parseSeriesApiBuckets,
   buildC2ResourceTreeNodesForPanel,
   buildC2SatelliteFlatRowsFromMatrix,
   buildC2SatelliteFlatRowsFromSeriesFallback,
@@ -130,7 +131,6 @@ import {
   expandCheckedKeysToSeriesNames,
   filterC2ResourceRowsToPanelCountries,
   mergeMatrixCatalogIntoPanelCatalog,
-  parseSeriesApiBuckets,
   type C2ResourceSatelliteRow,
   type C2ResourceTreeNode,
   type C2SeriesPreviewSatellite,
@@ -750,7 +750,7 @@ onUnmounted(() => {
       gap: 6px;
       line-height: 1.2;
 
-      & + & {
+      &+& {
         padding-top: 4px;
       }
     }

@@ -195,13 +195,6 @@ const rules = reactive<FormRules<BaseStationInfo>>({
 // const canDelete = computed(() => hasPermission(authStore.permissions, ['system:weapon:delete']))
 
 /**
- * 计算：当前列表中不重复的国家/地区数量。
- * 返回：对 `stations` 的 `country` 去空后 Set 的大小。
- * 作用：统计卡片展示覆盖国家数。
- */
-const countryCount = computed(() => new Set(stations.value.map((item) => item.country).filter(Boolean)).size)
-
-/**
  * 计算：基站新增/编辑弹窗标题。
  * 返回：有 `_id` 时为「编辑{pageTitle}」，否则为「新增{pageTitle}」。
  * 作用：弹窗标题区分新增与编辑及当前页面资源类型。

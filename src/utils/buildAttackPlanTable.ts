@@ -1,4 +1,5 @@
-import type { AttackPlan, SatelliteAnalysisData } from '@/api/task/task'
+
+import type { AttackPlan, SatelliteAnalysisData } from '@/types/task/task'
 import { buildBattleGlobeWeapons, resolveWeaponIdByName } from '@/utils/buildBattleGlobeWeapons'
 import { parseFeedbackTimestamp } from '@/utils/zhchPlanDisplay'
 

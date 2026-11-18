@@ -1,4 +1,5 @@
-import type { SatelliteAnalysisData } from '@/api/task/task'
+import type { SatelliteAnalysisData } from "@/types/task/task"
+
 
 /** 卫星指标表格行（展示用） */
 export interface SatelliteMetricTableRow {
@@ -34,6 +35,8 @@ export interface SatelliteMetricTableRow {
   threatReduceText: string
   /** 打击前覆盖率（排序用） */
   coverageBefore: number | null
+  /** 打击后覆盖率（排序与文案推断用） */
+  coverageAfter: number | null
   /** 打击前链路时延（分钟，排序用） */
   delayBefore: number | null
   /** 打击前威胁度（排序用） */
@@ -262,25 +265,26 @@ const toDisplayRow = (row: SatelliteMetricAccumulator): SatelliteMetricTableRow 
   const trueDelayAfter = resolveTrueDelayAfter(row.delayBefore, row.delayIncrease)
 
   return {
-  rowKey: row.rowKey,
-  norad: row.norad,
-  name: row.name,
-  series: row.series,
-  sysType: row.sysType,
-  usage: row.usage,
-  coverageBeforeText: formatSatelliteCoverage(row.coverageBefore),
-  coverageAfterText: formatSatelliteCoverage(row.coverageAfter),
-  coverageReduceText: formatSatelliteCoverageReduce(row.coverageBefore, row.coverageAfter),
-  delayBeforeText: formatSatelliteDelayMinutes(row.delayBefore),
-  delayAfterText: formatSatelliteDelayMinutes(trueDelayAfter),
-  delayIncreaseText: formatSatelliteDelayIncrease(row.delayIncrease),
-  threatBeforeText: formatSatelliteThreat(row.threatBefore),
-  threatAfterText: formatSatelliteThreat(row.threatAfter),
-  threatReduceText: formatSatelliteThreatReduce(row.threatBefore, row.threatAfter),
-  coverageBefore: row.coverageBefore,
-  delayBefore: row.delayBefore,
-  threatBefore: row.threatBefore,
-  threatAfter: row.threatAfter,
+    rowKey: row.rowKey,
+    norad: row.norad,
+    name: row.name,
+    series: row.series,
+    sysType: row.sysType,
+    usage: row.usage,
+    coverageBeforeText: formatSatelliteCoverage(row.coverageBefore),
+    coverageAfterText: formatSatelliteCoverage(row.coverageAfter),
+    coverageReduceText: formatSatelliteCoverageReduce(row.coverageBefore, row.coverageAfter),
+    delayBeforeText: formatSatelliteDelayMinutes(row.delayBefore),
+    delayAfterText: formatSatelliteDelayMinutes(trueDelayAfter),
+    delayIncreaseText: formatSatelliteDelayIncrease(row.delayIncrease),
+    threatBeforeText: formatSatelliteThreat(row.threatBefore),
+    threatAfterText: formatSatelliteThreat(row.threatAfter),
+    threatReduceText: formatSatelliteThreatReduce(row.threatBefore, row.threatAfter),
+    coverageBefore: row.coverageBefore,
+    coverageAfter: row.coverageAfter,
+    delayBefore: row.delayBefore,
+    threatBefore: row.threatBefore,
+    threatAfter: row.threatAfter,
   }
 }
 
@@ -456,44 +460,44 @@ export const buildSatelliteAnalysisTableRows = (
     const series = entity?.series?.trim() || EMPTY_TEXT
     const sysType = entity?.sysType?.trim() || EMPTY_TEXT
 
-    ;(entity?.initMatrixList || []).forEach((sat) => {
-      const norad = normalizeNorad(sat?.norad)
-      if (norad == null) return
-      upsert(series, sysType, norad, {
-        name: sat?.name,
-        usage: sat?.usage?.trim() || undefined,
-        coverageBefore: isValidNumber(sat?.coverage) ? sat.coverage : null,
+      ; (entity?.initMatrixList || []).forEach((sat) => {
+        const norad = normalizeNorad(sat?.norad)
+        if (norad == null) return
+        upsert(series, sysType, norad, {
+          name: sat?.name,
+          usage: sat?.usage?.trim() || undefined,
+          coverageBefore: isValidNumber(sat?.coverage) ? sat.coverage : null,
+        })
       })
-    })
 
-    ;(entity?.satelliteMatrixList || []).forEach((sat) => {
-      const norad = normalizeNorad(sat?.norad)
-      if (norad == null) return
-      upsert(series, sysType, norad, {
-        name: sat?.name,
-        coverageAfter: isValidNumber(sat?.coverage) ? sat.coverage : null,
+      ; (entity?.satelliteMatrixList || []).forEach((sat) => {
+        const norad = normalizeNorad(sat?.norad)
+        if (norad == null) return
+        upsert(series, sysType, norad, {
+          name: sat?.name,
+          coverageAfter: isValidNumber(sat?.coverage) ? sat.coverage : null,
+        })
       })
-    })
 
-    ;(entity?.timeEffects || []).forEach((item) => {
-      const norad = normalizeNorad(item?.norad)
-      if (norad == null) return
-      upsert(series, sysType, norad, {
-        name: item?.name,
-        delayBefore: isValidNumber(item?.duration) ? item.duration : null,
-        delayIncrease: isValidNumber(item?.afterDuration) ? item.afterDuration : null,
+      ; (entity?.timeEffects || []).forEach((item) => {
+        const norad = normalizeNorad(item?.norad)
+        if (norad == null) return
+        upsert(series, sysType, norad, {
+          name: item?.name,
+          delayBefore: isValidNumber(item?.duration) ? item.duration : null,
+          delayIncrease: isValidNumber(item?.afterDuration) ? item.afterDuration : null,
+        })
       })
-    })
 
-    ;(entity?.threatSats || []).forEach((item) => {
-      const norad = normalizeNorad(item?.norad)
-      if (norad == null) return
-      upsert(series, sysType, norad, {
-        name: item?.name,
-        threatBefore: isValidNumber(item?.threatScore) ? item.threatScore : null,
-        threatAfter: isValidNumber(item?.afterThreatScore) ? item.afterThreatScore : null,
+      ; (entity?.threatSats || []).forEach((item) => {
+        const norad = normalizeNorad(item?.norad)
+        if (norad == null) return
+        upsert(series, sysType, norad, {
+          name: item?.name,
+          threatBefore: isValidNumber(item?.threatScore) ? item.threatScore : null,
+          threatAfter: isValidNumber(item?.afterThreatScore) ? item.afterThreatScore : null,
+        })
       })
-    })
   })
 
   return Array.from(map.values())

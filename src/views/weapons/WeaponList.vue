@@ -115,11 +115,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { createWeapon, deleteWeapon, getAllWeapons, getBattleCountrys, updateWeapon } from '@/api/dashboard'
-import { useAuthStore } from '@/store/modules/auth'
-import { hasPermission } from '@/utils/permission'
 import type { Weapon } from '@/types/dashboard'
-
-const authStore = useAuthStore()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -189,19 +185,6 @@ const rules = reactive<FormRules<Weapon>>({
 // const canCreate = computed(() => hasPermission(authStore.permissions, ['system:weapon:add']))
 // const canEdit = computed(() => hasPermission(authStore.permissions, ['system:weapon:edit']))
 // const canDelete = computed(() => hasPermission(authStore.permissions, ['system:weapon:delete']))
-
-/**
- * 计算：武器列表总条数。
- * 返回：`weapons` 数组长度。
- * 作用：页头或统计区展示武器总量。
- */
-const totalCount = computed(() => weapons.value.length)
-/**
- * 计算：武器列表涉及的不重复国家数。
- * 返回：对 `country` 去空后 Set 大小。
- * 作用：统计卡片展示国家覆盖数。
- */
-const countryCount = computed(() => new Set(weapons.value.map((item) => item.country).filter(Boolean)).size)
 
 /**
  * 计算：按查询表单多条件过滤后的武器列表。

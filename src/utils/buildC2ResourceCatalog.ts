@@ -1,7 +1,6 @@
-import type { LevelSeriesEntity } from '@/api/task/task'
-import type { SatelliteAnalysisData } from '@/api/task/task'
-import type { SatelliteSeriesData } from '@/api/task/task'
+
 import { normalizeSatelliteUsageLabel, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
+import type { LevelSeriesEntity, SatelliteAnalysisData, SatelliteSeriesData } from '@/types/task/task'
 
 /** C2 左侧面板资源树固定展示的国家/地区（与作战对象三项一致） */
 export const C2_PANEL_TREE_COUNTRIES: readonly string[] = TASK_ENEMY_COUNTRY_OPTIONS
@@ -209,33 +208,33 @@ export function buildC2ResourceTreeNodes(rows: C2ResourceSatelliteRow[]): C2Reso
   sortedCountries.forEach((country) => {
     const sysMap = root.get(country)!
     const sysTypeNodes: C2ResourceTreeNode[] = []
-    ;[...sysMap.keys()].sort((a, b) => a.localeCompare(b, 'zh-CN')).forEach((sysType) => {
-      const usageMap = sysMap.get(sysType)!
-      const usageNodes: C2ResourceTreeNode[] = []
-      ;[...usageMap.keys()].sort((a, b) => a.localeCompare(b, 'zh-CN')).forEach((usage) => {
-        const seriesSet = usageMap.get(usage)!
-        const seriesNodes: C2ResourceTreeNode[] = [...seriesSet]
-          .sort((a, b) => a.localeCompare(b, 'zh-CN'))
-          .map((seriesName) => ({
-            id: buildSeriesNodeId(country, sysType, usage, seriesName),
-            label: seriesName,
-            kind: 'series' as const,
-            seriesName,
-          }))
-        usageNodes.push({
-          id: `usage|${encodePart(country)}|${encodePart(sysType)}|${encodePart(usage)}`,
-          label: usage,
-          kind: 'usage',
-          children: seriesNodes,
+      ;[...sysMap.keys()].sort((a, b) => a.localeCompare(b, 'zh-CN')).forEach((sysType) => {
+        const usageMap = sysMap.get(sysType)!
+        const usageNodes: C2ResourceTreeNode[] = []
+          ;[...usageMap.keys()].sort((a, b) => a.localeCompare(b, 'zh-CN')).forEach((usage) => {
+            const seriesSet = usageMap.get(usage)!
+            const seriesNodes: C2ResourceTreeNode[] = [...seriesSet]
+              .sort((a, b) => a.localeCompare(b, 'zh-CN'))
+              .map((seriesName) => ({
+                id: buildSeriesNodeId(country, sysType, usage, seriesName),
+                label: seriesName,
+                kind: 'series' as const,
+                seriesName,
+              }))
+            usageNodes.push({
+              id: `usage|${encodePart(country)}|${encodePart(sysType)}|${encodePart(usage)}`,
+              label: usage,
+              kind: 'usage',
+              children: seriesNodes,
+            })
+          })
+        sysTypeNodes.push({
+          id: `sysType|${encodePart(country)}|${encodePart(sysType)}`,
+          label: sysType,
+          kind: 'sysType',
+          children: usageNodes,
         })
       })
-      sysTypeNodes.push({
-        id: `sysType|${encodePart(country)}|${encodePart(sysType)}`,
-        label: sysType,
-        kind: 'sysType',
-        children: usageNodes,
-      })
-    })
     countryNodes.push({
       id: `country|${encodePart(country)}`,
       label: country,

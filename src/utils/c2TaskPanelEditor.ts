@@ -1,5 +1,6 @@
-import type { TaskCombatArea, TaskForm, TaskResourceItem } from '@/api/task/task'
+
 import { TASK_PANEL_SATELLITE_TYPES as MISSION_TASK_TYPES } from '@/constants/missionSatellite'
+import type { TaskCombatArea, TaskForm, TaskResourceItem } from '@/types/task/task'
 
 /** 标签候选项（系列名或资源 ID + 展示名） */
 export interface TaskPanelTagOption {

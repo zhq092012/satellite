@@ -1,5 +1,5 @@
+import type { SatelliteAnalysisData } from '@/types/task/task'
 import * as satellitejs from 'satellite.js'
-import type { SatelliteAnalysisData } from '@/api/task/task'
 
 /** 地球渲染所需的最小卫星字段（兼容 task / electronic 两套 InitMatrix） */
 export interface BattleGlobeSatelliteSource {

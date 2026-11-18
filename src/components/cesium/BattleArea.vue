@@ -6,15 +6,14 @@
       <el-button type="danger" round size="small" icon="Delete" @click="clearAll">清除区域</el-button>
       <span style="padding-left: 10px; color: red; font-weight: bold">
         ① 点击开始创建区域按钮,依次点击鼠标左键，需要完成创建时点击鼠标右键。②点击清除区域将会清除已经创建的区域。
-        ③至少应该选择三个坐标点</span
-      >
+        ③至少应该选择三个坐标点</span>
     </div>
   </div>
 </template>
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import * as Cesium from 'cesium'
-import { DrawClosedPolygon } from '@/utils/tools/cesiumPolygon'
+import { DrawClosedPolygon } from '@/utils/tools/drawTaskAreaPolygon'
 let viewer: Cesium.Viewer
 const cesiumContainer = ref<HTMLElement | null>()
 const creditEl = ref<HTMLElement | null>()
@@ -79,9 +78,11 @@ onMounted(() => {
 .cesium-container {
   height: 600px;
   position: relative;
+
   .credit {
     display: none;
   }
+
   .tool-bar {
     width: 100%;
     padding: 5px;

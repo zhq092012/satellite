@@ -1,13 +1,4 @@
-import type {
-  AttackPlan,
-  InitMatrix,
-  InitWindow,
-  LevelSeriesEntity,
-  RelationList,
-  SatelliteAnalysisData,
-  SatelliteMatrix,
-  TimeEffect,
-} from '@/api/task/task'
+
 import type { MatrixResult } from '@/api/electronic'
 import {
   formatSatelliteCoverage,
@@ -20,6 +11,16 @@ import {
 } from '@/utils/buildSatelliteAnalysisTable'
 import { parseReceiveLatLonString } from '@/utils/buildBattleGlobeGroundTargets'
 import * as satellitejs from 'satellite.js'
+import type {
+  AttackPlan,
+  InitMatrix,
+  InitWindow,
+  LevelSeriesEntity,
+  RelationList,
+  SatelliteAnalysisData,
+  SatelliteMatrix,
+  TimeEffect,
+} from '@/types/task/task'
 
 //-----------------------------构建推演时间轴-----------------------------
 // 本函数主要用于构建推演时间轴，将推演事件按照时间顺序排列，并构建推演提示文本。

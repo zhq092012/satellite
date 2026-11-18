@@ -71,7 +71,7 @@ import type {
   TaskRelationEndpointOption,
   TaskTargetRelation,
   TaskTargetRelationKind,
-} from '@/api/task/task'
+} from '@/types/task/task'
 
 /** 表格行（含内部主键） */
 interface RelationRow extends TaskTargetRelation {

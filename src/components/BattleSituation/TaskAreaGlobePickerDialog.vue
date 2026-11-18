@@ -1,14 +1,6 @@
 <template>
-  <el-dialog
-    v-model="dialogVisible"
-    title="从地球选取任务区域"
-    width="960px"
-    align-center
-    append-to-body
-    destroy-on-close
-    class="task-area-picker-dialog"
-    @closed="handleDialogClosed"
-  >
+  <el-dialog v-model="dialogVisible" title="从地球选取任务区域" width="960px" align-center append-to-body destroy-on-close
+    class="task-area-picker-dialog" @closed="handleDialogClosed">
     <div class="picker-form-row">
       <el-form inline label-width="88px">
         <el-form-item label="区域名称">
@@ -55,7 +47,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import * as Cesium from 'cesium'
 import { ElMessage } from 'element-plus'
 import type { TaskArea } from '@/types/task/task'
-import { DrawClosedPolygon } from '@/utils/tools/cesiumPolygon'
+import { DrawClosedPolygon } from '@/utils/tools/drawTaskAreaPolygon'
 import { DrawCircleByDrag } from '@/utils/tools/drawTaskAreaCircle'
 import { buildTaskAreaFromCircle, buildTaskAreaFromPolygon } from '@/utils/taskAreaFromDraw'
 import { setGlobeDrawCameraLocked } from '@/utils/tools/cameraTools'

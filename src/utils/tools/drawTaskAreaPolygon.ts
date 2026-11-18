@@ -178,9 +178,9 @@ class DrawClosedPolygon {
   _clear() {
     this.points = []
     this.positions = []
-    ;[this.tempLine, this.tempPoly].forEach((en) => {
-      if (en) this.viewer.entities.remove(en)
-    })
+      ;[this.tempLine, this.tempPoly].forEach((en) => {
+        if (en) this.viewer.entities.remove(en)
+      })
     this.tempLine = this.tempPoly = null
   }
 }

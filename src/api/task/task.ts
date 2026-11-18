@@ -4,6 +4,18 @@ import { requestAPI } from '@/utils/tools/request'
 import type { Satellite } from '@/types/cesium/satellite'
 import type { SatelliteAnalysisData, SatelliteSeriesData, TaskForm } from '@/types/task/task'
 
+export type {
+  SatelliteAnalysisData,
+  SatelliteSeriesData,
+  TaskForm,
+  TaskArea,
+  TaskCombatArea,
+  TaskResourceItem,
+  TaskRelationEndpointOption,
+  TaskTargetRelation,
+  TaskTargetRelationKind,
+} from '@/types/task/task'
+
 
 
 /**

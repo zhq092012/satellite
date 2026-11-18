@@ -1,4 +1,3 @@
-import type { SatelliteAnalysisData } from '@/api/task/task'
 import type { C2ResourceSatelliteRow } from '@/utils/buildC2ResourceCatalog'
 import {
   buildC2ResourceRowKey,
@@ -13,6 +12,7 @@ import {
 import { sortCountriesForTaskPhase } from '@/components/BattleSituation/analysis/countryAnalysisSort'
 import { parseFeedbackTimeAndLink } from '@/utils/zhchPlanDisplay'
 import * as satellitejs from 'satellite.js'
+import type { SatelliteAnalysisData } from '@/types/task/task'
 
 /** 威胁度分析双表头表格行（展示用） */
 export interface HomeThreatAnalysisTableRow {
@@ -78,14 +78,18 @@ const EMPTY = '--'
  */
 export function formatOrbitalInclinationFromTle(line1: string | undefined, line2: string | undefined): string {
   if (!line1?.trim() || !line2?.trim()) return EMPTY
+  const trimmed1 = line1.trim()
+  const trimmed2 = line2.trim()
+  if (trimmed2.length < 16) return EMPTY
   try {
-    const satrec = satellitejs.twoline2satrec(line1.trim(), line2.trim())
-    const inc = satrec?.inclination
-    if (typeof inc !== 'number' || !Number.isFinite(inc)) return EMPTY
-    return `${inc.toFixed(2)}°`
+    satellitejs.twoline2satrec(trimmed1, trimmed2)
   } catch {
     return EMPTY
   }
+  /** TLE 第二行第 9–16 列为轨道倾角（度） */
+  const inc = Number.parseFloat(trimmed2.slice(8, 16).trim())
+  if (!Number.isFinite(inc)) return EMPTY
+  return `${inc.toFixed(2)}°`
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { MatrixResult } from '@/api/electronic'
-import type { ReceiveObject, RelationList, SatelliteAnalysisData, StationObject } from '@/api/task/task'
+import type { ReceiveObject, RelationList, SatelliteAnalysisData, StationObject } from '@/types/task/task'
 import type { DeductionStationPassWindow } from '@/utils/buildSatelliteDeductionTimeline'
 
 /** 整体态势地球上的地面目标类型 */
