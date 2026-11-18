@@ -174,7 +174,7 @@ function migrateLegacyCombatScenario(legacy: Record<string, unknown>): CombatSce
 }
 
 /**
- * 保存任务作战场景选择（仅前端；待 POST /api/battle/saveTask 扩展字段）。
+ * 保存任务作战场景选择（仅前端；待 POST /api/battle-task 扩展字段）。
  */
 export function saveCombatScenarioForTask(taskId: number, selection: CombatScenarioSelection): void {
   if (!Number.isFinite(taskId)) return

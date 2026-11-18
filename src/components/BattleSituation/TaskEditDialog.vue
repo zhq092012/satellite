@@ -79,6 +79,48 @@
                 </el-select>
               </div>
             </el-form-item>
+            <el-form-item label="任务区域">
+              <div class="task-areas-block">
+                <div class="task-areas-toolbar">
+                  <el-button type="primary" plain @click="openAreaPicker">在地球上选取</el-button>
+                  <span class="task-areas-hint">支持多个区域；多边形左键选点右键闭合，圆形左键拖拽。</span>
+                </div>
+                <el-table v-if="taskForm.areas.length" :data="taskForm.areas" size="small" border
+                  class="task-areas-table" empty-text="暂无任务区域">
+                  <el-table-column prop="name" label="名称" min-width="140">
+                    <template #default="{ row }">
+                      <el-input v-model="row.name" size="small" maxlength="40" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="类型" width="88" align="center">
+                    <template #default="{ row }">
+                      {{ row.type === 'CIRCLE' ? '圆形' : '多边形' }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="中心 (°)" min-width="168">
+                    <template #default="{ row }">
+                      {{ formatAreaCenter(row) }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="半径(km)" width="100" align="right">
+                    <template #default="{ row }">
+                      {{ formatAreaRadius(row) }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="启用" width="72" align="center">
+                    <template #default="{ row }">
+                      <el-switch v-model="row.enabled" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="72" align="center">
+                    <template #default="{ $index }">
+                      <el-button type="danger" link @click="removeTaskArea($index)">删除</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div v-else class="task-areas-empty">暂无任务区域</div>
+              </div>
+            </el-form-item>
             <el-alert type="info" :closable="false" show-icon :title="COMBAT_SCENARIO_API_HINT"
               class="combat-scenario-hint" />
           </el-form>
@@ -89,8 +131,9 @@
           :target-types="taskForm.targetTypeShow" />
         <TaskAssembleTab ref="stationAssembleRef" v-show="activeTab === 'station'" kind="station"
           :reset-key="assembleResetKey" />
-        <TaskAssembleTab ref="centerAssembleRef" v-show="activeTab === 'center'" kind="center"
-          :reset-key="assembleResetKey" />
+        <TaskTargetRelationTab v-show="activeTab === 'relation'" ref="targetRelationRef" :reset-key="assembleResetKey"
+          :satellite-options="relationSatelliteOptions" :relay-options="relationRelayOptions"
+          :station-options="relationStationOptions" />
         <TaskAssembleTab ref="weaponAssembleRef" v-show="activeTab === 'weapon'" kind="weapon"
           :reset-key="assembleResetKey" />
       </div>
@@ -105,15 +148,17 @@
       </div>
     </template>
   </el-dialog>
+
+  <TaskAreaGlobePickerDialog v-model="areaPickerVisible" :temp-area-id="areaPickerTempId"
+    :default-name="nextAreaDefaultName" @confirm="handleAreaPicked" />
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { getBattleCountrys, updateTask } from '@/api/dashboard'
-import { addTask } from '@/api/task/task'
-import type { TaskForm } from '@/types/dashboard'
+import { getBattleCountrys } from '@/api/dashboard'
+import { createTask, updateTask } from '@/api/task/task'
 import { MISSION_SYS_TYPES, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
 import {
   COMBAT_BACKGROUND_OPTIONS,
@@ -127,18 +172,21 @@ import {
 } from '@/config/combatScenarioOptions'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskAssembleTab, { type TaskAssembleRow } from '@/components/BattleSituation/TaskAssembleTab.vue'
+import TaskTargetRelationTab from '@/components/BattleSituation/TaskTargetRelationTab.vue'
+import TaskAreaGlobePickerDialog from '@/components/BattleSituation/TaskAreaGlobePickerDialog.vue'
+import type { TaskArea, TaskForm, TaskRelationEndpointOption } from '@/types/task/task'
 
 /** 任务弹窗左侧菜单 key。 */
 type TaskEditTabKey =
-  /** 任务基本信息 */
+  /** 基本信息 */
   | 'basic'
-  /** 卫星装配 */
+  /** 卫星配置 */
   | 'satellite'
-  /** 地面站装配 */
+  /** 地面站配置 */
   | 'station'
-  /** 数据中心装配 */
-  | 'center'
-  /** 武器装配 */
+  /** 目标关系配置 */
+  | 'relation'
+  /** 武器配置 */
   | 'weapon'
 
 /** 左侧竖向菜单项。 */
@@ -219,7 +267,63 @@ const expectationSecondaryOptions = computed(() => {
 
 /** 后端未接入作战场景字段的说明 */
 const COMBAT_SCENARIO_API_HINT =
-  '作战背景/预期/阶段当前仅保存至浏览器本地；待 POST /api/battle/saveTask 扩展 combatScenario 字段后同步后端。'
+  '作战背景/预期/阶段当前仅保存至浏览器本地；待 POST /api/battle-task 扩展 combatScenario 字段后同步后端。'
+
+/** 深拷贝任务区域列表，避免编辑时污染原任务对象。 */
+const cloneTaskAreas = (areas?: TaskArea[]): TaskArea[] =>
+  (areas ?? []).map((area) => ({
+    ...area,
+    points: area.points?.map((pt) => ({ lng: pt.lng, lat: pt.lat })) ?? [],
+    center: { lng: area.center.lng, lat: area.center.lat },
+  }))
+
+/** 客户端临时区域 ID 序列（负数，待后端分配正式 ID）。 */
+let tempTaskAreaIdSeq = -1
+const allocTempTaskAreaId = () => {
+  tempTaskAreaIdSeq -= 1
+  return tempTaskAreaIdSeq
+}
+
+const areaPickerVisible = ref(false)
+const areaPickerTempId = ref(-1)
+
+/**
+ * 计算：打开区域选取器时的默认名称。
+ * 返回：`区域N` 字符串。
+ * 作用：区域选取弹窗默认填充名称。
+ */
+const nextAreaDefaultName = computed(() => `区域${taskForm.areas.length + 1}`)
+
+const openAreaPicker = () => {
+  areaPickerTempId.value = allocTempTaskAreaId()
+  areaPickerVisible.value = true
+}
+
+/** 将地球选取结果追加到任务区域列表。 */
+const handleAreaPicked = (area: TaskArea) => {
+  taskForm.areas.push({
+    ...area,
+    points: area.points.map((pt) => ({ ...pt })),
+    center: { ...area.center },
+  })
+}
+
+/** 删除指定下标的任务区域。 */
+const removeTaskArea = (index: number) => {
+  taskForm.areas.splice(index, 1)
+}
+
+const formatAreaCenter = (area: TaskArea): string => {
+  const lng = area.center?.lng
+  const lat = area.center?.lat
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return '--'
+  return `${lng.toFixed(4)}, ${lat.toFixed(4)}`
+}
+
+const formatAreaRadius = (area: TaskArea): string => {
+  if (!Number.isFinite(area.radius)) return '--'
+  return area.radius.toFixed(2)
+}
 
 /** 可编辑任务表单。 */
 const taskForm = reactive<TaskForm>({
@@ -228,7 +332,10 @@ const taskForm = reactive<TaskForm>({
   description: '',
   beginDate: '',
   endDate: '',
+  forecastHour: DEFAULT_TASK_DURATION_HOURS,
+  areas: [],
   targetType: '',
+  targetTypeNew: '',
   targetTypeShow: [],
   meCountry: DEFAULT_ME_COUNTRIES.join(','),
   meCountryShow: [...DEFAULT_ME_COUNTRIES],
@@ -238,6 +345,9 @@ const taskForm = reactive<TaskForm>({
   focusStatus: 0,
   delayMin: 60,
   coverage: 50,
+  weaponIds: [],
+  resources: [],
+  targetRelations: [],
 })
 
 /** 任务表单校验规则。 */
@@ -289,22 +399,55 @@ const dialogTitle = computed(() => (isEdit.value ? '修改任务' : '添加任�
 /** 各装配页组件引用，用于提交时汇总已选资源。 */
 const satelliteAssembleRef = ref<InstanceType<typeof TaskAssembleTab> | null>(null)
 const stationAssembleRef = ref<InstanceType<typeof TaskAssembleTab> | null>(null)
-const centerAssembleRef = ref<InstanceType<typeof TaskAssembleTab> | null>(null)
+const targetRelationRef = ref<InstanceType<typeof TaskTargetRelationTab> | null>(null)
 const weaponAssembleRef = ref<InstanceType<typeof TaskAssembleTab> | null>(null)
 
 /** 左侧竖向菜单。 */
 const taskEditMenus: TaskEditMenuItem[] = [
-  { key: 'basic', label: '任务基本信息' },
-  { key: 'satellite', label: '卫星装配' },
-  { key: 'station', label: '地面站装配' },
-  { key: 'center', label: '数据中心装配' },
-  { key: 'weapon', label: '武器装配' },
+  { key: 'basic', label: '基本信息' },
+  { key: 'satellite', label: '卫星配置' },
+  { key: 'station', label: '地面站配置' },
+  { key: 'relation', label: '目标关系配置' },
+  { key: 'weapon', label: '武器配置' },
 ]
 
 /** 当前右侧内容页。 */
 const activeTab = ref<TaskEditTabKey>('basic')
 /** 装配页重置令牌，弹窗每次打开递增。 */
 const assembleResetKey = ref(0)
+
+/**
+ * 计算：目标关系「卫星（系列）」下拉选项，来自卫星装配页已选系列。
+ * 返回：id/label 列表。
+ * 作用：供目标关系配置 Tab 选择链路边端点。
+ */
+const relationSatelliteOptions = computed((): TaskRelationEndpointOption[] => {
+  const rows = satelliteAssembleRef.value?.getAssembledRows() ?? []
+  return rows.map((row) => ({
+    id: row.id,
+    label: row.name || row.series || row.id,
+  }))
+})
+
+/**
+ * 计算：目标关系「中继卫星」下拉选项。
+ * 返回：已选系列列表；任务含通信类型时与卫星系列同源，否则仍使用已装配系列供演示配置。
+ * 作用：中继端点候选列表。
+ */
+const relationRelayOptions = computed((): TaskRelationEndpointOption[] => relationSatelliteOptions.value)
+
+/**
+ * 计算：目标关系「地面站」下拉选项。
+ * 返回：地面站装配页已选资源。
+ * 作用：地面站端点候选列表。
+ */
+const relationStationOptions = computed((): TaskRelationEndpointOption[] => {
+  const rows = stationAssembleRef.value?.getAssembledRows() ?? []
+  return rows.map((row) => ({
+    id: row.id,
+    label: row.name || row.id,
+  }))
+})
 
 /**
  * 监听：父组件 v-model 绑定的 `props.modelValue`（弹窗开关）。
@@ -521,15 +664,16 @@ const restoreAssembleFromTask = (task: TaskForm) => {
   const weaponIds = task.weaponIds ?? []
 
   const receiveIds = [...new Set(resources.flatMap((item) => item.receiveIds ?? []))]
-  const stationIds = [...new Set(resources.flatMap((item) => item.stationIds ?? []))]
 
   const seriesNames = [...new Set(resources.map((item) => item.series).filter(Boolean))]
   satelliteAssembleRef.value?.setAssembledRows(
     seriesNames.map((series) => createPlaceholderRow(series, series)),
   )
   stationAssembleRef.value?.setAssembledRows(receiveIds.map((id) => createPlaceholderRow(id)))
-  centerAssembleRef.value?.setAssembledRows(stationIds.map((id) => createPlaceholderRow(id)))
   weaponAssembleRef.value?.setAssembledRows(weaponIds.map((id) => createPlaceholderRow(id)))
+  void nextTick(() => {
+    targetRelationRef.value?.setRelations(task.targetRelations ?? [])
+  })
 }
 
 const splitCsv = (value?: string): string[] =>
@@ -587,14 +731,18 @@ const resetCreateForm = () => {
     coverage: DEFAULT_COVERAGE,
     weaponIds: [],
     resources: [],
+    forecastHour: DEFAULT_TASK_DURATION_HOURS,
+    areas: [] as TaskArea[],
+    targetTypeNew: DEFAULT_TARGET_TYPES.join(','),
+    targetRelations: [],
   })
   durationHours.value = DEFAULT_TASK_DURATION_HOURS
   initCombatScenarioDefaults()
   void nextTick(() => {
     satelliteAssembleRef.value?.setAssembledRows([])
     stationAssembleRef.value?.setAssembledRows([])
-    centerAssembleRef.value?.setAssembledRows([])
     weaponAssembleRef.value?.setAssembledRows([])
+    targetRelationRef.value?.setRelations([])
   })
 }
 
@@ -650,6 +798,7 @@ const fillForm = (task: TaskForm | null) => {
       receiveIds: [...(item.receiveIds ?? [])],
       stationIds: [...(item.stationIds ?? [])],
     })) : [],
+    areas: cloneTaskAreas(task.areas),
   })
   const begin = normalizeDateTime(task.beginDate)
   const end = normalizeDateTime(task.endDate)
@@ -747,7 +896,7 @@ const resolveCreatedTaskId = (data: unknown): number | undefined => {
  * 汇总各装配页数据，构建算法新增任务请求体（仅传系列，不传卫星 ID）。
  * @returns 请求体；校验失败时返回 null
  */
-type AddTaskPayload = Parameters<typeof addTask>[0]
+type AddTaskPayload = Parameters<typeof createTask>[0]
 
 const buildAddTaskPayload = (): AddTaskPayload | null => {
   syncCountryFields()
@@ -755,7 +904,6 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
 
   const seriesList = satelliteAssembleRef.value?.getAssembledSeries() ?? []
   const stations = stationAssembleRef.value?.getAssembledRows() ?? []
-  const centers = centerAssembleRef.value?.getAssembledRows() ?? []
   const weapons = weaponAssembleRef.value?.getAssembledRows() ?? []
 
   if (!seriesList.length) {
@@ -765,7 +913,7 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
   }
 
   const receiveIds = stations.map((row) => row.id)
-  const stationIds = centers.map((row) => row.id)
+  const stationIds: string[] = []
   const weaponIds = weapons.map((row) => row.id)
 
   const resources = seriesList.map((series) => ({
@@ -785,11 +933,14 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
     description: taskForm.description,
     beginDate: normalizeDateTime(taskForm.beginDate),
     endDate: normalizeDateTime(taskForm.endDate),
+    forecastHour: durationHours.value,
+    areas: cloneTaskAreas(taskForm.areas),
     targetType: targetTypeValue,
     coverage: taskCoverage.value,
     delayMin: linkDelayMin.value,
     weaponIds,
     resources,
+    targetRelations: targetRelationRef.value?.getRelations() ?? [],
   }
 }
 
@@ -832,11 +983,14 @@ const buildUpdateTaskPayload = (): TaskForm | null => {
       receiveIds: [...item.receiveIds],
       stationIds: [...item.stationIds],
     })),
+    forecastHour: assembled.forecastHour,
+    areas: assembled.areas,
+    targetRelations: assembled.targetRelations,
   }
 }
 
 /**
- * 校验并提交任务：新增走 addTask，编辑走 updateTask。
+ * 校验并提交任务：新增走 createTask，编辑走 updateTask。
  */
 const handleSubmit = async () => {
   if (!formRef.value) return
@@ -893,7 +1047,7 @@ const handleSubmit = async () => {
       const taskPayload = buildAddTaskPayload()
       if (!taskPayload) return
 
-      const res = await addTask(taskPayload)
+      const res = await createTask(taskPayload)
       if (res.code === 200) {
         const savedTask: TaskForm = {
           ...taskForm,
@@ -916,6 +1070,7 @@ const handleSubmit = async () => {
             receiveIds: [...item.receiveIds],
             stationIds: [...item.stationIds],
           })),
+          targetRelations: [...(taskPayload.targetRelations ?? [])],
         }
         const createdId = resolveCreatedTaskId(res.data)
         if (createdId != null) savedTask.id = createdId
@@ -1209,6 +1364,33 @@ const handleSubmit = async () => {
 
     .combat-scenario-hint {
       margin-bottom: 8px;
+    }
+
+    .task-areas-block {
+      width: 100%;
+    }
+
+    .task-areas-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .task-areas-hint {
+      color: #94a3b8;
+      font-size: 13px;
+    }
+
+    .task-areas-empty {
+      color: #64748b;
+      font-size: 14px;
+      padding: 8px 0;
+    }
+
+    .task-areas-table {
+      width: 100%;
     }
   }
 

@@ -128,3 +128,14 @@ export function listenClickPositionCartesian(
     }
   }
 }
+
+/**
+ * 绘制区域时禁止地球相机响应拖拽/缩放，结束绘制后恢复。
+ *
+ * @param viewer Cesium Viewer
+ * @param locked 为 true 时锁定相机交互
+ */
+export function setGlobeDrawCameraLocked(viewer: Cesium.Viewer | null | undefined, locked: boolean): void {
+  if (!viewer || viewer.isDestroyed()) return
+  viewer.scene.screenSpaceCameraController.enableInputs = !locked
+}

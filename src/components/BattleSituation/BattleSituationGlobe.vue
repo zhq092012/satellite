@@ -6,7 +6,7 @@
 
 <script setup lang="ts">
 import * as Cesium from 'cesium'
-import { markBattleArea, resolveBattleSpaceLabelPosition } from '@/utils/tools/functionTool'
+import { markTaskAreas, resolveTaskSpaceLabelPosition } from '@/utils/tools/functionTool'
 import { useLayoutStore } from '@/store/modules/layout'
 import { useBattleGlobeSatellites } from '@/composables/useBattleGlobeSatellites'
 import { useBattleGlobeWeapons } from '@/composables/useBattleGlobeWeapons'
@@ -298,8 +298,8 @@ const restoreOverviewView = () => {
     return
   }
 
-  if (store.battle) {
-    markBattleArea(viewer, store.battle, 24000000, { clampToGround: true })
+  if (store.activedTask?.areas?.length) {
+    markTaskAreas(viewer, store.activedTask.areas, 24000000, { clampToGround: true })
     viewer.scene.requestRender()
     return
   }
@@ -476,7 +476,7 @@ const renderBattleLabel = () => {
   if (!viewer || viewer.isDestroyed() || !store.battle?.name) return
 
   // 解析战场区域名称标签经纬度锚点
-  const labelPosition = resolveBattleSpaceLabelPosition(store.battle, store.battleCenterCartensian)
+  const labelPosition = resolveTaskSpaceLabelPosition(store.activedTask?.areas, store.battleCenterCartensian)
   if (!labelPosition) return
 
   // 将标签经纬度锚点转换为 Cartographic 对象
@@ -531,9 +531,9 @@ const renderBattleArea = () => {
 
   try {
     if (store.battle) {
-      markBattleArea(viewer, store.battle, 24000000, { clampToGround: true })
+      markTaskAreas(viewer, store.activedTask?.areas ?? [], 24000000, { clampToGround: true })
       renderBattleLabel()
-      if (!store.battleCenterCartensian && !resolveBattleSpaceLabelPosition(store.battle)) {
+      if (!store.battleCenterCartensian && !resolveTaskSpaceLabelPosition(store.activedTask?.areas)) {
         flyToDefaultEarthView()
       }
     } else {
@@ -647,12 +647,25 @@ watch(
 )
 
 /**
- * 监听：当前场景区域几何 `store.battle.area`。
+ * 监听：当前任务区域 `store.activedTask.areas`。
  * 返回：回调不返回清理函数。
- * 作用：区域变更时刷新多边形与视角。
+ * 作用：任务区域变更时刷新多边形/圆与视角。
  */
 watch(
-  () => store.battle?.area,
+  () => store.activedTask?.areas,
+  () => {
+    renderBattleArea()
+  },
+  { deep: true }
+)
+
+/**
+ * 监听：当前任务 ID。
+ * 返回：回调不返回清理函数。
+ * 作用：切换任务时重绘任务区域。
+ */
+watch(
+  () => store.activedTask?.id,
   () => {
     renderBattleArea()
   }

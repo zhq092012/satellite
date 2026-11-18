@@ -8,14 +8,16 @@ import {
 } from '@/api/electronic'
 import { type ChainNode } from '@/utils/satelliteFullChainAnalysis'
 import { prefetchSeriesTransmissionLinks } from '@/utils/prefetchTransmissionLinks'
-import { getTaskMatrix, type SatelliteAnalysisData } from '@/api/task/task'
+import { getTaskMatrix, } from '@/api/task/task'
 import { isTaskProgressComplete, taskProgressMap } from '@/composables/useTaskProgressPolling'
 import type { BattleForm } from '@/types/battle/battle'
-import type { SatelliteData, TaskForm } from '@/types/dashboard'
+import type { SatelliteData } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import type { SatelliteDetail } from '@/types/cesium/satellite'
 import type { C2ResourceSatelliteRow } from '@/utils/buildC2ResourceCatalog'
 import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
+import type { SatelliteAnalysisData, TaskForm } from '@/types/task/task'
+import { collectTaskAreaGeoCoords } from '@/utils/taskAreaGeo'
 
 interface State {
   isCollapse: boolean
@@ -208,52 +210,29 @@ export const useLayoutStore = defineStore('layout-store', {
       if (state.matrixData?.series) return [state.matrixData.series]
       return []
     },
-    // 从 battle.area 中解析 lonlats 并计算战场区域边界包围盒
-    battleAreaBounds(state): {
+    /**
+     * 从当前任务 `TaskForm.areas` 计算区域边界包围盒。
+     * 返回经纬度极值与全部顶点；无启用区域时返回 null。
+     */
+    taskAreaBounds(state): {
       min_lat: number
       max_lat: number
       min_lng: number
       max_lng: number
       lonlats: { lon: number; lat: number }[]
     } | null {
-      if (!state.battle?.area) return null
-      try {
-        let areaData = typeof state.battle.area === 'string' ? JSON.parse(state.battle.area) : state.battle.area
-        if (!Array.isArray(areaData)) areaData = [areaData]
+      const lonlats = collectTaskAreaGeoCoords(state.activedTask?.areas)
+      if (lonlats.length === 0) return null
 
-        const lonlats: { lon: number; lat: number }[] = []
-        areaData.forEach((item: any) => {
-          const raw = item?.lonlats
-          if (Array.isArray(raw)) {
-            raw.forEach((pt: any) => {
-              if (Array.isArray(pt) && pt.length >= 2) {
-                lonlats.push({ lon: Number(pt[0]), lat: Number(pt[1]) })
-              } else if (pt && typeof pt === 'object') {
-                const lon = typeof pt.lon === 'number' ? pt.lon : pt.lng
-                const lat = pt.lat
-                if (typeof lon === 'number' && typeof lat === 'number') {
-                  lonlats.push({ lon, lat })
-                }
-              }
-            })
-          }
-        })
+      const lons = lonlats.map((p) => p.lon)
+      const lats = lonlats.map((p) => p.lat)
 
-        if (lonlats.length === 0) return null
-
-        const lons = lonlats.map((p) => p.lon)
-        const lats = lonlats.map((p) => p.lat)
-
-        return {
-          min_lng: Math.min(...lons),
-          max_lng: Math.max(...lons),
-          min_lat: Math.min(...lats),
-          max_lat: Math.max(...lats),
-          lonlats,
-        }
-      } catch (e) {
-        console.error('解析战场区域失败:', e)
-        return null
+      return {
+        min_lng: Math.min(...lons),
+        max_lng: Math.max(...lons),
+        min_lat: Math.min(...lats),
+        max_lat: Math.max(...lats),
+        lonlats,
       }
     },
   },

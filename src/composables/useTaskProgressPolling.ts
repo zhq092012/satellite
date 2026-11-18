@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import type { TaskForm } from '@/types/dashboard'
+import type { TaskForm } from '@/api/task/task'
 
 /**
  * 任务后台算法计算进度信息。

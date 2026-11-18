@@ -19,7 +19,22 @@ class DrawClosedPolygon {
   _dynamicPositions: any
   positions: number[] | null
 
-  constructor(viewer: Cesium.Viewer, options = {}) {
+  /** 右键闭合多边形后的回调；提供时不再写入 layout store */
+  onPolygonComplete?: (points: { lng: number; lat: number }[]) => void
+  /** 结束绘制会话时回调 */
+  onDrawStopped?: () => void
+
+  constructor(
+    viewer: Cesium.Viewer,
+    options: {
+      fillColor?: Cesium.Color
+      outColor?: Cesium.Color
+      outWidth?: number
+      onPolygonComplete?: (points: { lng: number; lat: number }[]) => void
+      /** 结束绘制（含取消）时回调 */
+      onDrawStopped?: () => void
+    } = {},
+  ) {
     this.viewer = viewer
     this.fillColor = Cesium.Color.YELLOW.withAlpha(0.5)
     this.outColor = Cesium.Color.YELLOW
@@ -49,6 +64,7 @@ class DrawClosedPolygon {
     this.handler.destroy()
     this.handler = null
     this.viewer.canvas.style.cursor = 'default'
+    this.onDrawStopped?.()
   }
 
   /* ---------- 内部 ---------- */
@@ -85,6 +101,7 @@ class DrawClosedPolygon {
   _finish() {
     if (this.points.length < 3) {
       this._clear()
+      this.stop()
       return
     }
 
@@ -115,8 +132,12 @@ class DrawClosedPolygon {
         const lat = Cesium.Math.toDegrees(cartographic.latitude) // 纬度 °
         return { lon, lat }
       })
-
-      store.setPolygon(store.currentPolygonIdx, { name: '', lonlats: _points })
+      const taskPoints = _points.map((p) => ({ lng: p.lon, lat: p.lat }))
+      if (this.onPolygonComplete) {
+        this.onPolygonComplete(taskPoints)
+      } else {
+        store.setPolygon(store.currentPolygonIdx, { name: '', lonlats: _points })
+      }
     }
 
     // if (this.positions && this.positions.length >= 6) {

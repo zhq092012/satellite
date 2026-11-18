@@ -123,11 +123,11 @@ import TaskEditDialog from '@/components/BattleSituation/TaskEditDialog.vue'
  * 导入后台仪表盘与场景/任务管理相关 API 函数与类型
  */
 import { createBattle, deleteBattle, getBattleList, updateBattle } from '@/api/battle/battle'
-import { deleteTask, getTaskList } from '@/api/dashboard'
+import { deleteTask, getTaskList } from '@/api/task/task'
 import type { BattleForm, BattleUpsertPayload } from '@/types/battle/battle'
-import type { TaskForm } from '@/types/dashboard'
 import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
+import type { TaskForm } from '@/types/task/task'
 
 /** Store 状态对象 */
 const store = useLayoutStore()
@@ -161,9 +161,6 @@ const createBattleRules = reactive<FormRules<BattleUpsertPayload>>({
 })
 
 const {
-  getTaskProgress,
-  getTaskProgressPercent,
-  isTaskProgressComplete,
   startTaskProgressPolling,
   resumeTaskProgressPollingForTasks,
 } = useTaskProgressPolling()

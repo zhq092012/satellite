@@ -104,7 +104,7 @@ import { logout as logoutApi, type MenuItem } from '@/api/auth'
 import { useAuthStore } from '@/store/modules/auth'
 import { useLayoutStore } from '@/store/modules/layout'
 import { getBattleList } from '@/api/battle/battle'
-import { getTaskList } from '@/api/dashboard'
+import { getTaskList } from '@/api/task/task'
 import type { BattleForm } from '@/types/battle/battle'
 
 const authStore = useAuthStore()

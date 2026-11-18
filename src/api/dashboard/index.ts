@@ -1,6 +1,7 @@
 import type { Satellite, SatelliteDetail, SatelliteInfo, SatelliteTle, StepSatellite } from '@/types/cesium/satellite'
 import type { BattleForm } from '@/types/battle/battle'
-import type { SatelliteNode, SatelliteRelation, SatelliteStrike, SatelliteThreat, SceneConfig, TaskForm, TLEDataResponse, Weapon } from '@/types/dashboard'
+import type { TaskForm } from '@/api/task/task'
+import type { SatelliteNode, SatelliteRelation, SatelliteStrike, SatelliteThreat, SceneConfig, TLEDataResponse, Weapon } from '@/types/dashboard'
 import type { AxiosResponsePage, AxiosResponseType } from '@/types/http'
 import type { Strike, StrikeV2 } from '@/types/strike'
 import type { ThreatTaskWeightsResponse } from '@/types/threat'
@@ -132,15 +133,6 @@ export const getSatelliteDetail = (data: { norad: number }) => {
 }
 
 /**
- * 新增任务
- * @param battle
- */
-export const createTask = (task: TaskForm) => {
-  const url = `/api/battle/saveTask`
-  return requestAPI.post<AxiosResponseType<any>>(url, task)
-}
-
-/**
  * 查询当前任务后台计算进度（HTTP 快照，进度实时推送已改用 WebSocket）。
  * @param taskId 任务 ID
  */
@@ -156,30 +148,6 @@ export const queryTaskProgress = (taskId: number) => {
       mes: string
     }>
   >(url)
-}
-/**
- * 更新任务
- * @param battle
- */
-export const updateTask = (task: TaskForm) => {
-  const url = `/api/battle/updateTask`
-  return requestAPI.put<AxiosResponseType<any>>(url, task)
-}
-/**
- * 删除任务
- * @param battle
- */
-export const deleteTask = (taskId: number) => {
-  const url = `/api/battle/delTask/${taskId}`
-  return requestAPI.delete<AxiosResponseType<any>>(url)
-}
-/**
- * 任务列表
- * @param battle
- */
-export const getTaskList = (battleId: number) => {
-  const url = `/api/battle/taskList?battleId=${battleId}`
-  return requestAPI.get<AxiosResponseType<TaskForm[]>>(url)
 }
 /**
  * 根据任务Id获取TLE数据

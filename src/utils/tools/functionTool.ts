@@ -1,15 +1,10 @@
 import { useLayoutStore } from '@/store/modules/layout'
-import type { BattleForm } from '@/types/battle/battle';
-
-/** 历史战场数据上可能仍带区域字段，仅用于地图锚点解析。 */
-type BattleGeoSource = BattleForm & {
-  createAreaMode?: string
-  area?: string
-  circleJSON?: string
-}
+import type { TaskArea } from '@/types/task/task'
+import { collectTaskAreaGeoCoords, filterEnabledTaskAreas, normalizeTaskAreaKind } from '@/utils/taskAreaGeo'
 import { EntityCollection } from 'cesium'
 import * as Cesium from 'cesium'
-const store = useLayoutStore()
+
+export { collectTaskAreaGeoCoords } from '@/utils/taskAreaGeo'
 /**
  * 求多边形面积质心（椭球面）
  * @param {number[][]} lonlats  [[lon,lat], …]  必须闭合（首末点可相同）
@@ -177,172 +172,56 @@ const BATTLE_SPACE_LABEL_ALTITUDE_M = 50
 const BATTLE_LABEL_BOUNDS_MARGIN_DEG = 0.08
 
 /**
- * 从战场区域 JSON 解析地理中心点。
+ * 计算任务区域中心点（算术平均）。
  *
- * @param battle 战场表单
- * @returns 经纬度中心；无法解析时返回 null
+ * @param areas 当前任务的 `TaskForm.areas`
  */
-/**
- * 从多边形坐标项中解析经纬度。
- *
- * @param point 坐标项（数组或 {lon,lat} 对象）
- * @returns 经纬度或 null
- */
-const parseLonLatPoint = (point: unknown): { lon: number; lat: number } | null => {
-  if (Array.isArray(point) && point.length >= 2) {
-    const lon = Number(point[0])
-    const lat = Number(point[1])
-    if (Number.isFinite(lon) && Number.isFinite(lat)) return { lon, lat }
-  }
-  if (point && typeof point === 'object') {
-    const record = point as { lon?: number; lng?: number; lat?: number }
-    const lon = typeof record.lon === 'number' ? record.lon : typeof record.lng === 'number' ? record.lng : NaN
-    const lat = typeof record.lat === 'number' ? record.lat : NaN
-    if (Number.isFinite(lon) && Number.isFinite(lat)) return { lon, lat }
-  }
+export function resolveTaskGeoCenter(areas: TaskArea[] | null | undefined): { lon: number; lat: number } | null {
+  const coords = collectTaskAreaGeoCoords(areas)
+  if (!coords.length) return null
+  const lon = coords.reduce((sum, point) => sum + point.lon, 0) / coords.length
+  const lat = coords.reduce((sum, point) => sum + point.lat, 0) / coords.length
+  if (Number.isFinite(lon) && Number.isFinite(lat)) return { lon, lat }
   return null
 }
 
 /**
- * 计算战场区域中心点。
+ * 计算战场名称标签锚点（基于任务区域包络，置于北侧外部）。
  *
- * @param battle 战场表单
- * @returns 经纬度中心；无法解析时返回 null
+ * @param areas 当前任务的 `TaskForm.areas`
  */
-export function resolveBattleGeoCenter(battle: BattleGeoSource | null): { lon: number; lat: number } | null {
-  // 如果战场表单为空，则返回 null
-  if (!battle) return null
-
-  // 如果战场区域模式为多边形且有区域坐标，则解析多边形坐标
-  if (battle.createAreaMode === '多边形' && battle.area) {
-    try {
-      const polygons = JSON.parse(battle.area) as { lonlats?: unknown[] }[]
-      // 解析多边形坐标，并过滤掉解析失败的坐标
-      const coords = polygons.flatMap((polygon) => polygon.lonlats || []).map(parseLonLatPoint).filter(Boolean) as {
-        lon: number
-        lat: number
-      }[]
-      if (coords.length) {
-        const lon = coords.reduce((sum, point) => sum + point.lon, 0) / coords.length
-        const lat = coords.reduce((sum, point) => sum + point.lat, 0) / coords.length
-        // 如果经纬度都为有限数，则返回经纬度中心
-        if (Number.isFinite(lon) && Number.isFinite(lat)) return { lon, lat }
-      }
-    } catch {
-      // ignore parse error
-    }
-  }
-
-  // 如果战场区域模式为圆形且有圆形坐标，则解析圆形坐标
-  if (battle.circleJSON) {
-    try {
-      const circles = JSON.parse(battle.circleJSON) as { center?: unknown }[]
-      const center = parseLonLatPoint(circles[0]?.center)
-      if (center) return center
-    } catch {
-      // ignore parse error
-    }
-  }
-
-  return null
-}
-
-/**
- * 收集战场区域全部经纬度坐标点。
- *
- * @param battle 战场表单
- * @returns 区域坐标列表
- */
-function collectBattleGeoCoords(battle: BattleGeoSource | null): { lon: number; lat: number }[] {
-  const coords: { lon: number; lat: number }[] = []
-  if (!battle) return coords
-
-  if (battle.createAreaMode === '多边形' && battle.area) {
-    try {
-      const polygons = JSON.parse(battle.area) as { lonlats?: unknown[] }[]
-      polygons
-        .flatMap((polygon) => polygon.lonlats || [])
-        .forEach((point) => {
-          const parsed = parseLonLatPoint(point)
-          if (parsed) coords.push(parsed)
-        })
-    } catch {
-      // ignore parse error
-    }
-  }
-
-  if (battle.circleJSON) {
-    try {
-      const circles = JSON.parse(battle.circleJSON) as { center?: unknown; radiusKm?: number }[]
-      circles.forEach((circle) => {
-        const center = parseLonLatPoint(circle.center)
-        const radiusKm = typeof circle.radiusKm === 'number' ? circle.radiusKm : 0
-        if (center && radiusKm > 0) {
-          const latOffset = radiusKm / 111
-          const lonOffset = radiusKm / (111 * Math.cos(Cesium.Math.toRadians(center.lat)))
-          coords.push({ lon: center.lon - lonOffset, lat: center.lat - latOffset })
-          coords.push({ lon: center.lon + lonOffset, lat: center.lat + latOffset })
-        } else if (center) {
-          coords.push(center)
-        }
-      })
-    } catch {
-      // ignore parse error
-    }
-  }
-
-  return coords
-}
-
-/**
- * 计算战场名称标签锚点（置于区域北侧外部，避免遮挡多边形）。
- *
- * @param battle 战场表单
- * @returns 标签经纬度锚点；无法解析时返回 null
- */
-export function resolveBattleLabelGeoAnchor(battle: BattleGeoSource | null): { lon: number; lat: number } | null {
-  // 收集战场区域全部经纬度坐标点
-  const coords = collectBattleGeoCoords(battle)
-  // 如果收集到的坐标点为空，则返回战场中心
-  if (!coords.length) return resolveBattleGeoCenter(battle)
+export function resolveTaskLabelGeoAnchor(areas: TaskArea[] | null | undefined): { lon: number; lat: number } | null {
+  const coords = collectTaskAreaGeoCoords(areas)
+  if (!coords.length) return resolveTaskGeoCenter(areas)
 
   let minLon = Infinity
   let maxLon = -Infinity
   let minLat = Infinity
   let maxLat = -Infinity
   coords.forEach(({ lon, lat }) => {
-    // 计算经度最小值
     minLon = Math.min(minLon, lon)
-    // 计算经度最大值
     maxLon = Math.max(maxLon, lon)
-    // 计算纬度最小值
     minLat = Math.min(minLat, lat)
-    // 计算纬度最大值
     maxLat = Math.max(maxLat, lat)
   })
 
   const centerLon = (minLon + maxLon) / 2
-  // 计算纬度跨度
   const latSpan = maxLat - minLat
-  // 计算标签与区域边界的最小间距
   const margin = Math.max(latSpan * 0.25, BATTLE_LABEL_BOUNDS_MARGIN_DEG)
-  // 返回标签经纬度锚点，锚点在区域北侧外部，避免遮挡多边形
   return { lon: centerLon, lat: maxLat + margin }
 }
 
 /**
- * 计算战场名称贴地标签的三维坐标。
+ * 计算战场名称贴地标签的三维坐标（锚点来自任务区域）。
  *
- * @param battle 战场表单
- * @param fallbackCenter 已缓存的战场中心（可选，仅取经纬度）
- * @returns 贴地标签坐标
+ * @param areas 当前任务的 `TaskForm.areas`
+ * @param fallbackCenter 已缓存的任务俯视中心（可选）
  */
-export function resolveBattleSpaceLabelPosition(
-  battle: BattleGeoSource | null,
+export function resolveTaskSpaceLabelPosition(
+  areas: TaskArea[] | null | undefined,
   fallbackCenter?: Cesium.Cartesian3 | null
 ): Cesium.Cartesian3 | null {
-  // 计算战场名称标签锚点
-  const anchor = resolveBattleLabelGeoAnchor(battle)
+  const anchor = resolveTaskLabelGeoAnchor(areas)
   if (anchor) {
     return Cesium.Cartesian3.fromDegrees(anchor.lon, anchor.lat, BATTLE_SPACE_LABEL_ALTITUDE_M)
   }
@@ -355,70 +234,52 @@ export function resolveBattleSpaceLabelPosition(
   return null
 }
 
-/** 战场区域标记可选配置 */
-export interface MarkBattleAreaOptions {
+/** 任务区域标记可选配置 */
+export interface MarkTaskAreaOptions {
   /** 是否将多边形/边线贴地，避免开启 globe 深度检测后被地形遮挡 */
   clampToGround?: boolean
 }
 
 /**
- * 在地球上标记战场区域并调整初始视角。
+ * 在地球上标记当前任务区域（`TaskForm.areas`）并调整初始视角。
  *
  * @param viewer Cesium Viewer
- * @param battle 战场表单数据
+ * @param areas 任务区域列表
  * @param orbit_altitude_km 初始俯视高度（米）
  * @param options 可选渲染配置
  */
-export function markBattleArea(
+export function markTaskAreas(
   viewer: Cesium.Viewer,
-  battle: BattleGeoSource | null,
+  areas: TaskArea[] | null | undefined,
   orbit_altitude_km: number = 24000000,
-  options?: MarkBattleAreaOptions
+  options?: MarkTaskAreaOptions
 ) {
   const clampToGround = options?.clampToGround ?? false
-  if (!viewer || (viewer as any).isDestroyed?.() || battle === null) return
+  if (!viewer || (viewer as any).isDestroyed?.()) return
 
-  /** 先清掉旧战场面，避免每次 markBattle 再叠加一份 Polygon/Polyline 几何体 */
+  /** 先清掉旧任务区域面，避免重复叠加几何体 */
   const staleBattleEntities = viewer.entities.values.filter((entity) =>
     String(entity.id ?? '').startsWith('battle-area-')
   )
   staleBattleEntities.forEach((entity) => viewer.entities.remove(entity))
 
-  let entitys: EntityCollection = new EntityCollection()
-  // 用于计算整体视野的 BoundingSphere（包含所有圆与多边形）
+  const entitys: EntityCollection = new EntityCollection()
   let combinedBS: Cesium.BoundingSphere | null = null
-  const createAreaMode = battle.createAreaMode
-  if (createAreaMode === '多边形') {
-    const polygonJSON = JSON.parse(battle.area!) as {
-      name: string
-      lonlats: [number, number][]
-    }[]
-    if (polygonJSON.length === 0) return
-    polygonJSON.forEach((polygon) => {
-      const raw = (polygon as any).lonlats
-      if (!Array.isArray(raw) || raw.length === 0) return
+  const enabledAreas = filterEnabledTaskAreas(areas)
+  if (!enabledAreas.length) return
 
-      const points = raw
-        .map((p: any) => {
-          if (Array.isArray(p) && p.length >= 2 && typeof p[0] === 'number' && typeof p[1] === 'number') {
-            return Cesium.Cartesian3.fromDegrees(p[0], p[1])
-          }
-          if (p && typeof p === 'object') {
-            const lon = typeof p.lon === 'number' ? p.lon : typeof p.lng === 'number' ? p.lng : undefined
-            const lat = typeof p.lat === 'number' ? p.lat : undefined
-            if (typeof lon === 'number' && typeof lat === 'number') {
-              return Cesium.Cartesian3.fromDegrees(lon, lat)
-            }
-          }
-          return null
-        })
-        .filter((pt) => pt !== null) as Cesium.Cartesian3[]
+  enabledAreas.forEach((area, index) => {
+    const kind = normalizeTaskAreaKind(area.type)
+    const entityKey = area.name || `${area.id || kind || 'area'}-${index}`
 
-      if (points.length === 0) return
+    if (kind === 'POLYGON') {
+      const points = (area.points ?? [])
+        .filter((pt) => typeof pt.lng === 'number' && typeof pt.lat === 'number')
+        .map((pt) => Cesium.Cartesian3.fromDegrees(pt.lng, pt.lat))
+      if (points.length < 3) return
 
-      // 生成正式闭合多边形
       const entity = viewer.entities.add({
-        id: `battle-area-${polygon.name || 'poly'}-${entitys.values.length}`,
+        id: `battle-area-${entityKey}-${entitys.values.length}`,
         polygon: {
           hierarchy: new Cesium.PolygonHierarchy(points),
           material: new Cesium.ColorMaterialProperty(Cesium.Color.ORANGE.withAlpha(0.3)),
@@ -428,28 +289,57 @@ export function markBattleArea(
           distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 150000000),
         },
         polyline: {
-          positions: [...points, points[0]], // 闭合线
+          positions: [...points, points[0]],
           width: 2,
           material: new Cesium.ColorMaterialProperty(Cesium.Color.RED),
           ...(clampToGround ? { clampToGround: true } : {}),
           distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 150000000),
         },
       })
-
       entitys.add(entity)
-      // 计算多边形的 BoundingSphere 并合并到 overall
       try {
         const bs = Cesium.BoundingSphere.fromPoints(points)
         if (bs) {
           combinedBS = combinedBS ? Cesium.BoundingSphere.union(combinedBS, bs, new Cesium.BoundingSphere()) : bs
         }
       } catch (e) {
-        // 忽略计算错误
+        console.error('任务多边形区域包围球计算失败:', area, e)
       }
-    })
-  }
+      return
+    }
 
-  // 如果存在计算出的总 BoundingSphere，则让相机飞到该范围
+    if (kind === 'CIRCLE') {
+      const centerLng = area.center?.lng
+      const centerLat = area.center?.lat
+      const radiusKm = typeof area.radius === 'number' ? area.radius : 0
+      if (typeof centerLng !== 'number' || typeof centerLat !== 'number' || radiusKm <= 0) return
+
+      const center = Cesium.Cartesian3.fromDegrees(centerLng, centerLat)
+      const radiusM = radiusKm * 1000
+      const entity = viewer.entities.add({
+        id: `battle-area-${entityKey}-${entitys.values.length}`,
+        position: center,
+        ellipse: {
+          semiMajorAxis: radiusM,
+          semiMinorAxis: radiusM,
+          material: new Cesium.ColorMaterialProperty(Cesium.Color.ORANGE.withAlpha(0.3)),
+          outline: true,
+          outlineColor: Cesium.Color.RED,
+          outlineWidth: 2,
+          ...(clampToGround ? { heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } : {}),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 150000000),
+        },
+      })
+      entitys.add(entity)
+      try {
+        const bs = new Cesium.BoundingSphere(center, radiusM)
+        combinedBS = combinedBS ? Cesium.BoundingSphere.union(combinedBS, bs, new Cesium.BoundingSphere()) : bs
+      } catch (e) {
+        console.error('任务圆形区域包围球计算失败:', area, e)
+      }
+    }
+  })
+
   if (combinedBS) {
     // 避免半径为 0 导致视角过近
     const bs = combinedBS as Cesium.BoundingSphere
@@ -464,7 +354,7 @@ export function markBattleArea(
       const lat = Cesium.Math.toDegrees(centerCarto.latitude)
       const battleCenterCartesian = Cesium.Cartesian3.fromDegrees(lon, lat, targetAltitude)
       const battleCenterOrientation = new Cesium.HeadingPitchRoll(0.0, -Cesium.Math.toRadians(90.0), 0.0)
-      store.setBattleCenter(battleCenterCartesian, battleCenterOrientation)
+      useLayoutStore().setBattleCenter(battleCenterCartesian, battleCenterOrientation)
     } catch (e) {
       console.error('无法定位战场中心', e)
     }

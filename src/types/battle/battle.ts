@@ -1,4 +1,4 @@
-import type { TaskForm } from '@/types/dashboard'
+import type { TaskForm } from '@/api/task/task'
 
 /**
  * 战场实体（列表、详情及 Store 中的当前战场）。

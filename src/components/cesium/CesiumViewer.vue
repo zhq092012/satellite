@@ -16,7 +16,7 @@ import type { ChainNode, SatelliteTransmissionLink } from '@/utils/satelliteFull
 import { useElectronicCesiumBridge, type InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { Weapon } from '@/types/dashboard'
-import { markBattleArea } from '@/utils/tools/functionTool'
+import { markTaskAreas } from '@/utils/tools/functionTool'
 import laserStationIcon from '@/assets/icons/LaserStation.png'
 import groundStationIcon from '@/assets/icons/GroundStation.png'
 import launchPadIcon from '@/assets/icons/LaunchPad.png'
@@ -1891,10 +1891,10 @@ const ensureOrbitData = (norad: number, satel: any): Cesium.SampledPositionPrope
  * 在 Cesium 地图上标记战场区域
  *
  * [副作用]
- * - 调用工具函数 markBattleArea 修改 viewer.entities
+ * - 调用工具函数 markTaskAreas 修改 viewer.entities
  */
 function markBattle() {
-  markBattleArea(viewer, store.battle)
+  markTaskAreas(viewer, store.activedTask?.areas ?? [])
 }
 
 /**
