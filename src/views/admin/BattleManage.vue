@@ -100,25 +100,6 @@
         <el-form-item label="场景概述" prop="description">
           <el-input v-model="battleForm.description" type="textarea" placeholder="请输入场景概述" />
         </el-form-item>
-        <el-form-item label="" v-if="battleForm.createAreaMode === '多边形'">
-          <el-button type="primary" @click="addPolygonArea" size="small"> 新增区域 </el-button>
-        </el-form-item>
-        <div v-show="battleForm.createAreaMode === '多边形'" v-for="[idx, area] in store.battlePolygonMap" :key="idx"
-          class="polygon-area-item">
-          <el-form-item label="区域名称">
-            <div class="area-name-row">
-              <el-input v-model="area.name" placeholder="区域名称" />
-              <el-button type="primary" @click="chooseArea(idx)" round size="small">选择区域</el-button>
-              <el-button type="danger" @click="removeArea(idx)" round size="small">删除区域</el-button>
-            </div>
-          </el-form-item>
-          <el-form-item label="区域坐标">
-            <div v-for="(lonlat, lIdx) in area.lonlats" :key="lIdx" class="lonlat-row">
-              <div class="coord-field"><span>经度：</span><el-input v-model="lonlat.lon" type="number" /></div>
-              <div class="coord-field"><span>纬度：</span><el-input v-model="lonlat.lat" type="number" /></div>
-            </div>
-          </el-form-item>
-        </div>
       </el-form>
       <template #footer>
         <el-button @click="cancelBattleForm(battleFormRef)">取 消</el-button>
@@ -127,17 +108,6 @@
     </el-dialog>
 
     <TaskEditDialog v-model="taskEditVisible" :is-edit="taskEditIsEdit" :task="editingTask" @saved="handleTaskSaved" />
-
-    <!-- 战场区域地图绘制选择弹窗 -->
-    <el-dialog title="战场区域选择" v-model="showPolygonMap" width="1100px">
-      <div>
-        <PolygonMap ref="polygonRef" />
-      </div>
-      <template #footer>
-        <el-button @click="clearMap">取 消</el-button>
-        <el-button type="primary" @click="confirmPolygonMap">确 定</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -147,29 +117,20 @@
  */
 import { nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import PolygonMap from '@/components/cesium/BattleArea.vue'
 import TaskEditDialog from '@/components/BattleSituation/TaskEditDialog.vue'
 
 /**
  * 导入后台仪表盘与场景/任务管理相关 API 函数与类型
  */
-import {
-  deleteBattle,
-  deleteTask,
-  getBattleList,
-  getTaskList,
-  saveBattle,
-  updateBattle,
-} from '@/api/dashboard'
-import type { BattleForm, TaskForm } from '@/types/dashboard'
+import { createBattle, deleteBattle, getBattleList, updateBattle } from '@/api/battle/battle'
+import { deleteTask, getTaskList } from '@/api/dashboard'
+import type { BattleForm, BattleUpsertPayload } from '@/types/battle/battle'
+import type { TaskForm } from '@/types/dashboard'
 import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 
 /** Store 状态对象 */
 const store = useLayoutStore()
-
-/** 多边形绘制组件引用 */
-const polygonRef = ref<InstanceType<typeof PolygonMap> | null>(null)
 
 /** 场景表单引用的 DOM 对象 */
 const battleFormRef = ref<FormInstance>()
@@ -181,7 +142,6 @@ const activeNames = ref<number[]>([])
 /** 弹窗状态及标题 */
 const battleDialogTitle = ref('新建场景')
 const battleDialogVisible = ref(false)
-const showPolygonMap = ref(false)
 
 /** 任务编辑弹窗（复用态势页 TaskEditDialog） */
 const taskEditVisible = ref(false)
@@ -189,22 +149,13 @@ const taskEditIsEdit = ref(false)
 const editingTask = ref<TaskForm | null>(null)
 
 /** 场景表单绑定的数据结构 */
-const battleForm = reactive<BattleForm>({
+const battleForm = reactive<BattleUpsertPayload & { tasks?: TaskForm[] | null }>({
   name: '',
   description: '',
-  createAreaMode: '多边形',
-  area: '',
-  beginDate: '',
-  endDate: '',
-  dataRefreshRate: '',
-  tasks: [],
 })
 
-/** 日期范围选择器的底层中转变量 */
-const battleDatePickValue = ref<[string, string]>(['2025-12-01 09:00', '2025-12-02 18:00'])
-
 /** 场景表单校验规则 */
-const createBattleRules = reactive<FormRules<BattleForm>>({
+const createBattleRules = reactive<FormRules<BattleUpsertPayload>>({
   name: [{ required: true, message: '请输入战场名称', trigger: 'blur' }],
   description: [{ required: true, message: '请输入战场概述', trigger: 'blur' }],
 })
@@ -264,33 +215,6 @@ watch(
 )
 
 /**
- * 多边形区域绘制操作方法
- */
-const chooseArea = (idx: number) => {
-  store.currentPolygonIdx = idx
-  showPolygonMap.value = true
-  polygonRef.value?.clearAll()
-}
-
-const addPolygonArea = () => {
-  store.setPolygon(store.currentPolygonIdx, { name: '', lonlats: [] })
-  store.currentPolygonIdx++
-}
-
-const removeArea = (idx: number) => {
-  store.removePolygon(idx)
-}
-
-const confirmPolygonMap = () => {
-  showPolygonMap.value = false
-}
-
-const clearMap = () => {
-  showPolygonMap.value = false
-  polygonRef.value?.clearAll()
-}
-
-/**
  * 刷新指定场景下的任务列表。
  *
  * @param battleId 场景 ID
@@ -333,29 +257,15 @@ const handleCreateBattle = () => {
   battleForm.id = undefined
   battleForm.name = ''
   battleForm.description = ''
-  battleForm.area = ''
-  battleForm.beginDate = ''
-  battleForm.endDate = ''
-  battleForm.dataRefreshRate = ''
-  battleDatePickValue.value = ['', '']
-  battleForm.tasks = []
   battleDialogTitle.value = '新建场景'
   battleDialogVisible.value = true
-  store.battleCircleMap.clear()
-  store.battlePolygonMap.clear()
 }
 
 /** 打开编辑战场弹窗 */
 const handleEditBattle = (battle: BattleForm) => {
-  Object.assign(battleForm, battle)
-  if (battle.createAreaMode === '圆' && battle.circleJSON) {
-    const circles = JSON.parse(battle.circleJSON)
-    store.battleCircleMap.clear()
-    circles.forEach((circle: any, idx: number) => {
-      store.setCircle(idx, circle)
-    })
-    store.currentCircleIdx = circles.length
-  }
+  battleForm.id = battle.id
+  battleForm.name = battle.name
+  battleForm.description = battle.description
   battleDialogTitle.value = '修改战场'
   battleDialogVisible.value = true
 }
@@ -391,12 +301,15 @@ const submitBattleForm = async (formEl: FormInstance | undefined) => {
   await formEl.validate(async (valid) => {
     if (valid) {
       let res
-      battleForm.area = JSON.stringify(Array.from(store.battlePolygonMap.values()))
-      battleForm.circleJSON = JSON.stringify(Array.from(store.battleCircleMap.values()))
+      const payload: BattleUpsertPayload = {
+        id: battleForm.id,
+        name: battleForm.name.trim(),
+        description: battleForm.description.trim(),
+      }
       if (battleForm.id) {
-        res = await updateBattle(battleForm)
+        res = await updateBattle(payload)
       } else {
-        res = await saveBattle(battleForm)
+        res = await createBattle(payload)
       }
       if (res.code === 200) {
         await loadBattleList()
@@ -586,46 +499,6 @@ onMounted(async () => {
 
   .el-button {
     margin-left: 0 !important;
-  }
-}
-
-.polygon-area-item {
-  margin: 10px 0;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-
-  .area-name-row {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    width: 100%;
-  }
-
-  .lonlat-row {
-    display: flex;
-    gap: 16px;
-    margin-top: 8px;
-    width: 100%;
-
-    .coord-field {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex: 1;
-      min-width: 0;
-
-      span {
-        white-space: nowrap;
-        flex-shrink: 0;
-        font-size: 13px;
-      }
-
-      .el-input {
-        flex: 1;
-        min-width: 0;
-      }
-    }
   }
 }
 

@@ -24,31 +24,6 @@
           placeholder="请输入场景概述"
         />
       </el-form-item>
-      <el-form-item label="作战区域">
-        <el-button type="primary" size="small" @click="addPolygonArea">新增区域</el-button>
-      </el-form-item>
-      <div v-for="[idx, area] in store.battlePolygonMap" :key="idx" class="polygon-area-item">
-        <el-form-item label="区域名称">
-          <div class="area-name-row">
-            <el-input v-model="area.name" placeholder="区域名称" />
-            <el-button type="primary" size="small" round @click="chooseArea(idx)">选择区域</el-button>
-            <el-button type="danger" size="small" round @click="removeArea(idx)">删除区域</el-button>
-          </div>
-        </el-form-item>
-        <el-form-item label="区域坐标">
-          <div v-for="(lonlat, lIdx) in area.lonlats" :key="lIdx" class="lonlat-row">
-            <div class="coord-field">
-              <span>经度：</span>
-              <el-input v-model="lonlat.lon" type="number" />
-            </div>
-            <div class="coord-field">
-              <span>纬度：</span>
-              <el-input v-model="lonlat.lat" type="number" />
-            </div>
-          </div>
-          <div v-if="!area.lonlats.length" class="coord-empty">尚未绘制坐标，请点击「选择区域」</div>
-        </el-form-item>
-      </div>
     </el-form>
     <template #footer>
       <el-button class="scene-edit-btn scene-edit-btn--ghost" @click="visible = false">取 消</el-button>
@@ -62,29 +37,14 @@
       </el-button>
     </template>
   </el-dialog>
-
-  <el-dialog v-model="showPolygonMap" title="场景区域选择" width="1100px" append-to-body destroy-on-close>
-    <PolygonMap ref="polygonRef" />
-    <template #footer>
-      <el-button @click="clearMap">取 消</el-button>
-      <el-button type="primary" @click="confirmPolygonMap">确 定</el-button>
-    </template>
-  </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { getBattleList, saveBattle, updateBattle } from '@/api/dashboard'
-import type { BattleForm } from '@/types/dashboard'
-import { useLayoutStore } from '@/store/modules/layout'
-import PolygonMap from '@/components/cesium/BattleArea.vue'
-
-/** 多边形区域坐标点。 */
-type PolygonLonLat = { lon: number; lat: number }
-/** 多边形区域。 */
-type PolygonArea = { name: string; lonlats: PolygonLonLat[] }
+import { createBattle, getBattleList, updateBattle } from '@/api/battle/battle'
+import type { BattleForm, BattleUpsertPayload } from '@/types/battle/battle'
 
 const props = defineProps<{
   /** 对话框是否可见。 */
@@ -101,37 +61,19 @@ const emit = defineEmits<{
   (e: 'saved', scene: BattleForm): void
 }>()
 
-/** 布局 Store，多边形绘制结果写入 battlePolygonMap。 */
-const store = useLayoutStore()
 /** 表单实例。 */
 const formRef = ref<FormInstance>()
-/** 区域绘制组件实例。 */
-const polygonRef = ref<InstanceType<typeof PolygonMap> | null>(null)
 /** 提交中状态。 */
 const submitting = ref(false)
-/** 区域地图弹窗显隐。 */
-const showPolygonMap = ref(false)
-/** 本次是否已成功提交，关闭时据此决定是否还原多边形缓存。 */
-const committed = ref(false)
-/** 打开弹窗前的多边形缓存快照，取消编辑时还原。 */
-const polygonSnapshot = ref<Map<number, PolygonArea>>(new Map())
-/** 打开弹窗前的当前多边形下标快照。 */
-const polygonIdxSnapshot = ref(0)
 
-/** 场景（战场）表单。 */
-const sceneForm = reactive<BattleForm>({
+/** 场景（战场）表单，仅名称与描述。 */
+const sceneForm = reactive<BattleUpsertPayload>({
   name: '',
   description: '',
-  createAreaMode: '多边形',
-  area: '',
-  beginDate: '',
-  endDate: '',
-  dataRefreshRate: '',
-  tasks: [],
 })
 
 /** 场景名称与概述必填。 */
-const formRules = reactive<FormRules<BattleForm>>({
+const formRules = reactive<FormRules<BattleUpsertPayload>>({
   name: [{ required: true, message: '请输入场景名称', trigger: 'blur' }],
   description: [{ required: true, message: '请输入场景概述', trigger: 'blur' }],
 })
@@ -147,162 +89,18 @@ const visible = computed({
 })
 
 /**
- * 将 lonlats 原始数据规范为 `{ lon, lat }[]`。
- *
- * @param raw 接口或表单中的坐标数组
- * @returns 可编辑的坐标点列表
- */
-const normalizeLonlats = (raw: unknown): PolygonLonLat[] => {
-  if (!Array.isArray(raw)) return []
-  const points: PolygonLonLat[] = []
-  raw.forEach((pt) => {
-    if (Array.isArray(pt) && pt.length >= 2) {
-      points.push({ lon: Number(pt[0]), lat: Number(pt[1]) })
-      return
-    }
-    if (pt && typeof pt === 'object') {
-      const item = pt as { lon?: number; lng?: number; lat?: number }
-      const lon = typeof item.lon === 'number' ? item.lon : item.lng
-      const lat = item.lat
-      if (typeof lon === 'number' && typeof lat === 'number') {
-        points.push({ lon, lat })
-      }
-    }
-  })
-  return points
-}
-
-/**
- * 把当前 Store 中的多边形 Map 拷贝一份快照。
- *
- * @returns 快照 Map
- */
-const clonePolygonMap = (): Map<number, PolygonArea> => {
-  const cloned = new Map<number, PolygonArea>()
-  store.battlePolygonMap.forEach((area, idx) => {
-    cloned.set(idx, {
-      name: area.name,
-      lonlats: (area.lonlats || []).map((pt) => ({ lon: Number(pt.lon), lat: Number(pt.lat) })),
-    })
-  })
-  return cloned
-}
-
-/**
- * 用快照覆盖 Store 中的多边形缓存。
- *
- * @param snapshot 打开弹窗前保存的区域数据
- * @param currentIdx 打开弹窗前的当前区域下标
- */
-const restorePolygonMap = (snapshot: Map<number, PolygonArea>, currentIdx: number) => {
-  store.battlePolygonMap.clear()
-  snapshot.forEach((area, idx) => {
-    store.battlePolygonMap.set(idx, area)
-  })
-  store.currentPolygonIdx = currentIdx
-}
-
-/**
- * 将场景 area JSON 灌入 Store 多边形 Map，供表单编辑。
- *
- * @param scene 当前场景
- */
-const hydratePolygonMap = (scene: BattleForm | null) => {
-  store.battlePolygonMap.clear()
-  store.currentPolygonIdx = 0
-  if (!scene?.area) return
-  try {
-    let areaData = typeof scene.area === 'string' ? JSON.parse(scene.area) : scene.area
-    if (!Array.isArray(areaData)) areaData = [areaData]
-    areaData.forEach((item: { name?: string; lonlats?: unknown }, idx: number) => {
-      store.battlePolygonMap.set(idx, {
-        name: item?.name || '',
-        lonlats: normalizeLonlats(item?.lonlats),
-      })
-    })
-    store.currentPolygonIdx = store.battlePolygonMap.size
-  } catch (error) {
-    console.error('解析场景区域失败:', error)
-  }
-}
-
-/**
  * 用当前场景填充表单；添加模式则重置为空表单。
  */
 const fillForm = () => {
-  committed.value = false
-  polygonSnapshot.value = clonePolygonMap()
-  polygonIdxSnapshot.value = store.currentPolygonIdx
-
   if (props.isEdit && props.scene) {
-    Object.assign(sceneForm, {
-      ...props.scene,
-      createAreaMode: '多边形',
-      tasks: props.scene.tasks || [],
-    })
-    hydratePolygonMap(props.scene)
+    sceneForm.id = props.scene.id
+    sceneForm.name = props.scene.name
+    sceneForm.description = props.scene.description
     return
   }
-
   sceneForm.id = undefined
   sceneForm.name = ''
   sceneForm.description = ''
-  sceneForm.createAreaMode = '多边形'
-  sceneForm.area = ''
-  sceneForm.beginDate = ''
-  sceneForm.endDate = ''
-  sceneForm.dataRefreshRate = ''
-  sceneForm.tasks = []
-  sceneForm.circleJSON = ''
-  store.battlePolygonMap.clear()
-  store.currentPolygonIdx = 0
-}
-
-/**
- * 新增一块空白作战区域。
- */
-const addPolygonArea = () => {
-  const nextIdx =
-    store.battlePolygonMap.size === 0 ? 0 : Math.max(...Array.from(store.battlePolygonMap.keys())) + 1
-  store.battlePolygonMap.set(nextIdx, { name: '', lonlats: [] })
-  store.currentPolygonIdx = nextIdx
-}
-
-/**
- * 打开地图绘制指定区域。
- *
- * @param idx 区域下标
- */
-const chooseArea = (idx: number) => {
-  store.currentPolygonIdx = idx
-  showPolygonMap.value = true
-  nextTick(() => {
-    polygonRef.value?.clearAll()
-  })
-}
-
-/**
- * 删除指定作战区域。
- *
- * @param idx 区域下标
- */
-const removeArea = (idx: number) => {
-  store.removePolygon(idx)
-}
-
-/**
- * 确认地图绘制并关闭区域选择弹窗。
- */
-const confirmPolygonMap = () => {
-  showPolygonMap.value = false
-}
-
-/**
- * 取消地图绘制。
- */
-const clearMap = () => {
-  showPolygonMap.value = false
-  polygonRef.value?.clearAll()
 }
 
 /**
@@ -312,7 +110,10 @@ const clearMap = () => {
  * @param responseData 保存接口返回的 data
  * @returns 列表中的完整场景对象；找不到时回退为 payload
  */
-const resolveSavedScene = async (payload: BattleForm, responseData: unknown): Promise<BattleForm> => {
+const resolveSavedScene = async (
+  payload: BattleUpsertPayload,
+  responseData: unknown,
+): Promise<BattleForm> => {
   try {
     const listRes = await getBattleList()
     const list = listRes.code === 200 && Array.isArray(listRes.data) ? listRes.data : []
@@ -322,10 +123,11 @@ const resolveSavedScene = async (payload: BattleForm, responseData: unknown): Pr
       if (byId) return byId
     }
     const matched = [...list].reverse().find((item) => item.name === payload.name)
-    return matched || payload
+    if (matched) return matched
+    return { name: payload.name, description: payload.description, id: payload.id }
   } catch (error) {
     console.error('刷新场景列表失败:', error)
-    return payload
+    return { name: payload.name, description: payload.description, id: payload.id }
   }
 }
 
@@ -341,18 +143,19 @@ const handleSubmit = async () => {
     }
     submitting.value = true
     try {
-      const payload: BattleForm = {
-        ...sceneForm,
-        createAreaMode: '多边形',
-        area: JSON.stringify(Array.from(store.battlePolygonMap.values())),
-        circleJSON: JSON.stringify(Array.from(store.battleCircleMap.values())),
+      const payload: BattleUpsertPayload = {
+        id: sceneForm.id,
+        name: sceneForm.name.trim(),
+        description: sceneForm.description.trim(),
       }
-      const res = payload.id ? await updateBattle(payload) : await saveBattle(payload)
+      const res = payload.id ? await updateBattle(payload) : await createBattle(payload)
       if (res.code === 200) {
-        const saved = payload.id ? payload : await resolveSavedScene(payload, res.data)
-        committed.value = true
-        polygonSnapshot.value = clonePolygonMap()
-        polygonIdxSnapshot.value = store.currentPolygonIdx
+        const saved: BattleForm = payload.id
+          ? {
+              ...(props.scene ?? { name: payload.name, description: payload.description }),
+              ...payload,
+            }
+          : await resolveSavedScene(payload, res.data)
         ElMessage.success(payload.id ? '修改场景成功' : '添加场景成功')
         visible.value = false
         emit('saved', saved)
@@ -368,28 +171,21 @@ const handleSubmit = async () => {
   })
 }
 
-/**
- * 关闭弹窗：未保存则还原多边形缓存，并重置表单。
- */
+/** 关闭弹窗时重置表单。 */
 const handleClosed = () => {
   formRef.value?.resetFields()
-  showPolygonMap.value = false
-  if (!committed.value) {
-    restorePolygonMap(polygonSnapshot.value, polygonIdxSnapshot.value)
-  }
-  committed.value = false
 }
 
 /**
  * 监听：弹窗 `modelValue` 开合。
- * 返回：回调不返回清理函数。
+ * 回调不返回清理函数。
  * 作用：打开弹窗时用当前场景或空白模板填充表单。
  */
 watch(
   () => props.modelValue,
   (open) => {
     if (open) fillForm()
-  }
+  },
 )
 </script>
 
@@ -474,40 +270,5 @@ watch(
     background: linear-gradient(135deg, #40f2ff, #00b8d4) !important;
     border: 1px solid #00e1ff !important;
   }
-}
-
-.polygon-area-item {
-  margin-bottom: 8px;
-  padding: 8px 10px;
-  border: 1px dashed rgba(0, 225, 255, 0.22);
-  border-radius: 6px;
-  background: rgba(8, 20, 36, 0.45);
-}
-
-.area-name-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-
-.lonlat-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 6px;
-}
-
-.coord-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  color: #94a3b8;
-  font-size: 12px;
-}
-
-.coord-empty {
-  font-size: 12px;
-  color: #64748b;
 }
 </style>

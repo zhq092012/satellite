@@ -1,5 +1,6 @@
 import type { Satellite, SatelliteDetail, SatelliteInfo, SatelliteTle, StepSatellite } from '@/types/cesium/satellite'
-import type { BattleForm, SatelliteNode, SatelliteRelation, SatelliteStrike, SatelliteThreat, SceneConfig, TaskForm, TLEDataResponse, Weapon } from '@/types/dashboard'
+import type { BattleForm } from '@/types/battle/battle'
+import type { SatelliteNode, SatelliteRelation, SatelliteStrike, SatelliteThreat, SceneConfig, TaskForm, TLEDataResponse, Weapon } from '@/types/dashboard'
 import type { AxiosResponsePage, AxiosResponseType } from '@/types/http'
 import type { Strike, StrikeV2 } from '@/types/strike'
 import type { ThreatTaskWeightsResponse } from '@/types/threat'
@@ -131,30 +132,6 @@ export const getSatelliteDetail = (data: { norad: number }) => {
 }
 
 /**
- * 新增战场
- * @param battle
- */
-export const saveBattle = (battle: BattleForm) => {
-  const url = `/api/battle/save`
-  return requestAPI.post<AxiosResponseType<any>>(url, battle)
-}
-/**
- * 更新战场
- * @param battle
- */
-export const updateBattle = (battle: BattleForm) => {
-  const url = `/api/battle/update`
-  return requestAPI.put<AxiosResponseType<any>>(url, battle)
-}
-/**
- * 删除战场
- * @param battle
- */
-export const deleteBattle = (battleId: number) => {
-  const url = `/api/battle/del/${battleId}`
-  return requestAPI.delete<AxiosResponseType<any>>(url)
-}
-/**
  * 新增任务
  * @param battle
  */
@@ -195,14 +172,6 @@ export const updateTask = (task: TaskForm) => {
 export const deleteTask = (taskId: number) => {
   const url = `/api/battle/delTask/${taskId}`
   return requestAPI.delete<AxiosResponseType<any>>(url)
-}
-/**
- * 战场列表
- * @param battle
- */
-export const getBattleList = () => {
-  const url = `/api/battle/list`
-  return requestAPI.get<AxiosResponseType<BattleForm[]>>(url)
 }
 /**
  * 任务列表

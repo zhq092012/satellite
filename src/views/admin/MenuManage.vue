@@ -28,31 +28,31 @@
 
     <div class="menu-table-scroll">
       <el-table :data="list" v-loading="loading" border row-key="id" stripe default-expand-all :tree-props="treeProps">
-      <el-table-column prop="menuName" label="菜单名称" min-width="180" />
-      <el-table-column prop="path" label="路径" min-width="180" />
-      <el-table-column prop="component" label="组件" min-width="220" />
-      <el-table-column prop="icon" label="图标" min-width="120" />
-      <el-table-column prop="permission" label="权限标识" min-width="180" />
-      <el-table-column prop="type" label="类型" width="90">
-        <template #default="scope">
-          <el-tag>{{ typeLabel(scope.row.type) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" width="100">
-        <template #default="scope">
-          <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'">{{
-            scope.row.status === 1 ? '启用' : '禁用'
-          }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="sort" label="排序" width="90" />
-      <el-table-column fixed="right" label="操作" width="220">
-        <template #default="scope">
-          <el-button link type="primary" @click="openDialog(scope.row, true)">新增子菜单</el-button>
-          <el-button link type="primary" @click="openDialog(scope.row)">编辑</el-button>
-          <el-button link type="danger" @click="handleDelete(scope.row.id)">删除</el-button>
-        </template>
-      </el-table-column>
+        <el-table-column prop="menuName" label="菜单名称" min-width="180" />
+        <el-table-column prop="path" label="路径" min-width="180" />
+        <el-table-column prop="component" label="组件" min-width="220" />
+        <el-table-column prop="icon" label="图标" min-width="120" />
+        <el-table-column prop="permission" label="权限标识" min-width="180" />
+        <el-table-column prop="type" label="类型" width="90">
+          <template #default="scope">
+            <el-tag>{{ typeLabel(scope.row.type) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="scope">
+            <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'">{{
+              scope.row.status === 1 ? '启用' : '禁用'
+              }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="sort" label="排序" width="90" />
+        <el-table-column fixed="right" label="操作" width="250">
+          <template #default="scope">
+            <el-button link type="primary" @click="openDialog(scope.row, true)">新增子菜单</el-button>
+            <el-button link type="primary" @click="openDialog(scope.row)">编辑</el-button>
+            <el-button link type="danger" @click="handleDelete(scope.row.id)">删除</el-button>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
 

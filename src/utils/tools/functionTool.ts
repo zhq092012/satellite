@@ -1,5 +1,12 @@
 import { useLayoutStore } from '@/store/modules/layout'
-import type { BattleForm } from '@/types/dashboard';
+import type { BattleForm } from '@/types/battle/battle';
+
+/** 历史战场数据上可能仍带区域字段，仅用于地图锚点解析。 */
+type BattleGeoSource = BattleForm & {
+  createAreaMode?: string
+  area?: string
+  circleJSON?: string
+}
 import { EntityCollection } from 'cesium'
 import * as Cesium from 'cesium'
 const store = useLayoutStore()
@@ -202,7 +209,7 @@ const parseLonLatPoint = (point: unknown): { lon: number; lat: number } | null =
  * @param battle 战场表单
  * @returns 经纬度中心；无法解析时返回 null
  */
-export function resolveBattleGeoCenter(battle: BattleForm | null): { lon: number; lat: number } | null {
+export function resolveBattleGeoCenter(battle: BattleGeoSource | null): { lon: number; lat: number } | null {
   // 如果战场表单为空，则返回 null
   if (!battle) return null
 
@@ -246,7 +253,7 @@ export function resolveBattleGeoCenter(battle: BattleForm | null): { lon: number
  * @param battle 战场表单
  * @returns 区域坐标列表
  */
-function collectBattleGeoCoords(battle: BattleForm | null): { lon: number; lat: number }[] {
+function collectBattleGeoCoords(battle: BattleGeoSource | null): { lon: number; lat: number }[] {
   const coords: { lon: number; lat: number }[] = []
   if (!battle) return coords
 
@@ -293,7 +300,7 @@ function collectBattleGeoCoords(battle: BattleForm | null): { lon: number; lat: 
  * @param battle 战场表单
  * @returns 标签经纬度锚点；无法解析时返回 null
  */
-export function resolveBattleLabelGeoAnchor(battle: BattleForm | null): { lon: number; lat: number } | null {
+export function resolveBattleLabelGeoAnchor(battle: BattleGeoSource | null): { lon: number; lat: number } | null {
   // 收集战场区域全部经纬度坐标点
   const coords = collectBattleGeoCoords(battle)
   // 如果收集到的坐标点为空，则返回战场中心
@@ -331,7 +338,7 @@ export function resolveBattleLabelGeoAnchor(battle: BattleForm | null): { lon: n
  * @returns 贴地标签坐标
  */
 export function resolveBattleSpaceLabelPosition(
-  battle: BattleForm | null,
+  battle: BattleGeoSource | null,
   fallbackCenter?: Cesium.Cartesian3 | null
 ): Cesium.Cartesian3 | null {
   // 计算战场名称标签锚点
@@ -364,7 +371,7 @@ export interface MarkBattleAreaOptions {
  */
 export function markBattleArea(
   viewer: Cesium.Viewer,
-  battle: BattleForm | null,
+  battle: BattleGeoSource | null,
   orbit_altitude_km: number = 24000000,
   options?: MarkBattleAreaOptions
 ) {

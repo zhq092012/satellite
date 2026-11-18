@@ -20,7 +20,7 @@ interface TaskCombatArea {
   enabled: boolean
 }
 
-interface TaskForm {
+export interface TaskForm {
   id?: number
   battleId: number
   name: string
@@ -63,18 +63,7 @@ interface TaskForm {
     mes: string | null
   }
 }
-interface BattleForm {
-  id?: number
-  name: string
-  description: string
-  createAreaMode: string
-  beginDate: string
-  endDate: string
-  dataRefreshRate: string
-  tasks: TaskForm[] | null
-  circleJSON?: string
-  area?: string
-}
+
 interface TLEDataResponse {
   taskId: number
   battleId: number
