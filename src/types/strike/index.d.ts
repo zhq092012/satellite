@@ -1,3 +1,41 @@
+import type { AlgorithmSelection } from '@/types/threat'
+
+/** 计算模块：打击度分析表格行 */
+export interface ComputeStrikeRow {
+  /** NORAD 编号 */
+  noradId?: string
+  /** 卫星名称 */
+  satelliteName?: string
+  /** 所属国家 */
+  country?: string
+  /** 卫星类型（体系/系列） */
+  satelliteType?: string
+  /** 打击度 */
+  strike?: number
+  /** 打击度因子明细 */
+  factors?: import('@/types/threat').FactorScore[]
+}
+
+/** 计算模块：打击度分析响应 */
+export interface StrikeResp {
+  /** 任务 id */
+  taskId?: string
+  /** 任务名称 */
+  taskName?: string
+  /** 计算时间 */
+  generatedAt?: string
+  /** 本次使用的算法 */
+  algorithms?: AlgorithmSelection
+  /** 各卫星打击度 */
+  rows?: ComputeStrikeRow[]
+}
+
+/** 打击度分析可选查询参数 */
+export interface StrikeAnalysisQuery {
+  /** 打击度算法编码 */
+  strike?: string
+}
+
 /**
  * 仿真场景组件的共享类型定义
  * 从 SatelliteUnReal.vue 中提取，集中管理以便各子模块引用

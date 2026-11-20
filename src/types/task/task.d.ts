@@ -1,11 +1,21 @@
-/** 任务装配资源项（卫星系列 + 地面站/数据中心 ID） */
+/** 经纬度点（任务区域顶点 / 圆心） */
+export interface TaskLngLat {
+    /** 经度 */
+    lng: number
+    /** 纬度 */
+    lat: number
+}
+
+/**
+ * 任务挂载的资源项（卫星 / 接收站 / 武器，与 OpenAPI `TaskResourceItem` 一致）。
+ */
 export interface TaskResourceItem {
-    /** 卫星系列名称 */
-    series: string
-    /** 接收站 ID 列表 */
-    receiveIds: string[]
-    /** 发射站/数据中心 ID 列表 */
-    stationIds: string[]
+    /** 资源主键 id */
+    resourceId: string
+    /** 资源名称 */
+    name: string
+    /** 资源代号或编码 */
+    code: string
 }
 
 /** 任务后台算法计算进度 */
@@ -32,23 +42,17 @@ export interface TaskAlgorithmProgressEntity {
 
 /** 任务区域（接口 `areas` 元素） */
 export interface TaskArea {
-    /** 区域 ID */
-    id: number
+    /** 区域标识（新增可为空，保存后由后端生成） */
+    id?: string
     /** 区域名称 */
     name: string
     /** POLYGON 多边形 / CIRCLE 圆 */
     type: string
     /** 多边形顶点 */
-    points: {
-        lng: number
-        lat: number
-    }[]
+    points: TaskLngLat[]
     /** 圆心 */
-    center: {
-        lng: number
-        lat: number
-    }
-    /** 圆半径 */
+    center: TaskLngLat
+    /** 圆半径（km，type=CIRCLE 时使用） */
     radius: number
     /** 是否启用 */
     enabled: boolean
@@ -105,78 +109,58 @@ export interface TaskCombatArea {
 }
 
 /**
- * 战场任务（新增/修改请求体及列表、详情返回）。
- * 与战场仅通过 `battleId` 关联，不再嵌套 `battleEntity`。
- * 提交时可附带 `meCountryShow`、`enemyCountryShow`、`targetTypeShow` 等，后端可忽略。
+ * 战场任务（`BattleTaskReq` / `BattleTaskResp`）。
+ * 与战场仅通过 `battleId` 关联。
  */
 export interface TaskForm {
-    /** 任务 ID */
-    id?: number
-    /** 战场 ID */
-    battleId: number
+    /** 任务 id */
+    id?: string
+    /** 所属战场 id */
+    battleId: string
     /** 任务名称 */
     name: string
-    /** 任务描述 */
+    /** 描述 */
     description: string
-    /** 开始时间，格式 yyyy-MM-dd HH:mm */
+    /** 开始日期 yyyy-MM-dd HH:mm */
     beginDate: string
-    /** 结束时间，格式 yyyy-MM-dd HH:mm */
+    /** 结束日期 yyyy-MM-dd HH:mm */
     endDate: string
+    /** 作战任务来源 */
+    taskSource?: string
+    /** 作战背景 */
+    background?: string
+    /** 作战预期（如：示强威慑） */
+    expectation?: string
+    /** 作战预期下的具体情形 */
+    expectationCases?: string[]
     /** 预报小时 */
     forecastHour: number
-    /** 任务区域 */
-    areas: TaskArea[]
-    /** 卫星类型（侦察、通信），逗号分隔 */
-    targetType: string
-    /** 卫星类型新字段，与 targetType 一致 */
-    targetTypeNew: string
-    /** 覆盖率（0-100） */
-    coverage: number
-    /** 链路时延（分钟） */
-    delayMin: number
-    /** 武器 ID 列表 */
-    weaponIds: string[]
-    /** 装配资源列表 */
-    resources: TaskResourceItem[]
-    /** 创建时间（接口返回） */
-    createTime?: string
-    /** 更新时间（接口返回） */
-    updateTime?: string
-    /** 经度（接口返回） */
-    longitude?: number | null
-    /** 纬度（接口返回） */
-    latitude?: number | null
-    /** 高度（接口返回） */
-    altitude?: number | null
-    /** 前推小时（接口返回） */
-    forwardH?: number | null
-    /** 国家汇总字段（接口返回） */
+    /** 国家（汇总字段，接口可选返回） */
     country?: string
-    /** 作战步骤 JSON 字符串 */
+    /** 我方（红方）国家列表 */
+    ownCountry: string[]
+    /** 敌方（蓝方）国家列表 */
+    enemyCountry: string[]
+    /** 作战阶段信息（JSON 字符串） */
     steps?: string
-    /** 算法计算进度（接口返回） */
-    algorithmProgressEntity?: TaskAlgorithmProgressEntity
-    /** 卫星类型多选（前端展示） */
-    targetTypeShow?: string[]
     /** 关注状态 */
     focusStatus?: number
-    /** 红方国家，逗号分隔 */
-    meCountry: string
-    /** 蓝方国家，逗号分隔 */
-    enemyCountry: string
-    /** 红方国家多选（前端展示/提交） */
-    meCountryShow?: string[]
-    /** 蓝方国家多选（前端展示/提交） */
-    enemyCountryShow?: string[]
-    /**
-     * 任务作战区域（圆形）；C2 面板编辑用，可与接口字段 `areas` 并存。
-     */
-    combatArea?: TaskCombatArea | null
-    /**
-     * 目标任务关系（卫星-地面站 / 卫星-中继 / 中继-地面站）。
-     * 后端未持久化前随任务 JSON 一并提交，编辑时回显。
-     */
-    targetRelations?: TaskTargetRelation[]
+    /** 覆盖度 */
+    coverage: number
+    /** 延迟（分钟） */
+    delayMin: number
+    /** 任务区域集合 */
+    areas: TaskArea[]
+    /** 挂载的卫星 */
+    satellites: TaskResourceItem[]
+    /** 挂载的接收站 */
+    receiveStations: TaskResourceItem[]
+    /** 挂载的武器 */
+    weapons: TaskResourceItem[]
+    /** 创建时间 */
+    createTime?: string
+    /** 更新时间 */
+    updateTime?: string
 }
 
 

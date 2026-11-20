@@ -31,13 +31,13 @@ export function useSceneData() {
   const missileBases = ref<MissileBaseInfo[]>([])
   const baseStations = ref<GroundStation[]>([])
   const historicalPlans = ref<StrikePlanV2Extended[]>([])
-  const preloadedHistoricalPlanTaskId = ref<number | null>(null)
+  const preloadedHistoricalPlanTaskId = ref<string | null>(null)
   const loadingScene = ref(false)
 
   // ─── TLE 缓存（非响应式，性能优先） ───
   const satelliteTleCache = new Map<string, SatelliteTle>()
   const satelliteSatrecCache = new Map<string, ReturnType<typeof satellitejs.twoline2satrec>>()
-  let cachedSatelliteTleTaskId: number | null = null
+  let cachedSatelliteTleTaskId: string | null = null
 
   const clearSatelliteTleCache = () => {
     satelliteTleCache.clear()
@@ -49,8 +49,9 @@ export function useSceneData() {
    * 确保卫星 TLE 缓存已更新
    * 如果缓存中已有数据且任务 ID 匹配则复用，否则重新获取
    */
-  const ensureSatelliteTleCache = async (taskId: number, satellites: BlueSatelliteRecord[]) => {
-    if (cachedSatelliteTleTaskId === taskId && satelliteTleCache.size > 0) {
+  const ensureSatelliteTleCache = async (taskId: string | number, satellites: BlueSatelliteRecord[]) => {
+    const cacheKey = String(taskId)
+    if (cachedSatelliteTleTaskId === cacheKey && satelliteTleCache.size > 0) {
       return
     }
 
@@ -59,7 +60,7 @@ export function useSceneData() {
 
     const norads = Array.from(new Set(satellites.map((satellite) => Number(satellite.noradId)).filter(Number.isFinite)))
     if (norads.length === 0) {
-      cachedSatelliteTleTaskId = taskId
+      cachedSatelliteTleTaskId = cacheKey
       return
     }
 
@@ -70,7 +71,7 @@ export function useSceneData() {
           satelliteTleCache.set(String(item.noradId), item.satelliteTleResp)
         }
       })
-      cachedSatelliteTleTaskId = taskId
+      cachedSatelliteTleTaskId = cacheKey
     }
   }
 
@@ -205,7 +206,7 @@ export function useSceneData() {
   /**
    * 预加载历史打击方案列表
    */
-  const preloadHistoricalPlans = async (taskId?: number, forceReload = false) => {
+  const preloadHistoricalPlans = async (taskId?: string | number, forceReload = false) => {
     const targetTaskId = taskId ?? store.activedTask?.id
     if (!targetTaskId) {
       historicalPlans.value = []
@@ -215,10 +216,16 @@ export function useSceneData() {
 
     if (preloadedHistoricalPlanTaskId.value === targetTaskId && historicalPlans.value.length && !forceReload) return
 
-    const res = await getStrikePlanList(targetTaskId)
+    const legacyTaskId = Number(targetTaskId)
+    if (!Number.isFinite(legacyTaskId)) {
+      historicalPlans.value = []
+      preloadedHistoricalPlanTaskId.value = null
+      return
+    }
+    const res = await getStrikePlanList(legacyTaskId)
     if (res.code === 200) {
       historicalPlans.value = res.data
-      preloadedHistoricalPlanTaskId.value = targetTaskId
+      preloadedHistoricalPlanTaskId.value = String(targetTaskId)
     } else {
       historicalPlans.value = []
       preloadedHistoricalPlanTaskId.value = null
@@ -250,13 +257,17 @@ export function useSceneData() {
 
     loadingScene.value = true
     try {
+      const legacyTaskId = Number(taskId)
+      if (!Number.isFinite(legacyTaskId)) {
+        throw new Error(`无效的任务 ID：${taskId}`)
+      }
       const [satelliteRes, weaponRes, groundStationRes, missileBaseRes] = await Promise.all([
         getBattleSegmentSatellites(
-          taskId,
+          legacyTaskId,
           undefined,
           blueCountries.length ? blueCountries : undefined
         ),
-        getTaskWeapons(taskId, redCountries.length ? redCountries : undefined),
+        getTaskWeapons(legacyTaskId, redCountries.length ? redCountries : undefined),
         getGroundStationList({ status: 1 }),
         getMissileBaseListAll({ country: '', name: '' }),
       ])

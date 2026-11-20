@@ -41,16 +41,16 @@ interface TaskProgressWsPayload {
 }
 
 /** 各任务 ID 对应的最新进度快照（模块级共享，供态势页监听进度完成）。 */
-export const taskProgressMap = reactive<Record<number, TaskProgressInfo>>({})
+export const taskProgressMap = reactive<Record<string, TaskProgressInfo>>({})
 
 /** 各任务 ID 对应的进度 WebSocket 连接。 */
-const taskProgressSocketMap = new Map<number, WebSocket>()
+const taskProgressSocketMap = new Map<string, WebSocket>()
 
 /** 用户主动关闭或任务完成后不再自动重连的任务集合。 */
-const taskProgressStopSet = new Set<number>()
+const taskProgressStopSet = new Set<string>()
 
 /** 各任务重连定时器。 */
-const taskProgressReconnectTimerMap = new Map<number, ReturnType<typeof setTimeout>>()
+const taskProgressReconnectTimerMap = new Map<string, ReturnType<typeof setTimeout>>()
 
 /** 重连间隔（毫秒）。 */
 const TASK_PROGRESS_RECONNECT_MS = 3000
@@ -76,7 +76,7 @@ declare global {
  * @param taskId 任务 ID，会作为 query 参数附加到地址上
  * @returns 可直接传入 `WebSocket` 的地址
  */
-const resolveTaskProgressWsUrl = (taskId: number): string => {
+const resolveTaskProgressWsUrl = (taskId: string | number): string => {
   const configured = window.__APP_RUNTIME__?.wsUrl || import.meta.env.VITE_WS_URL || '/ws'
   const url = /^wss?:\/\//i.test(configured)
     ? new URL(configured)
@@ -122,11 +122,12 @@ export const getTaskProgressPercent = (progress?: TaskProgressInfo | null): numb
  *
  * @param taskId 任务 ID
  */
-const clearTaskProgressReconnectTimer = (taskId: number): void => {
-  const timer = taskProgressReconnectTimerMap.get(taskId)
+const clearTaskProgressReconnectTimer = (taskId: string | number): void => {
+  const key = String(taskId)
+  const timer = taskProgressReconnectTimerMap.get(key)
   if (!timer) return
   clearTimeout(timer)
-  taskProgressReconnectTimerMap.delete(taskId)
+  taskProgressReconnectTimerMap.delete(key)
 }
 
 /**
@@ -134,10 +135,11 @@ const clearTaskProgressReconnectTimer = (taskId: number): void => {
  *
  * @param taskId 任务 ID
  */
-export const stopTaskProgressPolling = (taskId: number): void => {
-  taskProgressStopSet.add(taskId)
-  clearTaskProgressReconnectTimer(taskId)
-  const socket = taskProgressSocketMap.get(taskId)
+export const stopTaskProgressPolling = (taskId: string | number): void => {
+  const key = String(taskId)
+  taskProgressStopSet.add(key)
+  clearTaskProgressReconnectTimer(key)
+  const socket = taskProgressSocketMap.get(key)
   if (!socket) return
   socket.onopen = null
   socket.onmessage = null
@@ -146,7 +148,7 @@ export const stopTaskProgressPolling = (taskId: number): void => {
   if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
     socket.close()
   }
-  taskProgressSocketMap.delete(taskId)
+  taskProgressSocketMap.delete(key)
 }
 
 /**
@@ -196,14 +198,14 @@ const parseTaskProgressWsMessage = (raw: string): TaskProgressWsPayload | null =
  * @param fallbackTaskId 连接时绑定的任务 ID（消息未带 taskId 时使用）
  * @param payload 解析后的进度载荷
  */
-const applyTaskProgressPayload = (fallbackTaskId: number, payload: TaskProgressWsPayload): void => {
+const applyTaskProgressPayload = (fallbackTaskId: string, payload: TaskProgressWsPayload): void => {
   const totalStatus = payload.totalStatus
   const transitStatus = payload.transitStatus
   const threatAndStrikeStatus = payload.threatAndStrikeStatus
   if (!totalStatus && !transitStatus && !threatAndStrikeStatus && payload.mes == null) return
 
-  const taskId = Number(payload.taskId ?? fallbackTaskId)
-  if (!Number.isFinite(taskId)) return
+  const taskId = String(payload.taskId ?? fallbackTaskId).trim()
+  if (!taskId) return
 
   const previous = taskProgressMap[taskId]
   taskProgressMap[taskId] = {
@@ -223,7 +225,7 @@ const applyTaskProgressPayload = (fallbackTaskId: number, payload: TaskProgressW
  *
  * @param taskId 任务 ID
  */
-const connectTaskProgressSocket = (taskId: number): void => {
+const connectTaskProgressSocket = (taskId: string): void => {
   if (taskProgressStopSet.has(taskId)) return
 
   const existing = taskProgressSocketMap.get(taskId)
@@ -274,16 +276,17 @@ const connectTaskProgressSocket = (taskId: number): void => {
  *
  * @param taskId 任务 ID
  */
-export const startTaskProgressPolling = async (taskId: number): Promise<void> => {
-  stopTaskProgressPolling(taskId)
-  taskProgressStopSet.delete(taskId)
-  taskProgressMap[taskId] = {
+export const startTaskProgressPolling = async (taskId: string | number): Promise<void> => {
+  const key = String(taskId)
+  stopTaskProgressPolling(key)
+  taskProgressStopSet.delete(key)
+  taskProgressMap[key] = {
     totalStatus: '进行中',
     transitStatus: '进行中',
     threatAndStrikeStatus: '进行中',
     mes: '任务后台计算中',
   }
-  connectTaskProgressSocket(taskId)
+  connectTaskProgressSocket(key)
 }
 
 /**
@@ -296,17 +299,9 @@ export const resumeTaskProgressPollingForTasks = async (tasks: TaskForm[]): Prom
     if (!task.id) continue
 
     const cached = taskProgressMap[task.id]
-    const entity = task.algorithmProgressEntity
-    if (isTaskProgressComplete(cached) || isTaskProgressComplete(entity as unknown as TaskProgressInfo)) continue
+    if (isTaskProgressComplete(cached)) continue
 
-    const shouldWatch =
-      !!cached ||
-      (entity &&
-        (entity.totalStatus !== '完成' ||
-          entity.transitStatus !== '完成' ||
-          entity.threatAndStrikeStatus !== '完成'))
-
-    if (shouldWatch) {
+    if (cached) {
       await startTaskProgressPolling(task.id)
     }
   }
@@ -326,7 +321,7 @@ export const useTaskProgressPolling = () => {
    */
   const getTaskProgress = (task: TaskForm): TaskProgressInfo | undefined => {
     if (!task.id) return undefined
-    return taskProgressMap[task.id] ?? task.algorithmProgressEntity ?? undefined
+    return taskProgressMap[task.id]
   }
 
   return {

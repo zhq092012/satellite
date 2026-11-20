@@ -56,7 +56,7 @@ import { setGlobeDrawCameraLocked } from '@/utils/tools/cameraTools'
 const props = defineProps<{
   modelValue: boolean
   /** 新区域临时 ID（由父组件分配） */
-  tempAreaId: number
+  tempAreaId: string | number
   /** 打开时默认区域名 */
   defaultName?: string
 }>()
@@ -139,7 +139,7 @@ const initViewer = () => {
     onPolygonComplete: (points) => {
       const built = buildTaskAreaFromPolygon({
         id: props.tempAreaId,
-        name: areaName.value.trim() || `区域${Math.abs(props.tempAreaId)}`,
+        name: areaName.value.trim() || `区域${String(props.tempAreaId)}`,
         points,
       })
       if (!built) {
@@ -157,7 +157,7 @@ const initViewer = () => {
     onComplete: ({ centerLng, centerLat, radiusKm }) => {
       const built = buildTaskAreaFromCircle({
         id: props.tempAreaId,
-        name: areaName.value.trim() || `区域${Math.abs(props.tempAreaId)}`,
+        name: areaName.value.trim() || `区域${String(props.tempAreaId)}`,
         centerLng,
         centerLat,
         radiusKm,

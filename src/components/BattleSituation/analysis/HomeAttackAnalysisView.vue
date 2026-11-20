@@ -1,53 +1,50 @@
 <template>
   <div class="home-attack-analysis home-analysis-page dark-theme">
     <div v-if="!store.activedTask" class="home-analysis-empty">请先选择场景与任务</div>
-    <div v-else-if="analysisLoading" class="home-analysis-empty">正在加载分析数据...</div>
     <div v-else class="attack-table-shell">
       <div class="attack-table-panel">
         <div class="attack-table-caption">
-          <span class="attack-table-title">目标攻击度分析</span>
-          <span class="attack-table-formula">综合可攻击条件 = 攻击度 × 背景加权</span>
+          <span class="attack-table-title">打击度分析</span>
+          <span class="attack-table-formula">各蓝方卫星可打击程度及因子分解</span>
+          <el-button size="small" :loading="loading" @click="loadStrikeAnalysis">刷新</el-button>
         </div>
-        <div class="attack-table-scroll">
+        <p class="analysis-intro">
+          数据来自 <code>GET /api/compute/strike/{taskId}</code>。打击度与因子明细由后端注册算法计算；可通过顶栏「算法列表」查看默认生效算法编码。
+        </p>
+        <p v-if="metaLine" class="analysis-meta">{{ metaLine }}</p>
+        <p v-if="algorithmLine" class="analysis-meta analysis-meta--algo">{{ algorithmLine }}</p>
+        <p v-if="errorMessage" class="analysis-error">{{ errorMessage }}</p>
+        <div v-loading="loading" class="attack-table-scroll">
           <table class="attack-dual-table" cellspacing="0" cellpadding="0">
             <colgroup>
               <col v-for="(width, idx) in columnWidths" :key="`col-${idx}`" :style="{ width }" />
             </colgroup>
             <thead>
               <tr class="attack-col-header">
+                <th scope="col">NORAD</th>
                 <th scope="col">所属国家</th>
                 <th scope="col">卫星名称</th>
                 <th scope="col">卫星类型</th>
-                <th scope="col">国家权重</th>
-                <th scope="col">武器名称</th>
-                <th scope="col">武器类型</th>
-                <th scope="col">攻击窗口</th>
-                <th scope="col">攻击度</th>
-                <th scope="col">背景加权</th>
-                <th scope="col">综合可攻击条件</th>
+                <th scope="col">打击度</th>
+                <th scope="col">打击因子</th>
               </tr>
             </thead>
             <tbody>
+              <tr v-if="!tableRows.length && !loading">
+                <td colspan="6" class="attack-empty-cell">暂无打击度数据</td>
+              </tr>
               <tr
                 v-for="row in tableRows"
                 :key="row.rowKey"
-                :class="homeAttackAnalysisCountryRowClass(row.country)"
+                :class="computeAnalysisCountryRowClass(row.country, priorityCountries)"
               >
-                <td>{{ row.country }}</td>
-                <td class="attack-cell--name">{{ row.satelliteName }}</td>
-                <td>{{ row.satelliteType }}</td>
-                <td>{{ row.countryWeightText }}</td>
-                <td class="attack-cell--name">{{ row.weaponName }}</td>
-                <td>{{ row.weaponType }}</td>
-                <td>{{ row.attackWindowText }}</td>
-                <td class="attack-cell--metric">
-                  <span class="attack-cell-value">{{ row.attackDegreeText }}</span>
-                  <span class="attack-cell-hint">{{ row.attackDegreeHint }}</span>
-                </td>
-                <td>{{ row.backgroundWeightText }}</td>
-                <td class="attack-cell--metric">
-                  <span class="attack-cell-value">{{ row.compositeAttackText }}</span>
-                  <span class="attack-cell-hint">{{ row.compositeAttackHint }}</span>
+                <td>{{ row.noradId || '--' }}</td>
+                <td>{{ row.country || '--' }}</td>
+                <td class="attack-cell--name">{{ row.satelliteName || '--' }}</td>
+                <td>{{ row.satelliteType || '--' }}</td>
+                <td class="attack-cell--emphasis">{{ row.strikeText }}</td>
+                <td class="attack-cell--factors">
+                  <span class="attack-cell-hint">{{ row.factorsHint || '--' }}</span>
                 </td>
               </tr>
             </tbody>
@@ -59,95 +56,161 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import { getStrikeAnalysis } from '@/api/strike/strike'
+import { listRegisteredComputeAlgorithms } from '@/api/threat/threat'
 import { useLayoutStore } from '@/store/modules/layout'
+import type { AlgorithmInfo } from '@/types/threat'
+import type { ComputeStrikeRow, StrikeResp } from '@/types/strike'
+import { isComputeApiSuccess } from '@/utils/computeApi'
 import {
-  buildHomeAttackAnalysisRowsFromMatrix,
-  buildMockHomeAttackAnalysisRows,
-  homeAttackAnalysisCountryRowClass,
-  type HomeAttackAnalysisDataSource,
-  type HomeAttackAnalysisTableRow,
-} from '@/utils/buildHomeAttackAnalysisTable'
+  computeAnalysisCountryRowClass,
+  formatAlgorithmSelectionText,
+  formatComputeScore,
+  formatFactorScoreHints,
+  sortComputeRowsByCountryAndScore,
+} from '@/utils/computeAnalysisDisplay'
 
 defineOptions({ name: 'HomeAttackAnalysisView' })
 
-/** 10 列宽 */
-const columnWidths = ['8%', '12%', '11%', '7%', '12%', '8%', '16%', '9%', '7%', '10%'] as const
+const columnWidths = ['10%', '10%', '18%', '14%', '10%', '38%'] as const
 
 const store = useLayoutStore()
+const loading = ref(false)
+const errorMessage = ref('')
+const strikeResp = ref<StrikeResp | null>(null)
+const algorithmCatalog = ref<AlgorithmInfo[]>([])
 
 /**
- * 计算：当前任务攻击分析矩阵是否正在加载。
- * 返回：`store.taskAnalysisLoading` 布尔值。
- * 作用：表格加载态展示依据。
+ * 计算：作战对象国家，用于排序与高亮。
+ * 返回：enemyCountry 列表。
+ * 作用：表格展示优先级。
  */
-const analysisLoading = computed(() => store.taskAnalysisLoading)
-/**
- * 计算：布局 Store 中缓存的任务分析矩阵原始数据。
- * 返回：`store.taskAnalysisData`。
- * 作用：攻击度矩阵行构建的数据来源。
- */
-const analysisData = computed(() => store.taskAnalysisData)
-/**
- * 计算：攻击分析矩阵是否已就绪且属于当前激活任务。
- * 返回：矩阵含层级实体且分析任务 id 与当前任务一致时为 `true`。
- * 作用：在接口矩阵与 mock 行之间切换数据源。
- */
-const analysisReady = computed(
-  () =>
-    Boolean(analysisData.value?.levelSeriesEntities?.length) &&
-    store.taskAnalysisTaskId === store.activedTask?.id,
+const priorityCountries = computed(() =>
+  Array.isArray(store.activedTask?.enemyCountry)
+    ? store.activedTask!.enemyCountry.filter(Boolean)
+    : [],
 )
 
-/**
- * 计算：当前任务作战对象国家列表。
- * 返回：`activedTask.enemyCountryShow`，缺失时为空数组。
- * 作用：构建矩阵行与 mock 攻击分析表的优先国家。
- */
-const priorityCountries = computed(() => store.activedTask?.enemyCountryShow ?? [])
+interface StrikeTableRow {
+  rowKey: string
+  noradId?: string
+  country?: string
+  satelliteName?: string
+  satelliteType?: string
+  strikeText: string
+  factorsHint: string
+}
 
-/**
- * 计算：首页攻击度表格行及数据来源。
- * 返回：`{ rows, source }`；无任务时空行 mock；矩阵可用且解析出行时用 matrix，否则 mock。
- * 作用：模板绑定攻击度表格数据与来源。
- */
-const tablePayload = computed((): { rows: HomeAttackAnalysisTableRow[]; source: HomeAttackAnalysisDataSource } => {
-  const task = store.activedTask
-  if (!task) {
-    return { rows: [], source: 'mock' }
-  }
-  if (analysisReady.value && analysisData.value) {
-    const fromMatrix = buildHomeAttackAnalysisRowsFromMatrix(
-      analysisData.value,
-      task.id!,
-      priorityCountries.value,
-      store.c2ResourceSatelliteRows,
-    )
-    if (fromMatrix.length) {
-      return { rows: fromMatrix, source: 'matrix' }
-    }
-  }
-  return {
-    rows: buildMockHomeAttackAnalysisRows(priorityCountries.value, task.id),
-    source: 'mock',
-  }
+const mapStrikeRow = (row: ComputeStrikeRow): StrikeTableRow => ({
+  rowKey: row.noradId?.trim() || `${row.satelliteName}-${row.country}`,
+  noradId: row.noradId,
+  country: row.country,
+  satelliteName: row.satelliteName,
+  satelliteType: row.satelliteType,
+  strikeText: formatComputeScore(row.strike),
+  factorsHint: formatFactorScoreHints(row.factors),
 })
 
 /**
- * 计算：攻击度表格当前展示的行列表。
- * 返回：`tablePayload.rows`。
- * 作用：表格组件的数据源。
+ * 计算：打击度表格行。
+ * 返回：排序后的展示行。
+ * 作用：表格绑定数据。
  */
-const tableRows = computed(() => tablePayload.value.rows)
+const tableRows = computed((): StrikeTableRow[] => {
+  const rows = strikeResp.value?.rows ?? []
+  const mapped = rows.map(mapStrikeRow)
+  return sortComputeRowsByCountryAndScore(
+    mapped.map((item) => ({
+      ...item,
+      score: Number.parseFloat(item.strikeText) || 0,
+    })),
+    priorityCountries.value,
+  )
+})
+
+/**
+ * 计算：任务元信息说明。
+ * 返回：拼接字符串。
+ * 作用：页头展示。
+ */
+const metaLine = computed(() => {
+  const data = strikeResp.value
+  if (!data) return ''
+  return [
+    data.taskName ? `任务：${data.taskName}` : '',
+    data.generatedAt ? `计算时间：${data.generatedAt}` : '',
+    data.taskId ? `任务 ID：${data.taskId}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+})
+
+/**
+ * 计算：打击度算法说明文本。
+ * 返回：算法名称解析结果。
+ * 作用：页头辅助说明。
+ */
+const algorithmLine = computed(() =>
+  formatAlgorithmSelectionText(strikeResp.value?.algorithms, algorithmCatalog.value),
+)
+
+const loadAlgorithmCatalog = async () => {
+  try {
+    const res = await listRegisteredComputeAlgorithms()
+    if (isComputeApiSuccess(res.code) && Array.isArray(res.data)) {
+      algorithmCatalog.value = res.data
+    }
+  } catch {
+    algorithmCatalog.value = []
+  }
+}
+
+const loadStrikeAnalysis = async () => {
+  const task = store.activedTask
+  if (!task?.id) {
+    strikeResp.value = null
+    return
+  }
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    const res = await getStrikeAnalysis(String(task.id))
+    if (!isComputeApiSuccess(res.code)) {
+      throw new Error(res.msg || `打击度分析失败（code=${res.code}）`)
+    }
+    if (!res.data) {
+      throw new Error('打击度分析返回 data 为空')
+    }
+    strikeResp.value = res.data
+  } catch (error) {
+    strikeResp.value = null
+    errorMessage.value = error instanceof Error ? error.message : String(error)
+    ElMessage.error(errorMessage.value)
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 监听：当前激活任务 id。
+ * 回调不返回清理函数。
+ * 作用：任务切换后重新请求打击度分析。
+ */
+watch(
+  () => store.activedTask?.id,
+  () => {
+    void loadStrikeAnalysis()
+  },
+  { immediate: true },
+)
+
+void loadAlgorithmCatalog()
 </script>
 
 <style scoped lang="scss">
 $attack-table-border: rgba(56, 189, 248, 0.55);
-
-$attack-header-basic: #6d5a1f;
-$attack-header-weapon: #7a4428;
-$attack-header-degree: #1e5280;
-$attack-header-composite: #6b3a55;
 
 .home-attack-analysis {
   box-sizing: border-box;
@@ -185,13 +248,12 @@ $attack-header-composite: #6b3a55;
   border: 2px solid $attack-table-border;
   border-radius: 8px;
   background: rgba(15, 23, 42, 0.85);
-  box-sizing: border-box;
 }
 
 .attack-table-caption {
   display: grid;
   flex-shrink: 0;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   column-gap: 12px;
   padding: 12px 16px;
@@ -200,26 +262,38 @@ $attack-header-composite: #6b3a55;
 }
 
 .attack-table-title {
-  grid-column: 1 / -1;
-  grid-row: 1;
-  margin: 0;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
-  line-height: 1.3;
-  text-align: center;
-  color: #e2e8f0;
+  color: #7dd3fc;
 }
 
 .attack-table-formula {
-  grid-column: 3;
-  grid-row: 1;
-  justify-self: end;
-  align-self: center;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.3;
-  color: #fca5a5;
-  white-space: nowrap;
+  justify-self: center;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.analysis-intro,
+.analysis-meta {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 16px;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.5;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+}
+
+.analysis-meta--algo {
+  color: #cbd5e1;
+}
+
+.analysis-error {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 16px;
+  color: #f87171;
+  font-size: 13px;
 }
 
 .attack-table-scroll {
@@ -230,63 +304,27 @@ $attack-header-composite: #6b3a55;
 
 .attack-dual-table {
   width: 100%;
-  min-width: 1100px;
-  border-collapse: separate;
-  border-spacing: 0;
+  border-collapse: collapse;
   table-layout: fixed;
-  font-size: inherit;
-}
-
-.attack-dual-table thead {
-  position: sticky;
-  top: 0;
-  z-index: 4;
-}
-
-.attack-col-header th,
-.attack-dual-table tbody td {
-  box-sizing: border-box;
-  border-right: 1px solid $attack-table-border;
-  border-bottom: 1px solid $attack-table-border;
-}
-
-.attack-col-header th:first-child,
-.attack-dual-table tbody td:first-child {
-  border-left: 1px solid $attack-table-border;
+  font-size: 13px;
 }
 
 .attack-col-header th {
-  border-top: 1px solid $attack-table-border;
-  padding: 8px 6px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 8px;
+  border: 1px solid $attack-table-border;
+  background: rgba(13, 27, 49, 0.95);
+  color: #e2e8f0;
   font-weight: 600;
-  text-align: center;
-  white-space: nowrap;
-  color: #f1f5f9;
-  vertical-align: middle;
-  line-height: 1.25;
 }
 
-.attack-col-header th:nth-child(-n + 4) {
-  background-color: $attack-header-basic;
-}
-
-.attack-col-header th:nth-child(n + 5):nth-child(-n + 7) {
-  background-color: $attack-header-weapon;
-}
-
-.attack-col-header th:nth-child(8) {
-  background-color: $attack-header-degree;
-}
-
-.attack-col-header th:nth-child(n + 9) {
-  background-color: $attack-header-composite;
-}
-
-.attack-dual-table tbody td {
+.attack-dual-table td {
   padding: 8px 6px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
   text-align: center;
-  vertical-align: middle;
-  color: #cbd5e1;
+  vertical-align: top;
   word-break: break-word;
 }
 
@@ -294,65 +332,26 @@ $attack-header-composite: #6b3a55;
   text-align: left;
 }
 
-.attack-cell--metric {
-  text-align: center;
-  vertical-align: top;
+.attack-cell--emphasis {
+  font-weight: 700;
+  color: #38bdf8;
 }
 
-.attack-cell-value {
+.attack-cell--factors .attack-cell-hint {
   display: block;
-  color: #e2e8f0;
-  line-height: 1.35;
-}
-
-.attack-cell-hint {
-  display: block;
-  margin-top: 4px;
-  color: #64748b;
+  text-align: left;
+  white-space: pre-wrap;
+  color: #94a3b8;
   font-size: 12px;
-  font-weight: 400;
   line-height: 1.35;
-  white-space: normal;
-  text-align: center;
 }
 
-.attack-row--tw td {
-  background-color: rgba(234, 179, 8, 0.2);
+.attack-empty-cell {
+  padding: 24px !important;
+  color: #64748b;
 }
 
-.attack-row--tw td:first-child {
-  border-left: 4px solid #fbbf24;
-}
-
-.attack-row--jp td {
-  background-color: rgba(16, 185, 129, 0.18);
-}
-
-.attack-row--jp td:first-child {
-  border-left: 4px solid #34d399;
-}
-
-.attack-row--us td {
-  background-color: rgba(59, 130, 246, 0.2);
-}
-
-.attack-row--us td:first-child {
-  border-left: 4px solid #38bdf8;
-}
-
-.attack-row--default td {
-  background-color: rgba(148, 163, 184, 0.12);
-}
-
-.attack-row--default td:first-child {
-  border-left: 4px solid #94a3b8;
-}
-</style>
-
-<style lang="scss">
-@use '@/components/BattleSituation/styles/home-analysis-typography.scss';
-
-.home-attack-analysis .attack-dual-table {
-  font-size: inherit;
+.compute-row--priority-country td {
+  background: rgba(34, 197, 94, 0.08);
 }
 </style>

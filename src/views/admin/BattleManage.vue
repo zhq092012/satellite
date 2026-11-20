@@ -55,8 +55,16 @@
                   <span>{{ scope.row.beginDate || '--' }} ~ {{ scope.row.endDate || '--' }}</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="meCountry" label="红方" width="120" show-overflow-tooltip />
-              <el-table-column prop="enemyCountry" label="蓝方" width="120" show-overflow-tooltip />
+              <el-table-column label="红方" width="120" show-overflow-tooltip>
+                <template #default="scope">
+                  {{ (scope.row.ownCountry || []).join('、') || '--' }}
+                </template>
+              </el-table-column>
+              <el-table-column label="蓝方" width="120" show-overflow-tooltip>
+                <template #default="scope">
+                  {{ (scope.row.enemyCountry || []).join('、') || '--' }}
+                </template>
+              </el-table-column>
               <!-- <el-table-column label="关注状态" width="100" align="center">
                 <template #default="scope">
                   <el-tag :type="scope.row.focusStatus === 1 ? 'danger' : 'info'" size="small">
@@ -216,7 +224,7 @@ watch(
  *
  * @param battleId 场景 ID
  */
-const refreshBattleTasks = async (battleId: number) => {
+const refreshBattleTasks = async (battleId: string | number) => {
   const res = await getTaskList(battleId)
   if (res.code !== 200) return
   await resumeTaskProgressPollingForTasks(res.data)
@@ -344,7 +352,7 @@ const handleEditTask = (task: TaskForm, battle: BattleForm) => {
 const handleTaskSaved = async (updated: TaskForm) => {
   const battleId = updated.battleId || store.battle?.id
   const previousTaskIds = new Set(
-    battleList.value.flatMap((battle) => (battle.tasks || []).map((task) => task.id).filter(Boolean) as number[])
+    battleList.value.flatMap((battle) => (battle.tasks || []).map((task) => task.id).filter(Boolean) as string[])
   )
   const isCreate = Boolean(updated.id && !previousTaskIds.has(updated.id))
 
@@ -353,10 +361,13 @@ const handleTaskSaved = async (updated: TaskForm) => {
     return
   }
 
-  if (!activeNames.value.includes(battleId)) {
-    activeNames.value.push(battleId)
+  const normalizedBattleId = Number(battleId)
+  if (Number.isFinite(normalizedBattleId)) {
+    if (!activeNames.value.includes(normalizedBattleId)) {
+      activeNames.value.push(normalizedBattleId)
+    }
+    await refreshBattleTasks(normalizedBattleId)
   }
-  await refreshBattleTasks(battleId)
 
   if (isCreate && updated.id) {
     await startTaskProgressPolling(updated.id)

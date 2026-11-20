@@ -64,7 +64,7 @@ import {
   type StrikePlanSchemeView,
 } from '@/utils/buildStrikePlanSchemeView'
 import { downloadStrikePlanCsv, downloadStrikePlanXls } from '@/utils/exportStrikePlanTable'
-import { buildStrikePlanDisplayName } from '@/config/combatScenarioOptions'
+import { buildStrikePlanDisplayNameFromTask } from '@/utils/taskEntity'
 import {
   useLayoutStore,
   ZHCH_USAGE_TYPE_OPTIONS,
@@ -88,9 +88,9 @@ const store = useLayoutStore()
  * @param usageType 用途类型键
  */
 const getPlanColumnTitle = (usageType: string): string => {
-  const taskId = store.activedTask?.id
-  if (!taskId) return getZhchUsageTypeLabel(usageType)
-  const base = buildStrikePlanDisplayName(taskId)
+  const task = store.activedTask
+  if (!task?.id) return getZhchUsageTypeLabel(usageType)
+  const base = buildStrikePlanDisplayNameFromTask(task)
   return `${base}（${getZhchUsageTypeLabel(usageType)}）`
 }
 
@@ -118,7 +118,7 @@ onMounted(() => {
  * 返回：string[]；无任务时为 []。
  * 作用：构建 Mock 综合方案与 buildStrikePlanSchemeView 时的 priorityCountries 入参。
  */
-const priorityCountries = computed(() => store.activedTask?.enemyCountryShow ?? [])
+const priorityCountries = computed(() => store.activedTask?.enemyCountry ?? [])
 
 /**
  * 读取展示用方案：优先接口缓存，缺失或空数据时使用演示 Mock。
@@ -132,7 +132,7 @@ const getPlanByType = (type: string): ZhchPlanResp | null => {
   if (cached && !isZhchPlanRespEmpty(cached)) {
     return cached
   }
-  return buildMockZhchPlanResp(type, taskId, priorityCountries.value)
+  return buildMockZhchPlanResp(type, Number(taskId), priorityCountries.value)
 }
 
 /**
@@ -142,12 +142,12 @@ const getPlanByType = (type: string): ZhchPlanResp | null => {
  */
 const getSchemeView = (usageType: string): StrikePlanSchemeView | null => {
   const plan = getPlanByType(usageType)
-  const taskId = store.activedTask?.id
-  if (!plan || !taskId) return null
+  const task = store.activedTask
+  if (!plan || !task?.id) return null
   return buildStrikePlanSchemeView(
     usageType,
     plan,
-    taskId,
+    task,
     store.c2ResourceSatelliteRows,
     priorityCountries.value,
   )

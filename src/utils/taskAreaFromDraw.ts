@@ -7,7 +7,7 @@ import { getCircumCircle } from '@/utils/tools/functionTool'
  * @param params 顶点、名称与 ID
  */
 export function buildTaskAreaFromPolygon(params: {
-  id: number
+  id: string | number
   name: string
   points: { lng: number; lat: number }[]
   enabled?: boolean
@@ -27,7 +27,7 @@ export function buildTaskAreaFromPolygon(params: {
   }
 
   return {
-    id: params.id,
+    id: params.id !== undefined && params.id !== '' ? String(params.id) : undefined,
     name: params.name,
     type: 'POLYGON',
     points: params.points.map((p) => ({ lng: p.lng, lat: p.lat })),
@@ -43,7 +43,7 @@ export function buildTaskAreaFromPolygon(params: {
  * @param params 圆心、半径、名称与 ID
  */
 export function buildTaskAreaFromCircle(params: {
-  id: number
+  id: string | number
   name: string
   centerLng: number
   centerLat: number
@@ -54,7 +54,7 @@ export function buildTaskAreaFromCircle(params: {
   if (!Number.isFinite(params.radiusKm) || params.radiusKm <= 0) return null
 
   return {
-    id: params.id,
+    id: params.id !== undefined && params.id !== '' ? String(params.id) : undefined,
     name: params.name,
     type: 'CIRCLE',
     points: [],

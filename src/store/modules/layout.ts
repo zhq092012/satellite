@@ -17,6 +17,10 @@ import type { SatelliteDetail } from '@/types/satellite/satellite'
 import type { C2ResourceSatelliteRow } from '@/utils/buildC2ResourceCatalog'
 import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
 import type { SatelliteAnalysisData, TaskForm } from '@/types/task/task'
+import {
+  normalizeTaskCountryList,
+  normalizeTaskExpectationCases,
+} from '@/utils/taskEntity'
 import { collectTaskAreaGeoCoords } from '@/utils/taskAreaGeo'
 
 interface State {
@@ -52,7 +56,7 @@ interface State {
   /** 任务算法分析结果加载状态 */
   taskAnalysisLoading: boolean
   /** 任务分析结果对应的任务 ID */
-  taskAnalysisTaskId: number | null
+  taskAnalysisTaskId: string | null
   /** [全局共享] 算法矩阵加载状态 */
   matrixLoading: boolean
   /** [全局共享] 算法矩阵当前查询条件 Key 缓存 */
@@ -68,7 +72,7 @@ interface State {
   /** 综合打击方案：按用途类型缓存的查询结果（军用 / 民用 / 军民混用） */
   zhchPlanMap: Record<string, ZhchPlanResp>
   /** 综合打击方案缓存对应的任务 ID */
-  zhchPlanTaskId: number | null
+  zhchPlanTaskId: string | null
   /** 综合打击方案加载状态 */
   zhchPlanLoading: boolean
   /** 当前勾选的用途类型（多选，打击方案管理页对比用） */
@@ -241,7 +245,16 @@ export const useLayoutStore = defineStore('layout-store', {
       this.isCollapse = isCollapse
     },
     setActivedTask(activedTask: TaskForm | null) {
-      this.activedTask = activedTask
+      if (!activedTask) {
+        this.activedTask = null
+        return
+      }
+      this.activedTask = {
+        ...activedTask,
+        ownCountry: normalizeTaskCountryList(activedTask.ownCountry),
+        enemyCountry: normalizeTaskCountryList(activedTask.enemyCountry),
+        expectationCases: normalizeTaskExpectationCases(activedTask.expectationCases),
+      }
     },
     setActivedBattle(battle: BattleForm) {
       this.battle = battle
@@ -347,7 +360,7 @@ export const useLayoutStore = defineStore('layout-store', {
      */
     isTaskAlgorithmComplete(task?: TaskForm | null): boolean {
       if (!task?.id) return false
-      const progress = taskProgressMap[task.id] ?? task.algorithmProgressEntity
+      const progress = taskProgressMap[task.id]
       return isTaskProgressComplete(progress as Parameters<typeof isTaskProgressComplete>[0])
     },
     /**
@@ -401,8 +414,8 @@ export const useLayoutStore = defineStore('layout-store', {
      * 生成当前矩阵查询范围 Key（任务 + 类型 + 系列）
      * @param taskId 任务 ID
      */
-    buildMatrixScopeKey(taskId?: number): string {
-      const id = taskId ?? this.activedTask?.id ?? 0
+    buildMatrixScopeKey(taskId?: string | number): string {
+      const id = taskId ?? this.activedTask?.id ?? ''
       if (!id) return ''
       const usage = this.activeZhchUsageType
       if (this.selectedSatSeries) return `${id}::${usage}::series::${this.selectedSatSeries}`
@@ -411,8 +424,8 @@ export const useLayoutStore = defineStore('layout-store', {
     /**
      * 开始一次矩阵拉取，返回用于校验响应是否仍有效的上下文
      */
-    beginMatrixFetch(): { token: number; scopeKey: string; queryKey: string; taskId: number } {
-      const taskId = this.activedTask?.id ?? 0
+    beginMatrixFetch(): { token: number; scopeKey: string; queryKey: string; taskId: string } {
+      const taskId = this.activedTask?.id ?? ''
       const token = ++this.matrixFetchToken
       const scopeKey = this.buildMatrixScopeKey(taskId)
       const usageType = this.activeZhchUsageType
@@ -434,7 +447,7 @@ export const useLayoutStore = defineStore('layout-store', {
     applyMatrixResult(
       token: number,
       _scopeKey: string,
-      _taskId: number,
+      _taskId: string,
       queryKey: string,
       data: MatrixResult | null
     ): MatrixResult | null {
@@ -493,7 +506,11 @@ export const useLayoutStore = defineStore('layout-store', {
               return this.matrixData
             }
 
-            const res = await getReconnaissanceAttackMatrix({ taskId, series })
+            const legacyTaskId = Number(taskId)
+            if (!Number.isFinite(legacyTaskId)) {
+              return this.matrixData
+            }
+            const res = await getReconnaissanceAttackMatrix({ taskId: legacyTaskId, series })
             const matrix = res.code === 200 ? res.data : null
             if (matrix) {
               await prefetchSeriesTransmissionLinks(matrix)
@@ -698,9 +715,13 @@ export const useLayoutStore = defineStore('layout-store', {
             if (!force && this.zhchPlanMap[type]) {
               return { type, data: this.zhchPlanMap[type] }
             }
+            const legacyTaskId = Number(taskId)
+            if (!Number.isFinite(legacyTaskId)) {
+              return { type, data: null }
+            }
             const res = await getSatelliteThreatInfoByType({
               type,
-              taskId,
+              taskId: legacyTaskId,
               sysType: sysType ?? null,
             })
             return { type, data: res.code === 200 ? res.data : null }

@@ -29,9 +29,9 @@
                 :value="toDatetimeLocalValue(taskForm.endDate)"
                 @input="handleEndInput(($event.target as HTMLInputElement).value)" />
             </el-form-item>
-            <el-form-item label="卫星类型" prop="targetTypeShow">
-              <el-select v-model="taskForm.targetTypeShow" multiple placeholder="请选择卫星类型"
-                popper-class="task-edit-select-popper" style="width: 100%" @change="handleTargetTypeShowChange">
+            <el-form-item label="卫星类型">
+              <el-select v-model="assembleTargetTypes" multiple placeholder="请选择卫星类型"
+                popper-class="task-edit-select-popper" style="width: 100%">
                 <el-option v-for="item in satelliteTypes" :key="item" :label="item" :value="item" />
               </el-select>
             </el-form-item>
@@ -47,7 +47,7 @@
                 <el-option v-for="item in COMBAT_PHASE_OPTIONS" :key="item.id" :label="item.label" :value="item.id" />
               </el-select>
             </el-form-item>
-            <el-form-item label="作战对象" prop="enemyCountryShow">
+            <el-form-item label="作战对象" prop="enemyCountry">
               <div class="combat-object-options" role="group" aria-label="作战对象">
                 <div v-for="country in combatObjectCountryOptions" :key="country" class="combat-object-chip" :class="{
                   'combat-object-chip--active': isCombatObjectActive(country),
@@ -121,14 +121,12 @@
                 <div v-else class="task-areas-empty">暂无任务区域</div>
               </div>
             </el-form-item>
-            <el-alert type="info" :closable="false" show-icon :title="COMBAT_SCENARIO_API_HINT"
-              class="combat-scenario-hint" />
           </el-form>
         </div>
 
         <TaskAssembleTab ref="satelliteAssembleRef" v-show="activeTab === 'satellite'" kind="satellite"
-          :reset-key="assembleResetKey" :enemy-countries="taskForm.enemyCountryShow"
-          :target-types="taskForm.targetTypeShow" />
+          :reset-key="assembleResetKey" :enemy-countries="taskForm.enemyCountry"
+          :target-types="assembleTargetTypes" />
         <TaskAssembleTab ref="stationAssembleRef" v-show="activeTab === 'station'" kind="station"
           :reset-key="assembleResetKey" />
         <TaskTargetRelationTab v-show="activeTab === 'relation'" ref="targetRelationRef" :reset-key="assembleResetKey"
@@ -165,11 +163,15 @@ import {
   COMBAT_EXPECTATION_PRIMARY_OPTIONS,
   COMBAT_PHASE_OPTIONS,
   COMMAND_SOURCE_OPTIONS,
-  loadCombatScenarioForTask,
   resolveEnemyCountriesByCombatPhase,
-  saveCombatScenarioForTask,
   type CombatScenarioSelection,
 } from '@/config/combatScenarioOptions'
+import {
+  applyCombatScenarioSelectionToTaskFields,
+  DEFAULT_TASK_OWN_COUNTRIES,
+  mapAssembleRowToTaskResource,
+  resolveCombatScenarioSelectionFromTask,
+} from '@/utils/taskEntity'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskAssembleTab, { type TaskAssembleRow } from '@/components/BattleSituation/TaskAssembleTab.vue'
 import TaskTargetRelationTab from '@/components/BattleSituation/TaskTargetRelationTab.vue'
@@ -201,7 +203,6 @@ const store = useLayoutStore()
 
 
 /** 新建任务默认红方国家 */
-const DEFAULT_ME_COUNTRIES = ['中国'] as const
 /** 新建任务默认蓝方国家（作战阶段选择后覆盖） */
 const DEFAULT_ENEMY_COUNTRIES = ['美国'] as const
 /** 新建任务默认卫星类型（四分类全选） */
@@ -251,7 +252,7 @@ const combatObjectCountryOptions = [...TASK_ENEMY_COUNTRY_OPTIONS]
  * @param country 国家/地区名称
  */
 const isCombatObjectActive = (country: string): boolean =>
-  (taskForm.enemyCountryShow || []).includes(country)
+  (taskForm.enemyCountry || []).includes(country)
 
 /**
  * 计算：当前作战预期一级选项下的二级子选项列表。
@@ -265,9 +266,8 @@ const expectationSecondaryOptions = computed(() => {
   return primary?.children ?? []
 })
 
-/** 后端未接入作战场景字段的说明 */
-const COMBAT_SCENARIO_API_HINT =
-  '作战背景/预期/阶段当前仅保存至浏览器本地；待 POST /api/battle-task 扩展 combatScenario 字段后同步后端。'
+/** 卫星装配筛选用类型（不写入任务实体，接口无该字段）。 */
+const assembleTargetTypes = ref<string[]>([...DEFAULT_TARGET_TYPES])
 
 /** 深拷贝任务区域列表，避免编辑时污染原任务对象。 */
 const cloneTaskAreas = (areas?: TaskArea[]): TaskArea[] =>
@@ -277,15 +277,15 @@ const cloneTaskAreas = (areas?: TaskArea[]): TaskArea[] =>
     center: { lng: area.center.lng, lat: area.center.lat },
   }))
 
-/** 客户端临时区域 ID 序列（负数，待后端分配正式 ID）。 */
-let tempTaskAreaIdSeq = -1
+/** 客户端临时区域 ID 序列（待后端分配正式 ID）。 */
+let tempTaskAreaIdSeq = 0
 const allocTempTaskAreaId = () => {
-  tempTaskAreaIdSeq -= 1
-  return tempTaskAreaIdSeq
+  tempTaskAreaIdSeq += 1
+  return `client-area-${tempTaskAreaIdSeq}`
 }
 
 const areaPickerVisible = ref(false)
-const areaPickerTempId = ref(-1)
+const areaPickerTempId = ref('client-area-0')
 
 /**
  * 计算：打开区域选取器时的默认名称。
@@ -327,48 +327,33 @@ const formatAreaRadius = (area: TaskArea): string => {
 
 /** 可编辑任务表单。 */
 const taskForm = reactive<TaskForm>({
-  battleId: -1,
+  battleId: '',
   name: '',
   description: '',
   beginDate: '',
   endDate: '',
+  taskSource: '',
+  background: '',
+  expectation: '',
+  expectationCases: [],
   forecastHour: DEFAULT_TASK_DURATION_HOURS,
   areas: [],
-  targetType: '',
-  targetTypeNew: '',
-  targetTypeShow: [],
-  meCountry: DEFAULT_ME_COUNTRIES.join(','),
-  meCountryShow: [...DEFAULT_ME_COUNTRIES],
-  enemyCountry: DEFAULT_ENEMY_COUNTRIES.join(','),
-  enemyCountryShow: [...DEFAULT_ENEMY_COUNTRIES],
+  ownCountry: [...DEFAULT_TASK_OWN_COUNTRIES],
+  enemyCountry: [...DEFAULT_ENEMY_COUNTRIES],
   steps: '',
   focusStatus: 0,
   delayMin: 60,
   coverage: 50,
-  weaponIds: [],
-  resources: [],
-  targetRelations: [],
+  satellites: [],
+  receiveStations: [],
+  weapons: [],
 })
 
 /** 任务表单校验规则。 */
 const formRules = reactive<FormRules<TaskForm>>({
   name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
   description: [{ required: true, message: '请输入任务概述', trigger: 'blur' }],
-  targetTypeShow: [{
-    type: 'array',
-    required: true,
-    min: 1,
-    message: '请选择卫星类型',
-    trigger: 'change',
-  }],
-  meCountryShow: [{
-    type: 'array',
-    required: true,
-    min: 1,
-    message: '红方国家缺失',
-    trigger: 'change',
-  }],
-  enemyCountryShow: [{
+  enemyCountry: [{
     type: 'array',
     required: true,
     min: 1,
@@ -660,19 +645,22 @@ const createPlaceholderRow = (id: string, name?: string): TaskAssembleRow => ({
  * @param task 列表接口返回的任务对象
  */
 const restoreAssembleFromTask = (task: TaskForm) => {
-  const resources = task.resources ?? []
-  const weaponIds = task.weaponIds ?? []
-
-  const receiveIds = [...new Set(resources.flatMap((item) => item.receiveIds ?? []))]
-
-  const seriesNames = [...new Set(resources.map((item) => item.series).filter(Boolean))]
-  satelliteAssembleRef.value?.setAssembledRows(
-    seriesNames.map((series) => createPlaceholderRow(series, series)),
+  const satellites = (task.satellites ?? []).map((item) => ({
+    resourceId: item.resourceId,
+    name: item.name,
+    code: item.code,
+  }))
+  satelliteAssembleRef.value?.setAssembledTaskSatellites(satellites)
+  stationAssembleRef.value?.setAssembledRows(
+    (task.receiveStations ?? []).map((item) =>
+      createPlaceholderRow(item.resourceId, item.name || item.resourceId),
+    ),
   )
-  stationAssembleRef.value?.setAssembledRows(receiveIds.map((id) => createPlaceholderRow(id)))
-  weaponAssembleRef.value?.setAssembledRows(weaponIds.map((id) => createPlaceholderRow(id)))
+  weaponAssembleRef.value?.setAssembledRows(
+    (task.weapons ?? []).map((item) => createPlaceholderRow(item.resourceId, item.name || item.resourceId)),
+  )
   void nextTick(() => {
-    targetRelationRef.value?.setRelations(task.targetRelations ?? [])
+    targetRelationRef.value?.setRelations([])
   })
 }
 
@@ -714,28 +702,28 @@ const resetCreateForm = () => {
   const endDate = createDefaultEndDate(beginDate, DEFAULT_TASK_DURATION_HOURS)
   Object.assign(taskForm, {
     id: undefined,
-    battleId: store.battle?.id ?? -1,
+    battleId: store.battle?.id != null ? String(store.battle.id) : '',
     name: '',
     description: '',
     beginDate,
     endDate,
-    targetType: DEFAULT_TARGET_TYPES.join(','),
-    targetTypeShow: [...DEFAULT_TARGET_TYPES],
-    meCountry: DEFAULT_ME_COUNTRIES.join(','),
-    meCountryShow: [...DEFAULT_ME_COUNTRIES],
-    enemyCountry: DEFAULT_ENEMY_COUNTRIES.join(','),
-    enemyCountryShow: [...DEFAULT_ENEMY_COUNTRIES],
+    taskSource: '',
+    background: '',
+    expectation: '',
+    expectationCases: [],
+    ownCountry: [...DEFAULT_TASK_OWN_COUNTRIES],
+    enemyCountry: [...DEFAULT_ENEMY_COUNTRIES],
     steps: '',
     focusStatus: 0,
     delayMin: DEFAULT_DELAY_MIN,
     coverage: DEFAULT_COVERAGE,
-    weaponIds: [],
-    resources: [],
+    satellites: [],
+    receiveStations: [],
+    weapons: [],
     forecastHour: DEFAULT_TASK_DURATION_HOURS,
     areas: [] as TaskArea[],
-    targetTypeNew: DEFAULT_TARGET_TYPES.join(','),
-    targetRelations: [],
   })
+  assembleTargetTypes.value = [...DEFAULT_TARGET_TYPES]
   durationHours.value = DEFAULT_TASK_DURATION_HOURS
   initCombatScenarioDefaults()
   void nextTick(() => {
@@ -757,18 +745,16 @@ const initCombatScenarioDefaults = () => {
   applyCombatPhaseToEnemyCountries(combatScenario.combatPhaseId)
 }
 
-const loadCombatScenarioIntoForm = (taskId: number) => {
-  const saved = loadCombatScenarioForTask(taskId)
-  if (!saved) {
-    initCombatScenarioDefaults()
-    return
+const syncCombatScenarioFromTask = (task: TaskForm) => {
+  const selection = resolveCombatScenarioSelectionFromTask(task)
+  combatScenario.backgroundId = selection.backgroundId
+  combatScenario.commandSourceId = selection.commandSourceId
+  combatScenario.combatPhaseId = selection.combatPhaseId
+  combatScenario.expectationPrimaryId = selection.expectationPrimaryId
+  combatScenario.expectationSecondaryId = selection.expectationSecondaryId
+  if (!task.enemyCountry?.length) {
+    applyCombatPhaseToEnemyCountries(selection.combatPhaseId)
   }
-  combatScenario.backgroundId = saved.backgroundId
-  combatScenario.commandSourceId = saved.commandSourceId
-  combatScenario.combatPhaseId = saved.combatPhaseId
-  combatScenario.expectationPrimaryId = saved.expectationPrimaryId
-  combatScenario.expectationSecondaryId = saved.expectationSecondaryId
-  applyCombatPhaseToEnemyCountries(saved.combatPhaseId)
 }
 
 /**
@@ -783,23 +769,22 @@ const fillForm = (task: TaskForm | null) => {
   }
   Object.assign(taskForm, {
     ...task,
-    meCountryShow: task.meCountryShow?.length ? [...task.meCountryShow] : splitCsv(task.meCountry),
-    enemyCountryShow: task.enemyCountryShow?.length ? [...task.enemyCountryShow] : splitCsv(task.enemyCountry),
-    targetTypeShow: task.targetTypeShow?.length
-      ? [...task.targetTypeShow]
-      : splitCsv(task.targetTypeNew || task.targetType),
+    battleId: task.battleId != null ? String(task.battleId) : '',
+    ownCountry: task.ownCountry?.length ? [...task.ownCountry] : [...DEFAULT_TASK_OWN_COUNTRIES],
+    enemyCountry: Array.isArray(task.enemyCountry)
+      ? [...task.enemyCountry]
+      : splitCsv(String(task.enemyCountry ?? '')),
+    expectationCases: task.expectationCases ? [...task.expectationCases] : [],
     steps: task.steps || '',
     focusStatus: Number(task.focusStatus) === 1 ? 1 : 0,
     delayMin: Number.isFinite(task.delayMin) ? Number(task.delayMin) : DEFAULT_DELAY_MIN,
     coverage: Number.isFinite(task.coverage) ? Number(task.coverage) : DEFAULT_COVERAGE,
-    weaponIds: task.weaponIds ? [...task.weaponIds] : [],
-    resources: task.resources ? task.resources.map((item) => ({
-      series: item.series,
-      receiveIds: [...(item.receiveIds ?? [])],
-      stationIds: [...(item.stationIds ?? [])],
-    })) : [],
+    satellites: task.satellites ? task.satellites.map((item) => ({ ...item })) : [],
+    receiveStations: task.receiveStations ? task.receiveStations.map((item) => ({ ...item })) : [],
+    weapons: task.weapons ? task.weapons.map((item) => ({ ...item })) : [],
     areas: cloneTaskAreas(task.areas),
   })
+  assembleTargetTypes.value = [...DEFAULT_TARGET_TYPES]
   const begin = normalizeDateTime(task.beginDate)
   const end = normalizeDateTime(task.endDate)
   taskForm.beginDate = begin
@@ -808,18 +793,15 @@ const fillForm = (task: TaskForm | null) => {
   void nextTick(() => {
     restoreAssembleFromTask(task)
   })
-  if (task.id) {
-    loadCombatScenarioIntoForm(task.id)
-  }
+  syncCombatScenarioFromTask(taskForm)
 }
 
 /**
  * 将多选国家同步回逗号分隔字段，供提交使用。
  */
 const syncCountryFields = () => {
-  taskForm.meCountryShow = [...DEFAULT_ME_COUNTRIES]
-  taskForm.meCountry = DEFAULT_ME_COUNTRIES.join(',')
-  taskForm.enemyCountry = (taskForm.enemyCountryShow || []).join(',')
+  taskForm.ownCountry = [...DEFAULT_TASK_OWN_COUNTRIES]
+  applyCombatScenarioSelectionToTaskFields(combatScenario, taskForm, taskForm.ownCountry)
 }
 
 /**
@@ -829,9 +811,9 @@ const syncCountryFields = () => {
  */
 const applyCombatPhaseToEnemyCountries = (phaseId: string) => {
   const countries = resolveEnemyCountriesByCombatPhase(phaseId)
-  taskForm.enemyCountryShow = countries
+  taskForm.enemyCountry = countries
   syncCountryFields()
-  formRef.value?.validateField('enemyCountryShow').catch(() => undefined)
+  formRef.value?.validateField('enemyCountry').catch(() => undefined)
 }
 
 const handleCombatPhaseChange = (phaseId: string) => {
@@ -845,15 +827,6 @@ const handleExpectationPrimaryChange = () => {
   const first = expectationSecondaryOptions.value[0]
   combatScenario.expectationSecondaryId = first?.id ?? ''
 }
-
-/**
- * 卫星类型变化：刷新校验状态。
- */
-const handleTargetTypeShowChange = () => {
-  formRef.value?.validateField('targetTypeShow').catch(() => undefined)
-}
-
-
 
 /**
  * 加载红蓝方可选国家列表。
@@ -882,65 +855,67 @@ const handleClosed = () => {
  * @param data 接口 data 字段（可能是数字或带 id 的对象）
  * @returns 新任务 ID；无法解析时为 undefined
  */
-const resolveCreatedTaskId = (data: unknown): number | undefined => {
+const resolveCreatedTaskId = (data: unknown): string | undefined => {
+  if (typeof data === 'string' && data.trim()) return data.trim()
   const numeric = Number(data)
-  if (Number.isFinite(numeric) && numeric > 0) return numeric
+  if (Number.isFinite(numeric) && numeric > 0) return String(numeric)
   if (data && typeof data === 'object' && 'id' in data) {
-    const id = Number((data as { id?: number }).id)
-    if (Number.isFinite(id) && id > 0) return id
+    const id = (data as { id?: string | number }).id
+    if (id != null && String(id).trim()) return String(id).trim()
   }
   return undefined
 }
 
 /**
- * 汇总各装配页数据，构建算法新增任务请求体（仅传系列，不传卫星 ID）。
+ * 汇总各装配页数据，构建算法新增任务请求体（satellites 为勾选的卫星 resourceId/name/code）。
  * @returns 请求体；校验失败时返回 null
  */
 type AddTaskPayload = Parameters<typeof createTask>[0]
 
 const buildAddTaskPayload = (): AddTaskPayload | null => {
   syncCountryFields()
-  const targetTypeValue = (taskForm.targetTypeShow || []).join(',')
+  if (!assembleTargetTypes.value.length) {
+    ElMessage.warning('请选择卫星类型')
+    activeTab.value = 'basic'
+    return null
+  }
 
-  const seriesList = satelliteAssembleRef.value?.getAssembledSeries() ?? []
+  const satellites = satelliteAssembleRef.value?.getAssembledTaskSatellites() ?? []
   const stations = stationAssembleRef.value?.getAssembledRows() ?? []
   const weapons = weaponAssembleRef.value?.getAssembledRows() ?? []
 
-  if (!seriesList.length) {
-    ElMessage.warning('请至少选择一个卫星系列')
+  if (!satellites.length) {
+    ElMessage.warning('请至少选择一颗卫星')
     activeTab.value = 'satellite'
     return null
   }
 
-  const receiveIds = stations.map((row) => row.id)
-  const stationIds: string[] = []
-  const weaponIds = weapons.map((row) => row.id)
-
-  const resources = seriesList.map((series) => ({
-    series,
-    receiveIds,
-    stationIds,
-  }))
-
   return {
-    battleId: store.battle?.id as number,
-    meCountry: taskForm.meCountry,
-    enemyCountry: taskForm.enemyCountry,
-    meCountryShow: [...(taskForm.meCountryShow || [])],
-    enemyCountryShow: [...(taskForm.enemyCountryShow || [])],
-    targetTypeNew: targetTypeValue,
+    battleId: store.battle?.id != null ? String(store.battle.id) : '',
     name: taskForm.name,
     description: taskForm.description,
     beginDate: normalizeDateTime(taskForm.beginDate),
     endDate: normalizeDateTime(taskForm.endDate),
+    taskSource: taskForm.taskSource ?? '',
+    background: taskForm.background ?? '',
+    expectation: taskForm.expectation ?? '',
+    expectationCases: [...(taskForm.expectationCases ?? [])],
     forecastHour: durationHours.value,
+    country: taskForm.country ?? '',
+    ownCountry: [...(taskForm.ownCountry ?? DEFAULT_TASK_OWN_COUNTRIES)],
+    enemyCountry: [...(taskForm.enemyCountry ?? [])],
+    steps: taskForm.steps ?? '',
+    focusStatus: taskForm.focusStatus ?? 0,
     areas: cloneTaskAreas(taskForm.areas),
-    targetType: targetTypeValue,
     coverage: taskCoverage.value,
     delayMin: linkDelayMin.value,
-    weaponIds,
-    resources,
-    targetRelations: targetRelationRef.value?.getRelations() ?? [],
+    satellites: satellites.map((item) => ({
+      resourceId: item.resourceId,
+      name: item.name,
+      code: item.code,
+    })),
+    receiveStations: stations.map((row) => mapAssembleRowToTaskResource(row)),
+    weapons: weapons.map((row) => mapAssembleRowToTaskResource(row)),
   }
 }
 
@@ -957,35 +932,17 @@ const buildUpdateTaskPayload = (): TaskForm | null => {
   }
   const assembled = buildAddTaskPayload()
   if (!assembled) return null
-  const targetTypeValue = (taskForm.targetTypeShow || []).join(',')
   return {
     ...base,
+    ...assembled,
     id: base.id,
     battleId: base.battleId,
     name: taskForm.name,
     description: taskForm.description,
-    beginDate: assembled.beginDate,
-    endDate: assembled.endDate,
-    meCountry: assembled.meCountry,
-    enemyCountry: assembled.enemyCountry,
-    meCountryShow: [...(assembled.meCountryShow ?? [])],
-    enemyCountryShow: [...(assembled.enemyCountryShow ?? [])],
-    targetType: targetTypeValue,
-    targetTypeNew: targetTypeValue,
-    targetTypeShow: [...(taskForm.targetTypeShow || [])],
     steps: taskForm.steps || base.steps || '',
     focusStatus: taskForm.focusStatus ?? base.focusStatus ?? 0,
-    delayMin: assembled.delayMin,
-    coverage: assembled.coverage,
-    weaponIds: [...assembled.weaponIds],
-    resources: assembled.resources.map((item) => ({
-      series: item.series,
-      receiveIds: [...item.receiveIds],
-      stationIds: [...item.stationIds],
-    })),
-    forecastHour: assembled.forecastHour,
-    areas: assembled.areas,
-    targetRelations: assembled.targetRelations,
+    createTime: base.createTime,
+    updateTime: base.updateTime,
   }
 }
 
@@ -1028,13 +985,6 @@ const handleSubmit = async () => {
         if (!updatePayload) return
         const res = await updateTask(updatePayload)
         if (res.code === 200) {
-          saveCombatScenarioForTask(updatePayload.id as number, {
-            backgroundId: combatScenario.backgroundId,
-            commandSourceId: combatScenario.commandSourceId,
-            combatPhaseId: combatScenario.combatPhaseId,
-            expectationPrimaryId: combatScenario.expectationPrimaryId,
-            expectationSecondaryId: combatScenario.expectationSecondaryId,
-          })
           ElMessage.success('修改任务成功')
           visible.value = false
           emit('saved', updatePayload)
@@ -1050,39 +1000,12 @@ const handleSubmit = async () => {
       const res = await createTask(taskPayload)
       if (res.code === 200) {
         const savedTask: TaskForm = {
-          ...taskForm,
-          battleId: taskPayload.battleId,
-          beginDate: taskPayload.beginDate,
-          endDate: taskPayload.endDate,
-          meCountry: taskPayload.meCountry,
-          enemyCountry: taskPayload.enemyCountry,
-          meCountryShow: [...(taskPayload.meCountryShow ?? [])],
-          enemyCountryShow: [...(taskPayload.enemyCountryShow ?? [])],
-          targetType: taskPayload.targetType,
-          targetTypeNew: taskPayload.targetTypeNew,
-          targetTypeShow: [...(taskForm.targetTypeShow || [])],
-          steps: taskForm.steps || '',
-          delayMin: taskPayload.delayMin,
-          coverage: taskPayload.coverage,
-          weaponIds: [...taskPayload.weaponIds],
-          resources: taskPayload.resources.map((item) => ({
-            series: item.series,
-            receiveIds: [...item.receiveIds],
-            stationIds: [...item.stationIds],
-          })),
-          targetRelations: [...(taskPayload.targetRelations ?? [])],
+          ...taskPayload,
+          name: taskForm.name,
+          description: taskForm.description,
         }
         const createdId = resolveCreatedTaskId(res.data)
         if (createdId != null) savedTask.id = createdId
-        if (createdId != null) {
-          saveCombatScenarioForTask(createdId, {
-            backgroundId: combatScenario.backgroundId,
-            commandSourceId: combatScenario.commandSourceId,
-            combatPhaseId: combatScenario.combatPhaseId,
-            expectationPrimaryId: combatScenario.expectationPrimaryId,
-            expectationSecondaryId: combatScenario.expectationSecondaryId,
-          })
-        }
         ElMessage.success('添加任务成功')
         visible.value = false
         emit('saved', savedTask)

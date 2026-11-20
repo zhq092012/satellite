@@ -1,13 +1,12 @@
 import type { ZhchPlanResp } from '@/api/electronic'
 import type { C2ResourceSatelliteRow } from '@/utils/buildC2ResourceCatalog'
+import { COMBAT_PHASE_OPTIONS } from '@/config/combatScenarioOptions'
+import type { TaskForm } from '@/types/task/task'
 import {
-  buildStrikePlanDisplayName,
-  loadCombatScenarioForTaskOrDefault,
-  COMBAT_BACKGROUND_OPTIONS,
-  COMBAT_EXPECTATION_PRIMARY_OPTIONS,
-  COMBAT_PHASE_OPTIONS,
-  COMMAND_SOURCE_OPTIONS,
-} from '@/config/combatScenarioOptions'
+  buildStrikePlanDisplayNameFromTask,
+  normalizeTaskCountryList,
+  normalizeTaskExpectationCases,
+} from '@/utils/taskEntity'
 import {
   formatCoverageReduction,
   formatStrikeDelayDuration,
@@ -78,42 +77,26 @@ export interface StrikePlanSchemeView {
 const EMPTY = '--'
 
 /**
- * 解析作战场景展示字段。
+ * 解析作战场景展示字段（任务实体：`background` / `taskSource` / `expectation` 等）。
  *
- * @param taskId 任务 ID
+ * @param task 当前任务
  */
-function resolveCombatScenarioLabels(taskId: number): Pick<
-  StrikePlanSchemeMeta,
-  'combatBackground' | 'commandSource' | 'combatPhase' | 'combatExpectation'
-> {
-  const selection = loadCombatScenarioForTaskOrDefault(taskId)
-  const bg =
-    COMBAT_BACKGROUND_OPTIONS.find((o) => o.id === selection.backgroundId)?.label ??
-    selection.backgroundId
-  const cmd =
-    COMMAND_SOURCE_OPTIONS.find((o) => o.id === selection.commandSourceId)?.label ??
-    selection.commandSourceId
+function resolveCombatScenarioLabelsFromTask(
+  task: Pick<TaskForm, 'background' | 'taskSource' | 'enemyCountry' | 'expectation' | 'expectationCases'>,
+): Pick<StrikePlanSchemeMeta, 'combatBackground' | 'commandSource' | 'combatPhase' | 'combatExpectation'> {
+  const enemyCountries = normalizeTaskCountryList(task.enemyCountry)
   const phase =
-    COMBAT_PHASE_OPTIONS.find((o) => o.id === selection.combatPhaseId)?.label ??
-    selection.combatPhaseId
-  const expPrimary = COMBAT_EXPECTATION_PRIMARY_OPTIONS.find(
-    (o) => o.id === selection.expectationPrimaryId,
-  )?.label
-  const expSecondary = COMBAT_EXPECTATION_PRIMARY_OPTIONS.flatMap((p) => p.children).find(
-    (o) => o.id === selection.expectationSecondaryId,
-  )?.label
-  const expectationDisplay =
-    expSecondary && expSecondary !== EMPTY
-      ? expSecondary
-      : expPrimary && expPrimary !== EMPTY
-        ? expPrimary
-        : EMPTY
+    COMBAT_PHASE_OPTIONS.find((item) =>
+      item.enemyCountries.some((country) => enemyCountries.includes(country)),
+    )?.label ?? EMPTY
+  const expectation =
+    normalizeTaskExpectationCases(task.expectationCases)[0] || task.expectation?.trim() || EMPTY
 
   return {
-    combatBackground: bg || EMPTY,
-    commandSource: cmd || EMPTY,
-    combatPhase: phase || EMPTY,
-    combatExpectation: expectationDisplay,
+    combatBackground: task.background?.trim() || EMPTY,
+    commandSource: task.taskSource?.trim() || EMPTY,
+    combatPhase: phase,
+    combatExpectation: expectation,
   }
 }
 
@@ -321,12 +304,12 @@ function buildStrikePlanRows(
 export function buildStrikePlanSchemeView(
   usageType: string,
   plan: ZhchPlanResp,
-  taskId: number,
+  task: TaskForm,
   catalogRows: C2ResourceSatelliteRow[],
   enemyCountries: string[],
 ): StrikePlanSchemeView {
-  const scenario = resolveCombatScenarioLabels(taskId)
-  const planName = buildStrikePlanDisplayName(taskId)
+  const scenario = resolveCombatScenarioLabelsFromTask(task)
+  const planName = buildStrikePlanDisplayNameFromTask(task)
   const description =
     plan.summary?.trim() ||
     [plan.beforeResult, plan.afterResult].filter(Boolean).join(' ') ||

@@ -25,48 +25,32 @@
         @click="loadCandidatePool">
         刷新
       </el-button>
-      <span class="assemble-count">{{ isSatelliteKind ? `已选系列 ${assembledSeriesIds.size} 个` : `已装配
+      <span class="assemble-count">{{ isSatelliteKind ? `已选卫星 ${assembledTaskSatellites.length} 颗` : `已装配
         ${assembledRows.length} 项` }}</span>
     </div>
 
-    <!-- 卫星：系列栏 + 卫星列表（无穿梭框） -->
-    <div v-if="isSatelliteKind" class="assemble-satellite-body">
-      <section class="assemble-pane series-pane">
+    <!-- 卫星：资源树（国家 → 体系 → 系列 → 卫星） + 已选列表 -->
+    <div v-if="isSatelliteKind" class="assemble-satellite-body assemble-satellite-body--tree">
+      <section class="assemble-pane satellite-tree-pane">
         <div class="assemble-pane-head">
-          <span>卫星系列</span>
-          <span class="assemble-pane-sub">勾选即装配系列</span>
+          <span>卫星资源树</span>
         </div>
-        <div v-loading="listLoading" class="assemble-pane-body series-pane-body">
-          <div v-if="!seriesGroupsByType.length" class="series-empty">
-            请先配置作战对象与卫星类型
+        <div v-loading="listLoading" class="assemble-pane-body satellite-tree-body">
+          <div v-if="!satelliteTreeUiNodes.length" class="series-empty">
+            请先配置作战对象与卫星类型，并点击刷新加载树
           </div>
-          <div v-else class="series-group-list">
-            <section v-for="group in seriesGroupsByType" :key="group.typeLabel" class="series-type-group"
-              :aria-label="`${group.typeLabel}卫星系列`">
-              <div class="series-type-head">{{ group.typeLabel }}</div>
-              <div class="series-chip-list" role="list">
-                <div v-for="row in group.rows" :key="row.id" class="series-chip" role="listitem" tabindex="0" :class="{
-                  'series-chip--preview': previewFocusSeries === row.series,
-                  'series-chip--assembled': isSeriesAssembled(row.id),
-                }" @click="handleSeriesChipToggle(row)" @keydown.enter.prevent="handleSeriesChipToggle(row)"
-                  @keydown.space.prevent="handleSeriesChipToggle(row)">
-                  <input type="checkbox" class="series-chip-native-check" :checked="isSeriesAssembled(row.id)"
-                    :aria-label="`装配系列 ${row.name}`" @click.stop @change="onSeriesNativeCheckChange(row, $event)" />
-                  <span class="series-chip-label">{{ row.name }}</span>
-                </div>
-              </div>
-            </section>
-          </div>
+          <el-tree v-else ref="satelliteTreeRef" class="satellite-resource-tree" :data="satelliteTreeUiNodes"
+            node-key="id" show-checkbox default-expand-all :props="{ label: 'label', children: 'children' }"
+            @check="handleSatelliteTreeCheck" />
         </div>
       </section>
       <section class="assemble-pane satellite-list-pane">
         <div class="assemble-pane-head">
-          <span>卫星列表</span>
-          <span class="assemble-pane-sub">{{ previewSeriesLabel }}</span>
+          <span>已选卫星</span>
         </div>
         <div class="assemble-pane-body assemble-pane-body--satellite-list">
-          <el-table v-loading="listLoading" :data="displaySatellitePreview" size="small" row-key="id"
-            class="assemble-table assemble-table--satellite-preview" empty-text="请勾选系列以加载卫星" :max-height="520" fit
+          <el-table v-loading="listLoading" :data="displayAssembledSatelliteRows" size="small" row-key="id"
+            class="assemble-table assemble-table--satellite-preview" empty-text="请在上方树中勾选卫星" height="100%" fit
             style="width: 100%">
             <el-table-column v-for="col in tableColumns" :key="col.prop" :prop="col.prop" :label="col.label"
               v-bind="assembleColumnTableProps(col)" show-overflow-tooltip />
@@ -113,12 +97,7 @@
             <el-form-item label="所属国家/地区" prop="country">
               <el-select v-model="stationForm.country" filterable placeholder="请选择国家/地区" class="full-width"
                 popper-class="task-edit-select-popper">
-                <el-option
-                  v-for="item in groundStationCountryOptions"
-                  :key="item"
-                  :label="item"
-                  :value="item"
-                />
+                <el-option v-for="item in groundStationCountryOptions" :key="item" :label="item" :value="item" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -134,24 +113,13 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="经度" prop="longitude">
-              <el-input-number
-                v-model="stationForm.longitude"
-                :precision="6"
-                :min="-180"
-                :max="180"
-                class="full-width"
-              />
+              <el-input-number v-model="stationForm.longitude" :precision="6" :min="-180" :max="180"
+                class="full-width" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="纬度" prop="latitude">
-              <el-input-number
-                v-model="stationForm.latitude"
-                :precision="6"
-                :min="-90"
-                :max="90"
-                class="full-width"
-              />
+              <el-input-number v-model="stationForm.latitude" :precision="6" :min="-90" :max="90" class="full-width" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -252,6 +220,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import type { TableInstance } from 'element-plus'
+import type { ElTree } from 'element-plus'
 import {
   createWeapon,
   deleteWeapon,
@@ -260,14 +229,15 @@ import {
   getBattleSateTypes,
   updateWeapon,
 } from '@/api/dashboard'
-import {
-  getSatelliteResourcesBySeries,
-  loadSatelliteSeriesDataForCountries,
-} from '@/api/satellite/satellite'
+import { getSatelliteResourceTree } from '@/api/satellite/satellite'
 import { isResourceApiSuccess } from '@/utils/resourceApi'
-import { mapSatelliteResourceToCatalog } from '@/utils/satelliteResource'
+import type { SatelliteAssembleTreeNode } from '@/types/satellite/satellite'
+import type { TaskResourceItem } from '@/types/task/task'
+import {
+  buildSatelliteAssembleTreeNodes,
+  indexSatelliteTreeResources,
+} from '@/utils/satelliteResourceTree'
 import { GROUND_STATION_COUNTRY_OPTIONS } from '@/constants/groundStationCountries'
-import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
 import {
   createGroundStation,
   deleteGroundStation,
@@ -380,7 +350,19 @@ const candidateSelection = ref<TaskAssembleRow[]>([])
 const assembledSelection = ref<TaskAssembleRow[]>([])
 /** 已从待选移入的资源。 */
 const assembledRows = ref<TaskAssembleRow[]>([])
-/** 卫星装配：已勾选系列 id 集合（与系列名一致，支持多选）。 */
+/** 卫星资源树组件引用 */
+const satelliteTreeRef = ref<InstanceType<typeof ElTree> | null>(null)
+/** 卫星装配树节点（国家 → 体系 → 系列 → 卫星） */
+const satelliteTreeUiNodes = ref<SatelliteAssembleTreeNode[]>([])
+/** 树叶子 resourceId → 元数据索引 */
+const satelliteTreeResourceIndex = ref(
+  new Map<string, { resource: TaskResourceItem; country: string; system: string; series: string }>(),
+)
+/** 已勾选卫星（对应任务 `satellites` 字段） */
+const assembledTaskSatellites = ref<TaskResourceItem[]>([])
+/** 程序化同步树勾选，避免递归触发 */
+const syncingTreeCheck = ref(false)
+/** @deprecated 系列多选遗留；C2 系列推导改由已选卫星反推 */
 const assembledSeriesIds = ref<Set<string>>(new Set())
 /** 列表加载中。 */
 const listLoading = ref(false)
@@ -420,7 +402,7 @@ const candidatePool = reactive<Record<TaskAssembleKind, TaskAssembleRow[]>>({
 const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
   satellite: {
     title: '卫星装配',
-    description: '系列按蓝方国家查询，并按任务卫星类型（侦察/通信）分组展示；勾选系列后可预览卫星，装配的是系列本身。',
+    description: '按国家拉取资源树（国家→体系→系列→卫星）；勾选卫星叶子即装配，并写入任务 satellites 字段。',
     searchPlaceholder: '国家 / 名称 / 系列',
     typePlaceholder: '卫星类型',
     typeOptions: [],
@@ -431,7 +413,7 @@ const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
       { prop: 'type', label: '卫星类型', minWidth: 120 },
       { prop: 'series', label: '卫星系列', minWidth: 120 },
       { prop: 'extra1', label: '卫星体系', minWidth: 120 },
-      { prop: 'extra2', label: '发射日期', minWidth: 120 },
+      { prop: 'extra2', label: '代号', minWidth: 120 },
     ],
   },
   station: {
@@ -442,7 +424,7 @@ const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
     typeOptions: [],
     seriesOptions: [],
     columns: [
-      { prop: 'country', label: '国家', width: 72 },
+      { prop: 'country', label: '国家', width: 100 },
       { prop: 'name', label: '名称', minWidth: 112, flex: true },
       { prop: 'type', label: '站号', minWidth: 100 },
       { prop: 'extra1', label: '经度', minWidth: 120 },
@@ -550,22 +532,6 @@ const seriesQueryCountries = computed(() => (props.enemyCountries || []).filter(
 const seriesQueryTargetTypes = computed(() =>
   (props.targetTypes || []).filter((type) => type === '侦察' || type === '通信')
 )
-
-/**
- * 计算：卫星预览区副标题文案（系列勾选、预览焦点与任务条件提示）。
- * 返回：描述当前系列状态或引导补全国家/类型的单行字符串。
- * 作用：在预览区向用户说明下一步操作或当前所选系列概况。
- */
-const satellitePreviewSubText = computed(() => {
-  const assembled = [...assembledSeriesIds.value]
-  if (assembled.length === 1) return `当前系列：${assembled[0]}`
-  if (assembled.length > 1) return `已勾选 ${assembled.length} 个系列`
-  if (previewFocusSeries.value) return `预览系列：${previewFocusSeries.value}`
-  if (!seriesQueryCountries.value.length) return '请先在基本信息中选择蓝方国家'
-  if (!seriesQueryTargetTypes.value.length) return '请先在基本信息中选择卫星类型（侦察/通信）'
-  const typeText = seriesQueryTargetTypes.value.join('、')
-  return `蓝方：${seriesQueryCountries.value.join('、')}；类型：${typeText}，请勾选系列`
-})
 
 /**
  * 计算：类型筛选下拉的可选项。
@@ -691,152 +657,6 @@ const stationToRow = (station: GroundStation): TaskAssembleRow => {
   }
 }
 
-/** querySatBySeries 返回项（仅本页展示用，不修改 task API 类型定义）。 */
-interface SatellitePreviewItem {
-  _id?: string
-  norad: number
-  name_en?: string
-  name_cn?: string | null
-  series?: string
-  sat_type?: string
-  country?: string
-  orbit_type?: number
-  /** catalog 扩展：任务系统类型（卫星体系） */
-  mission_sys_type?: string
-  /** catalog 扩展：发射日期 */
-  launch_date?: string
-}
-
-/**
- * 根据系列在 getSeries 缓存中的归属推断任务系统类型。
- *
- * @param seriesName 系列名称
- * @returns 侦察 / 通信等；无法推断时为 null
- */
-const resolveMissionSysTypeFromSeriesCache = (seriesName: string): string | null => {
-  const cache = seriesDataCache.value
-  const name = seriesName.trim()
-  if (!cache || !name) return null
-  if (cache.侦察?.includes(name)) return '侦察'
-  if (cache.通信?.includes(name)) return '通信'
-  return null
-}
-
-/**
- * catalog 未返回发射日期时，按 NORAD 生成稳定演示日期（仅展示用）。
- *
- * @param norad NORAD 编号
- * @returns `YYYY-MM-DD` 或 `--`
- */
-const mockLaunchDateFromNorad = (norad: number): string => {
-  if (!Number.isFinite(norad) || norad <= 0) return '--'
-  const year = 1985 + (Math.abs(Math.trunc(norad)) % 35)
-  const month = (Math.abs(Math.trunc(norad)) % 12) + 1
-  const day = (Math.abs(Math.trunc(norad)) % 27) + 1
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${year}-${pad(month)}-${pad(day)}`
-}
-
-/**
- * 将未知类型字段规范为展示用字符串。
- *
- * @param value 原始字段
- * @returns 去空白后的字符串
- */
-const toAssembleDisplayText = (value: unknown): string => {
-  if (value == null) return ''
-  if (typeof value === 'string') return value.trim()
-  return String(value).trim()
-}
-
-/**
- *
- * @param satellite 卫星预览数据
- * @param seriesName 所属系列
- * @returns 任务系统类型文案
- */
-const resolveSatelliteMissionSysType = (satellite: SatellitePreviewItem, seriesName: string): string => {
-  const fromApi = toAssembleDisplayText(satellite.mission_sys_type)
-  if (fromApi) return fromApi
-  const fromSeries = resolveMissionSysTypeFromSeriesCache(seriesName)
-  if (fromSeries) return fromSeries
-  const norad = Number(satellite.norad)
-  const idx = Number.isFinite(norad) ? Math.abs(Math.trunc(norad)) % MISSION_SYS_TYPES.length : 0
-  return MISSION_SYS_TYPES[idx] ?? '侦察'
-}
-
-/**
- * 将接口返回的发射时间规范为 `YYYY-MM-DD` 展示。
- *
- * @param raw 原始发射时间（可能为逗号分隔或 ISO 字符串）
- * @returns 展示用日期；无法解析时返回原文或 `--`
- */
-const normalizeLaunchDateDisplay = (raw: string): string => {
-  const text = raw.trim()
-  if (!text) return '--'
-  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10)
-  const commaParts = text.split(',').map((part) => part.trim())
-  if (commaParts.length >= 3) {
-    const year = Number(commaParts[0])
-    const month = Number(commaParts[1])
-    const day = Number(commaParts[2])
-    if (Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
-      const pad = (n: number) => String(n).padStart(2, '0')
-      return `${year}-${pad(month)}-${pad(day)}`
-    }
-  }
-  const parsed = Date.parse(text.replace(/-/g, '/'))
-  if (Number.isFinite(parsed)) {
-    const d = new Date(parsed)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-  }
-  return text
-}
-
-/**
- * 解析发射日期展示值：优先接口字段，缺失时使用 mock。
- *
- * @param satellite 卫星预览数据
- * @returns 发射日期文案
- */
-const resolveSatelliteLaunchDate = (satellite: SatellitePreviewItem): string => {
-  const fromApi = toAssembleDisplayText(satellite.launch_date)
-  if (fromApi) return normalizeLaunchDateDisplay(fromApi)
-  return mockLaunchDateFromNorad(Number(satellite.norad))
-}
-
-/**
- * 将卫星信息映射为装配表格行。
- *
- * @param satellite 卫星原始数据
- * @param seriesName 所属系列（接口未返回 series 时使用）
- */
-const satelliteToRow = (satellite: SatellitePreviewItem, seriesName?: string): TaskAssembleRow => {
-  const series = toAssembleDisplayText(satellite.series) || seriesName || '--'
-  const countryFromApi = toAssembleDisplayText(satellite.country)
-  const fallbackCountry =
-    props.enemyCountries?.length === 1
-      ? toAssembleDisplayText(props.enemyCountries[0])
-      : ''
-  const norad = Number(satellite.norad)
-  const id =
-    toAssembleDisplayText(satellite._id) ||
-    (Number.isFinite(norad) && norad > 0 ? String(norad) : `${series}-${toAssembleDisplayText(satellite.name_en) || toAssembleDisplayText(satellite.name_cn) || 'unknown'}`)
-  return {
-    id,
-    name:
-      toAssembleDisplayText(satellite.name_en) ||
-      toAssembleDisplayText(satellite.name_cn) ||
-      (Number.isFinite(norad) ? String(norad) : '--'),
-    series,
-    type: toAssembleDisplayText(satellite.sat_type) || '--',
-    country: countryFromApi || fallbackCountry || '--',
-    extra1: resolveSatelliteMissionSysType(satellite, series),
-    extra2: resolveSatelliteLaunchDate(satellite),
-  }
-}
-
 /**
  * 格式化武器坐标展示。
  *
@@ -913,218 +733,142 @@ const filteredCandidates = computed(() => {
   })
 })
 
-/** 按任务卫星类型分组的系列 chip 数据（侦察 / 通信）。 */
-interface SeriesTypeGroup {
-  /** 类型标题（侦察、通信） */
-  typeLabel: '侦察' | '通信'
-  /** 该类型下的系列行 */
-  rows: TaskAssembleRow[]
-}
-
 /**
- * 计算：按任务已选类型（侦察/通信）从系列缓存构建的分组列表。
- * 返回：`SeriesTypeGroup[]`，含类型标题与系列行；无缓存或未选类型时为空数组。
- * 作用：系列 chip 区按类型分组展示并可勾选装配。
+ * 计算：已选卫星表格行（本地关键字过滤）。
+ * 返回：`TaskAssembleRow[]`。
+ * 作用：展示任务将提交的卫星挂载列表。
  */
-const seriesGroupsByType = computed((): SeriesTypeGroup[] => {
-  const cache = seriesDataCache.value
-  const selectedTypes = seriesQueryTargetTypes.value
-  if (!cache || !selectedTypes.length) return []
-
-  const countryText = seriesQueryCountries.value.join('、') || '--'
-  const groups: SeriesTypeGroup[] = []
-
-  const appendGroup = (typeLabel: '侦察' | '通信', rawList: string[] | undefined) => {
-    if (!selectedTypes.includes(typeLabel)) return
-    const names = Array.from(new Set((rawList || []).filter(Boolean))).sort((a, b) =>
-      a.localeCompare(b, 'zh-CN'),
-    )
-    if (!names.length) return
-    groups.push({
-      typeLabel,
-      rows: names.map((series) => ({
-        id: series,
-        name: series,
-        series,
-        type: typeLabel,
-        country: countryText,
-        extra1: '--',
-        extra2: '--',
-      })),
-    })
-  }
-
-  appendGroup('侦察', cache.侦察)
-  appendGroup('通信', cache.通信)
-  return groups
+const displayAssembledSatelliteRows = computed(() => {
+  const key = keyword.value.trim().toLowerCase()
+  const rows = assembledRows.value
+  if (!key) return rows
+  return rows.filter((row) => buildRowSearchText(row).includes(key))
 })
-
-/**
- * 计算：系列分组扁平化后的全部系列行。
- * 返回：各 `SeriesTypeGroup.rows` 合并后的 `TaskAssembleRow` 数组。
- * 作用：同步已勾选装配行、裁剪无效系列 id 等逻辑的统一系列候选项来源。
- */
-const seriesTableRows = computed((): TaskAssembleRow[] =>
-  seriesGroupsByType.value.flatMap((group) => group.rows),
-)
-
-/**
- * 计算：卫星预览表实际展示的行（可在筛选结果上按单系列收窄）。
- * 返回：无系列收窄时为 `filteredCandidates`；有收窄时仅保留 `series` 匹配的行。
- * 作用：控制下方卫星列表在预览某一系列时的展示范围。
- */
-const displaySatellitePreview = computed(() => {
-  const rows = filteredCandidates.value
-  const narrow = satelliteTableSeriesFilter.value
-  if (!narrow) return rows
-  return rows.filter((row) => row.series === narrow)
-})
-
-/**
- * 根据当前系列候选项与 id 集合，同步 assembledRows（仅卫星装配页）。
- */
-const syncAssembledRowsFromSeriesIds = () => {
-  if (!isSatelliteKind.value) return
-  const idSet = assembledSeriesIds.value
-  assembledRows.value = seriesTableRows.value
-    .filter((row) => idSet.has(row.id))
-    .map((row) => ({ ...row }))
-}
-
-/**
- * 移除已不在候选项中的系列勾选。
- */
-const pruneAssembledSeriesIds = () => {
-  if (!isSatelliteKind.value) return
-  const allowed = new Set(seriesOptions.value)
-  const next = new Set([...assembledSeriesIds.value].filter((id) => allowed.has(id)))
-  assembledSeriesIds.value = next
-  syncAssembledRowsFromSeriesIds()
-}
 
 /**
  * 清空卫星系列勾选与预览。
  */
 const clearSatelliteAssemblyState = () => {
   assembledSeriesIds.value = new Set()
+  assembledTaskSatellites.value = []
   assembledRows.value = []
   previewFocusSeries.value = ''
   satelliteTableSeriesFilter.value = ''
   candidatePool.satellite = []
+  satelliteTreeUiNodes.value = []
+  satelliteTreeResourceIndex.value = new Map()
+  satelliteTreeRef.value?.setCheckedKeys([], false)
 }
 
 /**
- * 系列是否已勾选装配。
- *
- * @param seriesId 系列 id（与系列名一致）
+ * 由 `assembledTaskSatellites` 同步展示行。
  */
-const isSeriesAssembled = (seriesId: string): boolean => assembledSeriesIds.value.has(seriesId)
-
-/**
- * 原生 checkbox change：勾选/取消系列（可多选）。
- *
- * @param row 系列行
- * @param event change 事件
- */
-const onSeriesNativeCheckChange = async (row: TaskAssembleRow, event: Event) => {
-  const input = event.target as HTMLInputElement | null
-  if (!input) return
-  await handleSeriesAssemblyToggle(row, input.checked)
+const syncAssembledRowsFromTaskSatellites = () => {
+  if (!isSatelliteKind.value) return
+  assembledRows.value = assembledTaskSatellites.value.map((item) => {
+    const meta = satelliteTreeResourceIndex.value.get(item.resourceId)
+    return {
+      id: item.resourceId,
+      name: item.name,
+      series: meta?.series || item.code || '--',
+      type: meta?.system || '--',
+      country: meta?.country || '--',
+      extra1: meta?.system || '--',
+      extra2: item.code || '--',
+    }
+  })
 }
 
 /**
- * 勾选/取消系列装配；按全部已勾选系列合并加载下方卫星列表。
- *
- * @param row 系列行
- * @param checked 是否勾选
+ * 树勾选变化：仅保留叶子卫星，写入 `assembledTaskSatellites`。
  */
-const handleSeriesAssemblyToggle = async (row: TaskAssembleRow, checked: boolean) => {
-  if (syncingTableSelection.value) return
-  const nextIds = new Set(assembledSeriesIds.value)
-  if (checked) {
-    nextIds.add(row.id)
-  } else {
-    nextIds.delete(row.id)
-  }
-  assembledSeriesIds.value = nextIds
-  syncAssembledRowsFromSeriesIds()
-  satelliteTableSeriesFilter.value = ''
-  await reloadSatellitePreview()
+const handleSatelliteTreeCheck = () => {
+  if (syncingTreeCheck.value || !satelliteTreeRef.value) return
+  const checked = satelliteTreeRef.value.getCheckedNodes(true) as SatelliteAssembleTreeNode[]
+  assembledTaskSatellites.value = checked
+    .filter((node) => node.nodeType === 'satellite' && node.resource)
+    .map((node) => ({ ...node.resource! }))
+  syncAssembledRowsFromTaskSatellites()
 }
 
 /**
- * 点击系列 chip（含文字与边框内空白）：与 checkbox 一致，切换装配并刷新卫星列表。
- *
- * @param row 系列行
+ * 按国家与任务卫星类型加载资源树。
  */
-const handleSeriesChipToggle = async (row: TaskAssembleRow) => {
-  if (!row.series) return
-  await handleSeriesAssemblyToggle(row, !isSeriesAssembled(row.id))
-}
-
-/**
- * 计算：预览区当前系列/状态标题文案。
- * 返回：与 `satellitePreviewSubText` 相同的字符串。
- * 作用：模板中绑定预览标题，与副标题逻辑保持一致。
- */
-const previewSeriesLabel = computed(() => satellitePreviewSubText.value)
-
-/**
- * 按系列名称列表并行拉取卫星并合并到候选池（去重 by id）。
- *
- * @param seriesList 系列名称列表
- */
-const loadSatelliteCandidatesForSeriesList = async (seriesList: string[]) => {
-  if (!seriesList.length) {
-    candidatePool.satellite = []
+const loadSatelliteTree = async () => {
+  if (!isSatelliteKind.value) return
+  const countries = seriesQueryCountries.value
+  const systems = seriesQueryTargetTypes.value
+  if (!countries.length || !systems.length) {
+    satelliteTreeUiNodes.value = []
+    satelliteTreeResourceIndex.value = new Map()
     return
   }
   listLoading.value = true
   try {
-    const batches = await Promise.all(
-      seriesList.map(async (series) => {
-        const res = await getSatelliteResourcesBySeries(series)
-        const raw = isResourceApiSuccess(res.code) ? res.data : null
-        const list = Array.isArray(raw) ? raw : []
-        return list.map((item) =>
-          satelliteToRow(mapSatelliteResourceToCatalog(item) as SatellitePreviewItem, series),
-        )
-      }),
-    )
-    const byId = new Map<string, TaskAssembleRow>()
-    batches.flat().forEach((row) => {
-      if (!byId.has(row.id)) {
-        byId.set(row.id, row)
-      }
-    })
-    candidatePool.satellite = [...byId.values()].sort(
-      (a, b) =>
-        a.series.localeCompare(b.series, 'zh-CN') || a.name.localeCompare(b.name, 'zh-CN'),
-    )
+    const res = await getSatelliteResourceTree(countries)
+    if (!isResourceApiSuccess(res.code) || !Array.isArray(res.data)) {
+      satelliteTreeUiNodes.value = []
+      satelliteTreeResourceIndex.value = new Map()
+      return
+    }
+    const nodes = buildSatelliteAssembleTreeNodes(res.data, systems)
+    satelliteTreeUiNodes.value = nodes
+    satelliteTreeResourceIndex.value = indexSatelliteTreeResources(nodes)
+    await nextTick()
+    restoreSatelliteTreeCheckedFromTaskSatellites()
   } catch (error) {
-    console.error('加载系列卫星预览失败:', error)
-    candidatePool.satellite = []
+    console.error('加载卫星资源树失败:', error)
+    satelliteTreeUiNodes.value = []
+    satelliteTreeResourceIndex.value = new Map()
+    ElMessage.error('加载卫星资源树失败')
   } finally {
     listLoading.value = false
   }
 }
 
 /**
- * 根据已勾选系列或预览焦点，刷新下方卫星列表。
+ * 根据已选 `assembledTaskSatellites` 回显树勾选。
  */
-const reloadSatellitePreview = async () => {
-  const assembled = [...assembledSeriesIds.value].sort((a, b) => a.localeCompare(b, 'zh-CN'))
-  if (assembled.length) {
-    previewFocusSeries.value = ''
-    await loadSatelliteCandidatesForSeriesList(assembled)
-    return
+const restoreSatelliteTreeCheckedFromTaskSatellites = () => {
+  if (!satelliteTreeRef.value || !assembledTaskSatellites.value.length) return
+  syncingTreeCheck.value = true
+  try {
+    const ids: string[] = []
+    const walk = (list: SatelliteAssembleTreeNode[]) => {
+      for (const node of list) {
+        if (
+          node.nodeType === 'satellite' &&
+          node.resource &&
+          assembledTaskSatellites.value.some((item) => item.resourceId === node.resource!.resourceId)
+        ) {
+          ids.push(node.id)
+        }
+        if (node.children?.length) walk(node.children)
+      }
+    }
+    walk(satelliteTreeUiNodes.value)
+    satelliteTreeRef.value.setCheckedKeys(ids, false)
+  } finally {
+    syncingTreeCheck.value = false
   }
-  if (previewFocusSeries.value) {
-    await loadSatelliteCandidatesForSeriesList([previewFocusSeries.value])
-    return
-  }
-  candidatePool.satellite = []
 }
+
+/**
+ * 设置已装配卫星（编辑任务回显）。
+ *
+ * @param items 任务 `satellites`
+ */
+const setAssembledTaskSatellites = (items: TaskResourceItem[]) => {
+  assembledTaskSatellites.value = items.map((item) => ({ ...item }))
+  syncAssembledRowsFromTaskSatellites()
+  void nextTick(() => restoreSatelliteTreeCheckedFromTaskSatellites())
+}
+
+/**
+ * 获取将提交至任务的卫星挂载列表。
+ */
+const getAssembledTaskSatellites = (): TaskResourceItem[] =>
+  assembledTaskSatellites.value.map((item) => ({ ...item }))
 
 /**
  * 计算：左侧待选表绑定的行数据。
@@ -1154,66 +898,6 @@ const loadSatTypes = async () => {
     satTypes.value = res.code === 200 ? (res.data ?? []) : []
   } catch {
     satTypes.value = []
-  }
-}
-
-/**
- * 按任务卫星类型从系列接口结果中提取候选项。
- *
- * @param data 系列接口 data
- * @returns 去重排序后的系列名列表
- */
-const buildSeriesOptions = (data: { 侦察?: string[]; 通信?: string[] }): string[] => {
-  const selectedTypes = seriesQueryTargetTypes.value
-  if (!selectedTypes.length) return []
-
-  const merged: string[] = []
-  if (selectedTypes.includes('侦察')) merged.push(...(data.侦察 || []))
-  if (selectedTypes.includes('通信')) merged.push(...(data.通信 || []))
-
-  return Array.from(new Set(merged.filter(Boolean))).sort((a, b) => a.localeCompare(b, 'zh-CN'))
-}
-
-/**
- * 使用缓存的系列数据刷新下拉候选项。
- */
-const applySeriesOptionsFromCache = () => {
-  if (!seriesDataCache.value) {
-    seriesOptions.value = []
-    return
-  }
-  seriesOptions.value = buildSeriesOptions(seriesDataCache.value)
-  if (previewFocusSeries.value && !seriesOptions.value.includes(previewFocusSeries.value)) {
-    previewFocusSeries.value = ''
-    candidatePool.satellite = []
-  }
-  pruneAssembledSeriesIds()
-}
-
-/**
- * 根据国家列表拉取卫星系列（如 Capella、STARLINK），并按任务卫星类型过滤。
- */
-const loadSeriesOptions = async () => {
-  if (!seriesQueryCountries.value.length) {
-    seriesDataCache.value = null
-    seriesOptions.value = []
-    return
-  }
-  listLoading.value = true
-  try {
-    const data = await loadSatelliteSeriesDataForCountries(seriesQueryCountries.value)
-    if (data.侦察.length || data.通信.length) {
-      seriesDataCache.value = data
-      applySeriesOptionsFromCache()
-    } else {
-      seriesDataCache.value = null
-      seriesOptions.value = []
-    }
-  } catch {
-    seriesDataCache.value = null
-    seriesOptions.value = []
-  } finally {
-    listLoading.value = false
   }
 }
 
@@ -1268,10 +952,7 @@ const loadWeaponCandidates = async () => {
  */
 const loadCandidatePool = async () => {
   if (isSatelliteKind.value) {
-    if (seriesQueryCountries.value.length) {
-      await loadSeriesOptions()
-    }
-    await reloadSatellitePreview()
+    await loadSatelliteTree()
     return
   }
   if (!crudEnabled.value) return
@@ -1283,9 +964,7 @@ const loadCandidatePool = async () => {
       await loadWeaponCandidates()
     }
     enrichAssembledFromPool()
-    if (isSatelliteKind.value) {
-      await restoreSeriesAssemblySelection()
-    } else {
+    if (!isSatelliteKind.value) {
       await restoreDirectAssemblySelection()
     }
   } finally {
@@ -1307,13 +986,6 @@ const restoreDirectAssemblySelection = async () => {
     if (wanted.has(row.id)) table.toggleRowSelection(row, true)
   })
   syncingTableSelection.value = false
-}
-
-/**
- * 卫星系列装配状态由 assembledRows 驱动，chip 勾选为受控展示，无需表格回显。
- */
-const restoreSeriesAssemblySelection = async () => {
-  await nextTick()
 }
 
 /**
@@ -1500,7 +1172,7 @@ watch(
   async () => {
     if (!isSatelliteKind.value) return
     clearSatelliteAssemblyState()
-    await loadSeriesOptions()
+    await loadSatelliteTree()
   },
   { deep: true }
 )
@@ -1508,25 +1180,21 @@ watch(
 /**
  * 监听：参与系列过滤的任务卫星类型 `seriesQueryTargetTypes`（含深度变更）。
  * 返回：回调不返回清理函数。
- * 作用：类型变化时清空卫星装配状态，并按缓存或接口刷新系列候选项。
+ * 作用：类型变化时清空卫星装配并重新加载资源树（按体系过滤）。
  */
 watch(
   seriesQueryTargetTypes,
   async () => {
     if (!isSatelliteKind.value) return
     clearSatelliteAssemblyState()
-    if (seriesDataCache.value) {
-      applySeriesOptionsFromCache()
-      return
-    }
-    await loadSeriesOptions()
+    await loadSatelliteTree()
   },
   { deep: true }
 )
 
 onMounted(async () => {
   if (isSatelliteKind.value) {
-    await Promise.all([loadSatTypes(), loadSeriesOptions()])
+    await Promise.all([loadSatTypes(), loadSatelliteTree()])
     return
   }
   if (crudEnabled.value) {
@@ -1548,10 +1216,18 @@ const getAssembledRows = (): TaskAssembleRow[] => assembledRows.value
  * 获取已选卫星系列名称列表（提交任务时仅传系列）。
  * @returns 系列名称数组
  */
-const getAssembledSeries = (): string[] =>
-  isSatelliteKind.value
-    ? [...assembledSeriesIds.value].sort((a, b) => a.localeCompare(b, 'zh-CN'))
-    : assembledRows.value.map((row) => row.series || row.name).filter(Boolean)
+const getAssembledSeries = (): string[] => {
+  if (!isSatelliteKind.value) {
+    return assembledRows.value.map((row) => row.series || row.name).filter(Boolean)
+  }
+  const series = new Set<string>()
+  for (const item of assembledTaskSatellites.value) {
+    const meta = satelliteTreeResourceIndex.value.get(item.resourceId)
+    if (meta?.series) series.add(meta.series)
+    else if (item.code) series.add(item.code)
+  }
+  return [...series].sort((a, b) => a.localeCompare(b, 'zh-CN'))
+}
 
 /**
  * 回显已装配资源行（编辑任务时由弹窗调用）。
@@ -1560,10 +1236,16 @@ const getAssembledSeries = (): string[] =>
  */
 const setAssembledRows = (rows: TaskAssembleRow[]) => {
   if (isSatelliteKind.value) {
-    assembledSeriesIds.value = new Set(rows.map((row) => row.id).filter(Boolean))
-    syncAssembledRowsFromSeriesIds()
-    void restoreSeriesAssemblySelection()
-    void reloadSatellitePreview()
+    if (!rows.length) {
+      setAssembledTaskSatellites([])
+      return
+    }
+    const items: TaskResourceItem[] = rows.map((row) => ({
+      resourceId: row.id,
+      name: row.name || row.id,
+      code: row.extra2 && row.extra2 !== '--' ? row.extra2 : row.series || row.id,
+    }))
+    setAssembledTaskSatellites(items)
     return
   }
   assembledRows.value = rows.map((row) => ({ ...row }))
@@ -1574,7 +1256,9 @@ const setAssembledRows = (rows: TaskAssembleRow[]) => {
 defineExpose({
   getAssembledRows,
   getAssembledSeries,
+  getAssembledTaskSatellites,
   setAssembledRows,
+  setAssembledTaskSatellites,
 })
 </script>
 
@@ -1590,7 +1274,7 @@ defineExpose({
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
-  padding-bottom: 8px;
+  padding-bottom: 0;
 }
 
 .assemble-head {
@@ -1653,6 +1337,68 @@ defineExpose({
   gap: 10px;
   flex: 1;
   min-height: 0;
+}
+
+.assemble-satellite-body--tree {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.satellite-tree-pane {
+  flex: 0 0 clamp(200px, 26%, 280px);
+  max-width: 300px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.satellite-list-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.satellite-tree-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 4px 6px;
+  box-sizing: border-box;
+}
+
+.satellite-resource-tree {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: transparent;
+  color: #e2efff;
+  @include battleUi.battle-ui-el-tree-typography;
+
+  :deep(.atlas-app-tree) {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  :deep(.atlas-app-tree-node__content) {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  :deep(.atlas-app-tree-node__label) {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .series-pane {
@@ -1747,34 +1493,34 @@ defineExpose({
   }
 }
 
-.satellite-list-pane {
-  flex: 1;
-  min-height: 0;
-}
-
 .assemble-pane-body--satellite-list {
   flex: 1;
-  min-height: 240px;
+  min-height: 0;
   min-width: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .assemble-table--satellite-preview {
-  flex: 0 1 auto;
-  height: auto;
-  min-height: 120px;
+  flex: 1;
+  min-height: 0;
   width: 100%;
   max-width: 100%;
   @include battleUi.battle-ui-c2-panel-table-fit;
 
   :deep(.atlas-app-table),
   :deep(.atlas-app-table__inner-wrapper) {
-    height: auto !important;
+    height: 100% !important;
+  }
+
+  :deep(.atlas-app-table__header-wrapper),
+  :deep(.atlas-app-table__body-wrapper) {
+    overflow-x: hidden !important;
   }
 
   :deep(.atlas-app-table__body-wrapper) {
-    overflow-x: hidden !important;
+    overflow-y: auto !important;
   }
 }
 
@@ -1839,6 +1585,12 @@ defineExpose({
   min-width: 0;
   width: 100%;
   overflow: hidden;
+}
+
+/** 卫星树：覆盖通用 pane-body 的 hidden，内容超出时仅竖向滚动 */
+.assemble-pane-body.satellite-tree-body {
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .assemble-pager {

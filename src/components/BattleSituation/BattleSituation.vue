@@ -170,7 +170,7 @@ const playbackSpeed = ref(10)
 const AUTO_TIMELINE_PLAYBACK_SPEED = 10
 
 /** 已对某任务触发过「加载完成自动播放」，避免重复启动 */
-let autoTimelinePlaybackTaskId: number | null = null
+let autoTimelinePlaybackTaskId: string | null = null
 
 /** 播放循环句柄 */
 let playbackRafId: number | null = null
@@ -709,7 +709,7 @@ watch(
   () => {
     const taskId = store.activedTask?.id
     if (!taskId) return ''
-    const progress = taskProgressMap[taskId] ?? store.activedTask?.algorithmProgressEntity
+    const progress = taskProgressMap[String(taskId)]
     return `${taskId}:${progress?.totalStatus}:${progress?.transitStatus}:${progress?.threatAndStrikeStatus}`
   },
   () => {

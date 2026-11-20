@@ -94,6 +94,76 @@ export interface SatelliteSeriesByCountryQuery {
 export type SatelliteSeriesNameList = string[]
 
 /**
+ * `GET /resource/satellite/tree` 查询参数。
+ */
+export interface SatelliteResourceTreeQuery {
+  /** 国家列表（逗号分隔或重复 query） */
+  countries: string[]
+}
+
+/** 树接口叶子：卫星简要信息（含 NORAD；`resourceId`/`code` 以后端扩展为准） */
+export interface SatelliteTreeSatelliteLeaf {
+  /** 资源主键（与任务 `satellites.resourceId` 对应） */
+  resourceId?: string
+  /** 卫星记录 id（部分环境字段名） */
+  id?: string
+  /** 卫星名称 */
+  name: string
+  /** 卫星代号 */
+  code?: string
+  /** NORAD 编号 */
+  norad?: string
+  /** NORAD 编号（字段别名） */
+  noradId?: string
+}
+
+/** 系列节点 */
+export interface SatelliteTreeSeriesNode {
+  /** 系列名称 */
+  series: string
+  /** 该系列下的卫星 */
+  satellites: SatelliteTreeSatelliteLeaf[]
+}
+
+/** 体系节点 */
+export interface SatelliteTreeSystemNode {
+  /** 体系：侦察 / 通信 / 中继 */
+  system: string
+  /** 体系列表 */
+  series: SatelliteTreeSeriesNode[]
+}
+
+/** 国家节点（`SatelliteTreeResp`） */
+export interface SatelliteTreeCountryNode {
+  /** 国家 */
+  country: string
+  /** 该国下的体系 */
+  systems: SatelliteTreeSystemNode[]
+}
+
+/**
+ * 任务装配页 `el-tree` 节点（由 `SatelliteTreeCountryNode[]` 转换）。
+ */
+export interface SatelliteAssembleTreeNode {
+  /** 节点唯一键 */
+  id: string
+  /** 展示文案 */
+  label: string
+  /** 节点层级 */
+  nodeType: 'country' | 'system' | 'series' | 'satellite'
+  /** 子节点 */
+  children?: SatelliteAssembleTreeNode[]
+  /** 叶子：任务挂载项 */
+  resource?: import('@/types/task/task').TaskResourceItem
+  /** 国家（元数据） */
+  country?: string
+  /** 体系（元数据） */
+  system?: string
+  /** 系列（元数据） */
+  series?: string
+}
+
+/**
  * 系列接口 data：按任务系统类型分组的系列名列表（任务装配、C2 等资源树复用）。
  */
 export interface SatelliteSeriesData {

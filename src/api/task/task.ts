@@ -30,8 +30,10 @@ export const getTaskMatrix = (data: { taskId: string }) => {
  *
  * @param battleId 战场 ID
  */
-export const getTaskList = (battleId: number) => {
-    return requestAPI.get<AxiosResponseType<TaskForm[]>>('/api/battle-task/list', { battleId })
+export const getTaskList = (battleId: string | number) => {
+    return requestAPI.get<AxiosResponseType<TaskForm[]>>('/api/battle-task/list', {
+        battleId: String(battleId),
+    })
 }
 
 /**
@@ -39,7 +41,7 @@ export const getTaskList = (battleId: number) => {
  *
  * @param taskId 任务 ID
  */
-export const getTaskById = (taskId: number) => {
+export const getTaskById = (taskId: string | number) => {
     return requestAPI.get<AxiosResponseType<TaskForm>>(`/api/battle-task/${taskId}`)
 }
 
@@ -49,7 +51,7 @@ export const getTaskById = (taskId: number) => {
  * @param task 任务表单；成功时 `data` 一般为新任务 ID
  */
 export const createTask = (task: TaskForm) => {
-    return requestAPI.post<AxiosResponseType<number>>('/api/battle-task', task)
+    return requestAPI.post<AxiosResponseType<string>>('/api/battle-task', task)
 }
 
 /**
@@ -66,6 +68,6 @@ export const updateTask = (task: TaskForm) => {
  *
  * @param taskId 任务 ID
  */
-export const deleteTask = (taskId: number) => {
+export const deleteTask = (taskId: string | number) => {
     return requestAPI.delete<AxiosResponseType<unknown>>(`/api/battle-task/${taskId}`)
 }

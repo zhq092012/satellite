@@ -142,12 +142,13 @@ export function loadCombatScenarioForTaskOrDefault(taskId: number): CombatScenar
 }
 
 /**
- * 打击方案展示名称：作战阶段-作战预期（一级），如「对日作战阶段-信息孤困」。
+ * 打击方案展示名称：优先读本地缓存；无缓存时返回 `--`。
  *
  * @param taskId 任务 ID
+ * @deprecated 优先使用 `buildStrikePlanDisplayNameFromTask` 读任务实体字段
  */
-export function buildStrikePlanDisplayName(taskId: number): string {
-  const selection = loadCombatScenarioForTaskOrDefault(taskId)
+export function buildStrikePlanDisplayName(taskId: number | string): string {
+  const selection = loadCombatScenarioForTaskOrDefault(Number(taskId))
   const phase =
     COMBAT_PHASE_OPTIONS.find((item) => item.id === selection.combatPhaseId)?.label ?? ''
   const expectationPrimary =

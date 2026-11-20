@@ -62,7 +62,17 @@ const routes: Array<RouteRecordRaw> = [
         name: 'HomeAttack',
         component: () => import('@/layout/Home.vue'),
         meta: {
-          title: '攻击度分析',
+          title: '打击度分析',
+          icon: 'icon-situation',
+          showInMenu: false,
+        },
+      },
+      {
+        path: 'home/algorithms',
+        name: 'HomeComputeAlgorithms',
+        component: () => import('@/layout/Home.vue'),
+        meta: {
+          title: '算法列表',
           icon: 'icon-situation',
           showInMenu: false,
         },

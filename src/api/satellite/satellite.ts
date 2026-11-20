@@ -8,6 +8,7 @@ import type {
   SatelliteSeriesByCountryQuery,
   SatelliteSeriesData,
   SatelliteSeriesNameList,
+  SatelliteTreeCountryNode,
 } from '@/types/satellite/satellite'
 import { requestAPI } from '@/utils/tools/request'
 import { buildSatelliteSeriesDataFromSearchResults } from '@/utils/satelliteResource'
@@ -25,6 +26,11 @@ export type {
   SatelliteSeriesByCountryQuery,
   SatelliteSeriesData,
   SatelliteSeriesNameList,
+  SatelliteTreeCountryNode,
+  SatelliteAssembleTreeNode,
+  SatelliteTreeSeriesNode,
+  SatelliteTreeSystemNode,
+  SatelliteTreeSatelliteLeaf,
   SatelliteTle,
   StepSatellite,
   TaskSteps,
@@ -44,6 +50,21 @@ export const getSatelliteResourceList = (query: SatelliteResourceListQuery = {})
  */
 export const searchSatelliteResources = (query: SatelliteResourceSearchQuery = {}) => {
   return requestAPI.get<AxiosResponseType<SatelliteResource[]>>(`${BASE}/search`, query)
+}
+
+/**
+ * 按国家列表查询卫星层级树：国家 → 体系 → 系列 → 卫星（OpenAPI `tree`）。
+ *
+ * @param countries 国家列表，须非空
+ */
+export const getSatelliteResourceTree = (countries: string[]) => {
+  const list = countries.map((item) => item.trim()).filter(Boolean)
+  if (!list.length) {
+    return Promise.reject(new Error('查询卫星树时 countries 不能为空'))
+  }
+  return requestAPI.get<AxiosResponseType<SatelliteTreeCountryNode[]>>(`${BASE}/tree`, {
+    countries: list.join(','),
+  })
 }
 
 /**

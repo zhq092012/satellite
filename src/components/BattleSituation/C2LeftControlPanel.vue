@@ -118,9 +118,9 @@ import TaskEditDialog from '@/components/BattleSituation/TaskEditDialog.vue'
 import {
   COMBAT_EXPECTATION_PRIMARY_OPTIONS,
   COMBAT_PHASE_OPTIONS,
-  loadCombatScenarioForTask,
 } from '@/config/combatScenarioOptions'
-import { TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
+import { resolveCombatScenarioSelectionFromTask, resolveEnemyCountriesFromTask } from '@/utils/taskEntity'
+import { MISSION_SYS_TYPES, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
 import {
   createDraftFromTask,
   mergeTaskFormWithDraft,
@@ -151,7 +151,7 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'select-satellite', norad: number | null): void
   /** 保存并重算已提交，右侧面板应重新等待/拉取分析结果 */
-  (e: 'task-recalculated', taskId: number): void
+  (e: 'task-recalculated', taskId: string): void
 }>()
 
 const store = useLayoutStore()
@@ -209,9 +209,9 @@ const combatScenarioDisplayToken = ref(0)
  */
 const readActiveCombatScenario = () => {
   combatScenarioDisplayToken.value
-  const taskId = store.activedTask?.id
-  if (!taskId) return null
-  return loadCombatScenarioForTask(taskId)
+  const task = store.activedTask
+  if (!task?.id) return null
+  return resolveCombatScenarioSelectionFromTask(task)
 }
 
 /**
@@ -309,25 +309,18 @@ watch(
  */
 const resolveEnemyCountries = (task: TaskForm | null | undefined): string[] => {
   if (!task) return []
-  if (task.enemyCountryShow?.length) return [...task.enemyCountryShow]
-  return (task.enemyCountry || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+  return resolveEnemyCountriesFromTask(task)
 }
 
 /**
- * 解析任务卫星类型列表。
+ * 解析任务卫星类型列表（接口无字段时由 C2 草稿或默认类型兜底）。
  *
  * @param task 任务
  */
 const resolveTaskTargetTypes = (task: TaskForm | null | undefined): string[] => {
+  if (editorDraft.value?.targetTypeShow.length) return [...editorDraft.value.targetTypeShow]
   if (!task) return []
-  if (task.targetTypeShow?.length) return [...task.targetTypeShow]
-  return (task.targetTypeNew || task.targetType || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+  return [...MISSION_SYS_TYPES]
 }
 
 /**
@@ -658,9 +651,13 @@ const handleSaveAndRecalculate = async (options?: { forceWeaponIds?: string[] })
   if (!draft.targetTypeShow.length) return
   const payload = mergeTaskFormWithDraft(baseTask, draft)
   if (options?.forceWeaponIds !== undefined) {
-    payload.weaponIds = options.forceWeaponIds
+    payload.weapons = options.forceWeaponIds.map((resourceId) => ({
+      resourceId,
+      name: resourceId,
+      code: '',
+    }))
   } else if (!useWeaponsEnabled.value) {
-    payload.weaponIds = baseTask.weaponIds ? [...baseTask.weaponIds] : []
+    payload.weapons = []
   }
   savingRecalc.value = true
   try {
