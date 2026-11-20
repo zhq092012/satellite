@@ -64,7 +64,7 @@ import {
   type StrikePlanSchemeView,
 } from '@/utils/buildStrikePlanSchemeView'
 import { downloadStrikePlanCsv, downloadStrikePlanXls } from '@/utils/exportStrikePlanTable'
-import { buildStrikePlanDisplayNameFromTask } from '@/utils/taskEntity'
+import { buildStrikePlanDisplayNameFromTask, resolveCombatCountriesFromTask } from '@/utils/taskEntity'
 import {
   useLayoutStore,
   ZHCH_USAGE_TYPE_OPTIONS,
@@ -114,11 +114,11 @@ onMounted(() => {
 })
 
 /**
- * 计算：当前激活任务的敌方展示国家列表。
- * 返回：string[]；无任务时为 []。
- * 作用：构建 Mock 综合方案与 buildStrikePlanSchemeView 时的 priorityCountries 入参。
+ * 计算：当前任务的作战对象国家列表。
+ * 返回：`string[]`；无任务时为 `[]`。
+ * 作用：构建 Mock 综合方案与 `buildStrikePlanSchemeView` 的 priorityCountries 入参。
  */
-const priorityCountries = computed(() => store.activedTask?.enemyCountry ?? [])
+const priorityCountries = computed(() => resolveCombatCountriesFromTask(store.activedTask))
 
 /**
  * 读取展示用方案：优先接口缓存，缺失或空数据时使用演示 Mock。

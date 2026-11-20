@@ -4,8 +4,8 @@ import type { TaskForm } from '@/api/task/task'
  * 战场实体（列表、详情及 Store 中的当前战场）。
  */
 export interface BattleForm {
-  /** 战场 ID */
-  id?: number
+  /** 战场 ID（接口多为 MongoDB 字符串，历史数据可能为数字） */
+  id?: string | number
   /** 战场名称 */
   name: string
   /** 战场描述 */
@@ -29,7 +29,7 @@ export interface BattleForm {
  */
 export interface BattleUpsertPayload {
   /** 修改时必填 */
-  id?: number
+  id?: string | number
   /** 战场名称 */
   name: string
   /** 战场描述 */

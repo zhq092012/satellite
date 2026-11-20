@@ -64,6 +64,7 @@ import { useLayoutStore } from '@/store/modules/layout'
 import type { AlgorithmInfo } from '@/types/threat'
 import type { ComputeStrikeRow, StrikeResp } from '@/types/strike'
 import { isComputeApiSuccess } from '@/utils/computeApi'
+import { resolveCombatCountriesFromTask } from '@/utils/taskEntity'
 import {
   computeAnalysisCountryRowClass,
   formatAlgorithmSelectionText,
@@ -87,11 +88,7 @@ const algorithmCatalog = ref<AlgorithmInfo[]>([])
  * 返回：enemyCountry 列表。
  * 作用：表格展示优先级。
  */
-const priorityCountries = computed(() =>
-  Array.isArray(store.activedTask?.enemyCountry)
-    ? store.activedTask!.enemyCountry.filter(Boolean)
-    : [],
-)
+const priorityCountries = computed(() => resolveCombatCountriesFromTask(store.activedTask))
 
 interface StrikeTableRow {
   rowKey: string

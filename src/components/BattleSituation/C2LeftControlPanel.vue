@@ -2,92 +2,106 @@
   <aside class="c2-panel c2-panel--left dark-theme">
     <div class="panel-body">
       <div v-if="taskSwitching" class="zone-loading">正在切换任务...</div>
-      <div v-else-if="!store.activedTask" class="zone-empty">请选择当前任务</div>
+      <div v-else-if="taskLoading" class="zone-loading">正在加载任务列表...</div>
       <div v-else class="task-panel">
-        <section class="task-panel-block task-panel-block--meta">
-          <div class="task-panel-row task-panel-row--name">
-            <span class="task-panel-label">任务名称</span>
-            <span class="task-panel-value task-panel-name" :title="store.activedTask.name">{{ store.activedTask.name
-            }}</span>
-            <button type="button" class="task-edit-link" @click="openEditTask">编辑</button>
+        <section class="task-panel-block task-panel-block--tasks">
+          <div class="task-panel-section-head">任务列表</div>
+          <div v-if="!taskList.length" class="task-panel-hint task-panel-hint--center">
+            当前场景暂无任务
           </div>
-          <div class="task-panel-row">
-            <span class="task-panel-label">作战阶段</span>
-            <span class="task-panel-value" :title="currentCombatPhaseLabel">{{ currentCombatPhaseLabel }}</span>
-          </div>
-          <div class="task-panel-row task-panel-row--objects">
-            <span class="task-panel-label">作战对象</span>
-            <div class="combat-object-options" role="group" aria-label="当前作战对象">
-              <button v-for="country in combatObjectCountryOptions" :key="country" type="button"
-                class="combat-object-chip" :class="{
-                  'combat-object-chip--active': isTaskCombatObjectActive(country),
-                  'combat-object-chip--inactive': !isTaskCombatObjectActive(country),
-                  'combat-object-chip--tree-focus': treeSortFocusCountry === country,
-                }" @click="handleCombatObjectCountryClick(country)">
-                <span class="combat-object-label">{{ country }}</span>
-              </button>
-            </div>
-          </div>
-          <div class="task-panel-row task-panel-row--expectation">
-            <span class="task-panel-label">作战预期</span>
-            <div class="task-panel-expectation">
-              <span class="task-panel-value" :title="currentCombatExpectationPrimaryLabel">{{
-                currentCombatExpectationPrimaryLabel }}</span>
-              <span class="task-panel-expectation-sep">/</span>
-              <span class="task-panel-value task-panel-expectation-secondary"
-                :title="currentCombatExpectationSecondaryLabel">{{ currentCombatExpectationSecondaryLabel }}</span>
-            </div>
-          </div>
+          <el-select v-else v-model="activeTaskId" class="task-panel-task-select" placeholder="选择任务" filterable
+            @change="handleSwitchTask">
+            <el-option v-for="task in taskList" :key="task.id" :label="task.name" :value="task.id" />
+          </el-select>
         </section>
 
-        <section class="task-panel-block task-panel-block--tree">
-          <div class="task-panel-section-head">任务资源</div>
-          <p v-if="catalogSourceHint" class="task-panel-hint">{{ catalogSourceHint }}</p>
-          <div v-loading="catalogLoading" class="task-panel-block-body task-panel-block-body--tree">
-            <div v-if="!catalogLoading && !resourceTreeNodes.length" class="task-panel-hint task-panel-hint--center">
-              暂无卫星资源
+        <div v-if="!store.activedTask" class="zone-empty">请选择任务</div>
+        <template v-else>
+          <section class="task-panel-block task-panel-block--meta">
+            <div class="task-panel-row task-panel-row--name">
+              <span class="task-panel-label">任务名称</span>
+              <span class="task-panel-value task-panel-name" :title="store.activedTask.name">{{ store.activedTask.name
+              }}</span>
+              <button type="button" class="task-edit-link" @click="openEditTask">编辑</button>
             </div>
-            <el-tree v-show="resourceTreeNodes.length > 0" ref="resourceTreeRef" class="c2-resource-tree"
-              :data="resourceTreeNodes" node-key="id" show-checkbox default-expand-all :props="resourceTreeProps"
-              @check="handleResourceTreeCheck">
-              <template #default="{ node, data }">
-                <span class="c2-resource-tree-node-label" :class="{
-                  'c2-resource-tree-node-label--focus':
-                    data.kind === 'country' && data.label === treeSortFocusCountry,
-                }">{{ node.label }}</span>
-              </template>
-            </el-tree>
-          </div>
-        </section>
-
-        <div class="task-panel-weapon-dock">
-          <section v-if="useWeaponsEnabled" class="task-panel-block task-panel-block--weapons">
-            <div class="task-panel-section-head">武器列表</div>
-            <div class="task-panel-block-body task-panel-block-body--table">
-              <div v-if="weaponOptionsLoading" class="task-panel-hint task-panel-hint--center">正在加载武器...</div>
-              <div v-else-if="!weaponTableRows.length" class="task-panel-hint task-panel-hint--center">暂无武器候选项</div>
-              <el-table v-else ref="weaponTableRef" :data="weaponTableRows" size="small" class="c2-resource-table"
-                max-height="128" empty-text="暂无武器" @selection-change="handleWeaponSelectionChange">
-                <el-table-column type="selection" width="32" />
-                <el-table-column prop="name" label="武器名称" min-width="1" />
-                <el-table-column prop="type" label="武器类型" min-width="1" />
-                <el-table-column label="纬度" min-width="1" align="right">
-                  <template #default="{ row }">{{ formatWeaponCoordinate(row.latitude) }}</template>
-                </el-table-column>
-                <el-table-column label="经度" min-width="1" align="right">
-                  <template #default="{ row }">{{ formatWeaponCoordinate(row.longitude) }}</template>
-                </el-table-column>
-              </el-table>
+            <div class="task-panel-row">
+              <span class="task-panel-label">作战阶段</span>
+              <span class="task-panel-value" :title="currentCombatPhaseLabel">{{ currentCombatPhaseLabel }}</span>
+            </div>
+            <div class="task-panel-row task-panel-row--objects">
+              <span class="task-panel-label">作战对象</span>
+              <div class="combat-object-options" role="group" aria-label="当前作战对象">
+                <button v-for="country in combatObjectCountryOptions" :key="country" type="button"
+                  class="combat-object-chip" :class="{
+                    'combat-object-chip--active': isTaskCombatObjectActive(country),
+                    'combat-object-chip--inactive': !isTaskCombatObjectActive(country),
+                    'combat-object-chip--tree-focus': treeSortFocusCountry === country,
+                  }" @click="handleCombatObjectCountryClick(country)">
+                  <span class="combat-object-label">{{ country }}</span>
+                </button>
+              </div>
+            </div>
+            <div class="task-panel-row task-panel-row--expectation">
+              <span class="task-panel-label">作战预期</span>
+              <div class="task-panel-expectation">
+                <span class="task-panel-value" :title="currentCombatExpectationPrimaryLabel">{{
+                  currentCombatExpectationPrimaryLabel }}</span>
+                <span class="task-panel-expectation-sep">/</span>
+                <span class="task-panel-value task-panel-expectation-secondary"
+                  :title="currentCombatExpectationSecondaryLabel">{{ currentCombatExpectationSecondaryLabel }}</span>
+              </div>
             </div>
           </section>
 
-          <section class="task-panel-block task-panel-block--switch">
-            <div class="weapon-use-item">
-              <span class="weapon-use-item-label">是否使用武器</span>
-              <el-switch v-model="useWeaponsEnabled" size="small" @change="handleUseWeaponsChange" />
+          <section class="task-panel-block task-panel-block--tree">
+            <div class="task-panel-section-head">任务资源</div>
+            <p v-if="catalogSourceHint" class="task-panel-hint">{{ catalogSourceHint }}</p>
+            <div v-loading="catalogLoading" class="task-panel-block-body task-panel-block-body--tree">
+              <div v-if="!catalogLoading && !resourceTreeNodes.length" class="task-panel-hint task-panel-hint--center">
+                暂无卫星资源
+              </div>
+              <el-tree v-show="resourceTreeNodes.length > 0" ref="resourceTreeRef" class="c2-resource-tree"
+                :data="resourceTreeNodes" node-key="id" show-checkbox default-expand-all :props="resourceTreeProps"
+                @check="handleResourceTreeCheck">
+                <template #default="{ node, data }">
+                  <span class="c2-resource-tree-node-label" :class="{
+                    'c2-resource-tree-node-label--focus':
+                      data.kind === 'country' && data.label === treeSortFocusCountry,
+                  }">{{ node.label }}</span>
+                </template>
+              </el-tree>
             </div>
           </section>
-        </div>
+
+          <div class="task-panel-weapon-dock">
+            <section v-if="useWeaponsEnabled" class="task-panel-block task-panel-block--weapons">
+              <div class="task-panel-section-head">武器列表</div>
+              <div class="task-panel-block-body task-panel-block-body--table">
+                <div v-if="weaponOptionsLoading" class="task-panel-hint task-panel-hint--center">正在加载武器...</div>
+                <div v-else-if="!weaponTableRows.length" class="task-panel-hint task-panel-hint--center">暂无武器候选项</div>
+                <el-table v-else ref="weaponTableRef" :data="weaponTableRows" size="small" class="c2-resource-table"
+                  max-height="128" empty-text="暂无武器" @selection-change="handleWeaponSelectionChange">
+                  <el-table-column type="selection" width="32" />
+                  <el-table-column prop="name" label="武器名称" min-width="1" />
+                  <el-table-column prop="type" label="武器类型" min-width="1" />
+                  <el-table-column label="纬度" min-width="1" align="right">
+                    <template #default="{ row }">{{ formatWeaponCoordinate(row.latitude) }}</template>
+                  </el-table-column>
+                  <el-table-column label="经度" min-width="1" align="right">
+                    <template #default="{ row }">{{ formatWeaponCoordinate(row.longitude) }}</template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </section>
+
+            <section class="task-panel-block task-panel-block--switch">
+              <div class="weapon-use-item">
+                <span class="weapon-use-item-label">是否使用武器</span>
+                <el-switch v-model="useWeaponsEnabled" size="small" @change="handleUseWeaponsChange" />
+              </div>
+            </section>
+          </div>
+        </template>
       </div>
     </div>
     <TaskEditDialog v-model="taskEditVisible" :is-edit="taskEditIsEdit" :task="editingTask" @saved="handleTaskSaved" />
@@ -101,15 +115,16 @@ import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ElTable } from 'element-plus'
 import type { ElTree } from 'element-plus'
-import { getAllWeapons } from '@/api/dashboard'
 import { getTaskList, updateTask } from '@/api/task/task'
 import {
+  getSatelliteResourceTree,
   getSatelliteResourcesBySeries,
   loadSatelliteSeriesDataForCountries,
 } from '@/api/satellite/satellite'
 import { isResourceApiSuccess } from '@/utils/resourceApi'
 import { mapSatelliteResourceToCatalog } from '@/utils/satelliteResource'
 import type { TaskForm } from '@/api/task/task'
+import type { SatelliteTreeCountryNode } from '@/types/satellite/satellite'
 import type { Weapon } from '@/types/dashboard'
 import type { MatrixResult } from '@/api/electronic'
 import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
@@ -119,7 +134,14 @@ import {
   COMBAT_EXPECTATION_PRIMARY_OPTIONS,
   COMBAT_PHASE_OPTIONS,
 } from '@/config/combatScenarioOptions'
-import { resolveCombatScenarioSelectionFromTask, resolveEnemyCountriesFromTask } from '@/utils/taskEntity'
+import {
+  normalizeTaskListFromApi,
+  resolveCombatCountriesFromTask,
+  resolveCombatScenarioSelectionFromTask,
+  resolveEnemyCountriesFromTask,
+} from '@/utils/taskEntity'
+import { isSameBattleId } from '@/utils/battleEntity'
+import { pruneSatelliteResourceTreeByTaskSatellites } from '@/utils/satelliteResourceTree'
 import { MISSION_SYS_TYPES, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
 import {
   createDraftFromTask,
@@ -129,10 +151,13 @@ import {
 } from '@/utils/c2TaskPanelEditor'
 import {
   parseSeriesApiBuckets,
+  buildC2FlatRowsFromSatelliteResourceTree,
+  buildC2ResourceTreeFromSatelliteResourceTree,
   buildC2ResourceTreeNodesForPanel,
   buildC2SatelliteFlatRowsFromMatrix,
   buildC2SatelliteFlatRowsFromSeriesFallback,
   C2_PANEL_TREE_COUNTRIES,
+  collectC2TaskSatelliteTreeLeafIds,
   expandCheckedKeysToSeriesNames,
   filterC2ResourceRowsToPanelCountries,
   mergeMatrixCatalogIntoPanelCatalog,
@@ -180,6 +205,9 @@ const weaponOptionsLoading = ref(false)
 const resourceTreeRef = ref<InstanceType<typeof ElTree>>()
 const weaponTableRef = ref<InstanceType<typeof ElTable>>()
 const flatCatalogRows = ref<C2ResourceSatelliteRow[]>([])
+/** 按任务卫星裁剪后的资源树根（供树排序与重建） */
+const prunedTaskResourceRoots = ref<SatelliteTreeCountryNode[]>([])
+const catalogFromTaskResource = ref(false)
 const catalogLoading = ref(false)
 const catalogUsesMatrix = ref(false)
 const programmaticTreeSync = ref(false)
@@ -197,9 +225,29 @@ const treeSortFocusCountry = ref<string | null>(null)
  * 返回：`C2ResourceTreeNode[]`（三国根节点，顺序受 `treeSortFocusCountry` 影响）。
  * 作用：ElTree 数据源。
  */
-const resourceTreeNodes = computed((): C2ResourceTreeNode[] =>
-  buildC2ResourceTreeNodesForPanel(flatCatalogRows.value, treeSortFocusCountry.value),
-)
+const resourceTreeNodes = computed((): C2ResourceTreeNode[] => {
+  if (catalogFromTaskResource.value && prunedTaskResourceRoots.value.length) {
+    return buildC2ResourceTreeFromSatelliteResourceTree(
+      prunedTaskResourceRoots.value,
+      treeSortFocusCountry.value,
+    )
+  }
+  return buildC2ResourceTreeNodesForPanel(flatCatalogRows.value, treeSortFocusCountry.value)
+})
+
+/**
+ * 计算：左侧面板任务下拉当前值。
+ * 返回：激活任务 ID；写入时切换 `store.activedTask`。
+ * 作用：任务列表与全局激活任务双向同步。
+ */
+const activeTaskId = computed({
+  get: () => store.activedTask?.id ?? '',
+  set: (taskId: string) => {
+    if (!taskId) return
+    const task = taskList.value.find((item) => item.id === taskId)
+    if (task) store.setActivedTask(task)
+  },
+})
 
 /** 作战场景展示刷新令牌（任务保存 localStorage 后递增） */
 const combatScenarioDisplayToken = ref(0)
@@ -221,9 +269,19 @@ const readActiveCombatScenario = () => {
  */
 const catalogSourceHint = computed(() => {
   if (catalogLoading.value || !flatCatalogRows.value.length) return ''
+  if (catalogFromTaskResource.value) return ''
   if (catalogUsesMatrix.value) return ''
   return '算法未完成：当前为系列预览数据，用途/国际编号/发射时间可能为空。'
 })
+
+/**
+ * 切换左侧面板当前任务。
+ *
+ * @param taskId 任务 ID
+ */
+const handleSwitchTask = (taskId: string) => {
+  activeTaskId.value = taskId
+}
 
 /**
  * 计算：当前任务作战阶段展示名。
@@ -276,8 +334,22 @@ const loadBattleTasks = async () => {
   try {
     const res = await getTaskList(battleId)
     if (res.code === 200 && Array.isArray(res.data)) {
-      taskList.value = res.data
-      await resumeTaskProgressPollingForTasks(res.data)
+      const tasks = normalizeTaskListFromApi(res.data)
+      taskList.value = tasks
+      await resumeTaskProgressPollingForTasks(tasks)
+      // 请求返回后场景可能已切换；只有仍是本次拉取的战场对象时才写回任务列表。
+      const currentBattle = store.battle
+      if (currentBattle && isSameBattleId(currentBattle.id, battleId)) {
+        store.setActivedBattle({ ...currentBattle, tasks })
+      }
+      const activeId = store.activedTask?.id
+      if (!tasks.length) {
+        store.setActivedTask(null)
+      } else if (!activeId || !tasks.some((item) => item.id === activeId)) {
+        store.setActivedTask(tasks[0])
+      } else {
+        store.setActivedTask(tasks.find((item) => item.id === activeId) ?? tasks[0])
+      }
     } else {
       taskList.value = store.battle?.tasks || []
     }
@@ -332,6 +404,29 @@ const isTaskCombatObjectActive = (country: string): boolean =>
   resolveEnemyCountries(store.activedTask).includes(country)
 
 /**
+ * 由任务作战对象推导资源树国家排序优先项（单国为该国；多国取 `country` 中首个合法项）。
+ *
+ * @param task 当前任务
+ */
+const resolveDefaultTreeSortFocusCountry = (task: TaskForm | null | undefined): string | null => {
+  const countries = resolveCombatCountriesFromTask(task)
+  if (!countries.length) return null
+  const allowed = new Set<string>(TASK_ENEMY_COUNTRY_OPTIONS as readonly string[])
+  const matched = countries.filter((country) => allowed.has(country))
+  if (!matched.length) return null
+  return matched[0]
+}
+
+/**
+ * 将任务作战对象同步为资源树顶部国家（切换任务或 country 更新时调用）。
+ *
+ * @param task 当前任务
+ */
+const applyTreeSortFocusFromTask = (task: TaskForm | null | undefined) => {
+  treeSortFocusCountry.value = resolveDefaultTreeSortFocusCountry(task)
+}
+
+/**
  * 点击作战对象：将该国家排到资源树顶部，并高亮对应根节点（仅 UI 排序）。
  *
  * @param country 国家/地区名
@@ -351,6 +446,32 @@ const formatWeaponCoordinate = (value: number | string | undefined | null): stri
   const num = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(num)) return '--'
   return num.toFixed(3)
+}
+
+/**
+ * 按任务已挂载卫星拉取资源树并裁剪为左树数据源。
+ *
+ * @param task 当前任务
+ * @returns 是否成功走任务资源树模式
+ */
+const fetchTaskSatelliteResourceCatalog = async (task: TaskForm): Promise<boolean> => {
+  const mounted = (task.satellites ?? []).filter((item) => item.resourceId?.trim())
+  if (!mounted.length) return false
+
+  const countries = resolveCombatCountriesFromTask(task)
+  const queryCountries = countries.length ? countries : [...C2_PANEL_TREE_COUNTRIES]
+  const res = await getSatelliteResourceTree(queryCountries)
+  if (!isResourceApiSuccess(res.code) || !Array.isArray(res.data)) {
+    throw new Error('加载卫星资源树失败')
+  }
+
+  const pruned = pruneSatelliteResourceTreeByTaskSatellites(res.data, mounted)
+  if (!pruned.length) return false
+
+  prunedTaskResourceRoots.value = pruned
+  flatCatalogRows.value = buildC2FlatRowsFromSatelliteResourceTree(pruned)
+  catalogFromTaskResource.value = true
+  return true
 }
 
 /**
@@ -388,6 +509,8 @@ const fetchSeriesFallbackCatalog = async (task: TaskForm): Promise<C2ResourceSat
 const refreshResourceCatalog = async (task: TaskForm | null | undefined) => {
   if (!task) {
     flatCatalogRows.value = []
+    prunedTaskResourceRoots.value = []
+    catalogFromTaskResource.value = false
     store.setC2ResourceSatelliteRows([])
     catalogUsesMatrix.value = false
     return
@@ -395,10 +518,29 @@ const refreshResourceCatalog = async (task: TaskForm | null | undefined) => {
   const taskEnemies = resolveEnemyCountries(task)
   catalogLoading.value = true
   try {
+    catalogFromTaskResource.value = false
+    prunedTaskResourceRoots.value = []
+
+    const usedTaskResourceTree = await fetchTaskSatelliteResourceCatalog(task)
     const analysis = store.taskAnalysisData
     const hasMatrix =
       Boolean(analysis?.levelSeriesEntities?.length) &&
       store.taskAnalysisTaskId === task.id
+
+    if (usedTaskResourceTree) {
+      if (hasMatrix && analysis) {
+        const matrixRows = filterC2ResourceRowsToPanelCountries(
+          buildC2SatelliteFlatRowsFromMatrix(analysis, taskEnemies),
+        )
+        flatCatalogRows.value = mergeMatrixCatalogIntoPanelCatalog(flatCatalogRows.value, matrixRows)
+        catalogUsesMatrix.value = true
+      } else {
+        catalogUsesMatrix.value = false
+      }
+      store.setC2ResourceSatelliteRows(flatCatalogRows.value)
+      await applyTaskResourceTreeCheckedKeys()
+      return
+    }
 
     if (hasMatrix && analysis) {
       const matrixRows = filterC2ResourceRowsToPanelCountries(
@@ -419,10 +561,29 @@ const refreshResourceCatalog = async (task: TaskForm | null | undefined) => {
   } catch (error) {
     console.error('加载 C2 资源 catalog 失败:', error)
     flatCatalogRows.value = []
+    prunedTaskResourceRoots.value = []
+    catalogFromTaskResource.value = false
     store.setC2ResourceSatelliteRows([])
   } finally {
     catalogLoading.value = false
   }
+}
+
+/** 任务资源树模式：勾选任务内全部卫星叶子 */
+const applyTaskResourceTreeCheckedKeys = async () => {
+  const leafIds = collectC2TaskSatelliteTreeLeafIds(resourceTreeNodes.value)
+  await nextTick()
+  const tree = resourceTreeRef.value
+  programmaticTreeSync.value = true
+  if (leafIds.length) {
+    tree?.setCheckedKeys(leafIds)
+    store.setC2TreeCheckedKeys(leafIds)
+  } else {
+    tree?.setCheckedKeys([])
+    store.setC2TreeCheckedKeys([])
+  }
+  await nextTick()
+  programmaticTreeSync.value = false
 }
 
 /** 清空资源树勾选（界面默认不勾选，右侧列表为空） */
@@ -495,24 +656,6 @@ const syncWeaponTableSelection = async () => {
 }
 
 /**
- * 加载武器候选项。
- */
-const loadWeaponTagOptions = async () => {
-  weaponOptionsLoading.value = true
-  try {
-    const res = await getAllWeapons()
-    const list = res.code === 200 ? (res.data?.weapons ?? []) : []
-    weaponTableRows.value = list.filter((weapon) => weapon.id != null && String(weapon.id).length > 0)
-    await syncWeaponTableSelection()
-  } catch (error) {
-    console.error('加载武器列表失败:', error)
-    weaponTableRows.value = []
-  } finally {
-    weaponOptionsLoading.value = false
-  }
-}
-
-/**
  * 切换任务时同步编辑草稿与资源/武器。
  *
  * @param task 当前任务
@@ -532,8 +675,10 @@ const syncEditorForTask = async (task: TaskForm | null | undefined) => {
     return
   }
   store.setC2TreeCheckedKeys([])
-  await Promise.all([refreshResourceCatalog(task), loadWeaponTagOptions()])
-  await clearResourceTreeSelection()
+  await Promise.all([refreshResourceCatalog(task)])
+  if (!catalogFromTaskResource.value) {
+    await clearResourceTreeSelection()
+  }
 }
 
 /**
@@ -565,11 +710,23 @@ watch(
 watch(
   () => store.activedTask?.id,
   () => {
-    treeSortFocusCountry.value = null
+    applyTreeSortFocusFromTask(store.activedTask)
     combatScenarioDisplayToken.value += 1
     void syncEditorForTask(store.activedTask)
   },
   { immediate: true },
+)
+
+/**
+ * 监听：当前任务 `country`（作战对象）。
+ * 回调不返回清理函数。
+ * 作用：任务作战对象变更后将对应国家排到资源树顶部。
+ */
+watch(
+  () => store.activedTask?.country,
+  () => {
+    applyTreeSortFocusFromTask(store.activedTask)
+  },
 )
 
 /**
@@ -705,6 +862,10 @@ onUnmounted(() => {
     border-top: none;
     border-bottom: none;
   }
+}
+
+.task-panel-task-select {
+  width: 100%;
 }
 
 .panel-body {

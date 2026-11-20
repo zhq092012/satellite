@@ -4,7 +4,7 @@ import { COMBAT_PHASE_OPTIONS } from '@/config/combatScenarioOptions'
 import type { TaskForm } from '@/types/task/task'
 import {
   buildStrikePlanDisplayNameFromTask,
-  normalizeTaskCountryList,
+  parseTaskCombatCountries,
   normalizeTaskExpectationCases,
 } from '@/utils/taskEntity'
 import {
@@ -82,9 +82,9 @@ const EMPTY = '--'
  * @param task 当前任务
  */
 function resolveCombatScenarioLabelsFromTask(
-  task: Pick<TaskForm, 'background' | 'taskSource' | 'enemyCountry' | 'expectation' | 'expectationCases'>,
+  task: Pick<TaskForm, 'background' | 'taskSource' | 'country' | 'expectation' | 'expectationCases'>,
 ): Pick<StrikePlanSchemeMeta, 'combatBackground' | 'commandSource' | 'combatPhase' | 'combatExpectation'> {
-  const enemyCountries = normalizeTaskCountryList(task.enemyCountry)
+  const enemyCountries = parseTaskCombatCountries(task.country)
   const phase =
     COMBAT_PHASE_OPTIONS.find((item) =>
       item.enemyCountries.some((country) => enemyCountries.includes(country)),

@@ -106,6 +106,8 @@ import { useLayoutStore } from '@/store/modules/layout'
 import { getBattleList } from '@/api/battle/battle'
 import { getTaskList } from '@/api/task/task'
 import type { BattleForm } from '@/types/battle/battle'
+import { isSameBattleId } from '@/utils/battleEntity'
+import { normalizeTaskListFromApi } from '@/utils/taskEntity'
 
 const authStore = useAuthStore()
 const layoutStore = useLayoutStore()
@@ -397,10 +399,9 @@ const handleSceneDropdownVisible = async (visible: boolean) => {
  * @param battleId 下拉项 command，对应战场 ID
  */
 const handleSwitchScene = async (battleId: number | string) => {
-  const id = Number(battleId)
-  const battle = battleList.value.find((item) => item.id === id)
+  const battle = battleList.value.find((item) => isSameBattleId(item.id, battleId))
   if (!battle?.id || sceneSwitching.value) return
-  if (layoutStore.battle?.id === battle.id) return
+  if (isSameBattleId(layoutStore.battle?.id, battle.id)) return
 
   sceneSwitching.value = true
   try {
@@ -408,7 +409,10 @@ const handleSwitchScene = async (battleId: number | string) => {
     layoutStore.setSelectedSatSeries('')
 
     const taskRes = await getTaskList(battle.id)
-    const tasks = taskRes.code === 200 && Array.isArray(taskRes.data) ? taskRes.data : []
+    const tasks =
+      taskRes.code === 200 && Array.isArray(taskRes.data)
+        ? normalizeTaskListFromApi(taskRes.data)
+        : []
     layoutStore.setActivedBattle({ ...battle, tasks })
 
     const matchedTask = tasks.find((task) => task.id === layoutStore.activedTask?.id)
@@ -433,8 +437,33 @@ const handleSwitchScene = async (battleId: number | string) => {
   }
 }
 
+/**
+ * 进入系统时若未选中场景，则加载首个场景及其任务列表。
+ */
+const ensureDefaultBattleAndTasks = async () => {
+  if (layoutStore.battle?.id) return
+  if (!battleList.value.length) return
+  const battle = battleList.value[0]
+  if (!battle?.id) return
+  try {
+    const taskRes = await getTaskList(battle.id)
+    const tasks =
+      taskRes.code === 200 && Array.isArray(taskRes.data)
+        ? normalizeTaskListFromApi(taskRes.data)
+        : []
+    layoutStore.setActivedBattle({ ...battle, tasks })
+    if (tasks.length > 0) {
+      layoutStore.setActivedTask(tasks[0])
+    }
+  } catch (error) {
+    console.error('初始化默认场景任务失败:', error)
+    layoutStore.setActivedBattle(battle)
+  }
+}
+
 onMounted(async () => {
   await loadBattleList()
+  await ensureDefaultBattleAndTasks()
 
   if (layoutStore.activedTask?.id && layoutStore.selectedSatSeries) {
     await layoutStore.fetchMatrixForCurrentScope(false)

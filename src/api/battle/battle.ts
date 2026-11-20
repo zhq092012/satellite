@@ -15,7 +15,7 @@ export const getBattleList = () => {
  *
  * @param id 战场 ID
  */
-export const getBattleById = (id: number) => {
+export const getBattleById = (id: string | number) => {
   return requestAPI.get<AxiosResponseType<BattleForm>>(`/api/battle/${id}`)
 }
 
@@ -42,6 +42,6 @@ export const updateBattle = (battle: BattleUpsertPayload) => {
  *
  * @param battleId 战场 ID
  */
-export const deleteBattle = (battleId: number) => {
+export const deleteBattle = (battleId: string | number) => {
   return requestAPI.delete<AxiosResponseType<unknown>>(`/api/battle/${battleId}`)
 }

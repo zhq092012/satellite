@@ -18,8 +18,8 @@ import type { C2ResourceSatelliteRow } from '@/utils/buildC2ResourceCatalog'
 import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
 import type { SatelliteAnalysisData, TaskForm } from '@/types/task/task'
 import {
-  normalizeTaskCountryList,
   normalizeTaskExpectationCases,
+  resolveTaskCountryFieldFromEntity,
 } from '@/utils/taskEntity'
 import { collectTaskAreaGeoCoords } from '@/utils/taskAreaGeo'
 
@@ -251,8 +251,7 @@ export const useLayoutStore = defineStore('layout-store', {
       }
       this.activedTask = {
         ...activedTask,
-        ownCountry: normalizeTaskCountryList(activedTask.ownCountry),
-        enemyCountry: normalizeTaskCountryList(activedTask.enemyCountry),
+        country: resolveTaskCountryFieldFromEntity(activedTask),
         expectationCases: normalizeTaskExpectationCases(activedTask.expectationCases),
       }
     },

@@ -82,6 +82,7 @@ import { getThreatAnalysis, listRegisteredComputeAlgorithms } from '@/api/threat
 import { useLayoutStore } from '@/store/modules/layout'
 import type { AlgorithmInfo, ThreatResp, ThreatRow } from '@/types/threat'
 import { isComputeApiSuccess } from '@/utils/computeApi'
+import { resolveCombatCountriesFromTask } from '@/utils/taskEntity'
 import {
   computeAnalysisCountryRowClass,
   formatAlgorithmSelectionText,
@@ -119,11 +120,7 @@ const algorithmCatalog = ref<AlgorithmInfo[]>([])
  * 返回：enemyCountry 数组。
  * 作用：表格排序与行高亮。
  */
-const priorityCountries = computed(() =>
-  Array.isArray(store.activedTask?.enemyCountry)
-    ? store.activedTask!.enemyCountry.filter(Boolean)
-    : [],
-)
+const priorityCountries = computed(() => resolveCombatCountriesFromTask(store.activedTask))
 
 interface ThreatTableRow {
   rowKey: string

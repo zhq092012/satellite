@@ -135,12 +135,11 @@ export interface TaskForm {
     expectationCases?: string[]
     /** 预报小时 */
     forecastHour: number
-    /** 国家（汇总字段，接口可选返回） */
-    country?: string
-    /** 我方（红方）国家列表 */
-    ownCountry: string[]
-    /** 敌方（蓝方）国家列表 */
-    enemyCountry: string[]
+    /**
+     * 作战对象国家（OpenAPI `country`）。
+     * 多个国家使用英文逗号分隔，例如 `日本` 或 `美国,日本`。
+     */
+    country: string
     /** 作战阶段信息（JSON 字符串） */
     steps?: string
     /** 关注状态 */

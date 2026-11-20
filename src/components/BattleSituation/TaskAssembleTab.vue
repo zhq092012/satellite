@@ -40,8 +40,8 @@
             请先配置作战对象与卫星类型，并点击刷新加载树
           </div>
           <el-tree v-else ref="satelliteTreeRef" class="satellite-resource-tree" :data="satelliteTreeUiNodes"
-            node-key="id" show-checkbox default-expand-all :props="{ label: 'label', children: 'children' }"
-            @check="handleSatelliteTreeCheck" />
+            node-key="id" show-checkbox :default-expanded-keys="satelliteTreeCountryExpandedKeys"
+            :props="{ label: 'label', children: 'children' }" @check="handleSatelliteTreeCheck" />
         </div>
       </section>
       <section class="assemble-pane satellite-list-pane">
@@ -217,15 +217,13 @@
  * 任务弹窗中的资源装配页（卫星 / 地面站 / 数据中心 / 武器）。
  * 卫星列表分页查询；地面站、数据中心、武器已接入增删改查。
  */
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import type { TableInstance } from 'element-plus'
 import type { ElTree } from 'element-plus'
 import {
   createWeapon,
   deleteWeapon,
-  getAllWeapons,
-  getBattleCountrys,
   getBattleSateTypes,
   updateWeapon,
 } from '@/api/dashboard'
@@ -234,9 +232,14 @@ import { isResourceApiSuccess } from '@/utils/resourceApi'
 import type { SatelliteAssembleTreeNode } from '@/types/satellite/satellite'
 import type { TaskResourceItem } from '@/types/task/task'
 import {
-  buildSatelliteAssembleTreeNodes,
-  indexSatelliteTreeResources,
+  resolveSatelliteTreeMetaForTaskResource,
+  satelliteTreeNodeMatchesTaskResource,
+  type SatelliteTreeResourceMeta,
 } from '@/utils/satelliteResourceTree'
+import {
+  buildSatelliteAssembleTreeInBackground,
+  yieldToUiBeforeHeavyTreeMount,
+} from '@/utils/satelliteAssembleTreeWorkerClient'
 import { GROUND_STATION_COUNTRY_OPTIONS } from '@/constants/groundStationCountries'
 import {
   createGroundStation,
@@ -320,8 +323,8 @@ const props = defineProps<{
   kind: TaskAssembleKind
   /** 弹窗打开时递增，用于清空本地勾选与已装配列表 */
   resetKey: number
-  /** 任务基本信息中的蓝方国家，卫星系列查询直接使用该列表 */
-  enemyCountries?: string[]
+  /** 任务作战对象国家列表（来自任务 `country` 拆分） */
+  combatCountries?: string[]
   /** 任务基本信息中的卫星类型（侦察、通信），用于过滤系列下拉 */
   targetTypes?: string[]
 }>()
@@ -352,16 +355,16 @@ const assembledSelection = ref<TaskAssembleRow[]>([])
 const assembledRows = ref<TaskAssembleRow[]>([])
 /** 卫星资源树组件引用 */
 const satelliteTreeRef = ref<InstanceType<typeof ElTree> | null>(null)
-/** 卫星装配树节点（国家 → 体系 → 系列 → 卫星） */
-const satelliteTreeUiNodes = ref<SatelliteAssembleTreeNode[]>([])
+/** 卫星装配树节点（国家 → 体系 → 系列 → 卫星）；大树使用 shallowRef 避免深度响应式开销 */
+const satelliteTreeUiNodes = shallowRef<SatelliteAssembleTreeNode[]>([])
 /** 树叶子 resourceId → 元数据索引 */
-const satelliteTreeResourceIndex = ref(
-  new Map<string, { resource: TaskResourceItem; country: string; system: string; series: string }>(),
-)
+const satelliteTreeResourceIndex = ref(new Map<string, SatelliteTreeResourceMeta>())
 /** 已勾选卫星（对应任务 `satellites` 字段） */
 const assembledTaskSatellites = ref<TaskResourceItem[]>([])
 /** 程序化同步树勾选，避免递归触发 */
 const syncingTreeCheck = ref(false)
+/** 卫星树拉取世代号，丢弃过期异步结果避免重复渲染 */
+let satelliteTreeLoadGeneration = 0
 /** @deprecated 系列多选遗留；C2 系列推导改由已选卫星反推 */
 const assembledSeriesIds = ref<Set<string>>(new Set())
 /** 列表加载中。 */
@@ -410,7 +413,6 @@ const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
     columns: [
       { prop: 'country', label: '国家', width: 90 },
       { prop: 'name', label: '卫星名称', minWidth: 96, flex: true },
-      { prop: 'type', label: '卫星类型', minWidth: 120 },
       { prop: 'series', label: '卫星系列', minWidth: 120 },
       { prop: 'extra1', label: '卫星体系', minWidth: 120 },
       { prop: 'extra2', label: '代号', minWidth: 120 },
@@ -522,7 +524,7 @@ const isWeaponKind = computed(() => props.kind === 'weapon')
  * 返回：非空国家名称字符串数组。
  * 作用：查询卫星系列接口与系列分组展示时的国家条件。
  */
-const seriesQueryCountries = computed(() => (props.enemyCountries || []).filter(Boolean))
+const seriesQueryCountries = computed(() => (props.combatCountries || []).filter(Boolean))
 
 /**
  * 计算：任务已选卫星类型中可用于系列查询的类型。
@@ -532,6 +534,19 @@ const seriesQueryCountries = computed(() => (props.enemyCountries || []).filter(
 const seriesQueryTargetTypes = computed(() =>
   (props.targetTypes || []).filter((type) => type === '侦察' || type === '通信')
 )
+
+/**
+ * 比较两个字符串列表是否语义相同（去空、排序后逐项相等）。
+ *
+ * @param a 列表 a
+ * @param b 列表 b
+ */
+const areStringListsEqual = (a: readonly string[], b: readonly string[]): boolean => {
+  const na = [...a].map((s) => s.trim()).filter(Boolean).sort((x, y) => x.localeCompare(y, 'zh-CN'))
+  const nb = [...b].map((s) => s.trim()).filter(Boolean).sort((x, y) => x.localeCompare(y, 'zh-CN'))
+  if (na.length !== nb.length) return false
+  return na.every((value, index) => value === nb[index])
+}
 
 /**
  * 计算：类型筛选下拉的可选项。
@@ -555,6 +570,15 @@ const typeFilterOptions = computed(() => {
  * 作用：待选表标题或统计区展示候选总量。
  */
 const candidateTotalText = computed(() => String(filteredCandidates.value.length))
+
+/**
+ * 计算：卫星资源树默认展开的国家节点 key。
+ * 返回：仅国家层节点 id 列表。
+ * 作用：打开国家层便于浏览，避免全树展开导致页面卡死。
+ */
+const satelliteTreeCountryExpandedKeys = computed(() =>
+  satelliteTreeUiNodes.value.map((node) => node.id),
+)
 
 /**
  * 创建空白地面站表单。
@@ -657,50 +681,7 @@ const stationToRow = (station: GroundStation): TaskAssembleRow => {
   }
 }
 
-/**
- * 格式化武器坐标展示。
- *
- * @param value 经度或纬度
- * @returns 坐标文本；无效时为 `--`
- */
-const formatWeaponCoord = (value?: number | null): string => formatCoordinateDisplay(value)
 
-/**
- * 格式化武器打击间隔展示。
- *
- * @param value 打击间隔（分钟）
- * @returns 间隔文本；无效时为 `--`
- */
-const formatWeaponInterval = (value?: string | number | null): string => {
-  if (value == null || value === '') return '--'
-  const numeric = Number(value)
-  if (Number.isFinite(numeric)) return `${numeric}min`
-  return String(value)
-}
-
-/**
- * 将武器信息映射为装配表格行。
- * @param weapon 武器原始数据
- */
-const weaponToRow = (weapon: Weapon): TaskAssembleRow => {
-  const id = weapon.id || weapon.name
-  if (weapon.id) {
-    weaponRawMap[weapon.id] = weapon
-  }
-  const rangeText = weapon.range != null ? `${weapon.range}km` : '--'
-  return {
-    id,
-    name: weapon.name,
-    series: '',
-    type: weapon.type,
-    country: weapon.country,
-    extra1: weapon.satellite_type || '--',
-    extra2: rangeText,
-    extra3: formatWeaponCoord(weapon.longitude),
-    extra4: formatWeaponCoord(weapon.latitude),
-    extra5: formatWeaponInterval(weapon.interval),
-  }
-}
 
 /**
  * 生成资源行搜索关键字串。
@@ -766,15 +747,15 @@ const clearSatelliteAssemblyState = () => {
 const syncAssembledRowsFromTaskSatellites = () => {
   if (!isSatelliteKind.value) return
   assembledRows.value = assembledTaskSatellites.value.map((item) => {
-    const meta = satelliteTreeResourceIndex.value.get(item.resourceId)
+    const meta = resolveSatelliteTreeMetaForTaskResource(satelliteTreeResourceIndex.value, item)
     return {
       id: item.resourceId,
-      name: item.name,
-      series: meta?.series || item.code || '--',
-      type: meta?.system || '--',
+      name: meta?.resource.name || item.name || item.resourceId,
+      series: meta?.series || '--',
+      type: '--',
       country: meta?.country || '--',
       extra1: meta?.system || '--',
-      extra2: item.code || '--',
+      extra2: meta?.resource.code || item.code || '--',
     }
   })
 }
@@ -803,26 +784,36 @@ const loadSatelliteTree = async () => {
     satelliteTreeResourceIndex.value = new Map()
     return
   }
+  const loadGeneration = ++satelliteTreeLoadGeneration
   listLoading.value = true
   try {
     const res = await getSatelliteResourceTree(countries)
+    if (loadGeneration !== satelliteTreeLoadGeneration) return
     if (!isResourceApiSuccess(res.code) || !Array.isArray(res.data)) {
       satelliteTreeUiNodes.value = []
       satelliteTreeResourceIndex.value = new Map()
       return
     }
-    const nodes = buildSatelliteAssembleTreeNodes(res.data, systems)
+    const { nodes, indexEntries } = await buildSatelliteAssembleTreeInBackground(res.data, systems)
+    if (loadGeneration !== satelliteTreeLoadGeneration) return
+    await yieldToUiBeforeHeavyTreeMount()
+    if (loadGeneration !== satelliteTreeLoadGeneration) return
     satelliteTreeUiNodes.value = nodes
-    satelliteTreeResourceIndex.value = indexSatelliteTreeResources(nodes)
+    satelliteTreeResourceIndex.value = new Map(indexEntries)
     await nextTick()
+    if (loadGeneration !== satelliteTreeLoadGeneration) return
     restoreSatelliteTreeCheckedFromTaskSatellites()
+    syncAssembledRowsFromTaskSatellites()
   } catch (error) {
+    if (loadGeneration !== satelliteTreeLoadGeneration) return
     console.error('加载卫星资源树失败:', error)
     satelliteTreeUiNodes.value = []
     satelliteTreeResourceIndex.value = new Map()
     ElMessage.error('加载卫星资源树失败')
   } finally {
-    listLoading.value = false
+    if (loadGeneration === satelliteTreeLoadGeneration) {
+      listLoading.value = false
+    }
   }
 }
 
@@ -839,7 +830,7 @@ const restoreSatelliteTreeCheckedFromTaskSatellites = () => {
         if (
           node.nodeType === 'satellite' &&
           node.resource &&
-          assembledTaskSatellites.value.some((item) => item.resourceId === node.resource!.resourceId)
+          assembledTaskSatellites.value.some((item) => satelliteTreeNodeMatchesTaskResource(node, item))
         ) {
           ids.push(node.id)
         }
@@ -877,17 +868,7 @@ const getAssembledTaskSatellites = (): TaskResourceItem[] =>
  */
 const displayCandidates = computed(() => filteredCandidates.value)
 
-/**
- * 加载国家下拉选项。
- */
-const loadCountries = async () => {
-  try {
-    const res = await getBattleCountrys()
-    countries.value = res.code === 200 ? (res.data ?? []) : []
-  } catch {
-    countries.value = []
-  }
-}
+
 
 /**
  * 加载卫星类型筛选项。
@@ -937,15 +918,6 @@ const enrichAssembledFromPool = () => {
   })
 }
 
-/**
- * 从接口加载武器候选列表。
- */
-const loadWeaponCandidates = async () => {
-  const res = await getAllWeapons()
-  const list = res.code === 200 ? (res.data?.weapons ?? []) : []
-  Object.keys(weaponRawMap).forEach((key) => delete weaponRawMap[key])
-  candidatePool.weapon = list.map(weaponToRow)
-}
 
 /**
  * 按当前种类加载候选资源池。
@@ -960,8 +932,6 @@ const loadCandidatePool = async () => {
   try {
     if (isStationKind.value) {
       await loadStationCandidates()
-    } else if (isWeaponKind.value) {
-      await loadWeaponCandidates()
     }
     enrichAssembledFromPool()
     if (!isSatelliteKind.value) {
@@ -1169,8 +1139,9 @@ watch(
  */
 watch(
   seriesQueryCountries,
-  async () => {
+  async (next, prev) => {
     if (!isSatelliteKind.value) return
+    if (prev !== undefined && areStringListsEqual(next, prev)) return
     clearSatelliteAssemblyState()
     await loadSatelliteTree()
   },
@@ -1180,12 +1151,13 @@ watch(
 /**
  * 监听：参与系列过滤的任务卫星类型 `seriesQueryTargetTypes`（含深度变更）。
  * 返回：回调不返回清理函数。
- * 作用：类型变化时清空卫星装配并重新加载资源树（按体系过滤）。
+ * 作用：类型变化时清空卫星装配并重新加载资源树（按体系过滤）；内容未变时不重置已选卫星。
  */
 watch(
   seriesQueryTargetTypes,
-  async () => {
+  async (next, prev) => {
     if (!isSatelliteKind.value) return
+    if (prev !== undefined && areStringListsEqual(next, prev)) return
     clearSatelliteAssemblyState()
     await loadSatelliteTree()
   },
@@ -1198,11 +1170,7 @@ onMounted(async () => {
     return
   }
   if (crudEnabled.value) {
-    const tasks: Promise<void>[] = [loadCandidatePool()]
-    if (isWeaponKind.value) {
-      tasks.push(loadCountries())
-    }
-    await Promise.all(tasks)
+    await loadCandidatePool()
   }
 })
 
@@ -1222,9 +1190,8 @@ const getAssembledSeries = (): string[] => {
   }
   const series = new Set<string>()
   for (const item of assembledTaskSatellites.value) {
-    const meta = satelliteTreeResourceIndex.value.get(item.resourceId)
+    const meta = resolveSatelliteTreeMetaForTaskResource(satelliteTreeResourceIndex.value, item)
     if (meta?.series) series.add(meta.series)
-    else if (item.code) series.add(item.code)
   }
   return [...series].sort((a, b) => a.localeCompare(b, 'zh-CN'))
 }

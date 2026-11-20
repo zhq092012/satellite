@@ -47,7 +47,7 @@
                 <el-option v-for="item in COMBAT_PHASE_OPTIONS" :key="item.id" :label="item.label" :value="item.id" />
               </el-select>
             </el-form-item>
-            <el-form-item label="作战对象" prop="enemyCountry">
+            <el-form-item label="作战对象" prop="country">
               <div class="combat-object-options" role="group" aria-label="作战对象">
                 <div v-for="country in combatObjectCountryOptions" :key="country" class="combat-object-chip" :class="{
                   'combat-object-chip--active': isCombatObjectActive(country),
@@ -124,8 +124,8 @@
           </el-form>
         </div>
 
-        <TaskAssembleTab ref="satelliteAssembleRef" v-show="activeTab === 'satellite'" kind="satellite"
-          :reset-key="assembleResetKey" :enemy-countries="taskForm.enemyCountry"
+        <TaskAssembleTab v-if="activeTab === 'satellite'" ref="satelliteAssembleRef" kind="satellite"
+          :reset-key="assembleResetKey" :combat-countries="combatCountriesForAssembly"
           :target-types="assembleTargetTypes" />
         <TaskAssembleTab ref="stationAssembleRef" v-show="activeTab === 'station'" kind="station"
           :reset-key="assembleResetKey" />
@@ -155,7 +155,6 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { getBattleCountrys } from '@/api/dashboard'
 import { createTask, updateTask } from '@/api/task/task'
 import { MISSION_SYS_TYPES, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
 import {
@@ -168,15 +167,18 @@ import {
 } from '@/config/combatScenarioOptions'
 import {
   applyCombatScenarioSelectionToTaskFields,
-  DEFAULT_TASK_OWN_COUNTRIES,
+  DEFAULT_TASK_COMBAT_COUNTRY,
+  formatTaskCountryField,
   mapAssembleRowToTaskResource,
+  parseTaskCombatCountries,
   resolveCombatScenarioSelectionFromTask,
+  resolveTaskCountryFieldFromEntity,
 } from '@/utils/taskEntity'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskAssembleTab, { type TaskAssembleRow } from '@/components/BattleSituation/TaskAssembleTab.vue'
 import TaskTargetRelationTab from '@/components/BattleSituation/TaskTargetRelationTab.vue'
 import TaskAreaGlobePickerDialog from '@/components/BattleSituation/TaskAreaGlobePickerDialog.vue'
-import type { TaskArea, TaskForm, TaskRelationEndpointOption } from '@/types/task/task'
+import type { TaskArea, TaskForm, TaskRelationEndpointOption, TaskResourceItem } from '@/types/task/task'
 
 /** 任务弹窗左侧菜单 key。 */
 type TaskEditTabKey =
@@ -202,9 +204,7 @@ interface TaskEditMenuItem {
 const store = useLayoutStore()
 
 
-/** 新建任务默认红方国家 */
-/** 新建任务默认蓝方国家（作战阶段选择后覆盖） */
-const DEFAULT_ENEMY_COUNTRIES = ['美国'] as const
+/** 新建任务默认作战对象（作战阶段选择后覆盖） */
 /** 新建任务默认卫星类型（四分类全选） */
 const DEFAULT_TARGET_TYPES = [...MISSION_SYS_TYPES] as string[]
 /** 新建任务默认时长（小时） */
@@ -229,12 +229,10 @@ const emit = defineEmits<{
 const formRef = ref<FormInstance>()
 /** 提交中状态。 */
 const submitting = ref(false)
-/** 红蓝方国家下拉选项。 */
-const countryOptions = ref<string[]>([])
 /** 作战目标下拉选项。 */
 const satelliteTypes = [...MISSION_SYS_TYPES]
 
-/** 作战场景（仅前端 localStorage，待 saveTask 扩展） */
+/** 作战场景 */
 const combatScenario = reactive<CombatScenarioSelection>({
   backgroundId: COMBAT_BACKGROUND_OPTIONS[0]?.id ?? '',
   commandSourceId: COMMAND_SOURCE_OPTIONS[0]?.id ?? '',
@@ -247,12 +245,19 @@ const combatScenario = reactive<CombatScenarioSelection>({
 const combatObjectCountryOptions = [...TASK_ENEMY_COUNTRY_OPTIONS]
 
 /**
- * 当前作战阶段是否勾选该作战对象（勾选与提交字段 enemyCountryShow 一致）。
+ * 当前作战阶段是否勾选该作战对象（与任务 `country` 拆分列表一致）。
  *
  * @param country 国家/地区名称
  */
 const isCombatObjectActive = (country: string): boolean =>
-  (taskForm.enemyCountry || []).includes(country)
+  parseTaskCombatCountries(taskForm.country).includes(country)
+
+/**
+ * 计算：卫星资源树查询用的作战对象国家列表。
+ * 返回：由 `taskForm.country` 拆分后的国家名数组。
+ * 作用：传给卫星装配 Tab 拉取资源树。
+ */
+const combatCountriesForAssembly = computed(() => parseTaskCombatCountries(taskForm.country))
 
 /**
  * 计算：当前作战预期一级选项下的二级子选项列表。
@@ -338,8 +343,7 @@ const taskForm = reactive<TaskForm>({
   expectationCases: [],
   forecastHour: DEFAULT_TASK_DURATION_HOURS,
   areas: [],
-  ownCountry: [...DEFAULT_TASK_OWN_COUNTRIES],
-  enemyCountry: [...DEFAULT_ENEMY_COUNTRIES],
+  country: DEFAULT_TASK_COMBAT_COUNTRY,
   steps: '',
   focusStatus: 0,
   delayMin: 60,
@@ -353,11 +357,14 @@ const taskForm = reactive<TaskForm>({
 const formRules = reactive<FormRules<TaskForm>>({
   name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
   description: [{ required: true, message: '请输入任务概述', trigger: 'blur' }],
-  enemyCountry: [{
-    type: 'array',
-    required: true,
-    min: 1,
-    message: '请选择作战阶段以确定作战对象',
+  country: [{
+    validator: (_rule, value, callback) => {
+      if (!parseTaskCombatCountries(value).length) {
+        callback(new Error('请选择作战阶段以确定作战对象'))
+        return
+      }
+      callback()
+    },
     trigger: 'change',
   }],
   beginDate: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
@@ -400,6 +407,8 @@ const taskEditMenus: TaskEditMenuItem[] = [
 const activeTab = ref<TaskEditTabKey>('basic')
 /** 装配页重置令牌，弹窗每次打开递增。 */
 const assembleResetKey = ref(0)
+/** 卫星 Tab 未挂载时暂存回显数据，进入卫星页后写入装配组件。 */
+const pendingSatelliteRestore = ref<TaskResourceItem[] | null>(null)
 
 /**
  * 计算：目标关系「卫星（系列）」下拉选项，来自卫星装配页已选系列。
@@ -445,9 +454,8 @@ watch(
     visible.value = open
     if (open) {
       activeTab.value = 'basic'
-      assembleResetKey.value += 1
       fillForm(props.task)
-      loadCountryOptions()
+      assembleResetKey.value += 1
     }
   }
 )
@@ -458,7 +466,9 @@ watch(
  * 作用：向父组件 `emit('update:modelValue')` 以保持双向绑定一致。
  */
 watch(visible, (open) => {
-  emit('update:modelValue', open)
+  if (open !== props.modelValue) {
+    emit('update:modelValue', open)
+  }
 })
 
 /**
@@ -644,13 +654,34 @@ const createPlaceholderRow = (id: string, name?: string): TaskAssembleRow => ({
  *
  * @param task 列表接口返回的任务对象
  */
+const applyPendingSatelliteRestore = () => {
+  const pending = pendingSatelliteRestore.value
+  if (!pending?.length || !satelliteAssembleRef.value) return
+  satelliteAssembleRef.value.setAssembledTaskSatellites(pending)
+  pendingSatelliteRestore.value = null
+}
+
+/**
+ * 监听：任务编辑弹窗当前 Tab。
+ * 回调不返回清理函数。
+ * 作用：进入卫星配置页且卫星 Tab 挂载后应用暂存的卫星回显。
+ */
+watch(activeTab, (tab) => {
+  if (tab !== 'satellite') return
+  void nextTick(() => applyPendingSatelliteRestore())
+})
+
 const restoreAssembleFromTask = (task: TaskForm) => {
   const satellites = (task.satellites ?? []).map((item) => ({
     resourceId: item.resourceId,
     name: item.name,
     code: item.code,
   }))
+  pendingSatelliteRestore.value = satellites.length ? satellites : null
   satelliteAssembleRef.value?.setAssembledTaskSatellites(satellites)
+  if (satelliteAssembleRef.value) {
+    pendingSatelliteRestore.value = null
+  }
   stationAssembleRef.value?.setAssembledRows(
     (task.receiveStations ?? []).map((item) =>
       createPlaceholderRow(item.resourceId, item.name || item.resourceId),
@@ -663,12 +694,6 @@ const restoreAssembleFromTask = (task: TaskForm) => {
     targetRelationRef.value?.setRelations([])
   })
 }
-
-const splitCsv = (value?: string): string[] =>
-  (value || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
 
 /**
  * 获取新建任务默认开始时间（当天 08:00）。
@@ -711,8 +736,7 @@ const resetCreateForm = () => {
     background: '',
     expectation: '',
     expectationCases: [],
-    ownCountry: [...DEFAULT_TASK_OWN_COUNTRIES],
-    enemyCountry: [...DEFAULT_ENEMY_COUNTRIES],
+    country: DEFAULT_TASK_COMBAT_COUNTRY,
     steps: '',
     focusStatus: 0,
     delayMin: DEFAULT_DELAY_MIN,
@@ -742,18 +766,25 @@ const initCombatScenarioDefaults = () => {
   combatScenario.expectationPrimaryId = COMBAT_EXPECTATION_PRIMARY_OPTIONS[0]?.id ?? ''
   combatScenario.expectationSecondaryId =
     COMBAT_EXPECTATION_PRIMARY_OPTIONS[0]?.children[0]?.id ?? ''
-  applyCombatPhaseToEnemyCountries(combatScenario.combatPhaseId)
+  applyCombatPhaseToCountry(combatScenario.combatPhaseId)
 }
 
+/**
+ * 填充作战场景
+ * @param task 任务
+ */
 const syncCombatScenarioFromTask = (task: TaskForm) => {
-  const selection = resolveCombatScenarioSelectionFromTask(task)
+  const selection = resolveCombatScenarioSelectionFromTask({
+    ...task,
+    country: resolveTaskCountryFieldFromEntity(task),
+  })
   combatScenario.backgroundId = selection.backgroundId
   combatScenario.commandSourceId = selection.commandSourceId
   combatScenario.combatPhaseId = selection.combatPhaseId
   combatScenario.expectationPrimaryId = selection.expectationPrimaryId
   combatScenario.expectationSecondaryId = selection.expectationSecondaryId
-  if (!task.enemyCountry?.length) {
-    applyCombatPhaseToEnemyCountries(selection.combatPhaseId)
+  if (!parseTaskCombatCountries(task.country).length) {
+    applyCombatPhaseToCountry(selection.combatPhaseId)
   }
 }
 
@@ -770,10 +801,7 @@ const fillForm = (task: TaskForm | null) => {
   Object.assign(taskForm, {
     ...task,
     battleId: task.battleId != null ? String(task.battleId) : '',
-    ownCountry: task.ownCountry?.length ? [...task.ownCountry] : [...DEFAULT_TASK_OWN_COUNTRIES],
-    enemyCountry: Array.isArray(task.enemyCountry)
-      ? [...task.enemyCountry]
-      : splitCsv(String(task.enemyCountry ?? '')),
+    country: resolveTaskCountryFieldFromEntity(task),
     expectationCases: task.expectationCases ? [...task.expectationCases] : [],
     steps: task.steps || '',
     focusStatus: Number(task.focusStatus) === 1 ? 1 : 0,
@@ -789,35 +817,34 @@ const fillForm = (task: TaskForm | null) => {
   const end = normalizeDateTime(task.endDate)
   taskForm.beginDate = begin
   taskForm.endDate = end
+  syncCombatScenarioFromTask(task)
   syncCountryFields()
   void nextTick(() => {
     restoreAssembleFromTask(task)
   })
-  syncCombatScenarioFromTask(taskForm)
 }
 
 /**
  * 将多选国家同步回逗号分隔字段，供提交使用。
  */
 const syncCountryFields = () => {
-  taskForm.ownCountry = [...DEFAULT_TASK_OWN_COUNTRIES]
-  applyCombatScenarioSelectionToTaskFields(combatScenario, taskForm, taskForm.ownCountry)
+  applyCombatScenarioSelectionToTaskFields(combatScenario, taskForm)
 }
 
 /**
- * 作战阶段变更：自动设置作战对象（蓝方国家）。
+ * 作战阶段变更：自动设置作战对象并写入 `country`。
  *
  * @param phaseId 作战阶段 ID
  */
-const applyCombatPhaseToEnemyCountries = (phaseId: string) => {
+const applyCombatPhaseToCountry = (phaseId: string) => {
   const countries = resolveEnemyCountriesByCombatPhase(phaseId)
-  taskForm.enemyCountry = countries
+  taskForm.country = formatTaskCountryField(countries)
   syncCountryFields()
-  formRef.value?.validateField('enemyCountry').catch(() => undefined)
+  formRef.value?.validateField('country').catch(() => undefined)
 }
 
 const handleCombatPhaseChange = (phaseId: string) => {
-  applyCombatPhaseToEnemyCountries(phaseId)
+  applyCombatPhaseToCountry(phaseId)
 }
 
 /**
@@ -828,25 +855,13 @@ const handleExpectationPrimaryChange = () => {
   combatScenario.expectationSecondaryId = first?.id ?? ''
 }
 
-/**
- * 加载红蓝方可选国家列表。
- */
-const loadCountryOptions = async () => {
-  try {
-    const res = await getBattleCountrys()
-    if (res.code === 200 && Array.isArray(res.data)) {
-      countryOptions.value = res.data
-    }
-  } catch (error) {
-    console.error('加载国家列表失败:', error)
-  }
-}
 
 /**
  * 对话框关闭后重置表单状态。
  */
 const handleClosed = () => {
   formRef.value?.resetFields()
+  pendingSatelliteRestore.value = null
 }
 
 /**
@@ -873,16 +888,23 @@ const resolveCreatedTaskId = (data: unknown): string | undefined => {
 type AddTaskPayload = Parameters<typeof createTask>[0]
 
 const buildAddTaskPayload = (): AddTaskPayload | null => {
+  const satellites = satelliteAssembleRef.value
+    ? satelliteAssembleRef.value.getAssembledTaskSatellites()
+    : (taskForm.satellites ?? []).map((item) => ({
+        resourceId: item.resourceId,
+        name: item.name,
+        code: item.code,
+      }))
+  const stations = stationAssembleRef.value?.getAssembledRows() ?? []
+  const weapons = weaponAssembleRef.value?.getAssembledRows() ?? []
+
   syncCountryFields()
+
   if (!assembleTargetTypes.value.length) {
     ElMessage.warning('请选择卫星类型')
     activeTab.value = 'basic'
     return null
   }
-
-  const satellites = satelliteAssembleRef.value?.getAssembledTaskSatellites() ?? []
-  const stations = stationAssembleRef.value?.getAssembledRows() ?? []
-  const weapons = weaponAssembleRef.value?.getAssembledRows() ?? []
 
   if (!satellites.length) {
     ElMessage.warning('请至少选择一颗卫星')
@@ -902,8 +924,6 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
     expectationCases: [...(taskForm.expectationCases ?? [])],
     forecastHour: durationHours.value,
     country: taskForm.country ?? '',
-    ownCountry: [...(taskForm.ownCountry ?? DEFAULT_TASK_OWN_COUNTRIES)],
-    enemyCountry: [...(taskForm.enemyCountry ?? [])],
     steps: taskForm.steps ?? '',
     focusStatus: taskForm.focusStatus ?? 0,
     areas: cloneTaskAreas(taskForm.areas),

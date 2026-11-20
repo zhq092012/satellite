@@ -518,14 +518,7 @@ export const getSatelliteThreatList = (
   }
   return requestAPI.get<AxiosResponsePage<SatelliteThreat[]>>(url)
 }
-/**
- * 获取所有的武器列表
- * @returns
- */
-export const getAllWeapons = () => {
-  const url = `/api/battle/weaponList/v2`
-  return requestAPI.get<AxiosResponseType<{ weapons: Weapon[] }>>(url)
-}
+
 /**
  * 获取所有的武器列表
  * @returns
@@ -670,14 +663,7 @@ export const getBattleSateTypes = () => {
   const url = `/api/battle/satType`
   return requestAPI.get<AxiosResponseType<string[]>>(url)
 }
-/**
- * 战场所有国家
- * @returns
- */
-export const getBattleCountrys = () => {
-  const url = `/api/battle/country`
-  return requestAPI.get<AxiosResponseType<string[]>>(url)
-}
+
 
 /**
  * 任务下推荐的卫星和国家

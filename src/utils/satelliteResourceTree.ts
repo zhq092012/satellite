@@ -2,6 +2,7 @@ import type {
   SatelliteAssembleTreeNode,
   SatelliteTreeCountryNode,
   SatelliteTreeSatelliteLeaf,
+  SatelliteTreeSystemNode,
 } from '@/types/satellite/satellite'
 import type { TaskResourceItem } from '@/types/task/task'
 
@@ -127,26 +128,90 @@ export const buildSatelliteAssembleTreeNodes = (
  *
  * @param nodes 树根
  */
+/** 卫星树叶子在任务回显时附带的国家 / 体系 / 系列上下文 */
+export interface SatelliteTreeResourceMeta {
+  /** 任务挂载项 */
+  resource: TaskResourceItem
+  /** 国家 */
+  country: string
+  /** 体系（侦察 / 通信等） */
+  system: string
+  /** 系列名 */
+  series: string
+}
+
+/**
+ * 遍历树，按 resourceId 及别名建立索引。
+ *
+ * @param nodes 树根
+ */
 export const indexSatelliteTreeResources = (
   nodes: SatelliteAssembleTreeNode[],
-): Map<string, { resource: TaskResourceItem; country: string; system: string; series: string }> => {
-  const map = new Map<string, { resource: TaskResourceItem; country: string; system: string; series: string }>()
+): Map<string, SatelliteTreeResourceMeta> => {
+  const map = new Map<string, SatelliteTreeResourceMeta>()
+
+  const register = (key: string, meta: SatelliteTreeResourceMeta) => {
+    const trimmed = key.trim()
+    if (!trimmed || map.has(trimmed)) return
+    map.set(trimmed, meta)
+  }
 
   const walk = (list: SatelliteAssembleTreeNode[]) => {
     for (const node of list) {
       if (node.nodeType === 'satellite' && node.resource) {
-        map.set(node.resource.resourceId, {
+        const meta: SatelliteTreeResourceMeta = {
           resource: node.resource,
           country: node.country ?? '',
           system: node.system ?? '',
           series: node.series ?? '',
-        })
+        }
+        register(node.resource.resourceId, meta)
+        register(node.resource.code, meta)
+        register(node.resource.name, meta)
+        register(node.id, meta)
       }
       if (node.children?.length) walk(node.children)
     }
   }
   walk(nodes)
   return map
+}
+
+/**
+ * 按任务挂载项在树索引中解析国家 / 体系 / 系列。
+ *
+ * @param index `indexSatelliteTreeResources` 结果
+ * @param item 任务 `satellites` 元素
+ */
+export const resolveSatelliteTreeMetaForTaskResource = (
+  index: Map<string, SatelliteTreeResourceMeta>,
+  item: TaskResourceItem,
+): SatelliteTreeResourceMeta | undefined => {
+  const direct = index.get(item.resourceId?.trim() ?? '')
+  if (direct) return direct
+
+  const keys = buildTaskSatelliteMatchKeys([item])
+  for (const [, meta] of index) {
+    const candidateKeys = buildTaskSatelliteMatchKeys([meta.resource])
+    if ([...keys].some((key) => candidateKeys.has(key))) return meta
+  }
+  return undefined
+}
+
+/**
+ * 判断树卫星节点是否与任务挂载项对应（用于回显勾选）。
+ *
+ * @param node 树卫星叶子
+ * @param item 任务挂载项
+ */
+export const satelliteTreeNodeMatchesTaskResource = (
+  node: SatelliteAssembleTreeNode,
+  item: TaskResourceItem,
+): boolean => {
+  if (node.nodeType !== 'satellite' || !node.resource) return false
+  const left = buildTaskSatelliteMatchKeys([item])
+  const right = buildTaskSatelliteMatchKeys([node.resource])
+  return [...left].some((key) => right.has(key))
 }
 
 /**
@@ -164,4 +229,88 @@ export const collectSatelliteTreeLeafIds = (nodes: SatelliteAssembleTreeNode[]):
   }
   walk(nodes)
   return ids
+}
+
+/**
+ * 任务挂载卫星的可匹配键集合（resourceId / code / name / NORAD）。
+ *
+ * @param items 任务 `satellites`
+ */
+export const buildTaskSatelliteMatchKeys = (items: TaskResourceItem[]): Set<string> => {
+  const keys = new Set<string>()
+  for (const item of items) {
+    const resourceId = item.resourceId?.trim()
+    const code = item.code?.trim()
+    const name = item.name?.trim()
+    if (resourceId) keys.add(resourceId)
+    if (code) keys.add(code)
+    if (name) keys.add(name)
+  }
+  return keys
+}
+
+/**
+ * 判断树叶子是否匹配任务挂载项之一。
+ *
+ * @param leaf API 卫星叶子
+ * @param matchKeys 匹配键集合
+ */
+const satelliteLeafMatchesTaskKeys = (
+  leaf: SatelliteTreeSatelliteLeaf,
+  matchKeys: Set<string>,
+): boolean => {
+  if (!matchKeys.size) return false
+  const candidates = [
+    leaf.resourceId,
+    leaf.id,
+    leaf.code,
+    leaf.name,
+    leaf.norad,
+    leaf.noradId,
+  ]
+    .map((item) => (item == null ? '' : String(item).trim()))
+    .filter(Boolean)
+  return candidates.some((key) => matchKeys.has(key))
+}
+
+/**
+ * 按任务已选卫星裁剪资源树，仅保留仍挂载在任务中的卫星路径。
+ *
+ * @param roots 全量国家根节点
+ * @param taskSatellites 任务 `satellites`
+ */
+export const pruneSatelliteResourceTreeByTaskSatellites = (
+  roots: SatelliteTreeCountryNode[],
+  taskSatellites: TaskResourceItem[],
+): SatelliteTreeCountryNode[] => {
+  const matchKeys = buildTaskSatelliteMatchKeys(taskSatellites)
+  if (!matchKeys.size) return []
+
+  const pruned: SatelliteTreeCountryNode[] = []
+  for (const countryNode of roots) {
+    const country = countryNode.country?.trim() || '未知国家'
+    const systems: SatelliteTreeCountryNode['systems'] = []
+
+    for (const systemNode of countryNode.systems ?? []) {
+      const system = systemNode.system?.trim() || '--'
+      const seriesList: SatelliteTreeSystemNode['series'] = []
+
+      for (const seriesNode of systemNode.series ?? []) {
+        const series = seriesNode.series?.trim()
+        if (!series) continue
+        const satellites = (seriesNode.satellites ?? []).filter((leaf) =>
+          satelliteLeafMatchesTaskKeys(leaf, matchKeys),
+        )
+        if (!satellites.length) continue
+        seriesList.push({ series, satellites })
+      }
+
+      if (!seriesList.length) continue
+      systems.push({ system, series: seriesList })
+    }
+
+    if (!systems.length) continue
+    pruned.push({ country, systems })
+  }
+  return pruned
 }

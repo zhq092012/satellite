@@ -9,15 +9,15 @@ import {
 import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
 import type { TaskForm, TaskResourceItem } from '@/types/task/task'
 
-/** 新建任务默认红方国家 */
-export const DEFAULT_TASK_OWN_COUNTRIES = ['中国'] as const
+/** 新建任务默认作战对象（与默认作战阶段一致） */
+export const DEFAULT_TASK_COMBAT_COUNTRY = '美国'
 
 /**
- * 将任务国家字段规范为字符串数组（接口契约为数组；兼容历史逗号分隔字符串）。
+ * 将国家输入规范为字符串数组（兼容逗号/顿号分隔字符串与历史数组字段）。
  *
- * @param value 接口返回或前端残留的国家字段
+ * @param value `country` 或历史接口残留
  */
-export const normalizeTaskCountryList = (value: unknown): string[] => {
+export const parseTaskCombatCountries = (value: unknown): string[] => {
   if (Array.isArray(value)) {
     return [...new Set(value.map((item) => String(item).trim()).filter(Boolean))]
   }
@@ -26,6 +26,14 @@ export const normalizeTaskCountryList = (value: unknown): string[] => {
   }
   return []
 }
+
+/**
+ * 将作战对象国家列表写入任务 `country` 字段。
+ *
+ * @param countries 国家列表
+ */
+export const formatTaskCountryField = (countries: string[]): string =>
+  parseTaskCombatCountries(countries).join(',')
 
 /**
  * 将作战预期情形规范为字符串数组。
@@ -73,16 +81,49 @@ export const resolveSeriesNamesFromTaskSatellites = (items: TaskResourceItem[] |
   [...new Set((items ?? []).map((item) => (item.code || item.name || item.resourceId).trim()).filter(Boolean))]
 
 /**
- * 从任务解析蓝方国家列表。
+ * 从任务解析作战对象国家列表（由 `country` 拆分）。
  *
  * @param task 任务
  */
-export const resolveEnemyCountriesFromTask = (task: TaskForm | null | undefined): string[] =>
-  normalizeTaskCountryList(task?.enemyCountry)
+export const resolveCombatCountriesFromTask = (task: TaskForm | null | undefined): string[] =>
+  parseTaskCombatCountries(task?.country)
+
+/** @deprecated 使用 {@link resolveCombatCountriesFromTask} */
+export const resolveEnemyCountriesFromTask = resolveCombatCountriesFromTask
+
+/** @deprecated 使用 {@link parseTaskCombatCountries} */
+export const normalizeTaskCountryList = parseTaskCombatCountries
 
 /**
- * C2 / 系列筛选用卫星类型（接口无该字段时默认四分类全选）。
+ * 从任务实体（含历史 `enemyCountry` 数组响应）解析 `country` 字符串。
+ *
+ * @param raw 接口任务对象
  */
+export const resolveTaskCountryFieldFromEntity = (raw: TaskForm | (TaskForm & { enemyCountry?: unknown })): string => {
+  const direct = typeof raw.country === 'string' ? raw.country.trim() : ''
+  if (direct) return direct
+  const legacyEnemy = parseTaskCombatCountries(
+    (raw as { enemyCountry?: unknown }).enemyCountry,
+  )
+  if (legacyEnemy.length) return formatTaskCountryField(legacyEnemy)
+  return ''
+}
+
+/**
+ * 规范化战场任务列表接口数据（`country`、预期子项等）。
+ *
+ * @param list `/battle-task/list` 返回的 `data`
+ */
+export const normalizeTaskListFromApi = (list: TaskForm[] | null | undefined): TaskForm[] => {
+  if (!Array.isArray(list)) return []
+  return list.map((item) => ({
+    ...item,
+    country: resolveTaskCountryFieldFromEntity(item),
+    expectationCases: normalizeTaskExpectationCases(item.expectationCases),
+  }))
+}
+
+/** C2 / 系列筛选用卫星类型（接口无该字段时默认四分类全选）。 */
 export const DEFAULT_TASK_CATALOG_TARGET_TYPES = [...MISSION_SYS_TYPES] as string[]
 
 /**
@@ -90,15 +131,10 @@ export const DEFAULT_TASK_CATALOG_TARGET_TYPES = [...MISSION_SYS_TYPES] as strin
  *
  * @param selection 作战场景选择
  * @param target 任务对象子集
- * @param ownCountries 红方国家
  */
 export const applyCombatScenarioSelectionToTaskFields = (
   selection: CombatScenarioSelection,
-  target: Pick<
-    TaskForm,
-    'taskSource' | 'background' | 'expectation' | 'expectationCases' | 'ownCountry' | 'enemyCountry'
-  >,
-  ownCountries: string[] = [...DEFAULT_TASK_OWN_COUNTRIES],
+  target: Pick<TaskForm, 'taskSource' | 'background' | 'expectation' | 'expectationCases' | 'country'>,
 ): void => {
   target.taskSource =
     COMMAND_SOURCE_OPTIONS.find((item) => item.id === selection.commandSourceId)?.label ?? ''
@@ -111,8 +147,7 @@ export const applyCombatScenarioSelectionToTaskFields = (
       ?.children.find((item) => item.id === selection.expectationSecondaryId)?.label ?? ''
   target.expectationCases = secondary ? [secondary] : []
   const phase = COMBAT_PHASE_OPTIONS.find((item) => item.id === selection.combatPhaseId)
-  target.ownCountry = [...ownCountries]
-  target.enemyCountry = phase ? [...phase.enemyCountries] : []
+  target.country = phase?.enemyCountries.length ? formatTaskCountryField(phase.enemyCountries) : ''
 }
 
 /**
@@ -138,14 +173,21 @@ export const resolveCombatScenarioSelectionFromTask = (task: TaskForm): CombatSc
   const secondaryLabel = expectationCases[0] ?? ''
   const expectationSecondaryId =
     primary?.children.find((item) => item.label === secondaryLabel)?.id ?? primary?.children[0]?.id ?? ''
-  const enemyCountries = normalizeTaskCountryList(task.enemyCountry)
-  const enemyKey = enemyCountries.join('|')
+  const combatCountries = parseTaskCombatCountries(resolveTaskCountryFieldFromEntity(task))
+  const combatKey = combatCountries.join('|')
+  const exactPhase = COMBAT_PHASE_OPTIONS.find((item) => item.enemyCountries.join('|') === combatKey)
+  const partialPhase =
+    combatCountries.length === 1
+      ? COMBAT_PHASE_OPTIONS.find((item) => item.enemyCountries.join('|') === combatCountries[0])
+      : undefined
   const combatPhaseId =
-    COMBAT_PHASE_OPTIONS.find(
-      (item) =>
-        item.enemyCountries.join('|') === enemyKey ||
-        enemyCountries.some((c) => item.enemyCountries.includes(c)),
-    )?.id ?? COMBAT_PHASE_OPTIONS[0]?.id ?? ''
+    exactPhase?.id ??
+    partialPhase?.id ??
+    COMBAT_PHASE_OPTIONS.find((item) =>
+      combatCountries.every((c) => item.enemyCountries.includes(c)),
+    )?.id ??
+    COMBAT_PHASE_OPTIONS[0]?.id ??
+    ''
   return {
     backgroundId,
     commandSourceId,
@@ -160,11 +202,11 @@ export const resolveCombatScenarioSelectionFromTask = (task: TaskForm): CombatSc
  *
  * @param task 任务
  */
-export const buildStrikePlanDisplayNameFromTask = (task: Pick<TaskForm, 'enemyCountry' | 'expectation'>): string => {
-  const enemyCountries = normalizeTaskCountryList(task.enemyCountry)
+export const buildStrikePlanDisplayNameFromTask = (task: Pick<TaskForm, 'country' | 'expectation'>): string => {
+  const combatCountries = parseTaskCombatCountries(task.country)
   const phase =
     COMBAT_PHASE_OPTIONS.find((item) =>
-      item.enemyCountries.some((country) => enemyCountries.includes(country)),
+      item.enemyCountries.some((country) => combatCountries.includes(country)),
     )?.label ?? ''
   const expectation = task.expectation?.trim() ?? ''
   if (!phase && !expectation) return '--'

@@ -22,29 +22,28 @@
         </el-form-item>
         <div class="toolbar-actions">
           <el-button type="primary" plain @click="openCreateDialog">新增武器</el-button>
-          <el-button @click="loadWeapons" :loading="loading">刷新</el-button>
         </div>
       </el-form>
     </section>
 
     <section class="panel-card table-card">
       <div class="table-fill">
-      <el-table :data="displayWeapons" v-loading="loading" stripe border height="100%">
-        <el-table-column prop="name" label="武器名称" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="country" label="所属国家/地区" min-width="160" />
-        <el-table-column prop="type" label="武器类型" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="satellite_type" label="适用卫星类型" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="longitude" label="经度" width="110" />
-        <el-table-column prop="latitude" label="纬度" width="110" />
-        <el-table-column prop="range" label="打击高度(km)" width="130" />
-        <el-table-column prop="interval" label="打击间隔(分钟)" width="130" />
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="scope">
-            <el-button link type="primary" @click="openEditDialog(scope.row)">编辑</el-button>
-            <el-button link type="danger" @click="handleDelete(scope.row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        <el-table :data="displayWeapons" v-loading="loading" stripe border height="100%">
+          <el-table-column prop="name" label="武器名称" min-width="180" show-overflow-tooltip />
+          <el-table-column prop="country" label="所属国家/地区" min-width="160" />
+          <el-table-column prop="type" label="武器类型" min-width="150" show-overflow-tooltip />
+          <el-table-column prop="satellite_type" label="适用卫星类型" min-width="160" show-overflow-tooltip />
+          <el-table-column prop="longitude" label="经度" width="110" />
+          <el-table-column prop="latitude" label="纬度" width="110" />
+          <el-table-column prop="range" label="打击高度(km)" width="130" />
+          <el-table-column prop="interval" label="打击间隔(分钟)" width="130" />
+          <el-table-column label="操作" width="200" fixed="right">
+            <template #default="scope">
+              <el-button link type="primary" @click="openEditDialog(scope.row)">编辑</el-button>
+              <el-button link type="danger" @click="handleDelete(scope.row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
 
       <div class="pager">
@@ -112,9 +111,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { createWeapon, deleteWeapon, getAllWeapons, getBattleCountrys, updateWeapon } from '@/api/dashboard'
+import { createWeapon, deleteWeapon, updateWeapon } from '@/api/dashboard'
 import type { Weapon } from '@/types/dashboard'
 
 const loading = ref(false)
@@ -231,28 +230,6 @@ const displayWeapons = computed(() => {
  */
 const dialogTitle = computed(() => (form.id ? '编辑武器' : '新增武器'))
 
-async function loadCountries() {
-  try {
-    const res = await getBattleCountrys()
-    if (res.code === 200) {
-      countries.value = res.data ?? []
-    }
-  } catch {
-    countries.value = []
-  }
-}
-
-async function loadWeapons() {
-  loading.value = true
-  try {
-    const res = await getAllWeapons()
-    weapons.value = res.code === 200 ? (res.data?.weapons ?? []) : []
-    page.current = 1
-  } finally {
-    loading.value = false
-  }
-}
-
 function handleSearch() {
   page.current = 1
 }
@@ -308,7 +285,6 @@ async function submitForm() {
       if (response.code === 200) {
         ElMessage.success(`${dialogTitle.value}成功`)
         dialogVisible.value = false
-        await loadWeapons()
       }
     } finally {
       saving.value = false
@@ -321,13 +297,10 @@ async function handleDelete(row: Weapon) {
   const response = await deleteWeapon(row.id!)
   if (response.code === 200) {
     ElMessage.success('删除成功')
-    await loadWeapons()
+
   }
 }
 
-onMounted(async () => {
-  await Promise.all([loadWeapons(), loadCountries()])
-})
 </script>
 
 <style scoped lang="scss">

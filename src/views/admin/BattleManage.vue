@@ -55,14 +55,9 @@
                   <span>{{ scope.row.beginDate || '--' }} ~ {{ scope.row.endDate || '--' }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="红方" width="120" show-overflow-tooltip>
+              <el-table-column label="作战对象" min-width="140" show-overflow-tooltip>
                 <template #default="scope">
-                  {{ (scope.row.ownCountry || []).join('、') || '--' }}
-                </template>
-              </el-table-column>
-              <el-table-column label="蓝方" width="120" show-overflow-tooltip>
-                <template #default="scope">
-                  {{ (scope.row.enemyCountry || []).join('、') || '--' }}
+                  {{ formatBattleTaskCountryDisplay(scope.row) }}
                 </template>
               </el-table-column>
               <!-- <el-table-column label="关注状态" width="100" align="center">
@@ -136,6 +131,18 @@ import type { BattleForm, BattleUpsertPayload } from '@/types/battle/battle'
 import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 import type { TaskForm } from '@/types/task/task'
+import { isSameBattleId, normalizeBattleId } from '@/utils/battleEntity'
+import {
+  normalizeTaskListFromApi,
+  parseTaskCombatCountries,
+  resolveTaskCountryFieldFromEntity,
+} from '@/utils/taskEntity'
+
+/** 场景管理任务列表：作战对象展示文案 */
+const formatBattleTaskCountryDisplay = (task: TaskForm): string => {
+  const countries = parseTaskCombatCountries(resolveTaskCountryFieldFromEntity(task))
+  return countries.length ? countries.join('、') : '--'
+}
 
 /** Store 状态对象 */
 const store = useLayoutStore()
@@ -145,7 +152,7 @@ const battleFormRef = ref<FormInstance>()
 
 /** 场景列表及卡片展开控制响应式变量 */
 const battleList = ref<BattleForm[]>([])
-const activeNames = ref<number[]>([])
+const activeNames = ref<string[]>([])
 
 /** 弹窗状态及标题 */
 const battleDialogTitle = ref('新建场景')
@@ -177,21 +184,24 @@ const {
  * 判断指定战场 ID 的卡片是否展开
  * @param id 战场 ID
  */
-const isBattleExpanded = (id?: number) => {
-  return id !== undefined && activeNames.value.includes(id)
+const isBattleExpanded = (id?: string | number) => {
+  if (id === undefined) return false
+  return activeNames.value.some((activeId) => isSameBattleId(activeId, id))
 }
 
 /**
  * 切换指定战场 ID 的卡片展开状态
  * @param id 战场 ID
  */
-const toggleBattleExpand = (id?: number) => {
+const toggleBattleExpand = (id?: string | number) => {
   if (id === undefined) return
-  const index = activeNames.value.indexOf(id)
+  const normalizedId = normalizeBattleId(id)
+  if (!normalizedId) return
+  const index = activeNames.value.findIndex((activeId) => isSameBattleId(activeId, normalizedId))
   if (index > -1) {
     activeNames.value.splice(index, 1)
   } else {
-    activeNames.value.push(id)
+    activeNames.value.push(normalizedId)
   }
 }
 
@@ -205,12 +215,13 @@ watch(
   () => {
     if (activeNames.value.length) {
       activeNames.value.forEach(async (battleId) => {
-        const res = await getTaskList(Number(battleId))
+        const res = await getTaskList(battleId)
         if (res.code === 200) {
-          await resumeTaskProgressPollingForTasks(res.data)
-          const battle = battleList.value.find((s) => s.id === Number(battleId))
+          const tasks = normalizeTaskListFromApi(res.data)
+          await resumeTaskProgressPollingForTasks(tasks)
+          const battle = battleList.value.find((s) => isSameBattleId(s.id, battleId))
           if (battle) {
-            battle.tasks = res.data
+            battle.tasks = tasks
           }
         }
       })
@@ -227,10 +238,11 @@ watch(
 const refreshBattleTasks = async (battleId: string | number) => {
   const res = await getTaskList(battleId)
   if (res.code !== 200) return
-  await resumeTaskProgressPollingForTasks(res.data)
-  const battle = battleList.value.find((item) => item.id === battleId)
+  const tasks = normalizeTaskListFromApi(res.data)
+  await resumeTaskProgressPollingForTasks(tasks)
+  const battle = battleList.value.find((item) => isSameBattleId(item.id, battleId))
   if (battle) {
-    battle.tasks = res.data
+    battle.tasks = tasks
   }
 }
 
@@ -238,7 +250,9 @@ const refreshBattleTasks = async (battleId: string | number) => {
  * 重新拉取当前已展开场景的任务列表。
  */
 const refreshExpandedTaskLists = async () => {
-  const battleIds = activeNames.value.filter((id) => battleList.value.some((battle) => battle.id === id))
+  const battleIds = activeNames.value.filter((id) =>
+    battleList.value.some((battle) => isSameBattleId(battle.id, id)),
+  )
   await Promise.all(battleIds.map((battleId) => refreshBattleTasks(battleId)))
 }
 
@@ -248,9 +262,12 @@ const loadBattleList = async () => {
   if (res.code === 200) {
     battleList.value = res.data || []
     if (battleList.value.length > 0 && activeNames.value.length === 0) {
-      nextTick(() => {
-        activeNames.value = [battleList.value[0].id ?? 0]
-      })
+      const firstId = battleList.value[0].id
+      if (firstId != null) {
+        const normalizedFirstId = normalizeBattleId(firstId)
+        activeNames.value = [normalizedFirstId]
+        await refreshBattleTasks(normalizedFirstId)
+      }
       return
     }
     await refreshExpandedTaskLists()
@@ -276,7 +293,7 @@ const handleEditBattle = (battle: BattleForm) => {
 }
 
 /** 删除战场 */
-const handleDeleteBattle = (battleId?: number) => {
+const handleDeleteBattle = (battleId?: string | number) => {
   if (!battleId) return
   ElMessageBox.confirm('确定要删除该战场及其下属任务吗？', '提示', {
     confirmButtonText: '确定',
@@ -361,9 +378,9 @@ const handleTaskSaved = async (updated: TaskForm) => {
     return
   }
 
-  const normalizedBattleId = Number(battleId)
-  if (Number.isFinite(normalizedBattleId)) {
-    if (!activeNames.value.includes(normalizedBattleId)) {
+  const normalizedBattleId = normalizeBattleId(battleId)
+  if (normalizedBattleId) {
+    if (!activeNames.value.some((id) => isSameBattleId(id, normalizedBattleId))) {
       activeNames.value.push(normalizedBattleId)
     }
     await refreshBattleTasks(normalizedBattleId)

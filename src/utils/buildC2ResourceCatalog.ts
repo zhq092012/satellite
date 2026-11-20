@@ -1,7 +1,7 @@
 
 import { normalizeSatelliteUsageLabel, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
 import type { LevelSeriesEntity, SatelliteAnalysisData } from '@/types/task/task'
-import type { SatelliteSeriesData } from '@/types/satellite/satellite'
+import type { SatelliteSeriesData, SatelliteTreeCountryNode, SatelliteTreeSatelliteLeaf } from '@/types/satellite/satellite'
 
 /** C2 左侧面板资源树固定展示的国家/地区（与作战对象三项一致） */
 export const C2_PANEL_TREE_COUNTRIES: readonly string[] = TASK_ENEMY_COUNTRY_OPTIONS
@@ -16,9 +16,13 @@ export type C2ResourceTreeNodeKind =
   | 'usage'
   /** 卫星系列。树展示到这一层，不展示 NORAD。 */
   | 'series'
+  /** 资源树体系节点（国家 → 体系 → 系列 → 卫星） */
+  | 'system'
+  /** 资源树卫星叶子 */
+  | 'satellite'
 
 /**
- * C2 资源树节点（el-tree；界面展示至系列层，不在树中展示 NORAD 叶子）。
+ * C2 资源树节点（el-tree；系列预览模式到系列层；任务资源模式展示至卫星叶子）。
  */
 export interface C2ResourceTreeNode {
   /** 节点唯一键 */
@@ -29,6 +33,8 @@ export interface C2ResourceTreeNode {
   kind: C2ResourceTreeNodeKind
   /** 系列名（仅 kind=series 时有值） */
   seriesName?: string
+  /** 资源主键（kind=satellite 时与任务 satellites.resourceId 对应） */
+  resourceId?: string
   /** 子节点 */
   children?: C2ResourceTreeNode[]
 }
@@ -51,6 +57,8 @@ export interface C2ResourceSatelliteRow {
   usage: string
   /** 系列名 */
   series: string
+  /** 资源主键（任务资源树模式） */
+  resourceId?: string
   /** catalog 卫星类型 / InitMatrix.satType */
   sat_type: string
   /** 国际编号；catalog 未接入时为 `--` */
@@ -351,11 +359,19 @@ export function expandCheckedKeysToSeriesNames(
     const countryId = `country|${encodePart(row.country)}`
     const sysTypeId = `sysType|${encodePart(row.country)}|${encodePart(row.sysType)}`
     const usageId = `usage|${encodePart(row.country)}|${encodePart(row.sysType)}|${encodePart(row.usage)}`
+    const taskSeriesId = buildC2TaskSeriesNodeId(row.country, row.sysType, row.series)
+    const taskSystemId = buildC2TaskSystemNodeId(row.country, row.sysType)
+    const taskSatelliteId = row.resourceId
+      ? buildC2TaskSatelliteNodeId(row.country, row.sysType, row.series, row.resourceId)
+      : ''
     if (
       checked.has(seriesId) ||
       checked.has(usageId) ||
       checked.has(sysTypeId) ||
-      checked.has(countryId)
+      checked.has(countryId) ||
+      checked.has(taskSeriesId) ||
+      checked.has(taskSystemId) ||
+      (taskSatelliteId && checked.has(taskSatelliteId))
     ) {
       seriesNames.add(row.series)
     }
@@ -374,9 +390,183 @@ export function filterC2SatellitesByTreeSelection(
   checkedKeys: string[],
 ): C2ResourceSatelliteRow[] {
   if (!checkedKeys.length) return []
+  const checked = new Set(checkedKeys)
   const seriesSet = expandCheckedKeysToSeriesNames(checkedKeys, rows)
-  if (!seriesSet.size) return []
-  return rows.filter((row) => seriesSet.has(row.series))
+  return rows.filter((row) => {
+    if (seriesSet.has(row.series)) return true
+    if (!row.resourceId) return false
+    const satNodeId = buildC2TaskSatelliteNodeId(row.country, row.sysType, row.series, row.resourceId)
+    if (checked.has(satNodeId)) return true
+    const seriesNodeId = buildC2TaskSeriesNodeId(row.country, row.sysType, row.series)
+    const systemNodeId = buildC2TaskSystemNodeId(row.country, row.sysType)
+    const countryNodeId = `country|${encodePart(row.country)}`
+    if (
+      checked.has(seriesNodeId) ||
+      checked.has(systemNodeId) ||
+      checked.has(countryNodeId)
+    ) {
+      return true
+    }
+    return false
+  })
+}
+
+/**
+ * 解析资源树叶子 NORAD。
+ *
+ * @param leaf API 卫星叶子
+ */
+const parseNoradFromTreeLeaf = (leaf: SatelliteTreeSatelliteLeaf): number | null => {
+  const raw = leaf.noradId ?? leaf.norad ?? ''
+  const trimmed = String(raw).trim()
+  if (!trimmed) return null
+  const num = Number(trimmed)
+  return Number.isFinite(num) ? num : null
+}
+
+/**
+ * 由裁剪后的资源树生成 C2 扁平行。
+ *
+ * @param roots 裁剪后的国家根节点
+ */
+export function buildC2FlatRowsFromSatelliteResourceTree(
+  roots: SatelliteTreeCountryNode[],
+): C2ResourceSatelliteRow[] {
+  const rows: C2ResourceSatelliteRow[] = []
+  roots.forEach((countryNode) => {
+    const country = countryNode.country?.trim() || C2_RESOURCE_EMPTY_FIELD
+    countryNode.systems?.forEach((systemNode) => {
+      const sysType = systemNode.system?.trim() || '未分类'
+      systemNode.series?.forEach((seriesNode) => {
+        const series = seriesNode.series?.trim() || C2_RESOURCE_EMPTY_FIELD
+        seriesNode.satellites?.forEach((leaf) => {
+          const norad = parseNoradFromTreeLeaf(leaf)
+          if (norad == null) return
+          const resourceId = String(leaf.resourceId ?? leaf.id ?? norad).trim()
+          const name = leaf.name?.trim() || resourceId
+          rows.push({
+            rowKey: buildC2ResourceRowKey(series, sysType, norad),
+            norad,
+            name,
+            country,
+            sysType,
+            usage: C2_RESOURCE_EMPTY_FIELD,
+            series,
+            resourceId,
+            sat_type: C2_RESOURCE_EMPTY_FIELD,
+            int_id: C2_RESOURCE_EMPTY_FIELD,
+            launch_date: C2_RESOURCE_EMPTY_FIELD,
+          })
+        })
+      })
+    })
+  })
+  return dedupeC2ResourceRows(rows)
+}
+
+/** 任务资源树：体系节点 ID */
+export function buildC2TaskSystemNodeId(country: string, system: string): string {
+  return `task-system|${encodePart(country)}|${encodePart(system)}`
+}
+
+/** 任务资源树：系列节点 ID */
+export function buildC2TaskSeriesNodeId(country: string, system: string, series: string): string {
+  return `task-series|${encodePart(country)}|${encodePart(system)}|${encodePart(series)}`
+}
+
+/** 任务资源树：卫星叶子节点 ID */
+export function buildC2TaskSatelliteNodeId(
+  country: string,
+  system: string,
+  series: string,
+  resourceId: string,
+): string {
+  return `task-satellite|${encodePart(country)}|${encodePart(system)}|${encodePart(series)}|${encodePart(resourceId)}`
+}
+
+/**
+ * 由裁剪后的资源树构建 C2 左树（国家 → 体系 → 系列 → 卫星）。
+ *
+ * @param roots 裁剪后的国家根节点
+ * @param priorityCountry 国家排序优先项
+ */
+export function buildC2ResourceTreeFromSatelliteResourceTree(
+  roots: SatelliteTreeCountryNode[],
+  priorityCountry?: string | null,
+): C2ResourceTreeNode[] {
+  const built: C2ResourceTreeNode[] = roots.map((countryNode) => {
+    const country = countryNode.country?.trim() || '未知国家'
+    const systemChildren: C2ResourceTreeNode[] = (countryNode.systems ?? []).map((systemNode) => {
+      const system = systemNode.system?.trim() || '--'
+      const seriesChildren: C2ResourceTreeNode[] = (systemNode.series ?? []).map((seriesNode) => {
+        const series = seriesNode.series?.trim() || '--'
+        const satelliteChildren: C2ResourceTreeNode[] = (seriesNode.satellites ?? [])
+          .map((leaf) => {
+            const norad = parseNoradFromTreeLeaf(leaf)
+            if (norad == null) return null
+            const resourceId = String(leaf.resourceId ?? leaf.id ?? norad).trim()
+            const label = leaf.name?.trim() || resourceId
+            return {
+              id: buildC2TaskSatelliteNodeId(country, system, series, resourceId),
+              label,
+              kind: 'satellite' as const,
+              seriesName: series,
+              resourceId,
+            }
+          })
+          .filter(Boolean) as C2ResourceTreeNode[]
+        return {
+          id: buildC2TaskSeriesNodeId(country, system, series),
+          label: series,
+          kind: 'series' as const,
+          seriesName: series,
+          children: satelliteChildren.length ? satelliteChildren : undefined,
+        }
+      })
+      return {
+        id: buildC2TaskSystemNodeId(country, system),
+        label: system,
+        kind: 'system' as const,
+        children: seriesChildren.length ? seriesChildren : undefined,
+      }
+    })
+    return {
+      id: `country|${encodePart(country)}`,
+      label: country,
+      kind: 'country' as const,
+      children: systemChildren.length ? systemChildren : undefined,
+    }
+  })
+
+  const byLabel = new Map(built.map((node) => [node.label, node]))
+  const countryOrder = orderC2PanelTreeCountries(priorityCountry ?? null)
+  return countryOrder.map((country) => {
+    const existing = byLabel.get(country)
+    if (existing) return existing
+    return {
+      id: `country|${encodePart(country)}`,
+      label: country,
+      kind: 'country' as const,
+      children: [],
+    }
+  })
+}
+
+/**
+ * 收集任务资源树全部卫星叶子节点 ID（用于回显勾选）。
+ *
+ * @param nodes 树根
+ */
+export function collectC2TaskSatelliteTreeLeafIds(nodes: C2ResourceTreeNode[]): string[] {
+  const ids: string[] = []
+  const walk = (list: C2ResourceTreeNode[]) => {
+    list.forEach((node) => {
+      if (node.kind === 'satellite') ids.push(node.id)
+      if (node.children?.length) walk(node.children)
+    })
+  }
+  walk(nodes)
+  return ids
 }
 
 /**
