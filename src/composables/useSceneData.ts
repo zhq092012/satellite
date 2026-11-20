@@ -20,7 +20,7 @@ import {
 import { useLayoutStore } from '@/store/modules/layout'
 import type { BlueSatelliteRecord } from '@/types/strike'
 import type { Weapon } from '@/types/dashboard'
-import type { SatelliteDetail, SatelliteTle, StepSatellite } from '@/types/cesium/satellite'
+import type { SatelliteDetail, SatelliteTle, StepSatellite } from '@/types/satellite/satellite'
 
 export function useSceneData() {
   const store = useLayoutStore()

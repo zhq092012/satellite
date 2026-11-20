@@ -1,9 +1,3 @@
-/** getSatelliteSeries 接口 data：按任务系统类型分组的系列名列表 */
-export interface SatelliteSeriesData {
-    侦察: string[]
-    通信: string[]
-}
-
 /** 任务装配资源项（卫星系列 + 地面站/数据中心 ID） */
 export interface TaskResourceItem {
     /** 卫星系列名称 */

@@ -4,6 +4,7 @@
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
         <el-tab-pane label="场景管理" name="battles" />
         <el-tab-pane label="卫星管理" name="satellites" />
+        <el-tab-pane label="TLE 数据" name="tle" />
         <el-tab-pane label="地面站管理" name="groundStations" />
        
         <el-tab-pane label="武器管理" name="weapons" />
@@ -29,6 +30,7 @@ const router = useRouter()
 const tabNameMap: Record<string, string> = {
   BattleManage: 'battles',
   SatelliteManage: 'satellites',
+  TleManage: 'tle',
   GroundStationManage: 'groundStations',
   WeaponManage: 'weapons',
 }
@@ -53,6 +55,8 @@ const handleTabChange = (tabName: string) => {
     router.push({ name: 'BattleManage' })
   } else if (tabName === 'satellites') {
     router.push({ name: 'SatelliteManage' })
+  } else if (tabName === 'tle') {
+    router.push({ name: 'TleManage' })
   } else if (tabName === 'groundStations') {
     router.push({ name: 'GroundStationManage' })
   } else if (tabName === 'weapons') {

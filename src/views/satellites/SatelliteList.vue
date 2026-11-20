@@ -2,58 +2,41 @@
   <div class="container">
     <section class="panel-card toolbar-card">
       <el-form :inline="true" :model="queryForm" class="toolbar" @submit.prevent>
-        <el-form-item label="NORAD">
-          <el-input v-model="queryForm.norad" clearable placeholder="请输入 NORAD" style="width: 160px" />
+        <el-form-item label="查询方式">
+          <el-radio-group v-model="queryMode" @change="handleQueryModeChange">
+            <el-radio-button value="keyword">关键字</el-radio-button>
+            <el-radio-button value="filter">国家/体系/系列</el-radio-button>
+          </el-radio-group>
         </el-form-item>
-        <el-form-item label="卫星名称">
-          <el-input v-model="queryForm.name_en" clearable placeholder="请输入英文名称" style="width: 180px" />
+        <el-form-item v-if="queryMode === 'keyword'" label="关键字">
+          <el-input v-model="queryForm.keyword" clearable placeholder="NORAD / 代号 / 名称" class="keyword-input" />
         </el-form-item>
-        <el-form-item label="国家/地区">
-          <el-select v-model="queryForm.country" clearable filterable placeholder="全部" style="width: 160px">
-            <el-option v-for="item in countries" :key="item" :label="item" :value="item" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="卫星类型">
-          <el-select v-model="queryForm.sat_type" clearable filterable placeholder="载荷/平台类型" style="width: 160px">
-            <el-option v-for="item in satTypes" :key="item" :label="item" :value="item" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="任务系统类型">
-          <el-select v-model="queryForm.mission_sys_type" clearable placeholder="全部" style="width: 140px"
-            :disabled="!catalogExtendedFieldsAvailable">
-            <el-option v-for="item in missionSysTypeOptions" :key="item" :label="item" :value="item" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="卫星系列">
-          <el-input v-model="queryForm.series_name" clearable placeholder="系列名称" style="width: 140px"
-            :disabled="!catalogExtendedFieldsAvailable" />
-        </el-form-item>
-        <el-form-item label="卫星用途">
-          <el-select v-model="queryForm.usage" clearable placeholder="全部" style="width: 120px"
-            :disabled="!catalogExtendedFieldsAvailable">
-            <el-option v-for="item in usageTypeOptions" :key="item" :label="item" :value="item" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="轨道类型">
-          <el-select v-model="queryForm.orbit_type" clearable placeholder="全部" style="width: 140px">
-            <el-option v-for="item in orbitTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="轨道状态">
-          <el-select v-model="queryForm.orbit_status" clearable placeholder="全部" style="width: 140px">
-            <el-option v-for="item in orbitStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="载荷状态">
-          <el-select v-model="queryForm.payload_status" clearable placeholder="全部" style="width: 140px">
-            <el-option v-for="item in payloadStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
+        <template v-if="queryMode === 'filter'">
+          <el-form-item label="国家/地区">
+            <el-select v-model="queryForm.country" clearable filterable placeholder="全部" class="query-select"
+              @change="handleCountryChangeForSeries">
+              <el-option v-for="item in countryOptions" :key="item" :label="item" :value="item" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="卫星体系">
+            <el-select v-model="queryForm.system" clearable filterable placeholder="全部" class="query-select">
+              <el-option v-for="item in systemOptions" :key="item" :label="item" :value="item" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="卫星系列">
+            <el-select v-model="queryForm.series" clearable filterable placeholder="全部" class="query-select-series"
+              :loading="seriesLoading">
+              <el-option v-for="item in seriesOptions" :key="item" :label="item" :value="item" />
+            </el-select>
+          </el-form-item>
+        </template>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
         </el-form-item>
         <div class="toolbar-actions">
+          <el-button type="primary" plain @click="openCreateDialog">新增卫星</el-button>
+          <el-button @click="satelliteImportVisible = true">卫星批量导入</el-button>
           <el-button @click="loadSatellites" :loading="loading">刷新</el-button>
         </div>
       </el-form>
@@ -61,317 +44,369 @@
 
     <section class="panel-card table-card">
       <div class="table-fill">
-      <el-table :data="satellites" v-loading="loading" stripe border height="100%">
-        <el-table-column prop="norad" label="NORAD" width="110" />
-        <el-table-column prop="name_en" label="英文名称" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="name_cn" label="中文名称" min-width="140" show-overflow-tooltip />
-        <el-table-column prop="int_id" label="国际编号" width="130" show-overflow-tooltip />
-        <el-table-column prop="country" label="国家/地区" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="sat_type" label="载荷类型" min-width="120" show-overflow-tooltip />
-        <el-table-column label="任务系统类型" width="110" show-overflow-tooltip>
-          <template #default="scope">{{ formatMissionSysType(scope.row) }}</template>
-        </el-table-column>
-        <el-table-column label="卫星系列" width="120" show-overflow-tooltip>
-          <template #default="scope">{{ formatSeriesName(scope.row) }}</template>
-        </el-table-column>
-        <el-table-column label="卫星用途" width="100" show-overflow-tooltip>
-          <template #default="scope">{{ formatUsage(scope.row) }}</template>
-        </el-table-column>
-        <el-table-column label="轨道类型" width="110">
-          <template #default="scope">
-            {{ getOrbitType(Number(scope.row.orbit_type)) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="轨道状态" width="110">
-          <template #default="scope">
-            {{ getOrbitStatus(Number(scope.row.orbit_status)) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="载荷状态" width="110">
-          <template #default="scope">
-            {{ getPayloadStatus(Number(scope.row.payload_status)) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="launch_date" label="发射时间" width="130" show-overflow-tooltip />
-        <el-table-column label="操作" width="100" fixed="right">
-          <template #default="scope">
-            <el-button link type="primary" @click="handleViewDetail(scope.row)">详情</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        <el-table :data="pagedSatellites" v-loading="loading" stripe border height="100%">
+          <el-table-column prop="noradId" label="NORAD" width="110" />
+          <el-table-column prop="code" label="卫星代号" width="120" show-overflow-tooltip />
+          <el-table-column prop="nameEn" label="英文名称" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="nameCn" label="中文名称" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="intlDesignator" label="国际编号" width="120" show-overflow-tooltip />
+          <el-table-column prop="country" label="国家/地区" width="110" show-overflow-tooltip />
+          <el-table-column prop="system" label="卫星体系" width="100" show-overflow-tooltip />
+          <el-table-column prop="series" label="卫星系列" width="120" show-overflow-tooltip />
+          <el-table-column prop="usage" label="用途" width="90" show-overflow-tooltip />
+          <el-table-column prop="launchDate" label="发射时间" width="160" show-overflow-tooltip />
+          <!-- <el-table-column prop="updateTime" label="更新时间" width="160" show-overflow-tooltip /> -->
+          <el-table-column label="操作" width="180" fixed="right">
+            <template #default="scope">
+              <el-button link type="primary" @click="handleViewDetail(scope.row)">详情</el-button>
+              <el-button link type="primary" @click="openEditDialog(scope.row)">编辑</el-button>
+              <el-button link type="danger" @click="handleDelete(scope.row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
-      <p v-if="!catalogExtendedFieldsAvailable" class="catalog-field-hint">
-        卫星系列、用途、任务系统类型依赖 catalog 接口扩展；当前列表无对应字段时显示为 --，筛选不可用。
-      </p>
       <div class="pager">
-        <el-pagination
-          v-model:current-page="page.pageNum"
-          v-model:page-size="page.pageSize"
-          :total="totalElements"
-          @current-change="loadSatellites"
-          @size-change="loadSatellites"
-          layout="total, prev, pager, next, sizes"
-          :page-sizes="[10, 20, 50, 100]"
-        />
+        <el-pagination v-model:current-page="page.pageNum" v-model:page-size="page.pageSize" :total="totalElements"
+          layout="total, prev, pager, next, sizes" :page-sizes="[10, 20, 50, 100]" />
       </div>
     </section>
+
+    <SatelliteResourceImportDialog v-model:visible="satelliteImportVisible" @success="loadSatellites" />
+
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="720px" destroy-on-close append-to-body>
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="NORAD" prop="noradId">
+              <el-input v-model.trim="form.noradId" placeholder="关联 TLE" :disabled="Boolean(form.id)" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="卫星代号" prop="code">
+              <el-input v-model.trim="form.code" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="国际编号" prop="intlDesignator">
+              <el-input v-model.trim="form.intlDesignator" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="英文名称" prop="nameEn">
+              <el-input v-model.trim="form.nameEn" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="中文名称" prop="nameCn">
+              <el-input v-model.trim="form.nameCn" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="国家/地区" prop="country">
+              <el-select v-model="form.country" filterable class="full-width" @change="loadFormSeriesOptions">
+                <el-option v-for="item in countryOptions" :key="item" :label="item" :value="item" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="卫星体系" prop="system">
+              <el-select v-model="form.system" class="full-width">
+                <el-option v-for="item in systemOptions" :key="item" :label="item" :value="item" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="卫星系列" prop="series">
+              <el-select v-model="form.series" filterable allow-create class="full-width" :loading="formSeriesLoading">
+                <el-option v-for="item in formSeriesOptions" :key="item" :label="item" :value="item" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="用途" prop="usage">
+              <el-select v-model="form.usage" class="full-width">
+                <el-option v-for="item in usageOptions" :key="item" :label="item" :value="item" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="发射时间" prop="launchDate">
+              <el-input v-model.trim="form.launchDate" placeholder="yyyy-MM-dd" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="submitForm">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, computed } from 'vue'
-import { getBattleCountrys, getBattleSateTypes, getSatelliteList } from '@/api/dashboard'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import SatelliteResourceImportDialog from '@/components/satellite/SatelliteResourceImportDialog.vue'
+import {
+  createSatelliteResource,
+  deleteSatelliteResource,
+  getSatelliteResourceList,
+  fetchSatelliteSeriesNamesByCountry,
+  searchSatelliteResources,
+  updateSatelliteResource,
+} from '@/api/satellite/satellite'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
-import { getOrbitStatus, getOrbitType, getPayloadStatus } from '@/utils/tools/satellite'
-import type { Satellite } from '@/types/cesium/satellite'
-import { MISSION_SYS_TYPES, SATELLITE_USAGE_TYPES } from '@/constants/missionSatellite'
+import { SATELLITE_USAGE_TYPES, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
+import type { SatelliteResource, SatelliteResourceUpsertPayload } from '@/types/satellite/satellite'
+import { isResourceApiSuccess } from '@/utils/resourceApi'
+import { parseNoradIdNumber } from '@/utils/satelliteResource'
 
-/** 查询表单中轨道/载荷枚举选项。 */
-interface SatelliteEnumOption {
-  /** 下拉展示文案。 */
-  label: string
-  /** 对应接口枚举值。 */
-  value: number
-}
+type SatelliteFormModel = SatelliteResourceUpsertPayload
 
-/** 轨道类型筛选项，与 getOrbitType 枚举保持一致。 */
-const orbitTypeOptions: SatelliteEnumOption[] = [
-  { label: '未知', value: 0 },
-  { label: '低轨', value: 1 },
-  { label: '中轨', value: 2 },
-  { label: '高轨', value: 3 },
-  { label: '大椭圆', value: 4 },
-]
+/**
+ * 列表页查询方式：与 OpenAPI 两条接口一一对应。
+ * - keyword → GET /resource/satellite/list（仅 keyword）
+ * - filter → GET /resource/satellite/search（country / system / series）
+ */
+type SatelliteListQueryMode = 'keyword' | 'filter'
 
-/** 轨道状态筛选项，与 getOrbitStatus 枚举保持一致。 */
-const orbitStatusOptions: SatelliteEnumOption[] = [
-  { label: '未知', value: 0 },
-  { label: '在轨', value: 1 },
-  { label: '离轨', value: 2 },
-]
-
-/** 载荷状态筛选项，与 getPayloadStatus 枚举保持一致。 */
-const payloadStatusOptions: SatelliteEnumOption[] = [
-  { label: '未知', value: 0 },
-  { label: '堪用', value: 1 },
-  { label: '失效', value: 2 },
-]
+/** 卫星体系选项（与 OpenAPI 体系字段一致） */
+const systemOptions = ['侦察', '通信', '中继'] as const
 
 const { openSatelliteProfile } = useSatelliteProfileDialog()
 
-/** 列表加载状态。 */
+const satelliteImportVisible = ref(false)
 const loading = ref(false)
-/** 当前页卫星列表。 */
-const satellites = ref<Satellite[]>([])
-/** 国家/地区下拉数据。 */
-const countries = ref<string[]>([])
-/** 卫星类型下拉数据。 */
-const satTypes = ref<string[]>([])
-/** 分页总数。 */
-const totalElements = ref(0)
+const saving = ref(false)
+const seriesLoading = ref(false)
+const formSeriesLoading = ref(false)
+const satellites = ref<SatelliteResource[]>([])
+const seriesOptions = ref<string[]>([])
+const formSeriesOptions = ref<string[]>([])
+const dialogVisible = ref(false)
+const formRef = ref<FormInstance>()
 
-/**
- * 查询表头条件。空值表示不参与接口过滤。
- */
-const queryForm = reactive({
-  /** NORAD 编号，提交时转为数字。 */
-  norad: '',
-  /** 卫星英文名称。 */
-  name_en: '',
-  /** 国家/地区。 */
+const countryOptions = [...TASK_ENEMY_COUNTRY_OPTIONS]
+const usageOptions = [...SATELLITE_USAGE_TYPES]
+
+/** 当前查询方式，决定展示哪些表单项并调用 list 或 search。 */
+const queryMode = ref<SatelliteListQueryMode>('keyword')
+
+const queryForm = reactive<{
+  keyword: string
+  country: string
+  system: string
+  series: string
+}>({
+  keyword: '',
   country: '',
-  /** 卫星类型。 */
-  sat_type: '',
-  /** 轨道类型枚举。 */
-  orbit_type: undefined as number | undefined,
-  /** 轨道状态枚举。 */
-  orbit_status: undefined as number | undefined,
-  /** 载荷状态枚举。 */
-  payload_status: undefined as number | undefined,
-  /** 任务系统类型（catalog 扩展，仅前端筛选） */
-  mission_sys_type: '',
-  /** 系列名称（catalog 扩展，仅前端筛选） */
-  series_name: '',
-  /** 用途（catalog 扩展，仅前端筛选） */
-  usage: '',
+  system: '',
+  series: '',
 })
 
-const missionSysTypeOptions = [...MISSION_SYS_TYPES]
-const usageTypeOptions = [...SATELLITE_USAGE_TYPES]
+const page = reactive({ pageNum: 1, pageSize: 10 })
 
 /**
- * 计算：当前已加载卫星列表中是否存在 catalog 扩展字段数据。
- * 返回：任一卫星含非空 `series_name`、`usage` 或 `mission_sys_type` 时为 `true`。
- * 作用：控制扩展筛选项与列是否在列表页启用。
+ * 计算：当前页表格数据。
+ * 返回：在内存中对检索结果切片后的列表。
+ * 作用：服务端未分页时前端分页展示。
  */
-const catalogExtendedFieldsAvailable = computed(() =>
-  satellites.value.some(
-    (row) =>
-      Boolean(row.series_name?.trim()) ||
-      Boolean(row.usage?.trim()) ||
-      Boolean(row.mission_sys_type?.trim()),
-  ),
-)
-
-const EMPTY = '--'
-
-/**
- * 展示任务系统类型。
- *
- * @param row 卫星行
- */
-const formatMissionSysType = (row: Satellite): string => row.mission_sys_type?.trim() || EMPTY
-
-/**
- * 展示卫星系列名。
- *
- * @param row 卫星行
- */
-const formatSeriesName = (row: Satellite): string =>
-  row.series_name?.trim() || row.sat_series_id?.trim() || EMPTY
-
-/**
- * 展示卫星用途。
- *
- * @param row 卫星行
- */
-const formatUsage = (row: Satellite): string => row.usage?.trim() || EMPTY
-
-/** 分页参数。 */
-const page = reactive({
-  pageNum: 1,
-  pageSize: 10,
+const pagedSatellites = computed(() => {
+  const start = (page.pageNum - 1) * page.pageSize
+  return satellites.value.slice(start, start + page.pageSize)
 })
 
 /**
- * 将字符串查询值转换为接口可选参数。
- *
- * @param value 原始输入
- * @returns 非空字符串，空值时返回 undefined
+ * 计算：检索结果总数。
+ * 返回：卫星列表长度。
+ * 作用：分页组件 total。
  */
-const toOptionalString = (value: string): string | undefined => {
-  const trimmed = value.trim()
-  return trimmed ? trimmed : undefined
-}
+const totalElements = computed(() => satellites.value.length)
+
+const createEmptyForm = (): SatelliteFormModel => ({
+  noradId: '',
+  code: '',
+  intlDesignator: '',
+  nameEn: '',
+  nameCn: '',
+  country: '',
+  system: '侦察',
+  series: '',
+  usage: '军用',
+  launchDate: '',
+})
+
+const form = reactive<SatelliteFormModel>(createEmptyForm())
+
+const rules = reactive<FormRules<SatelliteFormModel>>({
+  noradId: { required: true, message: '请输入 NORAD', trigger: 'blur' },
+  country: { required: true, message: '请选择国家', trigger: 'change' },
+  system: { required: true, message: '请选择体系', trigger: 'change' },
+  series: { required: true, message: '请选择或输入系列', trigger: 'change' },
+})
 
 /**
- * 将 NORAD 输入转换为接口可选数字。
- *
- * @param value 原始输入
- * @returns 合法正整数，非法时返回 undefined
+ * 计算：卫星新增/编辑弹窗标题。
+ * 返回：有 `id` 时为「编辑卫星」，否则为「新增卫星」。
+ * 作用：弹窗标题区分新增与编辑。
  */
-const toOptionalNorad = (value: string): number | undefined => {
-  const trimmed = value.trim()
-  if (!trimmed) return undefined
-  const norad = Number(trimmed)
-  return Number.isFinite(norad) && norad > 0 ? norad : undefined
-}
+const dialogTitle = computed(() => (form.id ? '编辑卫星' : '新增卫星'))
 
-/**
- * 加载国家/地区筛选项。
- */
-async function loadCountries() {
+async function fetchSeriesNames(country: string): Promise<string[]> {
+  if (!country.trim()) return []
   try {
-    const res = await getBattleCountrys()
-    countries.value = res.code === 200 ? (res.data ?? []) : []
-  } catch {
-    countries.value = []
+    return await fetchSatelliteSeriesNamesByCountry(country)
+  } catch (error) {
+    console.error('按国家加载系列失败', country, error)
+    ElMessage.error(error instanceof Error ? error.message : '加载卫星系列失败')
+    return []
   }
 }
 
-/**
- * 加载卫星类型筛选项。
- */
-async function loadSatTypes() {
+async function handleCountryChangeForSeries() {
+  seriesLoading.value = true
   try {
-    const res = await getBattleSateTypes()
-    satTypes.value = res.code === 200 ? (res.data ?? []) : []
-  } catch {
-    satTypes.value = []
+    seriesOptions.value = await fetchSeriesNames(queryForm.country)
+    if (queryForm.series && !seriesOptions.value.includes(queryForm.series)) {
+      queryForm.series = ''
+    }
+  } finally {
+    seriesLoading.value = false
   }
 }
 
-/**
- * 对 catalog 扩展字段做前端筛选（接口未支持时仅过滤当前页）。
- *
- * @param rows 接口返回行
- */
-function applyClientCatalogFilters(rows: Satellite[]): Satellite[] {
-  const mission = queryForm.mission_sys_type.trim()
-  const series = queryForm.series_name.trim()
-  const usage = queryForm.usage.trim()
-  if (!mission && !series && !usage) return rows
-  return rows.filter((row) => {
-    if (mission && formatMissionSysType(row) !== mission) return false
-    if (series && !formatSeriesName(row).includes(series)) return false
-    if (usage && formatUsage(row) !== usage) return false
-    return true
-  })
+async function loadFormSeriesOptions() {
+  formSeriesLoading.value = true
+  try {
+    formSeriesOptions.value = await fetchSeriesNames(form.country ?? '')
+  } finally {
+    formSeriesLoading.value = false
+  }
 }
 
-/**
- * 按当前查询条件和分页拉取卫星列表。
- */
 async function loadSatellites() {
   loading.value = true
   try {
-    const res = await getSatelliteList(
-      page.pageNum,
-      page.pageSize,
-      toOptionalNorad(queryForm.norad),
-      undefined,
-      toOptionalString(queryForm.name_en),
-      toOptionalString(queryForm.country),
-      queryForm.orbit_status,
-      queryForm.orbit_type,
-      queryForm.payload_status,
-      toOptionalString(queryForm.sat_type)
-    )
-    satellites.value = res.code === 200 ? (res.data?.content ?? []) : []
-    satellites.value = applyClientCatalogFilters(satellites.value)
-    totalElements.value = res.code === 200 ? (res.data?.totalElements ?? 0) : 0
+    const res =
+      queryMode.value === 'filter'
+        ? await searchSatelliteResources({
+          country: queryForm.country || undefined,
+          system: queryForm.system || undefined,
+          series: queryForm.series || undefined,
+        })
+        : await getSatelliteResourceList({
+          keyword: queryForm.keyword.trim() || undefined,
+        })
+    satellites.value = isResourceApiSuccess(res.code) ? (res.data ?? []) : []
   } finally {
     loading.value = false
   }
 }
 
-/**
- * 按查询表头重新检索，并从第一页开始。
- */
+function handleQueryModeChange() {
+  queryForm.keyword = ''
+  queryForm.country = ''
+  queryForm.system = ''
+  queryForm.series = ''
+  seriesOptions.value = []
+  page.pageNum = 1
+  void loadSatellites()
+}
+
 function handleSearch() {
   page.pageNum = 1
-  loadSatellites()
+  void loadSatellites()
 }
 
-/**
- * 清空查询表头并重新加载列表。
- */
 function resetQuery() {
-  queryForm.norad = ''
-  queryForm.name_en = ''
-  queryForm.country = ''
-  queryForm.sat_type = ''
-  queryForm.orbit_type = undefined
-  queryForm.orbit_status = undefined
-  queryForm.payload_status = undefined
-  queryForm.mission_sys_type = ''
-  queryForm.series_name = ''
-  queryForm.usage = ''
+  if (queryMode.value === 'keyword') {
+    queryForm.keyword = ''
+  } else {
+    queryForm.country = ''
+    queryForm.system = ''
+    queryForm.series = ''
+    seriesOptions.value = []
+  }
   page.pageNum = 1
-  loadSatellites()
+  void loadSatellites()
+}
+
+function openCreateDialog() {
+  Object.assign(form, createEmptyForm())
+  formSeriesOptions.value = []
+  dialogVisible.value = true
+}
+
+function openEditDialog(row: SatelliteResource) {
+  Object.assign(form, { ...row })
+  void loadFormSeriesOptions()
+  dialogVisible.value = true
+}
+
+async function submitForm() {
+  if (!formRef.value) return
+  await formRef.value.validate(async (valid) => {
+    if (!valid) return
+    if (!form.id && !form.noradId.trim()) {
+      ElMessage.warning('NORAD 不能为空')
+      return
+    }
+    saving.value = true
+    try {
+      const res = form.id
+        ? await updateSatelliteResource({ ...form, id: form.id })
+        : await createSatelliteResource({ ...form })
+      if (isResourceApiSuccess(res.code)) {
+        ElMessage.success(`${dialogTitle.value}成功`)
+        dialogVisible.value = false
+        await loadSatellites()
+      }
+    } finally {
+      saving.value = false
+    }
+  })
+}
+
+async function handleDelete(row: SatelliteResource) {
+  if (!row.id) {
+    ElMessage.error('缺少记录 id，无法删除')
+    return
+  }
+  await ElMessageBox.confirm(
+    `确定删除卫星「${row.nameEn || row.noradId}」吗？`,
+    '提示',
+    { type: 'warning' },
+  )
+  const res = await deleteSatelliteResource(row.id)
+  if (isResourceApiSuccess(res.code)) {
+    ElMessage.success('删除成功')
+    await loadSatellites()
+  }
+}
+
+function handleViewDetail(row: SatelliteResource) {
+  const norad = parseNoradIdNumber(row.noradId)
+  if (!norad) return
+  openSatelliteProfile(norad)
 }
 
 /**
- * 打开卫星本体详情弹窗（SatelliteProfile）。
- *
- * @param row 当前行卫星数据
+ * 监听：查询条件中国家/地区变化。
+ * 回调不返回清理函数。
+ * 作用：清空国家时重置系列下拉。
  */
-function handleViewDetail(row: Satellite) {
-  openSatelliteProfile(row.norad)
-}
+watch(
+  () => queryForm.country,
+  (country) => {
+    if (!country) {
+      seriesOptions.value = []
+    }
+  },
+)
 
-onMounted(async () => {
-  await Promise.all([loadSatellites(), loadCountries(), loadSatTypes()])
+onMounted(() => {
+  void loadSatellites()
 })
 </script>
 
@@ -383,15 +418,13 @@ onMounted(async () => {
   flex-direction: column;
   overflow: hidden;
   padding: 16px;
-  border-radius: 8px;
   box-sizing: border-box;
 }
 
 .panel-card {
   border: 1px solid var(--surface-border-color);
-  border-radius: 24px;
-  background: linear-gradient(180deg, var(--surface-bg-color-soft) 0%, var(--surface-bg-color) 100%);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+  border-radius: 16px;
+  background: var(--surface-bg-color);
 }
 
 .toolbar-card,
@@ -417,6 +450,18 @@ onMounted(async () => {
   margin-left: auto;
 }
 
+.keyword-input {
+  width: 200px;
+}
+
+.query-select {
+  width: 140px;
+}
+
+.query-select-series {
+  width: 180px;
+}
+
 .table-card {
   flex: 1;
   min-height: 0;
@@ -428,37 +473,8 @@ onMounted(async () => {
 
 .table-fill {
   flex: 1;
-  height: 0;
   min-height: 0;
   overflow: hidden;
-}
-
-.table-card :deep(.atlas-app-table) {
-  --el-table-border-color: var(--surface-border-color);
-  --el-table-header-bg-color: var(--surface-bg-color-strong);
-  --el-table-bg-color: var(--surface-bg-color);
-  --el-table-tr-bg-color: var(--surface-bg-color);
-  --el-table-row-hover-bg-color: rgba(79, 147, 221, 0.18);
-  --el-fill-color-lighter: rgba(79, 147, 221, 0.14);
-  --el-text-color-regular: var(--text-color-primary);
-  --el-text-color-primary: var(--text-color-strong);
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.table-card :deep(.atlas-app-table th.atlas-app-table__cell),
-.table-card :deep(.atlas-app-table th.el-table__cell) {
-  color: var(--accent-color-active);
-  font-weight: 800;
-}
-
-.table-card :deep(.atlas-app-table td.el-table__cell) {
-  color: var(--text-color-primary);
-  background: var(--surface-bg-color);
-}
-
-.table-card :deep(.atlas-app-table__empty-block) {
-  background: var(--surface-bg-color);
 }
 
 .pager {
@@ -467,15 +483,14 @@ onMounted(async () => {
   justify-content: flex-end;
 }
 
+.full-width {
+  width: 100%;
+}
+
 @media (max-width: 1200px) {
   .toolbar-actions {
     width: 100%;
     margin-left: 0;
   }
-}
-.catalog-field-hint {
-  margin: 8px 16px 0;
-  font-size: 12px;
-  color: #64748b;
 }
 </style>

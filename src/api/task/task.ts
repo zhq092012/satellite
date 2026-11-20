@@ -1,12 +1,10 @@
 import type { AxiosResponseType } from '@/types/http'
 
 import { requestAPI } from '@/utils/tools/request'
-import type { Satellite } from '@/types/cesium/satellite'
-import type { SatelliteAnalysisData, SatelliteSeriesData, TaskForm } from '@/types/task/task'
+import type { SatelliteAnalysisData, TaskForm } from '@/types/task/task'
 
 export type {
   SatelliteAnalysisData,
-  SatelliteSeriesData,
   TaskForm,
   TaskArea,
   TaskCombatArea,
@@ -16,23 +14,7 @@ export type {
   TaskTargetRelationKind,
 } from '@/types/task/task'
 
-
-
-/**
- * 查询卫星系列
- */
-export const getSatelliteSeries = (countryList: string[]) => {
-    const url = `/api/algorithm/getSeries?enemyCountryList=${countryList.join(',')}`
-    return requestAPI.get<AxiosResponseType<SatelliteSeriesData>>(url)
-}
-
-/**
- * 根据系列查询卫星
- */
-export const getSatelliteBySeries = (series: string) => {
-    const url = `/api/algorithm/querySatBySeries?series=${series}`
-    return requestAPI.get<AxiosResponseType<Satellite[]>>(url)
-}
+export type { SatelliteSeriesData } from '@/types/satellite/satellite'
 
 /**
  * 获取任务矩阵

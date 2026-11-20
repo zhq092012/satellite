@@ -10,7 +10,7 @@ import type { StrikePlanV2MissionWindowItem } from '@/api/strikePlan/satellite-s
 import type { Weapon } from '@/types/dashboard'
 import type { ActiveStrikeQueueItem, BlueSatelliteRecord, MetricCard, StageItem } from '@/types/strike'
 import { formatClock, formatDateTime, formatFullDateTime, parseMissionWindowDate } from '@/utils/tools/dateFormat'
-import type { TaskSteps } from '@/types/cesium/satellite'
+import type { TaskSteps } from '@/types/satellite/satellite'
 
 export function useSimulationPlayback(
   viewer: ShallowRef<Cesium.Viewer | null>,

@@ -13,7 +13,7 @@ import { isTaskProgressComplete, taskProgressMap } from '@/composables/useTaskPr
 import type { BattleForm } from '@/types/battle/battle'
 import type { SatelliteData } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
-import type { SatelliteDetail } from '@/types/cesium/satellite'
+import type { SatelliteDetail } from '@/types/satellite/satellite'
 import type { C2ResourceSatelliteRow } from '@/utils/buildC2ResourceCatalog'
 import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
 import type { SatelliteAnalysisData, TaskForm } from '@/types/task/task'

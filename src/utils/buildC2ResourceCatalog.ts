@@ -1,6 +1,7 @@
 
 import { normalizeSatelliteUsageLabel, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
-import type { LevelSeriesEntity, SatelliteAnalysisData, SatelliteSeriesData } from '@/types/task/task'
+import type { LevelSeriesEntity, SatelliteAnalysisData } from '@/types/task/task'
+import type { SatelliteSeriesData } from '@/types/satellite/satellite'
 
 /** C2 左侧面板资源树固定展示的国家/地区（与作战对象三项一致） */
 export const C2_PANEL_TREE_COUNTRIES: readonly string[] = TASK_ENEMY_COUNTRY_OPTIONS

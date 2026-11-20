@@ -260,7 +260,12 @@ import {
   getBattleSateTypes,
   updateWeapon,
 } from '@/api/dashboard'
-import { getSatelliteBySeries, getSatelliteSeries } from '@/api/task/task'
+import {
+  getSatelliteResourcesBySeries,
+  loadSatelliteSeriesDataForCountries,
+} from '@/api/satellite/satellite'
+import { isResourceApiSuccess } from '@/utils/resourceApi'
+import { mapSatelliteResourceToCatalog } from '@/utils/satelliteResource'
 import { GROUND_STATION_COUNTRY_OPTIONS } from '@/constants/groundStationCountries'
 import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
 import {
@@ -1078,10 +1083,12 @@ const loadSatelliteCandidatesForSeriesList = async (seriesList: string[]) => {
   try {
     const batches = await Promise.all(
       seriesList.map(async (series) => {
-        const res = await getSatelliteBySeries(series)
-        const raw = res.code === 200 ? res.data : null
-        const list = Array.isArray(raw) ? raw : raw ? [raw] : []
-        return list.map((item) => satelliteToRow(item as SatellitePreviewItem, series))
+        const res = await getSatelliteResourcesBySeries(series)
+        const raw = isResourceApiSuccess(res.code) ? res.data : null
+        const list = Array.isArray(raw) ? raw : []
+        return list.map((item) =>
+          satelliteToRow(mapSatelliteResourceToCatalog(item) as SatellitePreviewItem, series),
+        )
       }),
     )
     const byId = new Map<string, TaskAssembleRow>()
@@ -1194,9 +1201,9 @@ const loadSeriesOptions = async () => {
   }
   listLoading.value = true
   try {
-    const res = await getSatelliteSeries(seriesQueryCountries.value)
-    if (res.code === 200 && res.data) {
-      seriesDataCache.value = res.data
+    const data = await loadSatelliteSeriesDataForCountries(seriesQueryCountries.value)
+    if (data.侦察.length || data.通信.length) {
+      seriesDataCache.value = data
       applySeriesOptionsFromCache()
     } else {
       seriesDataCache.value = null

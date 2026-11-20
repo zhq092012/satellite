@@ -122,6 +122,17 @@ const routes: Array<RouteRecordRaw> = [
             },
           },
           {
+            path: 'tle',
+            name: 'TleManage',
+            component: () => import('@/views/tle/TleList.vue'),
+            meta: {
+              title: 'TLE 数据管理',
+              showInMenu: false,
+              requiresAuth: true,
+              roles: ['admin'],
+            },
+          },
+          {
             path: 'ground-stations',
             name: 'GroundStationManage',
             component: () => import('@/views/ground-stations/GroundStations.vue'),

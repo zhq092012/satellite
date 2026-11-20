@@ -103,7 +103,12 @@ import type { ElTable } from 'element-plus'
 import type { ElTree } from 'element-plus'
 import { getAllWeapons } from '@/api/dashboard'
 import { getTaskList, updateTask } from '@/api/task/task'
-import { getSatelliteBySeries, getSatelliteSeries } from '@/api/task/task'
+import {
+  getSatelliteResourcesBySeries,
+  loadSatelliteSeriesDataForCountries,
+} from '@/api/satellite/satellite'
+import { isResourceApiSuccess } from '@/utils/resourceApi'
+import { mapSatelliteResourceToCatalog } from '@/utils/satelliteResource'
 import type { TaskForm } from '@/api/task/task'
 import type { Weapon } from '@/types/dashboard'
 import type { MatrixResult } from '@/api/electronic'
@@ -366,13 +371,15 @@ const fetchSeriesFallbackCatalog = async (task: TaskForm): Promise<C2ResourceSat
     ? [...editorDraft.value.targetTypeShow]
     : resolveTaskTargetTypes(task)
   if (!types.length) return []
-  const res = await getSatelliteSeries(treeCountries)
-  const buckets = res.code === 200 ? parseSeriesApiBuckets(res.data, types) : []
+  const seriesData = await loadSatelliteSeriesDataForCountries(treeCountries)
+  const buckets = parseSeriesApiBuckets(seriesData, types)
   const previews: Array<{ series: string; sysType: string; satellites: C2SeriesPreviewSatellite[] }> = []
   for (const bucket of buckets) {
-    const previewRes = await getSatelliteBySeries(bucket.series)
+    const previewRes = await getSatelliteResourcesBySeries(bucket.series)
     const satellites =
-      previewRes.code === 200 && Array.isArray(previewRes.data) ? previewRes.data : []
+      isResourceApiSuccess(previewRes.code) && Array.isArray(previewRes.data)
+        ? previewRes.data.map(mapSatelliteResourceToCatalog)
+        : []
     previews.push({ series: bucket.series, sysType: bucket.sysType, satellites })
   }
   return filterC2ResourceRowsToPanelCountries(

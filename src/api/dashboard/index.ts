@@ -1,4 +1,4 @@
-import type { Satellite, SatelliteDetail, SatelliteInfo, SatelliteTle, StepSatellite } from '@/types/cesium/satellite'
+import type { Satellite, SatelliteDetail, SatelliteInfo, SatelliteTle, StepSatellite } from '@/types/satellite/satellite'
 import type { BattleForm } from '@/types/battle/battle'
 import type { TaskForm } from '@/api/task/task'
 import type { SatelliteNode, SatelliteRelation, SatelliteStrike, SatelliteThreat, SceneConfig, TLEDataResponse, Weapon } from '@/types/dashboard'
