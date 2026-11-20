@@ -4,14 +4,14 @@
     <div v-else class="attack-table-shell">
       <div class="attack-table-panel">
         <div class="attack-table-caption">
-          <span class="attack-table-title">打击度分析</span>
-          <span class="attack-table-formula">各蓝方卫星可打击程度及因子分解</span>
+          <div class="attack-table-caption-text">
+            <span class="attack-table-title">打击度分析</span>
+            <p class="attack-table-formula">各蓝方卫星可打击程度及因子分解</p>
+            <p v-if="metaLine" class="analysis-meta analysis-meta--inline">{{ metaLine }}</p>
+          </div>
           <el-button size="small" :loading="loading" @click="loadStrikeAnalysis">刷新</el-button>
         </div>
-        <p class="analysis-intro">
-          数据来自 <code>GET /api/compute/strike/{taskId}</code>。打击度与因子明细由后端注册算法计算；可通过顶栏「算法列表」查看默认生效算法编码。
-        </p>
-        <p v-if="metaLine" class="analysis-meta">{{ metaLine }}</p>
+        <p class="analysis-intro">打击度与因子明细见对应列；默认算法可在顶栏「算法列表」查看。</p>
         <p v-if="algorithmLine" class="analysis-meta analysis-meta--algo">{{ algorithmLine }}</p>
         <p v-if="errorMessage" class="analysis-error">{{ errorMessage }}</p>
         <div v-loading="loading" class="attack-table-scroll">
@@ -138,7 +138,6 @@ const metaLine = computed(() => {
   return [
     data.taskName ? `任务：${data.taskName}` : '',
     data.generatedAt ? `计算时间：${data.generatedAt}` : '',
-    data.taskId ? `任务 ID：${data.taskId}` : '',
   ]
     .filter(Boolean)
     .join(' · ')
@@ -207,6 +206,8 @@ void loadAlgorithmCatalog()
 </script>
 
 <style scoped lang="scss">
+@use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
+
 $attack-table-border: rgba(56, 189, 248, 0.55);
 
 .home-attack-analysis {
@@ -248,37 +249,54 @@ $attack-table-border: rgba(56, 189, 248, 0.55);
 }
 
 .attack-table-caption {
-  display: grid;
+  display: flex;
   flex-shrink: 0;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  column-gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   padding: 12px 16px;
   background: rgba(13, 27, 49, 0.6);
   border-bottom: 1px solid $attack-table-border;
 }
 
+.attack-table-caption-text {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
 .attack-table-title {
-  font-size: 18px;
+  display: block;
+  font-size: battleUi.$battle-ui-font-emphasis;
   font-weight: 700;
   color: #7dd3fc;
 }
 
 .attack-table-formula {
-  justify-self: center;
+  margin: 6px 0 0;
   color: #94a3b8;
-  font-size: 14px;
+  font-size: battleUi.$battle-ui-font-base;
+  line-height: 1.45;
+  text-align: left;
 }
 
 .analysis-intro,
 .analysis-meta {
   flex-shrink: 0;
   margin: 0;
-  padding: 8px 16px;
+  padding: 10px 16px;
   color: #94a3b8;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: battleUi.$battle-ui-font-base;
+  line-height: 1.45;
+  text-align: left;
   border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+}
+
+.analysis-meta--inline {
+  margin: 6px 0 0;
+  padding: 0;
+  border-bottom: none;
+  color: #cbd5e1;
 }
 
 .analysis-meta--algo {
@@ -288,9 +306,10 @@ $attack-table-border: rgba(56, 189, 248, 0.55);
 .analysis-error {
   flex-shrink: 0;
   margin: 0;
-  padding: 8px 16px;
+  padding: 10px 16px;
   color: #f87171;
-  font-size: 13px;
+  font-size: battleUi.$battle-ui-font-base;
+  text-align: left;
 }
 
 .attack-table-scroll {
@@ -303,7 +322,7 @@ $attack-table-border: rgba(56, 189, 248, 0.55);
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 13px;
+  font-size: battleUi.$battle-ui-font-base;
 }
 
 .attack-col-header th {
@@ -314,11 +333,13 @@ $attack-table-border: rgba(56, 189, 248, 0.55);
   border: 1px solid $attack-table-border;
   background: rgba(13, 27, 49, 0.95);
   color: #e2e8f0;
-  font-weight: 600;
+  font-size: battleUi.$battle-ui-font-emphasis;
+  font-weight: 700;
 }
 
 .attack-dual-table td {
-  padding: 8px 6px;
+  padding: 10px 8px;
+  font-size: battleUi.$battle-ui-font-base;
   border: 1px solid rgba(56, 189, 248, 0.25);
   text-align: center;
   vertical-align: top;
@@ -339,7 +360,7 @@ $attack-table-border: rgba(56, 189, 248, 0.55);
   text-align: left;
   white-space: pre-wrap;
   color: #94a3b8;
-  font-size: 12px;
+  font-size: battleUi.$battle-ui-font-base;
   line-height: 1.35;
 }
 

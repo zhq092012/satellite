@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { markRaw } from 'vue'
 import * as Cesium from 'cesium'
 import {
   getReconnaissanceAttackMatrix,
@@ -13,7 +14,7 @@ import { isTaskProgressComplete, taskProgressMap } from '@/composables/useTaskPr
 import type { BattleForm } from '@/types/battle/battle'
 import type { SatelliteData } from '@/types/dashboard'
 import type { InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
-import type { SatelliteDetail } from '@/types/satellite/satellite'
+import type { SatelliteDetail, SatelliteTreeCountryNode } from '@/types/satellite/satellite'
 import type { C2ResourceSatelliteRow } from '@/utils/buildC2ResourceCatalog'
 import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
 import type { SatelliteAnalysisData, TaskForm } from '@/types/task/task'
@@ -22,7 +23,6 @@ import {
   resolveTaskCountryFieldFromEntity,
 } from '@/utils/taskEntity'
 import { collectTaskAreaGeoCoords } from '@/utils/taskAreaGeo'
-
 interface State {
   isCollapse: boolean
   activedTask: TaskForm | null
@@ -96,6 +96,13 @@ interface State {
   c2ResourceSatelliteRows: C2ResourceSatelliteRow[]
   /** C2 资源树勾选 keys */
   c2TreeCheckedKeys: string[]
+  /**
+   * 三国全量卫星资源树 API 快照（`中国台湾` / `日本` / `美国`）。
+   * 仅会话内存缓存，由面板按需拉取。
+   */
+  satelliteAssembleTreeRootsCache: SatelliteTreeCountryNode[]
+  /** 卫星资源树缓存写入时间（ISO 字符串，便于诊断） */
+  satelliteAssembleTreeCachedAt: string | null
 }
 
 /**
@@ -198,6 +205,8 @@ export const useLayoutStore = defineStore('layout-store', {
       focusedStrikeLink: null,
       c2ResourceSatelliteRows: [],
       c2TreeCheckedKeys: [],
+      satelliteAssembleTreeRootsCache: [],
+      satelliteAssembleTreeCachedAt: null,
     }
   },
   getters: {
@@ -756,8 +765,24 @@ export const useLayoutStore = defineStore('layout-store', {
       this.c2ResourceSatelliteRows = []
       this.c2TreeCheckedKeys = []
     },
+    /**
+     * 写入三国卫星资源树缓存。
+     *
+     * @param roots `GET /resource/satellite/tree` 国家根列表
+     */
+    setSatelliteAssembleTreeRootsCache(roots: SatelliteTreeCountryNode[]) {
+      /** 大树不做深度响应式，减轻主线程与交互卡顿 */
+      this.satelliteAssembleTreeRootsCache = markRaw(roots) as SatelliteTreeCountryNode[]
+      this.satelliteAssembleTreeCachedAt = new Date().toISOString()
+    },
+    /** 清空卫星资源树缓存（需强制与后台对齐时调用） */
+    clearSatelliteAssembleTreeRootsCache() {
+      this.satelliteAssembleTreeRootsCache = []
+      this.satelliteAssembleTreeCachedAt = null
+    },
   },
   persist: {
+    key: 'layout-store-v3',
     storage: localStorage,
     pick: [
       'activedTask',

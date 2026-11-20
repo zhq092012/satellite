@@ -1,9 +1,8 @@
 
 import { TASK_PANEL_SATELLITE_TYPES as MISSION_TASK_TYPES } from '@/constants/missionSatellite'
-import type { TaskArea, TaskCombatArea, TaskForm } from '@/types/task/task'
+import type { TaskArea, TaskCombatArea, TaskForm, TaskResourceItem } from '@/types/task/task'
 import {
   DEFAULT_TASK_CATALOG_TARGET_TYPES,
-  mapSeriesNameToTaskSatellite,
   resolveSeriesNamesFromTaskSatellites,
 } from '@/utils/taskEntity'
 
@@ -23,8 +22,10 @@ export interface C2TaskEditorDraft {
   beginDate: string
   /** 结束时间 */
   endDate: string
-  /** 已选卫星系列 */
+  /** 已选卫星系列（由 selectedSatellites 推导，提交前同步） */
   selectedSeries: string[]
+  /** 任务已挂载卫星（与资源树勾选分离） */
+  selectedSatellites: TaskResourceItem[]
   /** 已选武器 ID */
   selectedWeaponIds: string[]
   /** 已选地面接收站 ID */
@@ -179,6 +180,11 @@ export const applyDurationHoursToDraft = (draft: C2TaskEditorDraft, hours: numbe
  */
 export const createDraftFromTask = (task: TaskForm | null | undefined): C2TaskEditorDraft | null => {
   if (!task?.id) return null
+  const selectedSatellites = (task.satellites ?? []).map((item) => ({
+    resourceId: item.resourceId,
+    name: item.name,
+    code: item.code,
+  }))
   const selectedSeries = resolveSeriesNamesFromTaskSatellites(task.satellites)
   const selectedReceiveIds = [...new Set((task.receiveStations ?? []).map((item) => item.resourceId).filter(Boolean))]
   return {
@@ -186,6 +192,7 @@ export const createDraftFromTask = (task: TaskForm | null | undefined): C2TaskEd
     beginDate: normalizeTaskDateTime(task.beginDate),
     endDate: normalizeTaskDateTime(task.endDate),
     selectedSeries,
+    selectedSatellites,
     selectedWeaponIds: [...new Set((task.weapons ?? []).map((item) => item.resourceId).filter(Boolean))],
     selectedReceiveIds,
     delayMin: Number.isFinite(task.delayMin) ? Number(task.delayMin) : 60,
@@ -233,7 +240,11 @@ export const mergeTaskFormWithDraft = (base: TaskForm, draft: C2TaskEditorDraft)
     delayMin: draft.delayMin,
     coverage: draft.coverage,
     areas: upsertCircleAreaFromCombatDraft(base.areas ?? [], draft.combatArea),
-    satellites: draft.selectedSeries.map((series) => mapSeriesNameToTaskSatellite(series)),
+    satellites: draft.selectedSatellites.map((item) => ({
+      resourceId: item.resourceId,
+      name: item.name,
+      code: item.code,
+    })),
     receiveStations: draft.selectedReceiveIds.map((resourceId) => ({
       resourceId,
       name: resourceId,

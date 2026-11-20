@@ -1,23 +1,30 @@
 import type { SatelliteAssembleTreeNode, SatelliteTreeCountryNode } from '@/types/satellite/satellite'
+import type { TaskResourceItem } from '@/types/task/task'
 import {
-  buildSatelliteAssembleTreeNodes,
-  indexSatelliteTreeResources,
-  type SatelliteTreeResourceMeta,
+  buildSatelliteAssembleTreeNodesToSeries,
+  buildSeriesSatelliteInventoryFromApiRoots,
+  collectSeriesDescriptorsFromAssembleNodes,
+  computeAssembleSeriesCheckStates,
+  type AssembleSeriesCheckStateEntry,
 } from '@/utils/satelliteResourceTree'
 
-/** Worker 构建结果（索引以可结构化克隆的键值对数组表示） */
+/** Worker 构建最终结果 */
 export interface SatelliteAssembleTreeBuildResult {
-  /** el-tree 节点树根 */
+  /** 系列树国家根（完整） */
   nodes: SatelliteAssembleTreeNode[]
-  /** `indexSatelliteTreeResources` 的 Map 条目 */
-  indexEntries: Array<[string, SatelliteTreeResourceMeta]>
+  /** 各系列勾选态 */
+  seriesCheckStates: AssembleSeriesCheckStateEntry[]
+  /** API 快照中的系列卫星（key = country::system::series） */
+  seriesInventory: Record<string, TaskResourceItem[]>
 }
 
 type WorkerSuccessMessage = {
   requestId: number
   ok: true
+  partial: boolean
   nodes: SatelliteAssembleTreeNode[]
-  indexEntries: Array<[string, SatelliteTreeResourceMeta]>
+  seriesCheckStates: AssembleSeriesCheckStateEntry[]
+  seriesInventory: Record<string, TaskResourceItem[]>
 }
 
 type WorkerFailureMessage = {
@@ -38,6 +45,7 @@ const pendingWorkerRequests = new Map<
   {
     resolve: (result: SatelliteAssembleTreeBuildResult) => void
     reject: (error: Error) => void
+    onProgress?: (nodes: SatelliteAssembleTreeNode[]) => void
   }
 >()
 
@@ -56,14 +64,21 @@ const getAssembleTreeWorker = (): Worker | null => {
     assembleTreeWorker.onmessage = (event: MessageEvent<WorkerResponseMessage>) => {
       const pending = pendingWorkerRequests.get(event.data.requestId)
       if (!pending) return
-      pendingWorkerRequests.delete(event.data.requestId)
       if (event.data.ok) {
-        pending.resolve({
-          nodes: event.data.nodes,
-          indexEntries: event.data.indexEntries,
-        })
+        if (event.data.nodes.length && pending.onProgress) {
+          pending.onProgress(event.data.nodes)
+        }
+        if (!event.data.partial) {
+          pendingWorkerRequests.delete(event.data.requestId)
+          pending.resolve({
+            nodes: event.data.nodes,
+            seriesCheckStates: event.data.seriesCheckStates,
+            seriesInventory: event.data.seriesInventory,
+          })
+        }
         return
       }
+      pendingWorkerRequests.delete(event.data.requestId)
       pending.reject(new Error(event.data.error || '卫星树 Worker 计算失败'))
     }
     assembleTreeWorker.onerror = () => {
@@ -80,56 +95,48 @@ const getAssembleTreeWorker = (): Worker | null => {
 }
 
 /**
- * 在 Worker 中构建卫星装配树与索引。
- *
- * @param roots 资源树 API 数据
- * @param allowedSystems 允许的体系列表
- */
-const buildInWorker = (
-  roots: SatelliteTreeCountryNode[],
-  allowedSystems: string[],
-): Promise<SatelliteAssembleTreeBuildResult> => {
-  const worker = getAssembleTreeWorker()
-  if (!worker) {
-    return Promise.reject(new Error('Worker 不可用'))
-  }
-  const requestId = ++workerRequestId
-  return new Promise((resolve, reject) => {
-    pendingWorkerRequests.set(requestId, { resolve, reject })
-    worker.postMessage({ requestId, roots, allowedSystems })
-  })
-}
-
-/**
  * 主线程同步构建（Worker 不可用或失败时的回退）。
- *
- * @param roots 资源树 API 数据
- * @param allowedSystems 允许的体系列表
  */
 const buildOnMainThread = (
   roots: SatelliteTreeCountryNode[],
   allowedSystems: string[],
+  taskSatellites: TaskResourceItem[],
 ): SatelliteAssembleTreeBuildResult => {
-  const nodes = buildSatelliteAssembleTreeNodes(roots, allowedSystems)
-  const index = indexSatelliteTreeResources(nodes)
-  return { nodes, indexEntries: [...index.entries()] }
+  const nodes = buildSatelliteAssembleTreeNodesToSeries(roots, allowedSystems)
+  const inventory = buildSeriesSatelliteInventoryFromApiRoots(roots, allowedSystems)
+  const descriptors = collectSeriesDescriptorsFromAssembleNodes(nodes)
+  const seriesCheckStates = computeAssembleSeriesCheckStates(descriptors, taskSatellites, inventory)
+  return { nodes, seriesCheckStates, seriesInventory: inventory }
 }
 
 /**
- * 在后台 Worker 中构建卫星装配树；失败时回退主线程同步构建。
+ * Worker 渐进构建系列树并计算勾选态。
  *
- * @param roots 资源树 API 数据
- * @param allowedSystems 允许的体系列表
+ * @param roots API 树
+ * @param allowedSystems 体系过滤
+ * @param taskSatellites 已选卫星
+ * @param onProgress Worker 每追加一个国家根时的回调
  */
 export const buildSatelliteAssembleTreeInBackground = async (
   roots: SatelliteTreeCountryNode[],
   allowedSystems: string[],
+  taskSatellites: TaskResourceItem[],
+  onProgress?: (nodes: SatelliteAssembleTreeNode[]) => void,
 ): Promise<SatelliteAssembleTreeBuildResult> => {
+  const worker = getAssembleTreeWorker()
+  if (!worker) {
+    console.warn('卫星装配树 Worker 不可用，回退主线程')
+    return buildOnMainThread(roots, allowedSystems, taskSatellites)
+  }
+  const requestId = ++workerRequestId
   try {
-    return await buildInWorker(roots, allowedSystems)
+    return await new Promise<SatelliteAssembleTreeBuildResult>((resolve, reject) => {
+      pendingWorkerRequests.set(requestId, { resolve, reject, onProgress })
+      worker.postMessage({ requestId, roots, allowedSystems, taskSatellites })
+    })
   } catch (error) {
     console.warn('卫星装配树 Worker 计算失败，回退主线程:', error)
-    return buildOnMainThread(roots, allowedSystems)
+    return buildOnMainThread(roots, allowedSystems, taskSatellites)
   }
 }
 

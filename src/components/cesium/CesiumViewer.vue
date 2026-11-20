@@ -10,7 +10,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { getAllWeapons, getSatelliteDetail } from '@/api/dashboard'
+import { getSatelliteDetail } from '@/api/dashboard'
 import type { MatrixResult } from '@/api/electronic'
 import type { ChainNode, SatelliteTransmissionLink } from '@/utils/satelliteFullChainAnalysis'
 import { useElectronicCesiumBridge, type InfrastructureLocation } from '@/composables/useElectronicCesiumBridge'
@@ -1097,31 +1097,7 @@ const handleOurWeaponsToggle = (visible: boolean | string | number) => {
 
 
 
-/**
- * [功能]
- * 查询我方所有武器资源列表并将其绘制到 Cesium 地球球面上
- *
- * [数据来源]
- * 调用 getAllWeapons API 接口获取全量武器数据模型
- *
- * [处理规则]
- * - 使用倒立三角形 Billboard 标记武器部署位置，尺寸与敌方地面站图标一致
- * - 在实体上绑定 Label 与 Ellipse（武器作用半径/防线）
- * - 标签在相机距离过远时自动隐藏
- * - 我方武器图层始终显示
- */
-const loadAndRenderWeapons = async () => {
-  if (!viewer) return
-  try {
-    const res = await getAllWeapons()
-    if (res.code === 200 && res.data?.weapons) {
-      redWeaponDataList.value = res.data.weapons
-      renderWeaponsOnCesium()
-    }
-  } catch (err) {
-    console.error('获取我方武器列表失败:', err)
-  }
-}
+
 const getWeaponImageByType = (type: string) => {
   switch (type) {
     case '动能':
@@ -1136,99 +1112,7 @@ const getWeaponImageByType = (type: string) => {
       return launchPadIcon
   }
 }
-/**
- * [功能]
- * 在 Cesium Viewer 中构造并绘制我方武器 3D 节点与作用防线
- */
-const renderWeaponsOnCesium = () => {
-  if (!viewer) return
 
-  // 清理旧的武器实体
-  redWeaponEntities.value.forEach((entity) => {
-    viewer?.entities.remove(entity)
-    const entityId = String(entity.id ?? '')
-    const highlightRing = viewer?.entities.getById(`${entityId}-highlight-ring`)
-    if (highlightRing) {
-      viewer?.entities.remove(highlightRing)
-    }
-  })
-  redWeaponEntities.value = []
-  ourWeaponStyleCache.clear()
-
-  const weapons = redWeaponDataList.value
-  const newEntities: Cesium.Entity[] = []
-
-  weapons.forEach((weapon, index) => {
-    if (!Number.isFinite(weapon.longitude) || !Number.isFinite(weapon.latitude)) return
-
-    const weaponId = `our-weapon-${weapon.id ?? index}`
-    const position = Cesium.Cartesian3.fromDegrees(weapon.longitude, weapon.latitude, 0)
-    // const rangeMeters = Math.max(10000, Number(weapon.range ?? 0) * 1000)
-    const weaponType = weapon.type
-
-    // 单一实体：近距离显示真实武器图标 Billboard (<= 8,000 km)，远距离切换显示 Point 点 (> 8,000 km)
-    const entity = viewer.entities.add({
-      id: weaponId,
-      name: weapon.name,
-      position: new Cesium.ConstantPositionProperty(position),
-      show: true,
-      billboard: {
-        image: getWeaponImageByType(weaponType),
-        color: Cesium.Color.WHITE,
-        width: 28,
-        height: 28,
-        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        disableDepthTestDistance: 0,
-        heightReference: Cesium.HeightReference.NONE,
-        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, WEAPON_BILLBOARD_MAX_DISTANCE),
-      },
-      point: {
-        pixelSize: 8,
-        color: OUR_WEAPON_DEFAULT_COLOR,
-        disableDepthTestDistance: 0,
-        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(WEAPON_BILLBOARD_MAX_DISTANCE, Number.MAX_VALUE),
-      },
-      label: {
-        text: `${weapon.name} (${weapon.type || '武器'})`,
-        font: 'bold 13px sans-serif',
-        fillColor: OUR_WEAPON_DEFAULT_LABEL_COLOR,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        showBackground: true,
-        backgroundColor: new Cesium.Color(0, 0, 0, 0.3),
-        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        pixelOffset: new Cesium.Cartesian2(0, -28),
-        heightReference: Cesium.HeightReference.NONE,
-        show: false,
-        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, WEAPON_LABEL_LOD_NEAR),
-      },
-      description: `<div style="padding: 12px; font-family: sans-serif; background-color: #1a2233; color: #e6f7ff; border-radius: 8px; border: 1px solid #ef6b73;">
-        <h3 style="margin: 0 0 10px 0; color: #ef6b73; font-size: 16px;">🛩️ 我方武器资产</h3>
-        <p style="margin: 4px 0;"><strong>武器名称:</strong> ${weapon.name}</p>
-        <p style="margin: 4px 0;"><strong>所属国家/地区:</strong> ${weapon.country}</p>
-        <p style="margin: 4px 0;"><strong>武器类型:</strong> ${weapon.type}</p>
-        <p style="margin: 4px 0;"><strong>部署位置:</strong> 经度 ${weapon.longitude.toFixed(2)}°, 纬度 ${weapon.latitude.toFixed(2)}°</p>
-        <p style="margin: 4px 0;"><strong>打击高度/射程:</strong> ${weapon.range} km</p>
-        ${weapon.satellite_type ? `<p style="margin: 4px 0;"><strong>适用目标:</strong> ${weapon.satellite_type}</p>` : ''}
-      </div>`,
-    })
-    newEntities.push(entity)
-
-    ourWeaponStyleCache.set(weaponId, {
-      billboardColor: Cesium.Color.WHITE,
-      labelFillColor: OUR_WEAPON_DEFAULT_LABEL_COLOR,
-      ellipseMaterial: OUR_WEAPON_DEFAULT_COLOR.withAlpha(0.1),
-      ellipseOutlineColor: OUR_WEAPON_DEFAULT_COLOR.withAlpha(0.5),
-    })
-  })
-
-  redWeaponEntities.value = newEntities
-  updateOurWeaponsVisibility(true)
-  updateWeaponLabelVisuals()
-
-}
 
 // [变量用途]
 // 防重入防死循环集合：避免 CallbackProperty 计算 position 时触发递归调用导致栈溢出
@@ -2027,7 +1911,6 @@ onMounted(async () => {
   await initViewer()
   if (viewer) {
     store.setShowOurWeapons(true)
-    void loadAndRenderWeapons()
   }
   startContainerSizeObserver()
 })

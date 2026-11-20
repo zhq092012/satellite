@@ -124,9 +124,16 @@
           </el-form>
         </div>
 
-        <TaskAssembleTab v-if="activeTab === 'satellite'" ref="satelliteAssembleRef" kind="satellite"
-          :reset-key="assembleResetKey" :combat-countries="combatCountriesForAssembly"
-          :target-types="assembleTargetTypes" />
+        <TaskAssembleTab
+          v-if="satelliteTabMounted"
+          v-show="activeTab === 'satellite'"
+          ref="satelliteAssembleRef"
+          kind="satellite"
+          :reset-key="assembleResetKey"
+          :combat-countries="combatCountriesForAssembly"
+          :target-types="assembleTargetTypes"
+          :initial-task-satellites="draftAssembledSatellites"
+        />
         <TaskAssembleTab ref="stationAssembleRef" v-show="activeTab === 'station'" kind="station"
           :reset-key="assembleResetKey" />
         <TaskTargetRelationTab v-show="activeTab === 'relation'" ref="targetRelationRef" :reset-key="assembleResetKey"
@@ -258,6 +265,43 @@ const isCombatObjectActive = (country: string): boolean =>
  * 作用：传给卫星装配 Tab 拉取资源树。
  */
 const combatCountriesForAssembly = computed(() => parseTaskCombatCountries(taskForm.country))
+
+/** 回填表单时暂不根据作战对象变化清空卫星（避免打开弹窗误清） */
+const suppressAssemblyCountryWatch = ref(false)
+
+/** 卫星装配所依据的作战对象快照（国家列表规范化串） */
+const assemblyCountrySnapshot = ref('')
+
+/**
+ * 将任务 `country` 字段规范为可比快照。
+ *
+ * @param countryField 逗号分隔作战对象
+ */
+const buildAssemblyCountrySnapshot = (countryField: string): string =>
+  parseTaskCombatCountries(countryField)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, 'zh-CN'))
+    .join('||')
+
+/**
+ * 记录当前作战对象快照（打开任务 / 确认变更后调用）。
+ *
+ * @param countryField 逗号分隔作战对象
+ */
+const syncAssemblyCountrySnapshot = (countryField: string) => {
+  assemblyCountrySnapshot.value = buildAssemblyCountrySnapshot(countryField)
+}
+
+/**
+ * 基本信息中作战对象变更：清空卫星草稿与装配页已选（与新房树国家一致）。
+ */
+const clearSatelliteAssemblyForCountryChange = () => {
+  draftAssembledSatellites.value = []
+  pendingSatelliteRestore.value = null
+  taskForm.satellites = []
+  satelliteAssembleRef.value?.setAssembledTaskSatellites([])
+}
 
 /**
  * 计算：当前作战预期一级选项下的二级子选项列表。
@@ -409,6 +453,10 @@ const activeTab = ref<TaskEditTabKey>('basic')
 const assembleResetKey = ref(0)
 /** 卫星 Tab 未挂载时暂存回显数据，进入卫星页后写入装配组件。 */
 const pendingSatelliteRestore = ref<TaskResourceItem[] | null>(null)
+/** 卫星 Tab 是否已挂载（首次进入后保持，切换 Tab 不销毁组件） */
+const satelliteTabMounted = ref(false)
+/** 离开卫星 Tab 或提交前缓存的已选卫星（弹窗内未保存态） */
+const draftAssembledSatellites = ref<TaskResourceItem[]>([])
 
 /**
  * 计算：目标关系「卫星（系列）」下拉选项，来自卫星装配页已选系列。
@@ -454,6 +502,8 @@ watch(
     visible.value = open
     if (open) {
       activeTab.value = 'basic'
+      satelliteTabMounted.value = false
+      draftAssembledSatellites.value = []
       fillForm(props.task)
       assembleResetKey.value += 1
     }
@@ -470,6 +520,26 @@ watch(visible, (open) => {
     emit('update:modelValue', open)
   }
 })
+
+/**
+ * 监听：基本信息中的作战对象 `taskForm.country`。
+ * 回调不返回清理函数。
+ * 作用：仅作战对象变化时清空卫星装配；切换 Tab 不清空。
+ */
+watch(
+  () => taskForm.country,
+  (next) => {
+    if (!visible.value || suppressAssemblyCountryWatch.value) return
+    const nextSnapshot = buildAssemblyCountrySnapshot(next)
+    if (!assemblyCountrySnapshot.value) {
+      assemblyCountrySnapshot.value = nextSnapshot
+      return
+    }
+    if (nextSnapshot === assemblyCountrySnapshot.value) return
+    clearSatelliteAssemblyForCountryChange()
+    assemblyCountrySnapshot.value = nextSnapshot
+  },
+)
 
 /**
  * 规范化时间字符串为任务提交格式（不含秒）。
@@ -650,25 +720,39 @@ const createPlaceholderRow = (id: string, name?: string): TaskAssembleRow => ({
 })
 
 /**
- * 从任务 resources / weaponIds 恢复各装配页已选资源（卫星系列不在弹窗内回显勾选）。
- *
- * @param task 列表接口返回的任务对象
+ * 将卫星装配页当前选择写入弹窗草稿（Tab 切换 / 提交前调用）。
  */
+const snapshotSatelliteAssemblyDraft = () => {
+  if (!satelliteAssembleRef.value) return
+  const items = satelliteAssembleRef.value.getAssembledTaskSatellites()
+  draftAssembledSatellites.value = items.map((item) => ({ ...item }))
+  taskForm.satellites = draftAssembledSatellites.value.map((item) => ({ ...item }))
+}
+
 const applyPendingSatelliteRestore = () => {
-  const pending = pendingSatelliteRestore.value
-  if (!pending?.length || !satelliteAssembleRef.value) return
-  satelliteAssembleRef.value.setAssembledTaskSatellites(pending)
+  if (!satelliteAssembleRef.value) return
+  const source =
+    pendingSatelliteRestore.value ??
+    (draftAssembledSatellites.value.length ? draftAssembledSatellites.value : null)
+  if (!source?.length) return
+  satelliteAssembleRef.value.setAssembledTaskSatellites(source)
+  draftAssembledSatellites.value = source.map((item) => ({ ...item }))
   pendingSatelliteRestore.value = null
 }
 
 /**
  * 监听：任务编辑弹窗当前 Tab。
  * 回调不返回清理函数。
- * 作用：进入卫星配置页且卫星 Tab 挂载后应用暂存的卫星回显。
+ * 作用：离开卫星页时缓存已选卫星；进入时挂载并保持实例，回显草稿。
  */
-watch(activeTab, (tab) => {
-  if (tab !== 'satellite') return
-  void nextTick(() => applyPendingSatelliteRestore())
+watch(activeTab, (tab, prevTab) => {
+  if (prevTab === 'satellite') {
+    snapshotSatelliteAssemblyDraft()
+  }
+  if (tab === 'satellite') {
+    satelliteTabMounted.value = true
+    void nextTick(() => applyPendingSatelliteRestore())
+  }
 })
 
 const restoreAssembleFromTask = (task: TaskForm) => {
@@ -677,7 +761,8 @@ const restoreAssembleFromTask = (task: TaskForm) => {
     name: item.name,
     code: item.code,
   }))
-  pendingSatelliteRestore.value = satellites.length ? satellites : null
+  draftAssembledSatellites.value = satellites.map((item) => ({ ...item }))
+  pendingSatelliteRestore.value = satellites.length ? satellites.map((item) => ({ ...item })) : null
   satelliteAssembleRef.value?.setAssembledTaskSatellites(satellites)
   if (satelliteAssembleRef.value) {
     pendingSatelliteRestore.value = null
@@ -750,6 +835,8 @@ const resetCreateForm = () => {
   assembleTargetTypes.value = [...DEFAULT_TARGET_TYPES]
   durationHours.value = DEFAULT_TASK_DURATION_HOURS
   initCombatScenarioDefaults()
+  draftAssembledSatellites.value = []
+  pendingSatelliteRestore.value = null
   void nextTick(() => {
     satelliteAssembleRef.value?.setAssembledRows([])
     stationAssembleRef.value?.setAssembledRows([])
@@ -794,8 +881,11 @@ const syncCombatScenarioFromTask = (task: TaskForm) => {
  * @param task 待编辑任务；添加时为 null
  */
 const fillForm = (task: TaskForm | null) => {
+  suppressAssemblyCountryWatch.value = true
   if (!task || !props.isEdit) {
     resetCreateForm()
+    syncAssemblyCountrySnapshot(taskForm.country)
+    suppressAssemblyCountryWatch.value = false
     return
   }
   Object.assign(taskForm, {
@@ -821,6 +911,8 @@ const fillForm = (task: TaskForm | null) => {
   syncCountryFields()
   void nextTick(() => {
     restoreAssembleFromTask(task)
+    syncAssemblyCountrySnapshot(taskForm.country)
+    suppressAssemblyCountryWatch.value = false
   })
 }
 
@@ -862,6 +954,9 @@ const handleExpectationPrimaryChange = () => {
 const handleClosed = () => {
   formRef.value?.resetFields()
   pendingSatelliteRestore.value = null
+  satelliteTabMounted.value = false
+  draftAssembledSatellites.value = []
+  assemblyCountrySnapshot.value = ''
 }
 
 /**
@@ -888,13 +983,16 @@ const resolveCreatedTaskId = (data: unknown): string | undefined => {
 type AddTaskPayload = Parameters<typeof createTask>[0]
 
 const buildAddTaskPayload = (): AddTaskPayload | null => {
+  snapshotSatelliteAssemblyDraft()
   const satellites = satelliteAssembleRef.value
     ? satelliteAssembleRef.value.getAssembledTaskSatellites()
-    : (taskForm.satellites ?? []).map((item) => ({
-        resourceId: item.resourceId,
-        name: item.name,
-        code: item.code,
-      }))
+    : draftAssembledSatellites.value.length
+      ? draftAssembledSatellites.value.map((item) => ({ ...item }))
+      : (taskForm.satellites ?? []).map((item) => ({
+          resourceId: item.resourceId,
+          name: item.name,
+          code: item.code,
+        }))
   const stations = stationAssembleRef.value?.getAssembledRows() ?? []
   const weapons = weaponAssembleRef.value?.getAssembledRows() ?? []
 

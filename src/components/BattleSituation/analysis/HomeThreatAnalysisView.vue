@@ -4,14 +4,14 @@
   <div v-else class="threat-table-shell">
       <div class="threat-table-panel">
         <div class="threat-table-caption">
-          <span class="threat-table-title">威胁度分析</span>
-          <span class="threat-table-formula">综合威胁度 = 静态威胁度 × 动态威胁度（默认聚合算法 multiply）</span>
+          <div class="threat-table-caption-text">
+            <span class="threat-table-title">威胁度分析</span>
+            <p class="threat-table-formula">综合威胁度 = 静态威胁度 × 动态威胁度（默认聚合算法 multiply）</p>
+            <p v-if="metaLine" class="analysis-meta analysis-meta--inline">{{ metaLine }}</p>
+          </div>
           <el-button size="small" :loading="loading" @click="loadThreatAnalysis">刷新</el-button>
         </div>
-        <p class="analysis-intro">
-          数据来自 <code>GET /api/compute/threat/{taskId}</code>。静态、动态因子明细见对应列辅助说明；任务算法未完成时接口可能返回错误，请以提示为准。
-        </p>
-        <p v-if="metaLine" class="analysis-meta">{{ metaLine }}</p>
+        <p class="analysis-intro">静态、动态因子明细见对应列辅助说明；任务算法未完成时请稍后刷新。</p>
         <p v-if="algorithmLine" class="analysis-meta analysis-meta--algo">{{ algorithmLine }}</p>
         <p v-if="errorMessage" class="analysis-error">{{ errorMessage }}</p>
         <div v-loading="loading" class="threat-table-scroll">
@@ -182,7 +182,6 @@ const metaLine = computed(() => {
   const parts = [
     data.taskName ? `任务：${data.taskName}` : '',
     data.generatedAt ? `计算时间：${data.generatedAt}` : '',
-    data.taskId ? `任务 ID：${data.taskId}` : '',
   ].filter(Boolean)
   return parts.join(' · ')
 })
@@ -250,6 +249,8 @@ void loadAlgorithmCatalog()
 </script>
 
 <style scoped lang="scss">
+@use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
+
 $threat-table-border: rgba(56, 189, 248, 0.55);
 
 .home-threat-analysis {
@@ -291,37 +292,54 @@ $threat-table-border: rgba(56, 189, 248, 0.55);
 }
 
 .threat-table-caption {
-  display: grid;
+  display: flex;
   flex-shrink: 0;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  column-gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   padding: 12px 16px;
   background: rgba(13, 27, 49, 0.6);
   border-bottom: 1px solid $threat-table-border;
 }
 
+.threat-table-caption-text {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
 .threat-table-title {
-  font-size: 18px;
+  display: block;
+  font-size: battleUi.$battle-ui-font-emphasis;
   font-weight: 700;
   color: #7dd3fc;
 }
 
 .threat-table-formula {
-  justify-self: center;
+  margin: 6px 0 0;
   color: #94a3b8;
-  font-size: 14px;
+  font-size: battleUi.$battle-ui-font-base;
+  line-height: 1.45;
+  text-align: left;
 }
 
 .analysis-intro,
 .analysis-meta {
   flex-shrink: 0;
   margin: 0;
-  padding: 8px 16px;
+  padding: 10px 16px;
   color: #94a3b8;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: battleUi.$battle-ui-font-base;
+  line-height: 1.45;
+  text-align: left;
   border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+}
+
+.analysis-meta--inline {
+  margin: 6px 0 0;
+  padding: 0;
+  border-bottom: none;
+  color: #cbd5e1;
 }
 
 .analysis-meta--algo {
@@ -331,9 +349,10 @@ $threat-table-border: rgba(56, 189, 248, 0.55);
 .analysis-error {
   flex-shrink: 0;
   margin: 0;
-  padding: 8px 16px;
+  padding: 10px 16px;
   color: #f87171;
-  font-size: 13px;
+  font-size: battleUi.$battle-ui-font-base;
+  text-align: left;
 }
 
 .threat-table-scroll {
@@ -346,7 +365,7 @@ $threat-table-border: rgba(56, 189, 248, 0.55);
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 13px;
+  font-size: battleUi.$battle-ui-font-base;
 }
 
 .threat-group-header th,
@@ -354,11 +373,12 @@ $threat-table-border: rgba(56, 189, 248, 0.55);
   position: sticky;
   top: 0;
   z-index: 2;
-  padding: 8px 6px;
+  padding: 10px 8px;
   border: 1px solid $threat-table-border;
   background: rgba(13, 27, 49, 0.95);
   color: #e2e8f0;
-  font-weight: 600;
+  font-size: battleUi.$battle-ui-font-emphasis;
+  font-weight: 700;
   text-align: center;
 }
 
@@ -379,8 +399,9 @@ $threat-table-border: rgba(56, 189, 248, 0.55);
 }
 
 .threat-dual-table td {
-  padding: 8px 6px;
+  padding: 10px 8px;
   border: 1px solid rgba(56, 189, 248, 0.25);
+  font-size: battleUi.$battle-ui-font-base;
   text-align: center;
   vertical-align: top;
   word-break: break-word;
@@ -395,7 +416,7 @@ $threat-table-border: rgba(56, 189, 248, 0.55);
   text-align: left;
   white-space: pre-wrap;
   color: #94a3b8;
-  font-size: 12px;
+  font-size: battleUi.$battle-ui-font-base;
   line-height: 1.35;
 }
 

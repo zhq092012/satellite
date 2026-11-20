@@ -56,13 +56,14 @@
           <section class="task-panel-block task-panel-block--tree">
             <div class="task-panel-section-head">任务资源</div>
             <p v-if="catalogSourceHint" class="task-panel-hint">{{ catalogSourceHint }}</p>
-            <div v-loading="catalogLoading" class="task-panel-block-body task-panel-block-body--tree">
-              <div v-if="!catalogLoading && !resourceTreeNodes.length" class="task-panel-hint task-panel-hint--center">
+            <div v-loading="treeBootLoading" class="task-panel-block-body task-panel-block-body--tree">
+              <div v-if="!treeBootLoading && !c2PanelResourceTreeNodes.length"
+                class="task-panel-hint task-panel-hint--center">
                 暂无卫星资源
               </div>
-              <el-tree v-show="resourceTreeNodes.length > 0" ref="resourceTreeRef" class="c2-resource-tree"
-                :data="resourceTreeNodes" node-key="id" show-checkbox default-expand-all :props="resourceTreeProps"
-                @check="handleResourceTreeCheck">
+              <el-tree v-show="c2PanelResourceTreeNodes.length > 0" ref="resourceTreeRef" class="c2-resource-tree"
+                :data="c2PanelResourceTreeNodes" node-key="id" show-checkbox :check-on-click-node="false"
+                v-model:expanded-keys="c2TreeExpandedKeys" :props="resourceTreeProps" @check="handleResourceTreeCheck">
                 <template #default="{ node, data }">
                   <span class="c2-resource-tree-node-label" :class="{
                     'c2-resource-tree-node-label--focus':
@@ -111,19 +112,18 @@
 /**
  * 战场态势 - C2 左侧面板：任务摘要、作战阶段/对象、三国资源树、武器配置。
  */
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ElTable } from 'element-plus'
 import type { ElTree } from 'element-plus'
 import { getTaskList, updateTask } from '@/api/task/task'
+import { loadSatelliteSeriesDataForCountries } from '@/api/satellite/satellite'
 import {
-  getSatelliteResourceTree,
-  getSatelliteResourcesBySeries,
-  loadSatelliteSeriesDataForCountries,
-} from '@/api/satellite/satellite'
-import { isResourceApiSuccess } from '@/utils/resourceApi'
-import { mapSatelliteResourceToCatalog } from '@/utils/satelliteResource'
+  getSeriesTaskSatellitesFromPanelTreeCache,
+  loadSatelliteResourceTreeRootsForPanel,
+} from '@/utils/satelliteResourceTreeStoreCache'
 import type { TaskForm } from '@/api/task/task'
+import type { TaskResourceItem } from '@/types/task/task'
 import type { SatelliteTreeCountryNode } from '@/types/satellite/satellite'
 import type { Weapon } from '@/types/dashboard'
 import type { MatrixResult } from '@/api/electronic'
@@ -141,7 +141,10 @@ import {
   resolveEnemyCountriesFromTask,
 } from '@/utils/taskEntity'
 import { isSameBattleId } from '@/utils/battleEntity'
-import { pruneSatelliteResourceTreeByTaskSatellites } from '@/utils/satelliteResourceTree'
+import {
+  buildTaskScopedInventoryFromApiTreeRoots,
+  pruneSatelliteResourceTreeByTaskSatellites,
+} from '@/utils/satelliteResourceTree'
 import { MISSION_SYS_TYPES, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
 import {
   createDraftFromTask,
@@ -152,19 +155,39 @@ import {
 import {
   parseSeriesApiBuckets,
   buildC2FlatRowsFromSatelliteResourceTree,
-  buildC2ResourceTreeFromSatelliteResourceTree,
-  buildC2ResourceTreeNodesForPanel,
+  buildC2PanelCountryNodeId,
+  buildC2PanelFilterKeysFromSeriesCheckStates,
+  buildC2PanelResourceTreeFromApiRoots,
+  buildC2PanelSystemNodeId,
+  parseC2PanelSeriesNodeId,
   buildC2SatelliteFlatRowsFromMatrix,
-  buildC2SatelliteFlatRowsFromSeriesFallback,
   C2_PANEL_TREE_COUNTRIES,
-  collectC2TaskSatelliteTreeLeafIds,
-  expandCheckedKeysToSeriesNames,
+  C2_RESOURCE_EMPTY_FIELD,
+  collectC2ResourceTreeSeriesIdsUnderNode,
+  collectC2ResourceTreeSeriesNodes,
   filterC2ResourceRowsToPanelCountries,
+  mapTaskResourceItemToC2Row,
+  mergeC2ResourceSatelliteRows,
   mergeMatrixCatalogIntoPanelCatalog,
+  resolveC2SeriesScopeFromNode,
   type C2ResourceSatelliteRow,
   type C2ResourceTreeNode,
-  type C2SeriesPreviewSatellite,
 } from '@/utils/buildC2ResourceCatalog'
+import type { AssembleSeriesCheckState, AssembleSeriesCheckStateEntry } from '@/utils/satelliteResourceTree'
+import {
+  applyElTreeSeriesCheckStates,
+  buildTaskSatelliteDisplayMetaFromInventory,
+  clearSeriesSatelliteCache,
+  computeElTreeSeriesCheckStates,
+  fetchSeriesTaskSatellites,
+  mergeSeriesSatellitesIntoTaskList,
+  removeSeriesSatellitesFromTaskList,
+} from '@/utils/taskSatelliteTreeBridge'
+import {
+  buildSatelliteAssembleTreeInBackground,
+  yieldToUiBeforeHeavyTreeMount,
+} from '@/utils/satelliteAssembleTreeWorkerClient'
+import { resolveSeriesNamesFromTaskSatellites } from '@/utils/taskEntity'
 
 defineProps<{
   /** 算法矩阵（与父组件兼容） */
@@ -205,12 +228,23 @@ const weaponOptionsLoading = ref(false)
 const resourceTreeRef = ref<InstanceType<typeof ElTree>>()
 const weaponTableRef = ref<InstanceType<typeof ElTable>>()
 const flatCatalogRows = ref<C2ResourceSatelliteRow[]>([])
-/** 按任务卫星裁剪后的资源树根（供树排序与重建） */
-const prunedTaskResourceRoots = ref<SatelliteTreeCountryNode[]>([])
+/** 左树数据源：`/resource/satellite/tree` 三国缓存（与任务装配一致，展示到系列层） */
+const panelApiTreeRoots = ref<SatelliteTreeCountryNode[]>([])
+/** 扁平行是否来自任务已挂卫星裁剪（仅影响 catalog 提示与右侧数据，不影响左树层级） */
 const catalogFromTaskResource = ref(false)
+/** 首次加载卫星资源树（不遮挡已挂载的 el-tree） */
+const treeBootLoading = ref(false)
 const catalogLoading = ref(false)
 const catalogUsesMatrix = ref(false)
 const programmaticTreeSync = ref(false)
+/** 程序化回显期间禁止 @check 触发保存 / 重算（避免连锁写任务） */
+const suppressResourceTreeSave = ref(false)
+/** Worker 构建的系列卫星清单，供勾选态一次计算 */
+const c2SeriesInventoryForEcho = shallowRef<Record<string, TaskResourceItem[]>>({})
+/** C2 树中处于全选态的系列 node-key（与任务卫星列表分离） */
+const trackedC2FullyCheckedSeriesIds = ref<Set<string>>(new Set())
+/** 系列节点勾选态缓存（避免勾选后再全树 sync 触发 @check 把选中打没） */
+const c2SeriesCheckStateByNodeId = ref<Map<string, AssembleSeriesCheckState>>(new Map())
 const weaponTableRows = ref<Weapon[]>([])
 const resourceTreeProps = { label: 'label', children: 'children' as const }
 
@@ -220,20 +254,147 @@ const combatObjectCountryOptions = [...TASK_ENEMY_COUNTRY_OPTIONS]
 /** 点击作战对象后用于资源树排序 / 高亮的国家（不改变任务数据） */
 const treeSortFocusCountry = ref<string | null>(null)
 
+/** 左树 el-tree 数据（引用稳定，避免勾选/更新 catalog 时整树 remount） */
+const c2PanelResourceTreeNodes = shallowRef<C2ResourceTreeNode[]>([])
+/** 左树当前展开节点 id（用户展开状态与重建树时保留） */
+const c2TreeExpandedKeys = ref<string[]>([])
+
 /**
- * 计算：左侧 C2 资源树节点。
- * 返回：`C2ResourceTreeNode[]`（三国根节点，顺序受 `treeSortFocusCountry` 影响）。
- * 作用：ElTree 数据源。
+ * 收集树中全部 node id。
+ *
+ * @param nodes 树根
  */
-const resourceTreeNodes = computed((): C2ResourceTreeNode[] => {
-  if (catalogFromTaskResource.value && prunedTaskResourceRoots.value.length) {
-    return buildC2ResourceTreeFromSatelliteResourceTree(
-      prunedTaskResourceRoots.value,
-      treeSortFocusCountry.value,
-    )
+const collectC2ResourceTreeNodeIds = (nodes: C2ResourceTreeNode[]): Set<string> => {
+  const ids = new Set<string>()
+  const walk = (list: C2ResourceTreeNode[]) => {
+    list.forEach((node) => {
+      ids.add(node.id)
+      if (node.children?.length) walk(node.children)
+    })
   }
-  return buildC2ResourceTreeNodesForPanel(flatCatalogRows.value, treeSortFocusCountry.value)
-})
+  walk(nodes)
+  return ids
+}
+
+/**
+ * 重建 C2 资源树节点（仅在树根缓存 / 体系过滤 / 国家排序变化时调用）。
+ *
+ * @param options.resetCountryExpand 为 true 时保证国家根处于展开态
+ */
+const rebuildC2PanelResourceTreeNodes = (options?: { resetCountryExpand?: boolean }) => {
+  const next = buildC2PanelResourceTreeFromApiRoots(
+    panelApiTreeRoots.value,
+    resolveTaskTargetTypes(store.activedTask),
+    treeSortFocusCountry.value,
+  )
+  c2PanelResourceTreeNodes.value = next
+  const validIds = collectC2ResourceTreeNodeIds(next)
+  const countryIds = next.filter((node) => node.kind === 'country').map((node) => node.id)
+  let preserved = c2TreeExpandedKeys.value.filter((id) => validIds.has(id))
+  if (options?.resetCountryExpand || !preserved.length) {
+    preserved = [...new Set([...preserved, ...countryIds])]
+  }
+  c2TreeExpandedKeys.value = preserved
+}
+
+/**
+ * 读取 el-tree 中已全选的系列叶子 id（不含国家/体系父节点）。
+ *
+ * @param tree ElTree 实例
+ */
+const collectC2FullyCheckedSeriesNodeIds = (tree: InstanceType<typeof ElTree>): Set<string> =>
+  new Set(
+    (tree.getCheckedNodes(true) as C2ResourceTreeNode[])
+      .filter((node) => node.kind === 'series')
+      .map((node) => node.id),
+  )
+
+/**
+ * 解析应视为全选的系列 id（含勾选 country / system 父节点时未在 true 列表中的系列）。
+ *
+ * @param tree ElTree 实例
+ */
+const resolveC2FullyCheckedSeriesIdsFromTree = (tree: InstanceType<typeof ElTree>): Set<string> => {
+  const seriesIds = collectC2FullyCheckedSeriesNodeIds(tree)
+  for (const node of tree.getCheckedNodes(false) as C2ResourceTreeNode[]) {
+    if (node.kind !== 'country' && node.kind !== 'system') continue
+    const storeNode = tree.getNode(node.id)
+    if (!storeNode?.checked || storeNode.indeterminate) continue
+    collectC2ResourceTreeSeriesIdsUnderNode(c2PanelResourceTreeNodes.value, node.id).forEach((id) => seriesIds.add(id))
+  }
+  return seriesIds
+}
+
+/**
+ * 将 el-tree 当前勾选 / 半选 key 同步到 Store，供右侧列表过滤。
+ */
+const syncC2TreeCheckedKeysToStore = () => {
+  const tree = resourceTreeRef.value
+  if (!tree) {
+    store.setC2TreeCheckedKeys([])
+    return
+  }
+  const checked = tree.getCheckedKeys() as string[]
+  const half =
+    typeof (tree as { getHalfCheckedKeys?: () => string[] }).getHalfCheckedKeys === 'function'
+      ? ((tree as { getHalfCheckedKeys: () => string[] }).getHalfCheckedKeys() as string[])
+      : []
+  store.setC2TreeCheckedKeys([...checked, ...half])
+}
+
+/**
+ * 将缓存的系列勾选态写入树（单节点，不触发全树 sync）。
+ *
+ * @param nodeId 系列节点 id
+ */
+const applyC2CachedSeriesCheckStateToTreeNode = (nodeId: string) => {
+  const state = c2SeriesCheckStateByNodeId.value.get(nodeId)
+  const tree = resourceTreeRef.value
+  if (!state || !tree) return
+  applyElTreeSeriesCheckStates(tree, [{ id: nodeId, state }])
+}
+
+/**
+ * 保证左树已加载（重复调用不会 remount 树）。
+ *
+ * @param options.forceRebuild 强制按最新树根重建
+ */
+const ensureC2PanelResourceTreeLoaded = async (options?: { forceRebuild?: boolean }) => {
+  const needFetchRoots = !panelApiTreeRoots.value.length
+  const needBuild = options?.forceRebuild || !c2PanelResourceTreeNodes.value.length
+  if (!needFetchRoots && !needBuild) return
+  if (needFetchRoots && !c2PanelResourceTreeNodes.value.length) {
+    treeBootLoading.value = true
+  }
+  try {
+    if (needFetchRoots) {
+      panelApiTreeRoots.value = await loadSatelliteResourceTreeRootsForPanel([...C2_PANEL_TREE_COUNTRIES])
+    }
+    if (needBuild) {
+      rebuildC2PanelResourceTreeNodes({ resetCountryExpand: !c2PanelResourceTreeNodes.value.length })
+      if (c2SeriesCheckStateByNodeId.value.size) {
+        await nextTick()
+        await applyC2TreeVisualCheckStates()
+      }
+    }
+  } finally {
+    treeBootLoading.value = false
+  }
+}
+
+/**
+ * 监听：草稿任务卫星类型（体系过滤）。
+ * 回调不返回清理函数。
+ * 作用：类型变更时重建左树，不影响 catalog 扁平行刷新。
+ */
+watch(
+  () => editorDraft.value?.targetTypeShow,
+  () => {
+    if (!panelApiTreeRoots.value.length) return
+    rebuildC2PanelResourceTreeNodes()
+  },
+  { deep: true },
+)
 
 /**
  * 计算：左侧面板任务下拉当前值。
@@ -322,15 +483,21 @@ const currentCombatExpectationSecondaryLabel = computed(() => {
 
 /**
  * 拉取当前场景任务列表（供任务保存后刷新）。
+ *
+ * @param options.silent 为 true 时不顶掉整面板（避免保存后卸载 el-tree）
  */
-const loadBattleTasks = async () => {
+const loadBattleTasks = async (options?: { silent?: boolean }) => {
   const battleId = store.battle?.id
   if (!battleId) {
     taskList.value = store.battle?.tasks || []
     return
   }
-  taskLoading.value = true
-  taskList.value = []
+  const previousTaskList = [...taskList.value]
+  const activeId = store.activedTask?.id
+  if (!options?.silent) {
+    taskLoading.value = true
+    taskList.value = []
+  }
   try {
     const res = await getTaskList(battleId)
     if (res.code === 200 && Array.isArray(res.data)) {
@@ -342,22 +509,33 @@ const loadBattleTasks = async () => {
       if (currentBattle && isSameBattleId(currentBattle.id, battleId)) {
         store.setActivedBattle({ ...currentBattle, tasks })
       }
-      const activeId = store.activedTask?.id
-      if (!tasks.length) {
+      if (options?.silent) {
+        if (!tasks.length) {
+          store.setActivedTask(null)
+        } else if (!activeId || !tasks.some((item) => item.id === activeId)) {
+          store.setActivedTask(tasks[0])
+        }
+      } else if (!tasks.length) {
         store.setActivedTask(null)
       } else if (!activeId || !tasks.some((item) => item.id === activeId)) {
         store.setActivedTask(tasks[0])
       } else {
         store.setActivedTask(tasks.find((item) => item.id === activeId) ?? tasks[0])
       }
-    } else {
+    } else if (!options?.silent) {
       taskList.value = store.battle?.tasks || []
+    } else {
+      taskList.value = previousTaskList
     }
   } catch (error) {
     console.error('加载场景任务列表失败:', error)
-    taskList.value = store.battle?.tasks || []
+    if (!options?.silent) {
+      taskList.value = store.battle?.tasks || []
+    }
   } finally {
-    taskLoading.value = false
+    if (!options?.silent) {
+      taskLoading.value = false
+    }
   }
 }
 
@@ -368,8 +546,9 @@ const loadBattleTasks = async () => {
  */
 watch(
   () => store.battle?.id,
-  () => {
-    void loadBattleTasks()
+  (battleId, prevBattleId) => {
+    if (!battleId || battleId === prevBattleId) return
+    void loadBattleTasks({ silent: true })
   },
   { immediate: true },
 )
@@ -434,6 +613,9 @@ const applyTreeSortFocusFromTask = (task: TaskForm | null | undefined) => {
 const handleCombatObjectCountryClick = (country: string) => {
   if (!(TASK_ENEMY_COUNTRY_OPTIONS as readonly string[]).includes(country)) return
   treeSortFocusCountry.value = country
+  if (panelApiTreeRoots.value.length) {
+    rebuildC2PanelResourceTreeNodes()
+  }
 }
 
 /**
@@ -460,15 +642,10 @@ const fetchTaskSatelliteResourceCatalog = async (task: TaskForm): Promise<boolea
 
   const countries = resolveCombatCountriesFromTask(task)
   const queryCountries = countries.length ? countries : [...C2_PANEL_TREE_COUNTRIES]
-  const res = await getSatelliteResourceTree(queryCountries)
-  if (!isResourceApiSuccess(res.code) || !Array.isArray(res.data)) {
-    throw new Error('加载卫星资源树失败')
-  }
-
-  const pruned = pruneSatelliteResourceTreeByTaskSatellites(res.data, mounted)
+  const roots = await loadSatelliteResourceTreeRootsForPanel(queryCountries)
+  const pruned = pruneSatelliteResourceTreeByTaskSatellites(roots, mounted)
   if (!pruned.length) return false
 
-  prunedTaskResourceRoots.value = pruned
   flatCatalogRows.value = buildC2FlatRowsFromSatelliteResourceTree(pruned)
   catalogFromTaskResource.value = true
   return true
@@ -479,6 +656,42 @@ const fetchTaskSatelliteResourceCatalog = async (task: TaskForm): Promise<boolea
  *
  * @param task 当前任务
  */
+/**
+ * 按草稿已选卫星 lazy 填充右侧列表（系列预览树骨架不含 NORAD）。
+ *
+ * @param taskSatellites 任务挂载卫星
+ */
+const hydrateC2FlatRowsFromTaskSatellites = async (taskSatellites: TaskResourceItem[]) => {
+  if (!taskSatellites.length) return
+  const inventory = buildTaskScopedInventoryFromApiTreeRoots(
+    store.satelliteAssembleTreeRootsCache,
+    taskSatellites,
+  )
+  const metaById = buildTaskSatelliteDisplayMetaFromInventory(taskSatellites, inventory)
+  const rowsFromMeta: C2ResourceSatelliteRow[] = []
+  for (const item of taskSatellites) {
+    const meta = metaById.get(item.resourceId)
+    rowsFromMeta.push(
+      mapTaskResourceItemToC2Row(
+        item,
+        meta ?? {
+          country: C2_RESOURCE_EMPTY_FIELD,
+          system: C2_RESOURCE_EMPTY_FIELD,
+          series: C2_RESOURCE_EMPTY_FIELD,
+        },
+      ),
+    )
+  }
+  const roots = await loadSatelliteResourceTreeRootsForPanel([...C2_PANEL_TREE_COUNTRIES])
+  const pruned = pruneSatelliteResourceTreeByTaskSatellites(roots, taskSatellites)
+  const rowsFromTree = buildC2FlatRowsFromSatelliteResourceTree(pruned)
+  flatCatalogRows.value = mergeC2ResourceSatelliteRows(
+    flatCatalogRows.value,
+    mergeC2ResourceSatelliteRows(rowsFromTree, rowsFromMeta),
+  )
+  store.setC2ResourceSatelliteRows(flatCatalogRows.value)
+}
+
 const fetchSeriesFallbackCatalog = async (task: TaskForm): Promise<C2ResourceSatelliteRow[]> => {
   const treeCountries = [...C2_PANEL_TREE_COUNTRIES]
   const types = editorDraft.value?.targetTypeShow?.length
@@ -487,18 +700,24 @@ const fetchSeriesFallbackCatalog = async (task: TaskForm): Promise<C2ResourceSat
   if (!types.length) return []
   const seriesData = await loadSatelliteSeriesDataForCountries(treeCountries)
   const buckets = parseSeriesApiBuckets(seriesData, types)
-  const previews: Array<{ series: string; sysType: string; satellites: C2SeriesPreviewSatellite[] }> = []
-  for (const bucket of buckets) {
-    const previewRes = await getSatelliteResourcesBySeries(bucket.series)
-    const satellites =
-      isResourceApiSuccess(previewRes.code) && Array.isArray(previewRes.data)
-        ? previewRes.data.map(mapSatelliteResourceToCatalog)
-        : []
-    previews.push({ series: bucket.series, sysType: bucket.sysType, satellites })
+  const skeletonRows: C2ResourceSatelliteRow[] = []
+  for (const country of treeCountries) {
+    for (const bucket of buckets) {
+      skeletonRows.push({
+        rowKey: `skeleton|${country}|${bucket.sysType}|${bucket.series}`,
+        norad: -1,
+        name: '',
+        country,
+        sysType: bucket.sysType,
+        usage: C2_RESOURCE_EMPTY_FIELD,
+        series: bucket.series,
+        sat_type: bucket.sysType,
+        int_id: C2_RESOURCE_EMPTY_FIELD,
+        launch_date: C2_RESOURCE_EMPTY_FIELD,
+      })
+    }
   }
-  return filterC2ResourceRowsToPanelCountries(
-    buildC2SatelliteFlatRowsFromSeriesFallback(previews, treeCountries),
-  )
+  return filterC2ResourceRowsToPanelCountries(skeletonRows)
 }
 
 /**
@@ -506,20 +725,44 @@ const fetchSeriesFallbackCatalog = async (task: TaskForm): Promise<C2ResourceSat
  *
  * @param task 当前任务
  */
+/**
+ * 仅合并 matrix 扁平行，不重建左树（避免分析就绪时把勾选冲掉）。
+ *
+ * @param task 当前任务
+ */
+const mergeC2CatalogRowsFromTaskMatrix = (task: TaskForm) => {
+  const analysis = store.taskAnalysisData
+  const hasMatrix =
+    Boolean(analysis?.levelSeriesEntities?.length) && store.taskAnalysisTaskId === task.id
+  if (!hasMatrix || !analysis) {
+    catalogUsesMatrix.value = false
+    return
+  }
+  const taskEnemies = resolveEnemyCountries(task)
+  const matrixRows = filterC2ResourceRowsToPanelCountries(
+    buildC2SatelliteFlatRowsFromMatrix(analysis, taskEnemies),
+  )
+  flatCatalogRows.value = mergeMatrixCatalogIntoPanelCatalog(flatCatalogRows.value, matrixRows)
+  catalogUsesMatrix.value = true
+  store.setC2ResourceSatelliteRows(flatCatalogRows.value)
+}
+
 const refreshResourceCatalog = async (task: TaskForm | null | undefined) => {
+  await yieldToUiBeforeHeavyTreeMount()
   if (!task) {
     flatCatalogRows.value = []
-    prunedTaskResourceRoots.value = []
+    panelApiTreeRoots.value = []
+    c2PanelResourceTreeNodes.value = []
+    c2TreeExpandedKeys.value = []
     catalogFromTaskResource.value = false
     store.setC2ResourceSatelliteRows([])
     catalogUsesMatrix.value = false
     return
   }
   const taskEnemies = resolveEnemyCountries(task)
-  catalogLoading.value = true
   try {
     catalogFromTaskResource.value = false
-    prunedTaskResourceRoots.value = []
+    await ensureC2PanelResourceTreeLoaded()
 
     const usedTaskResourceTree = await fetchTaskSatelliteResourceCatalog(task)
     const analysis = store.taskAnalysisData
@@ -538,11 +781,7 @@ const refreshResourceCatalog = async (task: TaskForm | null | undefined) => {
         catalogUsesMatrix.value = false
       }
       store.setC2ResourceSatelliteRows(flatCatalogRows.value)
-      await applyTaskResourceTreeCheckedKeys()
-      return
-    }
-
-    if (hasMatrix && analysis) {
+    } else if (hasMatrix && analysis) {
       const matrixRows = filterC2ResourceRowsToPanelCountries(
         buildC2SatelliteFlatRowsFromMatrix(analysis, taskEnemies),
       )
@@ -556,34 +795,181 @@ const refreshResourceCatalog = async (task: TaskForm | null | undefined) => {
       catalogUsesMatrix.value = false
       flatCatalogRows.value = await fetchSeriesFallbackCatalog(task)
     }
+    const taskSats = editorDraft.value?.selectedSatellites ?? task.satellites ?? []
     store.setC2ResourceSatelliteRows(flatCatalogRows.value)
-    await reapplyResourceTreeCheckedKeys()
+    suppressResourceTreeSave.value = true
+    try {
+      if (taskSats.length) {
+        await hydrateC2FlatRowsFromTaskSatellites(taskSats)
+        store.setC2ResourceSatelliteRows(flatCatalogRows.value)
+        const roots = store.satelliteAssembleTreeRootsCache
+        if (roots?.length) {
+          const systems = resolveTaskTargetTypes(task)
+          const { seriesInventory } = await buildSatelliteAssembleTreeInBackground(
+            roots,
+            systems,
+            taskSats.map((item) => ({ ...item })),
+          )
+          c2SeriesInventoryForEcho.value = seriesInventory
+        } else {
+          c2SeriesInventoryForEcho.value = {}
+        }
+        buildC2SeriesCheckEchoFromTaskSatellites(taskSats)
+        await nextTick()
+        await applyTaskResourceTreeCheckedKeys()
+      } else {
+        c2SeriesInventoryForEcho.value = {}
+        await clearResourceTreeSelection()
+      }
+    } finally {
+      await nextTick()
+      suppressResourceTreeSave.value = false
+    }
   } catch (error) {
     console.error('加载 C2 资源 catalog 失败:', error)
     flatCatalogRows.value = []
-    prunedTaskResourceRoots.value = []
+    panelApiTreeRoots.value = []
+    c2PanelResourceTreeNodes.value = []
+    c2TreeExpandedKeys.value = []
     catalogFromTaskResource.value = false
     store.setC2ResourceSatelliteRows([])
-  } finally {
-    catalogLoading.value = false
   }
 }
 
-/** 任务资源树模式：勾选任务内全部卫星叶子 */
-const applyTaskResourceTreeCheckedKeys = async () => {
-  const leafIds = collectC2TaskSatelliteTreeLeafIds(resourceTreeNodes.value)
-  await nextTick()
-  const tree = resourceTreeRef.value
-  programmaticTreeSync.value = true
-  if (leafIds.length) {
-    tree?.setCheckedKeys(leafIds)
-    store.setC2TreeCheckedKeys(leafIds)
-  } else {
-    tree?.setCheckedKeys([])
-    store.setC2TreeCheckedKeys([])
+/**
+ * 根据系列勾选态汇总 country / system 展示态（与任务装配页一致）。
+ *
+ * @param nodeId 国家或体系节点 id
+ */
+const computeC2AggregateCheckState = (nodeId: string): AssembleSeriesCheckState => {
+  const seriesIds = collectC2ResourceTreeSeriesIdsUnderNode(c2PanelResourceTreeNodes.value, nodeId)
+  if (!seriesIds.length) return 'none'
+  const states = seriesIds.map((id) => c2SeriesCheckStateByNodeId.value.get(id) ?? 'none')
+  if (states.every((state) => state === 'all')) return 'all'
+  if (states.every((state) => state === 'none')) return 'none'
+  return 'partial'
+}
+
+/**
+ * 根据任务 satellites 计算系列勾选态，并写入 Store 过滤键（不依赖 el-tree 已挂载）。
+ *
+ * @param taskSats 任务已选卫星
+ */
+const buildC2SeriesCheckEchoFromTaskSatellites = (taskSats: TaskResourceItem[]) => {
+  const entries = collectC2ResourceTreeSeriesNodes(c2PanelResourceTreeNodes.value)
+    .map((node) => {
+      const scope = resolveC2SeriesScopeFromNode(node)
+      return scope ? { id: node.id, scope } : null
+    })
+    .filter(Boolean) as Array<{ id: string; scope: { country: string; system: string; series: string } }>
+  const seriesStates = computeElTreeSeriesCheckStates(entries, taskSats, c2SeriesInventoryForEcho.value)
+  c2SeriesCheckStateByNodeId.value = new Map(seriesStates.map((item) => [item.id, item.state]))
+  const filterKeys = buildC2PanelFilterKeysFromSeriesCheckStates(
+    seriesStates,
+    c2PanelResourceTreeNodes.value,
+  )
+  if (filterKeys.length) {
+    store.setC2TreeCheckedKeys(filterKeys)
   }
+  trackedC2FullyCheckedSeriesIds.value = new Set(
+    seriesStates.filter((item) => item.state === 'all').map((item) => item.id),
+  )
+  return seriesStates
+}
+
+/**
+ * 收集 C2 树回显勾选条目（系列 + country/system 汇总；与任务装配页 `collectEchoCheckStateEntries` 一致）。
+ */
+const collectC2EchoCheckStateEntries = (): AssembleSeriesCheckStateEntry[] => {
+  const entries: AssembleSeriesCheckStateEntry[] = []
+  const pushed = new Set<string>()
+  const pushEntry = (id: string, state: AssembleSeriesCheckState) => {
+    if (state === 'none' || pushed.has(id)) return
+    pushed.add(id)
+    entries.push({ id, state })
+  }
+  for (const [seriesId, state] of c2SeriesCheckStateByNodeId.value) {
+    pushEntry(seriesId, state)
+  }
+  const walk = (nodes: C2ResourceTreeNode[]) => {
+    for (const node of nodes) {
+      if (node.kind === 'country' || node.kind === 'system') {
+        pushEntry(node.id, computeC2AggregateCheckState(node.id))
+      }
+      if (node.children?.length) walk(node.children)
+    }
+  }
+  walk(c2PanelResourceTreeNodes.value)
+  return entries
+}
+
+/**
+ * 回显写入顺序：先系列，再体系，最后国家（避免父节点先写导致子节点被清掉）。
+ */
+const orderC2EchoEntriesForTreeApply = (entries: AssembleSeriesCheckStateEntry[]): AssembleSeriesCheckStateEntry[] => {
+  const rank = (nodeId: string): number => {
+    if (nodeId.startsWith('series::')) return 0
+    if (nodeId.startsWith('system::')) return 1
+    if (nodeId.startsWith('country::')) return 2
+    return 3
+  }
+  return [...entries].sort((left, right) => rank(left.id) - rank(right.id))
+}
+
+/**
+ * 将已缓存的勾选态绘制到 C2 el-tree（展开路径 + 分层层级回写）。
+ */
+const applyC2TreeVisualCheckStates = async () => {
+  const tree = resourceTreeRef.value
+  if (!tree || !c2PanelResourceTreeNodes.value.length) return
+  if (!c2SeriesCheckStateByNodeId.value.size) return
+
+  const expandKeys = new Set(c2TreeExpandedKeys.value)
+  for (const [seriesId, state] of c2SeriesCheckStateByNodeId.value) {
+    if (state === 'none') continue
+    const parsed = parseC2PanelSeriesNodeId(seriesId)
+    if (parsed) {
+      expandKeys.add(buildC2PanelCountryNodeId(parsed.country))
+      expandKeys.add(buildC2PanelSystemNodeId(parsed.country, parsed.system))
+    }
+  }
+  c2TreeExpandedKeys.value = [...expandKeys]
   await nextTick()
-  programmaticTreeSync.value = false
+
+  const entries = orderC2EchoEntriesForTreeApply(
+    collectC2EchoCheckStateEntries().filter((entry) => Boolean(tree.getNode(entry.id))),
+  )
+  if (!entries.length) return
+
+  programmaticTreeSync.value = true
+  try {
+    applyElTreeSeriesCheckStates(tree, entries)
+    trackedC2FullyCheckedSeriesIds.value = new Set(
+      [...c2SeriesCheckStateByNodeId.value.entries()]
+        .filter(([, state]) => state === 'all')
+        .map(([id]) => id),
+    )
+    const seriesStates = [...c2SeriesCheckStateByNodeId.value.entries()].map(([id, state]) => ({ id, state }))
+    const filterKeys = buildC2PanelFilterKeysFromSeriesCheckStates(
+      seriesStates,
+      c2PanelResourceTreeNodes.value,
+    )
+    if (filterKeys.length) store.setC2TreeCheckedKeys(filterKeys)
+  } finally {
+    await nextTick()
+    programmaticTreeSync.value = false
+  }
+}
+
+/**
+ * 任务资源树模式：按任务 satellites 回显系列全选 / 半选，并同步右侧列表过滤键。
+ */
+const applyTaskResourceTreeCheckedKeys = async () => {
+  await nextTick()
+  const taskSats = editorDraft.value?.selectedSatellites ?? store.activedTask?.satellites ?? []
+  if (!taskSats.length) return
+  buildC2SeriesCheckEchoFromTaskSatellites(taskSats)
+  await applyC2TreeVisualCheckStates()
 }
 
 /** 清空资源树勾选（界面默认不勾选，右侧列表为空） */
@@ -597,33 +983,70 @@ const clearResourceTreeSelection = async () => {
   programmaticTreeSync.value = false
 }
 
-/**
- * catalog 刷新后恢复 store 中的勾选（不从任务 resources 自动回显）。
- */
-const reapplyResourceTreeCheckedKeys = async () => {
-  await nextTick()
-  const tree = resourceTreeRef.value
-  if (!tree) return
-  programmaticTreeSync.value = true
-  tree.setCheckedKeys([...store.c2TreeCheckedKeys])
-  await nextTick()
-  programmaticTreeSync.value = false
-}
+
 
 /**
- * 资源树勾选变更：立即同步 Store 供右侧列表过滤；系列写入草稿后再保存任务。
- * 仅使用叶子节点 keys（不含半选父节点），避免取消单个系列时仍匹配整国/整类。
+ * 资源树勾选：系列叶子全选时 search 加载卫星；与 `selectedSatellites` 分离维护后写回任务。
  */
-const handleResourceTreeCheck = () => {
-  if (programmaticTreeSync.value || !editorDraft.value) return
+const handleResourceTreeCheck = async () => {
+  if (programmaticTreeSync.value || suppressResourceTreeSave.value || !editorDraft.value) return
   const tree = resourceTreeRef.value
   if (!tree) return
-  const checkedLeafKeys = tree.getCheckedKeys(true) as string[]
-  store.setC2TreeCheckedKeys(checkedLeafKeys)
-  const seriesSet = expandCheckedKeysToSeriesNames(checkedLeafKeys, flatCatalogRows.value)
-  editorDraft.value.selectedSeries = [...seriesSet].sort((a, b) => a.localeCompare(b, 'zh-CN'))
-  if (editorDraft.value.selectedSeries.length > 0) {
-    void handleSaveAndRecalculate()
+  const checkedSeriesIds = resolveC2FullyCheckedSeriesIdsFromTree(tree)
+  const prev = trackedC2FullyCheckedSeriesIds.value
+  const added = [...checkedSeriesIds].filter((id) => !prev.has(id))
+  const removed = [...prev].filter((id) => !checkedSeriesIds.has(id))
+  if (!added.length && !removed.length) return
+
+  const findSeriesNode = (id: string) =>
+    collectC2ResourceTreeSeriesNodes(c2PanelResourceTreeNodes.value).find((node) => node.id === id)
+
+  programmaticTreeSync.value = true
+  try {
+    let nextSelected = editorDraft.value.selectedSatellites.map((item) => ({ ...item }))
+    let nextRows = [...flatCatalogRows.value]
+
+    for (const seriesId of added) {
+      const scope = resolveC2SeriesScopeFromNode(findSeriesNode(seriesId) as C2ResourceTreeNode)
+      if (!scope) continue
+      const seriesResources = await fetchSeriesTaskSatellites(scope)
+      nextSelected = mergeSeriesSatellitesIntoTaskList(nextSelected, seriesResources)
+      nextRows = mergeC2ResourceSatelliteRows(
+        nextRows,
+        seriesResources.map((item) => mapTaskResourceItemToC2Row(item, scope)),
+      )
+    }
+
+    for (const seriesId of removed) {
+      const scope = resolveC2SeriesScopeFromNode(findSeriesNode(seriesId) as C2ResourceTreeNode)
+      if (!scope) continue
+      const seriesResources = getSeriesTaskSatellitesFromPanelTreeCache(scope)
+      const removedKeys = new Set(seriesResources.map((item) => item.resourceId))
+      nextSelected = removeSeriesSatellitesFromTaskList(nextSelected, seriesResources)
+      nextRows = nextRows.filter((row) => !row.resourceId || !removedKeys.has(row.resourceId))
+    }
+
+    editorDraft.value.selectedSatellites = nextSelected
+    editorDraft.value.selectedSeries = resolveSeriesNamesFromTaskSatellites(nextSelected)
+    flatCatalogRows.value = nextRows
+    store.setC2ResourceSatelliteRows(nextRows)
+    added.forEach((id) => c2SeriesCheckStateByNodeId.value.set(id, 'all'))
+    removed.forEach((id) => c2SeriesCheckStateByNodeId.value.set(id, 'none'))
+    for (const id of [...added, ...removed]) {
+      applyC2CachedSeriesCheckStateToTreeNode(id)
+    }
+    trackedC2FullyCheckedSeriesIds.value = resolveC2FullyCheckedSeriesIdsFromTree(tree)
+    syncC2TreeCheckedKeysToStore()
+
+    if (editorDraft.value.selectedSatellites.length > 0) {
+      void handleSaveAndRecalculate()
+    }
+  } catch (error) {
+    console.error('C2 资源树勾选处理失败:', error)
+    ElMessage.error('加载系列卫星失败')
+  } finally {
+    await nextTick()
+    programmaticTreeSync.value = false
   }
 }
 
@@ -655,30 +1078,46 @@ const syncWeaponTableSelection = async () => {
   })
 }
 
+/** 同一任务并发同步去重 */
+let syncEditorInflight: Promise<void> | null = null
+let syncEditorInflightTaskId: string | null = null
+
 /**
  * 切换任务时同步编辑草稿与资源/武器。
  *
  * @param task 当前任务
  */
 const syncEditorForTask = async (task: TaskForm | null | undefined) => {
-  editorDraft.value = createDraftFromTask(task)
-  if (task && editorDraft.value) {
-    stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
-    useWeaponsEnabled.value = false
-    editorDraft.value.selectedWeaponIds = []
-  } else {
-    stashedWeaponIds.value = []
-    useWeaponsEnabled.value = false
+  const taskId = task?.id ?? null
+  if (syncEditorInflight && syncEditorInflightTaskId === taskId) {
+    return syncEditorInflight
   }
-  if (!task) {
-    store.clearC2ResourceSelection()
-    return
-  }
-  store.setC2TreeCheckedKeys([])
-  await Promise.all([refreshResourceCatalog(task)])
-  if (!catalogFromTaskResource.value) {
-    await clearResourceTreeSelection()
-  }
+  syncEditorInflightTaskId = taskId
+  syncEditorInflight = (async () => {
+    editorDraft.value = createDraftFromTask(task)
+    if (task && editorDraft.value) {
+      stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
+      useWeaponsEnabled.value = false
+      editorDraft.value.selectedWeaponIds = []
+    } else {
+      stashedWeaponIds.value = []
+      useWeaponsEnabled.value = false
+    }
+    if (!task) {
+      store.clearC2ResourceSelection()
+      return
+    }
+    clearSeriesSatelliteCache()
+    trackedC2FullyCheckedSeriesIds.value = new Set()
+    c2SeriesCheckStateByNodeId.value = new Map()
+    c2SeriesInventoryForEcho.value = {}
+    store.setC2TreeCheckedKeys([])
+    await refreshResourceCatalog(task)
+  })().finally(() => {
+    syncEditorInflight = null
+    syncEditorInflightTaskId = null
+  })
+  return syncEditorInflight
 }
 
 /**
@@ -696,7 +1135,7 @@ watch(
       analysis?.levelSeriesEntities?.length &&
       store.taskAnalysisTaskId === task.id
     ) {
-      void refreshResourceCatalog(task)
+      mergeC2CatalogRowsFromTaskMatrix(task)
     }
   },
   { deep: true },
@@ -726,6 +1165,21 @@ watch(
   () => store.activedTask?.country,
   () => {
     applyTreeSortFocusFromTask(store.activedTask)
+  },
+)
+
+/**
+ * 监听：C2 el-tree 实例挂载。
+ * 回调不返回清理函数。
+ * 作用：与任务装配页一致，树组件就绪后把缓存勾选态写入界面。
+ */
+watch(
+  () => resourceTreeRef.value,
+  async (tree) => {
+    if (!tree) return
+    if (!c2SeriesCheckStateByNodeId.value.size) return
+    await nextTick()
+    await applyC2TreeVisualCheckStates()
   },
 )
 
@@ -823,9 +1277,7 @@ const handleSaveAndRecalculate = async (options?: { forceWeaponIds?: string[] })
       ElMessage.error(res.msg || '保存任务失败')
       return
     }
-    await loadBattleTasks()
-    const latest = taskList.value.find((item) => item.id === baseTask.id) || payload
-    store.setActivedTask(latest)
+    await loadBattleTasks({ silent: true })
     store.clearTaskAnalysisData()
     await startTaskProgressPolling(baseTask.id)
     emit('task-recalculated', baseTask.id)

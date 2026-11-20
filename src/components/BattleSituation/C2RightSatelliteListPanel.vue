@@ -12,7 +12,7 @@
       <p class="empty-text">请先选择任务</p>
     </div>
 
-    <div v-else-if="!store.c2TreeCheckedKeys.length" class="empty-sat-box">
+    <div v-else-if="!showSatelliteList" class="empty-sat-box">
       <span class="empty-icon">☑️</span>
       <p class="empty-text">请在左侧资源树勾选国家或系列</p>
     </div>
@@ -66,11 +66,29 @@ const store = useLayoutStore()
 
 /**
  * 计算：右侧列表展示的卫星行。
- * 返回：经资源树勾选过滤后的 `c2ResourceSatelliteRows` 子集。
+ * 返回：经资源树勾选过滤后的 `c2ResourceSatelliteRows` 子集；无勾选键时回退到当前任务已选卫星行。
  * 作用：表格数据源与选中高亮 NORAD 对应行。
  */
-const displayRows = computed(() =>
-  filterC2SatellitesByTreeSelection(store.c2ResourceSatelliteRows, store.c2TreeCheckedKeys),
+const displayRows = computed(() => {
+  const filtered = filterC2SatellitesByTreeSelection(
+    store.c2ResourceSatelliteRows,
+    store.c2TreeCheckedKeys,
+  )
+  if (filtered.length) return filtered
+  const taskIds = new Set(
+    (store.activedTask?.satellites ?? []).map((item) => item.resourceId?.trim()).filter(Boolean) as string[],
+  )
+  if (!taskIds.size) return filtered
+  return store.c2ResourceSatelliteRows.filter((row) => row.resourceId && taskIds.has(row.resourceId))
+})
+
+/**
+ * 计算：是否展示卫星表（有树勾选或任务卫星可展示）。
+ * 返回 boolean。
+ * 作用：避免任务回显已写入 catalog 但尚未同步树 key 时出现空提示。
+ */
+const showSatelliteList = computed(
+  () => store.c2TreeCheckedKeys.length > 0 || displayRows.value.length > 0,
 )
 
 /**

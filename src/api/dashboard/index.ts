@@ -655,14 +655,6 @@ export const updateStrikeOfTaskV2 = (taskId: number | undefined, norad?: number)
   }
   return requestAPI.get<AxiosResponseType<StrikeV2>>(url)
 }
-/**
- * 战场所有卫星类型
- * @returns
- */
-export const getBattleSateTypes = () => {
-  const url = `/api/battle/satType`
-  return requestAPI.get<AxiosResponseType<string[]>>(url)
-}
 
 
 /**

@@ -1,8 +1,11 @@
 import type { SatelliteAssembleTreeNode, SatelliteTreeCountryNode } from '@/types/satellite/satellite'
+import type { TaskResourceItem } from '@/types/task/task'
 import {
-  buildSatelliteAssembleTreeNodes,
-  indexSatelliteTreeResources,
-  type SatelliteTreeResourceMeta,
+  buildSatelliteAssembleTreeNodesToSeries,
+  buildSeriesSatelliteInventoryFromApiRoots,
+  collectSeriesDescriptorsFromAssembleNodes,
+  computeAssembleSeriesCheckStates,
+  type AssembleSeriesCheckStateEntry,
 } from '@/utils/satelliteResourceTree'
 
 /** Worker 请求入参 */
@@ -13,14 +16,22 @@ interface BuildTreeMessage {
   roots: SatelliteTreeCountryNode[]
   /** 允许的体系（侦察 / 通信等） */
   allowedSystems: string[]
+  /** 当前任务已选卫星（用于勾选态计算，与树节点分离） */
+  taskSatellites: TaskResourceItem[]
 }
 
-/** Worker 成功回包 */
+/** Worker 成功回包（支持分片渐进返回国家节点） */
 interface BuildTreeSuccess {
   requestId: number
   ok: true
+  /** 是否为渐进分片（末包为 false） */
+  partial: boolean
+  /** 当前已构建的国家根节点（逐包递增） */
   nodes: SatelliteAssembleTreeNode[]
-  indexEntries: Array<[string, SatelliteTreeResourceMeta]>
+  /** 系列勾选态（仅末包携带完整结果） */
+  seriesCheckStates: AssembleSeriesCheckStateEntry[]
+  /** API 系列卫星清单（仅末包；供取消勾选时本地比对，不触发 search） */
+  seriesInventory: Record<string, TaskResourceItem[]>
 }
 
 /** Worker 失败回包 */
@@ -31,24 +42,46 @@ interface BuildTreeFailure {
 }
 
 /**
- * 卫星装配资源树构建 Worker。
- * 将 API 原始数据转换为 el-tree 节点并建立 resourceId 索引，避免大国家在主线程长时间阻塞。
+ * 卫星装配资源树 Worker：渐进构建系列树 + 后台计算勾选态。
  */
 self.onmessage = (event: MessageEvent<BuildTreeMessage>) => {
-  const { requestId, roots, allowedSystems } = event.data || {}
+  const { requestId, roots, allowedSystems, taskSatellites } = event.data || {}
   try {
     if (!Array.isArray(roots)) {
       throw new Error('卫星树 Worker 入参 roots 无效')
     }
-    const nodes = buildSatelliteAssembleTreeNodes(roots, allowedSystems ?? [])
-    const index = indexSatelliteTreeResources(nodes)
-    const payload: BuildTreeSuccess = {
-      requestId,
-      ok: true,
-      nodes,
-      indexEntries: [...index.entries()],
+    const systems = allowedSystems ?? []
+    const picked = Array.isArray(taskSatellites) ? taskSatellites : []
+    const nodes = buildSatelliteAssembleTreeNodesToSeries(roots, systems)
+    const inventory = buildSeriesSatelliteInventoryFromApiRoots(roots, systems)
+    const descriptors = collectSeriesDescriptorsFromAssembleNodes(nodes)
+    const seriesCheckStates = computeAssembleSeriesCheckStates(descriptors, picked, inventory)
+
+    if (!nodes.length) {
+      const payload: BuildTreeSuccess = {
+        requestId,
+        ok: true,
+        partial: false,
+        nodes: [],
+        seriesCheckStates,
+        seriesInventory: inventory,
+      }
+      self.postMessage(payload)
+      return
     }
-    self.postMessage(payload)
+
+    for (let index = 0; index < nodes.length; index += 1) {
+      const partial = index < nodes.length - 1
+      const payload: BuildTreeSuccess = {
+        requestId,
+        ok: true,
+        partial,
+        nodes: nodes.slice(0, index + 1),
+        seriesCheckStates: partial ? [] : seriesCheckStates,
+        seriesInventory: partial ? {} : inventory,
+      }
+      self.postMessage(payload)
+    }
   } catch (error) {
     const payload: BuildTreeFailure = {
       requestId,

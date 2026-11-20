@@ -21,8 +21,8 @@
         filterable>
         <el-option v-for="item in typeFilterOptions" :key="item" :label="item" :value="item" />
       </el-select>
-      <el-button v-if="apiEnabled" class="task-edit-btn task-edit-btn--ghost" size="small" :loading="listLoading"
-        @click="loadCandidatePool">
+      <el-button v-if="apiEnabled" class="task-edit-btn task-edit-btn--ghost" size="small"
+        :loading="isSatelliteKind ? satelliteTreePaneLoading : listLoading" @click="handleRefreshToolbar">
         刷新
       </el-button>
       <span class="assemble-count">{{ isSatelliteKind ? `已选卫星 ${assembledTaskSatellites.length} 颗` : `已装配
@@ -35,13 +35,18 @@
         <div class="assemble-pane-head">
           <span>卫星资源树</span>
         </div>
-        <div v-loading="listLoading" class="assemble-pane-body satellite-tree-body">
-          <div v-if="!satelliteTreeUiNodes.length" class="series-empty">
-            请先配置作战对象与卫星类型，并点击刷新加载树
+        <div v-loading="satelliteTreePaneLoading"
+          :element-loading-text="satelliteTreeCheckLoading ? '正在加载系列卫星并计算勾选状态…' : undefined"
+          class="assemble-pane-body satellite-tree-body">
+          <div v-if="!satelliteTreePaneLoading && !satelliteTreeLazyReady" class="series-empty">
+            请先配置作战对象与卫星类型，并点击刷新加载系列树
           </div>
-          <el-tree v-else ref="satelliteTreeRef" class="satellite-resource-tree" :data="satelliteTreeUiNodes"
-            node-key="id" show-checkbox :default-expanded-keys="satelliteTreeCountryExpandedKeys"
-            :props="{ label: 'label', children: 'children' }" @check="handleSatelliteTreeCheck" />
+          <div v-else-if="satelliteTreeLoading && !satelliteTreeLazyReady" class="series-empty">
+            系列树后台构建中，可先查看右侧已选卫星列表
+          </div>
+          <el-tree v-else ref="satelliteTreeRef" v-model:expanded-keys="satelliteTreeExpandedKeys"
+            class="satellite-resource-tree" lazy :load="loadSatelliteTreeLazyNode" node-key="id" show-checkbox
+            :props="satelliteTreeLazyProps" @check="handleSatelliteTreeCheck" />
         </div>
       </section>
       <section class="assemble-pane satellite-list-pane">
@@ -49,7 +54,7 @@
           <span>已选卫星</span>
         </div>
         <div class="assemble-pane-body assemble-pane-body--satellite-list">
-          <el-table v-loading="listLoading" :data="displayAssembledSatelliteRows" size="small" row-key="id"
+          <el-table :data="displayAssembledSatelliteRows" size="small" row-key="id"
             class="assemble-table assemble-table--satellite-preview" empty-text="请在上方树中勾选卫星" height="100%" fit
             style="width: 100%">
             <el-table-column v-for="col in tableColumns" :key="col.prop" :prop="col.prop" :label="col.label"
@@ -224,22 +229,33 @@ import type { ElTree } from 'element-plus'
 import {
   createWeapon,
   deleteWeapon,
-  getBattleSateTypes,
   updateWeapon,
 } from '@/api/dashboard'
-import { getSatelliteResourceTree } from '@/api/satellite/satellite'
-import { isResourceApiSuccess } from '@/utils/resourceApi'
-import type { SatelliteAssembleTreeNode } from '@/types/satellite/satellite'
+import {
+  getSeriesTaskSatellitesFromPanelTreeCache,
+  loadSatelliteResourceTreeRootsForPanel,
+} from '@/utils/satelliteResourceTreeStoreCache'
+import type { SatelliteAssembleTreeNode, SatelliteTreeCountryNode } from '@/types/satellite/satellite'
 import type { TaskResourceItem } from '@/types/task/task'
+import { buildSatelliteAssembleTreeInBackground } from '@/utils/satelliteAssembleTreeWorkerClient'
 import {
-  resolveSatelliteTreeMetaForTaskResource,
-  satelliteTreeNodeMatchesTaskResource,
-  type SatelliteTreeResourceMeta,
+  clearSeriesSatelliteCache,
+  fetchSeriesTaskSatellites,
+  mergeSeriesSatellitesIntoTaskList,
+  removeSeriesSatellitesFromTaskList,
+  buildSeriesScopeCacheKey,
+  resolveSeriesScopeFromAssembleNode,
+  applyElTreeSeriesCheckStates,
+  buildTaskSatelliteDisplayMetaFromInventory,
+  type SatelliteSeriesScope,
+  type TaskSatelliteTreeDisplayMeta,
+} from '@/utils/taskSatelliteTreeBridge'
+import {
+  buildTaskScopedInventoryFromApiTreeRoots,
+  type AssembleSeriesCheckState,
+  type AssembleSeriesCheckStateEntry,
 } from '@/utils/satelliteResourceTree'
-import {
-  buildSatelliteAssembleTreeInBackground,
-  yieldToUiBeforeHeavyTreeMount,
-} from '@/utils/satelliteAssembleTreeWorkerClient'
+import { useLayoutStore } from '@/store/modules/layout'
 import { GROUND_STATION_COUNTRY_OPTIONS } from '@/constants/groundStationCountries'
 import {
   createGroundStation,
@@ -327,6 +343,8 @@ const props = defineProps<{
   combatCountries?: string[]
   /** 任务基本信息中的卫星类型（侦察、通信），用于过滤系列下拉 */
   targetTypes?: string[]
+  /** 编辑任务回显：进入卫星 Tab 前已知的任务 `satellites` */
+  initialTaskSatellites?: TaskResourceItem[]
 }>()
 
 /** 候选表实例，用于同步勾选。 */
@@ -355,10 +373,37 @@ const assembledSelection = ref<TaskAssembleRow[]>([])
 const assembledRows = ref<TaskAssembleRow[]>([])
 /** 卫星资源树组件引用 */
 const satelliteTreeRef = ref<InstanceType<typeof ElTree> | null>(null)
-/** 卫星装配树节点（国家 → 体系 → 系列 → 卫星）；大树使用 shallowRef 避免深度响应式开销 */
-const satelliteTreeUiNodes = shallowRef<SatelliteAssembleTreeNode[]>([])
-/** 树叶子 resourceId → 元数据索引 */
-const satelliteTreeResourceIndex = ref(new Map<string, SatelliteTreeResourceMeta>())
+/** 回显时展开的国家 / 体系节点（懒加载树下勾选态依赖子节点已挂载） */
+const satelliteTreeExpandedKeys = ref<string[]>([])
+/** Worker 构建的完整系列树（懒加载数据源，不一次性挂到 el-tree） */
+const satelliteTreeBuiltRoots = shallowRef<SatelliteAssembleTreeNode[]>([])
+/** 系列树是否可懒加载展示（Worker 至少返回一国后即 true） */
+const satelliteTreeLazyReady = ref(false)
+/** 仅系列树区域加载中（与已选卫星表分离） */
+const satelliteTreeLoading = ref(false)
+/** 勾选系列后 search + Worker 重算勾选态 */
+const satelliteTreeCheckLoading = ref(false)
+/** 最近一次 Worker 建树入参（勾选后重算勾选态复用） */
+const satelliteTreeLastBuildContext = shallowRef<{
+  roots: SatelliteTreeCountryNode[]
+  systems: string[]
+} | null>(null)
+/**
+ * 计算：卫星资源树区域是否显示 loading 遮罩。
+ * 返回 boolean。
+ * 作用：初次 Worker 建树与勾选后重算期间禁止重复操作树。
+ */
+const satelliteTreePaneLoading = computed(
+  () => satelliteTreeLoading.value || satelliteTreeCheckLoading.value,
+)
+/** Worker 计算的系列勾选态 */
+const seriesCheckStateByNodeId = ref(new Map<string, AssembleSeriesCheckState>())
+/** API 快照系列卫星（取消勾选时本地比对，默认不 search） */
+const seriesInventoryFromApiByScopeKey = shallowRef<Record<string, TaskResourceItem[]>>({})
+/** 已选卫星展示元数据（与树节点分离，resourceId → 国家/体系/系列） */
+const satelliteDisplayMetaByResourceId = ref(new Map<string, TaskSatelliteTreeDisplayMeta>())
+/** 系列节点处于「全选」态的 tree id（与任务卫星分离，用于 diff 勾选） */
+const trackedFullyCheckedSeriesIds = ref<Set<string>>(new Set())
 /** 已勾选卫星（对应任务 `satellites` 字段） */
 const assembledTaskSatellites = ref<TaskResourceItem[]>([])
 /** 程序化同步树勾选，避免递归触发 */
@@ -571,14 +616,111 @@ const typeFilterOptions = computed(() => {
  */
 const candidateTotalText = computed(() => String(filteredCandidates.value.length))
 
+/** 懒加载树 props：系列为叶子 */
+const satelliteTreeLazyProps = {
+  label: 'label',
+  children: 'children',
+  isLeaf: (data: SatelliteAssembleTreeNode) => data.nodeType === 'series',
+}
+
 /**
- * 计算：卫星资源树默认展开的国家节点 key。
- * 返回：仅国家层节点 id 列表。
- * 作用：打开国家层便于浏览，避免全树展开导致页面卡死。
+ * 在 Worker 完整树中查找节点。
+ *
+ * @param nodeId 节点 id
  */
-const satelliteTreeCountryExpandedKeys = computed(() =>
-  satelliteTreeUiNodes.value.map((node) => node.id),
-)
+const findBuiltAssembleNodeById = (nodeId: string): SatelliteAssembleTreeNode | undefined => {
+  let found: SatelliteAssembleTreeNode | undefined
+  const walk = (list: SatelliteAssembleTreeNode[]) => {
+    for (const node of list) {
+      if (node.id === nodeId) {
+        found = node
+        return
+      }
+      if (node.children?.length) walk(node.children)
+    }
+  }
+  walk(satelliteTreeBuiltRoots.value)
+  return found
+}
+
+
+
+/**
+ * 从 Worker 完整树收集某节点下全部系列 id。
+ *
+ * @param nodeId 国家 / 体系 / 系列节点 id
+ */
+const collectSeriesIdsUnderBuiltNode = (nodeId: string): string[] => {
+  const root = findBuiltAssembleNodeById(nodeId)
+  if (!root) return []
+  const ids: string[] = []
+  const walk = (node: SatelliteAssembleTreeNode) => {
+    if (node.nodeType === 'series') {
+      ids.push(node.id)
+      return
+    }
+    node.children?.forEach(walk)
+  }
+  walk(root)
+  return ids
+}
+
+/**
+ * 解析当前应视为「全选」的系列 id（含懒加载未展开的父节点勾选）。
+ *
+ * @param tree ElTree 实例
+ */
+const resolveFullyCheckedSeriesIdsFromTree = (tree: InstanceType<typeof ElTree>): Set<string> => {
+  const seriesIds = new Set(
+    (tree.getCheckedNodes(true) as SatelliteAssembleTreeNode[])
+      .filter((node) => node.nodeType === 'series')
+      .map((node) => node.id),
+  )
+  for (const node of tree.getCheckedNodes(false) as SatelliteAssembleTreeNode[]) {
+    if (node.nodeType !== 'country' && node.nodeType !== 'system') continue
+    const storeNode = tree.getNode(node.id)
+    if (!storeNode?.checked || storeNode.indeterminate) continue
+    collectSeriesIdsUnderBuiltNode(node.id).forEach((id) => seriesIds.add(id))
+  }
+  return seriesIds
+}
+
+/**
+ * el-tree 懒加载：国家 → 体系 → 系列；不预加载 search 卫星。
+ */
+const loadSatelliteTreeLazyNode = (
+  node: { level: number; data: SatelliteAssembleTreeNode },
+  resolve: (children: SatelliteAssembleTreeNode[]) => void,
+) => {
+  if (node.level === 0) {
+    resolve(
+      satelliteTreeBuiltRoots.value.map((country) => ({
+        ...country,
+        children: undefined,
+      })),
+    )
+    void nextTick(() => refreshMountedTreeEchoCheckStates())
+    return
+  }
+  const data = node.data
+  const full = findBuiltAssembleNodeById(data.id)
+  if (!full?.children?.length) {
+    resolve([])
+    return
+  }
+  if (data.nodeType === 'system') {
+    const seriesNodes = full.children.map((item) => ({ ...item, children: undefined }))
+    resolve(seriesNodes)
+    void nextTick(() => refreshMountedTreeEchoCheckStates())
+    return
+  }
+  const childNodes = full.children.map((item) => ({
+    ...item,
+    children: undefined,
+  }))
+  resolve(childNodes)
+  void nextTick(() => refreshMountedTreeEchoCheckStates())
+}
 
 /**
  * 创建空白地面站表单。
@@ -736,9 +878,182 @@ const clearSatelliteAssemblyState = () => {
   previewFocusSeries.value = ''
   satelliteTableSeriesFilter.value = ''
   candidatePool.satellite = []
-  satelliteTreeUiNodes.value = []
-  satelliteTreeResourceIndex.value = new Map()
+  satelliteTreeBuiltRoots.value = []
+  satelliteTreeLazyReady.value = false
+  seriesCheckStateByNodeId.value = new Map()
+  seriesInventoryFromApiByScopeKey.value = {}
+  satelliteDisplayMetaByResourceId.value = new Map()
+  trackedFullyCheckedSeriesIds.value = new Set()
+  satelliteTreeLastBuildContext.value = null
+  satelliteTreeExpandedKeys.value = []
+  clearSeriesSatelliteCache()
   satelliteTreeRef.value?.setCheckedKeys([], false)
+}
+
+/**
+ * 合并 Worker 与 Store 树快照，用于任务卫星反向归属查询。
+ */
+const layoutStore = useLayoutStore()
+
+/**
+ * 合并 Worker / Store 树快照，用于任务卫星反向归属（仅扫任务相关系列）。
+ */
+const resolveSatelliteEchoInventorySnapshot = (): Record<string, TaskResourceItem[]> => ({
+  ...buildTaskScopedInventoryFromApiTreeRoots(
+    layoutStore.satelliteAssembleTreeRootsCache,
+    assembledTaskSatellites.value,
+  ),
+  ...seriesInventoryFromApiByScopeKey.value,
+})
+
+/**
+ * 从树快照反查任务卫星的国家 / 体系 / 系列并写入展示元数据。
+ */
+const hydrateSatelliteDisplayMetaFromInventory = () => {
+  if (!assembledTaskSatellites.value.length) {
+    satelliteDisplayMetaByResourceId.value = new Map()
+    return
+  }
+  satelliteDisplayMetaByResourceId.value = buildTaskSatelliteDisplayMetaFromInventory(
+    assembledTaskSatellites.value,
+    resolveSatelliteEchoInventorySnapshot(),
+  )
+}
+
+/**
+ * 生成装配树节点 id（与 `satelliteResourceTree` 建树规则一致）。
+ */
+const buildAssembleTreeEchoNodeId = (
+  nodeType: 'country' | 'system',
+  parts: string[],
+): string => [nodeType, ...parts].join('::')
+
+/**
+ * 根据子系列 Worker 勾选态汇总 country / system 在树上的展示态。
+ *
+ * @param nodeId 国家 / 体系节点 id
+ */
+const computeAggregateCheckStateForBuiltNode = (nodeId: string): AssembleSeriesCheckState => {
+  const seriesIds = collectSeriesIdsUnderBuiltNode(nodeId)
+  if (!seriesIds.length) return 'none'
+  const states = seriesIds.map((id) => seriesCheckStateByNodeId.value.get(id) ?? 'none')
+  if (states.every((state) => state === 'all')) return 'all'
+  if (states.every((state) => state === 'none')) return 'none'
+  return 'partial'
+}
+
+/**
+ * 收集应回写到树上的勾选条目（系列 + 已挂载的 country / system 汇总态）。
+ */
+const collectEchoCheckStateEntries = (): AssembleSeriesCheckStateEntry[] => {
+  const entries: AssembleSeriesCheckStateEntry[] = []
+  const pushed = new Set<string>()
+  const pushEntry = (id: string, state: AssembleSeriesCheckState) => {
+    if (state === 'none' || pushed.has(id)) return
+    pushed.add(id)
+    entries.push({ id, state })
+  }
+  for (const [seriesId, state] of seriesCheckStateByNodeId.value) {
+    pushEntry(seriesId, state)
+  }
+  const walk = (nodes: SatelliteAssembleTreeNode[]) => {
+    for (const node of nodes) {
+      if (node.nodeType === 'country' || node.nodeType === 'system') {
+        pushEntry(node.id, computeAggregateCheckStateForBuiltNode(node.id))
+      }
+      if (node.children?.length) walk(node.children)
+    }
+  }
+  walk(satelliteTreeBuiltRoots.value)
+  return entries
+}
+
+/**
+ * 将回显勾选态写入当前已挂载节点（懒加载未展开的系列节点之后于展开时再写）。
+ */
+const refreshMountedTreeEchoCheckStates = () => {
+  const tree = satelliteTreeRef.value
+  if (!tree) return
+  const entries = collectEchoCheckStateEntries().filter((entry) => Boolean(tree.getNode(entry.id)))
+  if (!entries.length) return
+  syncingTreeCheck.value = true
+  try {
+    applyElTreeSeriesCheckStates(tree, entries)
+    trackedFullyCheckedSeriesIds.value = new Set(
+      [...seriesCheckStateByNodeId.value.entries()]
+        .filter(([, state]) => state === 'all')
+        .map(([id]) => id),
+    )
+  } finally {
+    syncingTreeCheck.value = false
+  }
+}
+
+/**
+ * 展开回显路径后等待系列叶子挂载到 ElTree store。
+ */
+const waitForLazyEchoSeriesNodes = async () => {
+  const tree = satelliteTreeRef.value
+  if (!tree) return
+  const targetSeriesIds = [...seriesCheckStateByNodeId.value.entries()]
+    .filter(([, state]) => state !== 'none')
+    .map(([id]) => id)
+  if (!targetSeriesIds.length) return
+  for (let round = 0; round < 40; round += 1) {
+    await nextTick()
+    const pending = targetSeriesIds.filter((id) => !tree.getNode(id))
+    if (!pending.length) return
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  }
+}
+
+/**
+ * 根据系列勾选态收集需展开的 country / system 节点 id。
+ */
+const collectSatelliteTreeEchoExpandedKeys = (): string[] => {
+  const keys = new Set<string>()
+  for (const [seriesNodeId, state] of seriesCheckStateByNodeId.value) {
+    if (state === 'none') continue
+    const node = findBuiltAssembleNodeById(seriesNodeId)
+    if (!node || node.nodeType !== 'series' || !node.country?.trim()) continue
+    const country = node.country.trim()
+    keys.add(buildAssembleTreeEchoNodeId('country', [country]))
+    const system = node.system?.trim()
+    if (system) keys.add(buildAssembleTreeEchoNodeId('system', [country, system]))
+  }
+  return [...keys]
+}
+
+/**
+ * 树加载或任务卫星变更后：回填列表元数据、展开路径并回写系列勾选态。
+ */
+const applyTaskSatelliteTreeEcho = async () => {
+  if (!isSatelliteKind.value || !satelliteTreeLazyReady.value) return
+  hydrateSatelliteDisplayMetaFromInventory()
+  syncAssembledRowsFromTaskSatellites()
+  satelliteTreeExpandedKeys.value = collectSatelliteTreeEchoExpandedKeys()
+  await nextTick()
+  refreshMountedTreeEchoCheckStates()
+  await waitForLazyEchoSeriesNodes()
+  refreshMountedTreeEchoCheckStates()
+}
+
+/**
+ * 登记系列下卫星的展示元数据。
+ *
+ * @param scope 系列
+ * @param items 卫星挂载项
+ */
+const registerSeriesSatelliteDisplayMeta = (scope: SatelliteSeriesScope, items: TaskResourceItem[]) => {
+  const next = new Map(satelliteDisplayMetaByResourceId.value)
+  items.forEach((item) => {
+    next.set(item.resourceId, {
+      ...scope,
+      name: item.name,
+      code: item.code,
+    })
+  })
+  satelliteDisplayMetaByResourceId.value = next
 }
 
 /**
@@ -747,100 +1062,196 @@ const clearSatelliteAssemblyState = () => {
 const syncAssembledRowsFromTaskSatellites = () => {
   if (!isSatelliteKind.value) return
   assembledRows.value = assembledTaskSatellites.value.map((item) => {
-    const meta = resolveSatelliteTreeMetaForTaskResource(satelliteTreeResourceIndex.value, item)
+    const meta = satelliteDisplayMetaByResourceId.value.get(item.resourceId)
     return {
       id: item.resourceId,
-      name: meta?.resource.name || item.name || item.resourceId,
+      name: item.name || meta?.name || item.resourceId,
       series: meta?.series || '--',
       type: '--',
       country: meta?.country || '--',
       extra1: meta?.system || '--',
-      extra2: meta?.resource.code || item.code || '--',
+      extra2: item.code || meta?.code || '--',
     }
   })
 }
 
 /**
- * 树勾选变化：仅保留叶子卫星，写入 `assembledTaskSatellites`。
+ * 在装配树中按 node id 查找系列节点数据。
+ *
+ * @param seriesNodeId 系列节点 id
  */
-const handleSatelliteTreeCheck = () => {
-  if (syncingTreeCheck.value || !satelliteTreeRef.value) return
-  const checked = satelliteTreeRef.value.getCheckedNodes(true) as SatelliteAssembleTreeNode[]
-  assembledTaskSatellites.value = checked
-    .filter((node) => node.nodeType === 'satellite' && node.resource)
-    .map((node) => ({ ...node.resource! }))
-  syncAssembledRowsFromTaskSatellites()
+const findSeriesAssembleNodeById = (seriesNodeId: string): SatelliteAssembleTreeNode | undefined => {
+  let found: SatelliteAssembleTreeNode | undefined
+  const walk = (list: SatelliteAssembleTreeNode[]) => {
+    for (const node of list) {
+      if (node.id === seriesNodeId && node.nodeType === 'series') {
+        found = node
+        return
+      }
+      if (node.children?.length) walk(node.children)
+    }
+  }
+  walk(satelliteTreeBuiltRoots.value)
+  return found
+}
+
+/**
+ * 取消系列勾选时：用 Worker/API 树快照或 Store 树缓存，不调用 search。
+ *
+ * @param scope 系列
+ */
+const resolveSeriesSatellitesForRemoval = (scope: SatelliteSeriesScope): TaskResourceItem[] => {
+  const scopeKey = buildSeriesScopeCacheKey(scope)
+  const fromApi = seriesInventoryFromApiByScopeKey.value[scopeKey]
+  if (fromApi?.length) return fromApi.map((item) => ({ ...item }))
+  return getSeriesTaskSatellitesFromPanelTreeCache(scope)
+}
+
+/**
+ * 按当前已选卫星在 Worker 中重算系列勾选态并回写 el-tree（不重建树根数据）。
+ *
+ * @param taskSatellites 任务已选卫星快照
+ */
+const refreshAssembleSeriesCheckStatesViaWorker = async (taskSatellites: TaskResourceItem[]) => {
+  const ctx = satelliteTreeLastBuildContext.value
+  if (!ctx) return
+  const { seriesCheckStates, seriesInventory } = await buildSatelliteAssembleTreeInBackground(
+    ctx.roots,
+    ctx.systems,
+    taskSatellites,
+  )
+  seriesInventoryFromApiByScopeKey.value = seriesInventory
+  const checkMap = new Map<string, AssembleSeriesCheckState>()
+  seriesCheckStates.forEach((entry: AssembleSeriesCheckStateEntry) => {
+    checkMap.set(entry.id, entry.state)
+  })
+  seriesCheckStateByNodeId.value = checkMap
+  await nextTick()
+  const tree = satelliteTreeRef.value
+  if (tree && seriesCheckStates.length) {
+    applyElTreeSeriesCheckStates(tree, seriesCheckStates)
+  }
+}
+
+/**
+ * 树勾选变化：系列叶子全选时按 search 拉取卫星；取消全选时从任务卫星列表移除该系列。
+ */
+const handleSatelliteTreeCheck = async () => {
+  if (
+    syncingTreeCheck.value ||
+    satelliteTreeLoading.value ||
+    satelliteTreeCheckLoading.value ||
+    !satelliteTreeRef.value
+  ) {
+    return
+  }
+  const tree = satelliteTreeRef.value
+  const checkedSeriesIds = resolveFullyCheckedSeriesIdsFromTree(tree)
+  const prev = trackedFullyCheckedSeriesIds.value
+  const added = [...checkedSeriesIds].filter((id) => !prev.has(id))
+  const removed = [...prev].filter((id) => !checkedSeriesIds.has(id))
+  if (!added.length && !removed.length) return
+
+  syncingTreeCheck.value = true
+  satelliteTreeCheckLoading.value = true
+  try {
+    let nextTaskSatellites = assembledTaskSatellites.value.map((item) => ({ ...item }))
+    for (const seriesId of added) {
+      const node = findSeriesAssembleNodeById(seriesId)
+      const scope = node ? resolveSeriesScopeFromAssembleNode(node) : null
+      if (!scope) continue
+      const seriesSatellites = await fetchSeriesTaskSatellites(scope)
+      registerSeriesSatelliteDisplayMeta(scope, seriesSatellites)
+      nextTaskSatellites = mergeSeriesSatellitesIntoTaskList(nextTaskSatellites, seriesSatellites)
+    }
+    for (const seriesId of removed) {
+      const node = findSeriesAssembleNodeById(seriesId)
+      const scope = node ? resolveSeriesScopeFromAssembleNode(node) : null
+      if (!scope) continue
+      const seriesSatellites = resolveSeriesSatellitesForRemoval(scope)
+      nextTaskSatellites = removeSeriesSatellitesFromTaskList(nextTaskSatellites, seriesSatellites)
+    }
+    assembledTaskSatellites.value = nextTaskSatellites
+    trackedFullyCheckedSeriesIds.value = checkedSeriesIds
+    await refreshAssembleSeriesCheckStatesViaWorker(nextTaskSatellites)
+    syncAssembledRowsFromTaskSatellites()
+  } catch (error) {
+    console.error('处理卫星树勾选失败:', error)
+    ElMessage.error('加载系列卫星失败，请稍后重试')
+  } finally {
+    satelliteTreeCheckLoading.value = false
+    syncingTreeCheck.value = false
+  }
 }
 
 /**
  * 按国家与任务卫星类型加载资源树。
  */
-const loadSatelliteTree = async () => {
+const loadSatelliteTree = async (options?: { forceRefresh?: boolean }) => {
   if (!isSatelliteKind.value) return
   const countries = seriesQueryCountries.value
   const systems = seriesQueryTargetTypes.value
+  syncAssembledRowsFromTaskSatellites()
   if (!countries.length || !systems.length) {
-    satelliteTreeUiNodes.value = []
-    satelliteTreeResourceIndex.value = new Map()
+    satelliteTreeBuiltRoots.value = []
+    satelliteTreeLazyReady.value = false
+    satelliteDisplayMetaByResourceId.value = new Map()
     return
   }
   const loadGeneration = ++satelliteTreeLoadGeneration
-  listLoading.value = true
+  satelliteTreeLoading.value = true
+  satelliteTreeLazyReady.value = false
   try {
-    const res = await getSatelliteResourceTree(countries)
-    if (loadGeneration !== satelliteTreeLoadGeneration) return
-    if (!isResourceApiSuccess(res.code) || !Array.isArray(res.data)) {
-      satelliteTreeUiNodes.value = []
-      satelliteTreeResourceIndex.value = new Map()
+    let treeRoots: Awaited<ReturnType<typeof loadSatelliteResourceTreeRootsForPanel>>
+    try {
+      treeRoots = await loadSatelliteResourceTreeRootsForPanel(countries, options)
+    } catch {
+      satelliteTreeBuiltRoots.value = []
+      satelliteTreeLazyReady.value = false
+      satelliteDisplayMetaByResourceId.value = new Map()
       return
     }
-    const { nodes, indexEntries } = await buildSatelliteAssembleTreeInBackground(res.data, systems)
     if (loadGeneration !== satelliteTreeLoadGeneration) return
-    await yieldToUiBeforeHeavyTreeMount()
+    clearSeriesSatelliteCache()
+    trackedFullyCheckedSeriesIds.value = new Set()
+    const taskSnapshot = assembledTaskSatellites.value.map((item) => ({ ...item }))
+    const { nodes, seriesCheckStates, seriesInventory } = await buildSatelliteAssembleTreeInBackground(
+      treeRoots,
+      systems,
+      taskSnapshot,
+      (partialNodes) => {
+        if (loadGeneration !== satelliteTreeLoadGeneration) return
+        satelliteTreeBuiltRoots.value = partialNodes
+        if (partialNodes.length) satelliteTreeLazyReady.value = true
+      },
+    )
     if (loadGeneration !== satelliteTreeLoadGeneration) return
-    satelliteTreeUiNodes.value = nodes
-    satelliteTreeResourceIndex.value = new Map(indexEntries)
+    satelliteTreeBuiltRoots.value = nodes
+    satelliteTreeLastBuildContext.value = { roots: treeRoots, systems }
+    seriesInventoryFromApiByScopeKey.value = seriesInventory
+    const checkMap = new Map<string, AssembleSeriesCheckState>()
+    seriesCheckStates.forEach((entry: AssembleSeriesCheckStateEntry) => {
+      checkMap.set(entry.id, entry.state)
+    })
+    seriesCheckStateByNodeId.value = checkMap
+    trackedFullyCheckedSeriesIds.value = new Set(
+      seriesCheckStates.filter((item) => item.state === 'all').map((item) => item.id),
+    )
+    satelliteTreeLazyReady.value = nodes.length > 0
     await nextTick()
     if (loadGeneration !== satelliteTreeLoadGeneration) return
-    restoreSatelliteTreeCheckedFromTaskSatellites()
-    syncAssembledRowsFromTaskSatellites()
+    await applyTaskSatelliteTreeEcho()
   } catch (error) {
     if (loadGeneration !== satelliteTreeLoadGeneration) return
     console.error('加载卫星资源树失败:', error)
-    satelliteTreeUiNodes.value = []
-    satelliteTreeResourceIndex.value = new Map()
+    satelliteTreeBuiltRoots.value = []
+    satelliteTreeLazyReady.value = false
+    satelliteDisplayMetaByResourceId.value = new Map()
     ElMessage.error('加载卫星资源树失败')
   } finally {
     if (loadGeneration === satelliteTreeLoadGeneration) {
-      listLoading.value = false
+      satelliteTreeLoading.value = false
     }
-  }
-}
-
-/**
- * 根据已选 `assembledTaskSatellites` 回显树勾选。
- */
-const restoreSatelliteTreeCheckedFromTaskSatellites = () => {
-  if (!satelliteTreeRef.value || !assembledTaskSatellites.value.length) return
-  syncingTreeCheck.value = true
-  try {
-    const ids: string[] = []
-    const walk = (list: SatelliteAssembleTreeNode[]) => {
-      for (const node of list) {
-        if (
-          node.nodeType === 'satellite' &&
-          node.resource &&
-          assembledTaskSatellites.value.some((item) => satelliteTreeNodeMatchesTaskResource(node, item))
-        ) {
-          ids.push(node.id)
-        }
-        if (node.children?.length) walk(node.children)
-      }
-    }
-    walk(satelliteTreeUiNodes.value)
-    satelliteTreeRef.value.setCheckedKeys(ids, false)
-  } finally {
-    syncingTreeCheck.value = false
   }
 }
 
@@ -852,7 +1263,13 @@ const restoreSatelliteTreeCheckedFromTaskSatellites = () => {
 const setAssembledTaskSatellites = (items: TaskResourceItem[]) => {
   assembledTaskSatellites.value = items.map((item) => ({ ...item }))
   syncAssembledRowsFromTaskSatellites()
-  void nextTick(() => restoreSatelliteTreeCheckedFromTaskSatellites())
+  void (async () => {
+    hydrateSatelliteDisplayMetaFromInventory()
+    syncAssembledRowsFromTaskSatellites()
+    if (!satelliteTreeLazyReady.value || !satelliteTreeLastBuildContext.value) return
+    await refreshAssembleSeriesCheckStatesViaWorker(assembledTaskSatellites.value)
+    await applyTaskSatelliteTreeEcho()
+  })()
 }
 
 /**
@@ -870,17 +1287,7 @@ const displayCandidates = computed(() => filteredCandidates.value)
 
 
 
-/**
- * 加载卫星类型筛选项。
- */
-const loadSatTypes = async () => {
-  try {
-    const res = await getBattleSateTypes()
-    satTypes.value = res.code === 200 ? (res.data ?? []) : []
-  } catch {
-    satTypes.value = []
-  }
-}
+
 
 /**
  * 从接口加载地面站或数据中心候选列表。
@@ -920,11 +1327,20 @@ const enrichAssembledFromPool = () => {
 
 
 /**
- * 按当前种类加载候选资源池。
+ * 工具栏刷新：卫星页可强制拉取最新树缓存。
  */
-const loadCandidatePool = async () => {
+const handleRefreshToolbar = () => {
+  void loadCandidatePool(isSatelliteKind.value)
+}
+
+/**
+ * 按当前种类加载候选资源池。
+ *
+ * @param forceTreeRefresh 卫星页为 true 时跳过 Store 树缓存
+ */
+const loadCandidatePool = async (forceTreeRefresh = false) => {
   if (isSatelliteKind.value) {
-    await loadSatelliteTree()
+    await loadSatelliteTree(forceTreeRefresh ? { forceRefresh: true } : undefined)
     return
   }
   if (!crudEnabled.value) return
@@ -1166,7 +1582,12 @@ watch(
 
 onMounted(async () => {
   if (isSatelliteKind.value) {
-    await Promise.all([loadSatTypes(), loadSatelliteTree()])
+    const initial = props.initialTaskSatellites
+    if (initial?.length) {
+      assembledTaskSatellites.value = initial.map((item) => ({ ...item }))
+      syncAssembledRowsFromTaskSatellites()
+    }
+    await loadSatelliteTree()
     return
   }
   if (crudEnabled.value) {
@@ -1190,7 +1611,7 @@ const getAssembledSeries = (): string[] => {
   }
   const series = new Set<string>()
   for (const item of assembledTaskSatellites.value) {
-    const meta = resolveSatelliteTreeMetaForTaskResource(satelliteTreeResourceIndex.value, item)
+    const meta = satelliteDisplayMetaByResourceId.value.get(item.resourceId)
     if (meta?.series) series.add(meta.series)
   }
   return [...series].sort((a, b) => a.localeCompare(b, 'zh-CN'))
