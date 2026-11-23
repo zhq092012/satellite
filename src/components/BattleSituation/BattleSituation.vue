@@ -5,11 +5,12 @@
       <BattleSituationGlobe ref="globeRef" :satellites="globeSatellites" :weapons="globeWeapons"
         :ground-targets="globeGroundTargets" :current-time-ms="currentTimeMs" :selected-norad="selectedNorad"
         :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
-        :task-start-ms="taskStartMs" :task-end-ms="taskEndMs" :follow-selected-satellite="!isDeductionPlaying"
+        :task-start-ms="taskStartMs" :task-end-ms="taskEndMs" :follow-selected-satellite="false"
+        :follow-selected-weapon="false" :follow-selected-ground-target="false"
         :follow-deduction-satellite="followDeductionSatellite" :is-deduction-playing="isDeductionPlaying"
         :is-timeline-playing="isTimelinePlaying" :deduction-visual-plan="deductionVisualPlan" />
 
-      <div v-if="selectedNorad" class="globe-selected-bar">
+      <!-- <div v-if="selectedNorad" class="globe-selected-bar">
         <span class="globe-selected-label">选中卫星：</span>
         <span class="globe-selected-name">{{ selectedSatelliteName }}</span>
         <button type="button" class="globe-deduction-btn" :disabled="!selectedNorad || isDeductionPlaying"
@@ -37,7 +38,7 @@
         <span class="globe-selected-label">{{ selectedGroundTargetBarLabel }}：</span>
         <span class="globe-selected-name globe-selected-name--ground">{{ selectedGroundTargetName }}</span>
         <button type="button" class="globe-clear-btn" @click="handleClearSelectedGroundTarget">清除</button>
-      </div>
+      </div> -->
     </div>
 
     <!-- 2. 悬浮左侧控制面板 -->
@@ -84,7 +85,7 @@
         <span class="btn-text">{{ isTimelineCollapsed ? '展开时间轴' : '收起时间轴' }}</span>
       </button>
 
-      <BattleGlobeDeductionToast v-if="selectedNorad && deductionToastHighlightLines.length"
+      <BattleGlobeDeductionToast v-if="isDeductionPlaying && deductionToastHighlightLines.length"
         :lines="deductionToastHighlightLines" />
 
       <div class="timeline-inner">
@@ -123,9 +124,16 @@ import { useLayoutStore } from '@/store/modules/layout'
 import type { MatrixResult } from '@/api/electronic'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
 import { useSatelliteDeductionPlayback } from '@/composables/useSatelliteDeductionPlayback'
+import { useBattleTaskGlobeResources } from '@/composables/useBattleTaskGlobeResources'
 
 /** 全局布局 Store */
 const store = useLayoutStore()
+
+/** 任务挂载资源 → 地球卫星 / 地面站（`GET /battle-task/{id}/resources`） */
+const {
+  taskGlobeSatellites,
+  taskGlobeGroundTargets,
+} = useBattleTaskGlobeResources()
 
 /** 卫星档案弹窗 */
 useSatelliteProfileDialog()
@@ -240,6 +248,9 @@ const taskEndMs = computed(() => parseTaskTimeMs(taskTimeRange.value?.end))
  * 作用：绑定 `BattleSituationGlobe` 的 `satellites`。
  */
 const globeSatellites = computed(() => {
+  if (taskGlobeSatellites.value.length) {
+    return taskGlobeSatellites.value
+  }
   const fromAnalysis = buildBattleGlobeSatellites(taskAnalysisData.value)
   if (fromAnalysis.length) return fromAnalysis
   return buildBattleGlobeSatellitesFromMatrix(matrixData.value)
@@ -262,6 +273,9 @@ const globeWeapons = computed(() => {
  * 作用：绑定 `BattleSituationGlobe` 的 `ground-targets`。
  */
 const globeGroundTargets = computed(() => {
+  if (taskGlobeGroundTargets.value.length) {
+    return taskGlobeGroundTargets.value
+  }
   const fromAnalysis = buildBattleGlobeGroundTargets(taskAnalysisData.value)
   if (fromAnalysis.length) return fromAnalysis
   return buildBattleGlobeGroundTargetsFromMatrix(matrixData.value)

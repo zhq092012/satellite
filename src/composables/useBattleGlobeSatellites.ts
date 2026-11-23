@@ -227,17 +227,11 @@ export const useBattleGlobeSatellites = (
   }
 
   /**
-   * 最近 LOD 层是否应显示卫星名称。
+   * 卫星在地球上可见时是否显示名称（与点位同一可见性，不再按距离 LOD 隐藏）。
    *
-   * @param distance 相机距离（米）
-   * @param selected 是否选中
    * @returns 是否显示名称标签
    */
-  const shouldShowSatelliteLabel = (
-    distance: number,
-    selected: boolean,
-    playbackSelected: boolean
-  ): boolean => playbackSelected || selected || distance <= LOD_NEAR_DISTANCE
+  const shouldShowSatelliteLabel = (): boolean => true
 
   /**
    * 根据卫星列表重建 Point 图元。
@@ -334,7 +328,7 @@ export const useBattleGlobeSatellites = (
       const inFrustum = isPositionInCameraFrustum(viewer, visual.position)
       const distance = Cesium.Cartesian3.distance(cameraPosition, visual.position)
       const lodStyle = resolveLodStyle(distance, selected, emphasizeSelected)
-      const showLabel = shouldShowSatelliteLabel(distance, selected, emphasizeSelected)
+      const showLabel = shouldShowSatelliteLabel()
 
       if (hideForExplosion) {
         visual.point.show = false
@@ -342,13 +336,13 @@ export const useBattleGlobeSatellites = (
         return
       }
 
-      if (!selected && !facing) {
+      if (!facing) {
         visual.point.show = false
         visual.label.show = false
         return
       }
 
-      if (!selected && !inFrustum) {
+      if (!inFrustum) {
         visual.point.show = false
         visual.label.show = false
         return

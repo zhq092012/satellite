@@ -4,6 +4,9 @@
       <span class="header-title">任务卫星列表</span>
       <span v-if="store.activedTask" class="header-count">
         共 {{ displayRows.length }} 颗
+        <template v-if="store.c2TreeCheckedKeys.length > 0 && displayRows.length !== taskSatelliteRows.length">
+          （任务 {{ taskSatelliteRows.length }} 颗）
+        </template>
       </span>
     </header>
 
@@ -51,6 +54,7 @@ import { useLayoutStore } from '@/store/modules/layout'
 import {
   C2_RESOURCE_EMPTY_FIELD,
   filterC2SatellitesByTreeSelection,
+  resolveTaskSatelliteRowsFromCatalog,
 } from '@/utils/buildC2ResourceCatalog'
 
 defineProps<{
@@ -65,21 +69,26 @@ const emit = defineEmits<{
 const store = useLayoutStore()
 
 /**
+ * 计算：当前任务挂载卫星在 catalog 中的扁平行（去重后）。
+ * 返回：`resolveTaskSatelliteRowsFromCatalog` 结果。
+ * 作用：右侧列表仅展示任务卫星，不含 catalog 中同系列未挂载项。
+ */
+const taskSatelliteRows = computed(() =>
+  resolveTaskSatelliteRowsFromCatalog(
+    store.c2ResourceSatelliteRows,
+    store.activedTask?.satellites,
+  ),
+)
+
+/**
  * 计算：右侧列表展示的卫星行。
- * 返回：经资源树勾选过滤后的 `c2ResourceSatelliteRows` 子集；无勾选键时回退到当前任务已选卫星行。
+ * 返回：任务卫星在资源树勾选条件下的子集；无勾选时展示全部任务卫星。
  * 作用：表格数据源与选中高亮 NORAD 对应行。
  */
 const displayRows = computed(() => {
-  const filtered = filterC2SatellitesByTreeSelection(
-    store.c2ResourceSatelliteRows,
-    store.c2TreeCheckedKeys,
-  )
-  if (filtered.length) return filtered
-  const taskIds = new Set(
-    (store.activedTask?.satellites ?? []).map((item) => item.resourceId?.trim()).filter(Boolean) as string[],
-  )
-  if (!taskIds.size) return filtered
-  return store.c2ResourceSatelliteRows.filter((row) => row.resourceId && taskIds.has(row.resourceId))
+  const scoped = taskSatelliteRows.value
+  if (!store.c2TreeCheckedKeys.length) return scoped
+  return filterC2SatellitesByTreeSelection(scoped, store.c2TreeCheckedKeys)
 })
 
 /**

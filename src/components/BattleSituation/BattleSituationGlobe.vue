@@ -44,8 +44,12 @@ const props = withDefaults(
     taskStartMs?: number
     /** 任务结束时间（毫秒） */
     taskEndMs?: number
-    /** 选中卫星时是否自动飞行跟踪 */
+    /** 选中卫星时是否自动飞行跟踪（列表/球面点选默认仅高亮） */
     followSelectedSatellite?: boolean
+    /** 选中武器时是否自动飞行跟踪 */
+    followSelectedWeapon?: boolean
+    /** 选中地面目标时是否自动飞行跟踪 */
+    followSelectedGroundTarget?: boolean
     /** 推演播放时是否让相机跟随卫星 */
     followDeductionSatellite?: boolean
     /** 是否正在推演播放 */
@@ -65,7 +69,9 @@ const props = withDefaults(
     selectedGroundTargetKey: null,
     taskStartMs: 0,
     taskEndMs: 0,
-    followSelectedSatellite: true,
+    followSelectedSatellite: false,
+    followSelectedWeapon: false,
+    followSelectedGroundTarget: false,
     followDeductionSatellite: true,
     isDeductionPlaying: false,
     isTimelinePlaying: false,
@@ -214,7 +220,13 @@ useBattleGlobeWeapons(
    * 返回：`props.selectedWeaponId`。
    * 作用：高亮与 `flyTo` 选中武器。
    */
-  computed(() => props.selectedWeaponId)
+  computed(() => props.selectedWeaponId),
+  /**
+   * 计算：选中武器时是否跟随相机。
+   * 返回：`props.followSelectedWeapon`。
+   * 作用：选中武器 ID 变化时是否 `flyTo`。
+   */
+  computed(() => props.followSelectedWeapon)
 )
 
 /**
@@ -317,6 +329,12 @@ useBattleGlobeGroundTargets(
    * 作用：选中态飞行与高亮。
    */
   computed(() => props.selectedGroundTargetKey),
+  /**
+   * 计算：选中地面目标时是否跟随相机。
+   * 返回：`props.followSelectedGroundTarget`。
+   * 作用：选中键变化时是否 `flyToGroundTarget`。
+   */
+  computed(() => props.followSelectedGroundTarget),
   deductionStruckReceiveKeys,
   deductionPassHighlightReceiveKeys,
   deductionPassHighlightPasses

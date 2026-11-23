@@ -1,14 +1,22 @@
 import type { AxiosResponseType } from '@/types/http'
 
 import { requestAPI } from '@/utils/tools/request'
-import type { SatelliteAnalysisData, TaskForm } from '@/types/task/task'
+import type {
+  BattleTaskResourceResp,
+  SatelliteAnalysisData,
+  TaskForm,
+} from '@/types/task/task'
+import { isResourceApiSuccess } from '@/utils/resourceApi'
 
 export type {
+  BattleTaskResourceResp,
   SatelliteAnalysisData,
   TaskForm,
   TaskArea,
   TaskCombatArea,
   TaskResourceItem,
+  TaskResourceSatelliteItem,
+  TaskResourceStationItem,
   TaskRelationEndpointOption,
   TaskTargetRelation,
   TaskTargetRelationKind,
@@ -70,4 +78,25 @@ export const updateTask = (task: TaskForm) => {
  */
 export const deleteTask = (taskId: string | number) => {
     return requestAPI.delete<AxiosResponseType<unknown>>(`/api/battle-task/${taskId}`)
+}
+
+/**
+ * 获取指定任务下的所有挂载资源（卫星含 TLE、接收站含经纬度、武器清单）。
+ * OpenAPI：`GET /battle-task/{id}/resources`，operationId `getResources`。
+ *
+ * @param taskId 任务 ID
+ * @throws 业务失败或响应体无 `data` 时抛出错误
+ */
+export const getTaskResources = async (taskId: string | number): Promise<BattleTaskResourceResp> => {
+    const id = String(taskId).trim()
+    if (!id) {
+        throw new Error('getTaskResources: taskId 不能为空')
+    }
+    const res = await requestAPI.get<AxiosResponseType<BattleTaskResourceResp>>(
+        `/api/battle-task/${id}/resources`,
+    )
+    if (!isResourceApiSuccess(res.code) || !res.data) {
+        throw new Error(res.msg || '获取任务挂载资源失败')
+    }
+    return res.data
 }

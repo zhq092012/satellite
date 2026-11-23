@@ -1,5 +1,5 @@
 import * as Cesium from 'cesium'
-import { onBeforeUnmount, watch, type ComputedRef, type Ref } from 'vue'
+import { onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
 
 /** 近距离 LOD 阈值（米） */
@@ -35,11 +35,13 @@ interface WeaponPointVisual {
  * @param viewerRef Cesium Viewer 引用
  * @param weaponsRef 武器列表
  * @param selectedWeaponIdRef 当前选中武器 ID
+ * @param followSelectedRef 选中武器时是否自动飞行定位
  */
 export const useBattleGlobeWeapons = (
   viewerRef: Ref<Cesium.Viewer | null>,
   weaponsRef: Ref<BattleGlobeWeapon[]> | ComputedRef<BattleGlobeWeapon[]>,
-  selectedWeaponIdRef: Ref<string | null> | ComputedRef<string | null>
+  selectedWeaponIdRef: Ref<string | null> | ComputedRef<string | null>,
+  followSelectedRef: Ref<boolean> | ComputedRef<boolean> = ref(false)
 ) => {
   const visualMap = new Map<string, WeaponPointVisual>()
   let pointCollection: Cesium.PointPrimitiveCollection | null = null
@@ -145,14 +147,11 @@ export const useBattleGlobeWeapons = (
   }
 
   /**
-   * 最近 LOD 层是否应显示武器名称。
+   * 武器在地球上可见时是否显示名称（与点位同一可见性，不再按距离 LOD 隐藏）。
    *
-   * @param distance 相机距离（米）
-   * @param selected 是否选中
    * @returns 是否显示名称标签
    */
-  const shouldShowWeaponLabel = (distance: number, selected: boolean): boolean =>
-    selected || distance <= LOD_NEAR_DISTANCE
+  const shouldShowWeaponLabel = (): boolean => true
 
   /**
    * 清理武器 Point 集合。
@@ -265,15 +264,15 @@ export const useBattleGlobeWeapons = (
       const inFrustum = isPositionInCameraFrustum(viewer, visual.position)
       const distance = Cesium.Cartesian3.distance(cameraPosition, visual.position)
       const lodStyle = resolveLodStyle(distance, selected)
-      const showLabel = shouldShowWeaponLabel(distance, selected)
+      const showLabel = shouldShowWeaponLabel()
 
-      if (!selected && !facing) {
+      if (!facing) {
         visual.point.show = false
         visual.label.show = false
         return
       }
 
-      if (!selected && !inFrustum) {
+      if (!inFrustum) {
         visual.point.show = false
         visual.label.show = false
         return
@@ -366,7 +365,7 @@ export const useBattleGlobeWeapons = (
    * 作用：选中时飞行到武器并更新高亮 visual。
    */
   watch(selectedWeaponIdRef, (weaponId) => {
-    if (weaponId) flyToWeapon(weaponId)
+    if (weaponId && followSelectedRef.value) flyToWeapon(weaponId)
     updateWeaponVisuals()
   })
 

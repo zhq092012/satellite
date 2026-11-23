@@ -190,16 +190,121 @@ export function buildC2SatelliteFlatRowsFromSeriesFallback(
 }
 
 /**
- * 去重扁平行（同 rowKey 保留首条）。
+ * 扁平行业务去重键：优先 resourceId，其次 NORAD，最后回退 rowKey（骨架行等）。
+ *
+ * @param row C2 扁平行
+ */
+const c2SatelliteRowIdentityKey = (row: C2ResourceSatelliteRow): string => {
+  const resourceId = row.resourceId?.trim()
+  if (resourceId) return `id:${resourceId}`
+  if (row.norad > 0) return `norad:${row.norad}`
+  return `key:${row.rowKey}`
+}
+
+/**
+ * 合并两条同一卫星的扁平行，保留元数据更完整的一行。
+ *
+ * @param primary 候选主行
+ * @param secondary 另一行
+ */
+const mergeC2ResourceRowPair = (
+  primary: C2ResourceSatelliteRow,
+  secondary: C2ResourceSatelliteRow,
+): C2ResourceSatelliteRow => {
+  const richness = (row: C2ResourceSatelliteRow): number => {
+    let score = 0
+    if (row.norad > 0) score += 8
+    if (row.resourceId?.trim()) score += 4
+    if (row.series?.trim() && row.series !== C2_RESOURCE_EMPTY_FIELD) score += 2
+    if (row.country?.trim() && row.country !== C2_RESOURCE_EMPTY_FIELD) score += 2
+    if (row.usage?.trim() && row.usage !== C2_RESOURCE_EMPTY_FIELD) score += 1
+    if (row.sat_type?.trim() && row.sat_type !== C2_RESOURCE_EMPTY_FIELD) score += 1
+    return score
+  }
+  const richer = richness(secondary) > richness(primary) ? secondary : primary
+  const other = richer === secondary ? primary : secondary
+  return {
+    ...richer,
+    norad: richer.norad > 0 ? richer.norad : other.norad,
+    resourceId: richer.resourceId?.trim() ? richer.resourceId : other.resourceId,
+    name: richer.name?.trim() ? richer.name : other.name,
+    country:
+      richer.country?.trim() && richer.country !== C2_RESOURCE_EMPTY_FIELD
+        ? richer.country
+        : other.country,
+    sysType: richer.sysType?.trim() ? richer.sysType : other.sysType,
+    series:
+      richer.series?.trim() && richer.series !== C2_RESOURCE_EMPTY_FIELD
+        ? richer.series
+        : other.series,
+    usage:
+      richer.usage?.trim() && richer.usage !== C2_RESOURCE_EMPTY_FIELD
+        ? richer.usage
+        : other.usage,
+    sat_type:
+      richer.sat_type?.trim() && richer.sat_type !== C2_RESOURCE_EMPTY_FIELD
+        ? richer.sat_type
+        : other.sat_type,
+  }
+}
+
+/**
+ * 去重扁平行（同一 resourceId / NORAD 仅保留一行，避免 `res|*` 与 `系列|类型|norad` 重复）。
  *
  * @param rows 原始行
  */
 function dedupeC2ResourceRows(rows: C2ResourceSatelliteRow[]): C2ResourceSatelliteRow[] {
   const map = new Map<string, C2ResourceSatelliteRow>()
   rows.forEach((row) => {
-    if (!map.has(row.rowKey)) map.set(row.rowKey, row)
+    const identity = c2SatelliteRowIdentityKey(row)
+    const prev = map.get(identity)
+    map.set(identity, prev ? mergeC2ResourceRowPair(prev, row) : row)
   })
   return [...map.values()]
+}
+
+/**
+ * 从 catalog 中取出当前任务挂载的卫星行（按 resourceId / NORAD 匹配，去重）。
+ *
+ * @param rows Store 中 C2 扁平行全集
+ * @param taskSatellites 任务 `satellites` 挂载列表
+ */
+export function resolveTaskSatelliteRowsFromCatalog(
+  rows: C2ResourceSatelliteRow[],
+  taskSatellites: TaskResourceItem[] | undefined,
+): C2ResourceSatelliteRow[] {
+  const mounts = taskSatellites ?? []
+  if (!mounts.length) return []
+
+  const resourceIds = new Set<string>()
+  const norads = new Set<number>()
+  mounts.forEach((item) => {
+    const rid = item.resourceId?.trim()
+    if (rid) resourceIds.add(rid)
+    const norad = Number(String(item.code ?? '').trim())
+    if (Number.isFinite(norad) && norad > 0) norads.add(norad)
+  })
+
+  const matched = rows.filter((row) => {
+    const rid = row.resourceId?.trim()
+    if (rid && resourceIds.has(rid)) return true
+    if (row.norad > 0 && norads.has(row.norad)) return true
+    return false
+  })
+
+  if (matched.length) {
+    return dedupeC2ResourceRows(matched)
+  }
+
+  return dedupeC2ResourceRows(
+    mounts.map((item) =>
+      mapTaskResourceItemToC2Row(item, {
+        country: C2_RESOURCE_EMPTY_FIELD,
+        system: C2_RESOURCE_EMPTY_FIELD,
+        series: C2_RESOURCE_EMPTY_FIELD,
+      }),
+    ),
+  )
 }
 
 /**
@@ -620,10 +725,7 @@ export function mergeC2ResourceSatelliteRows(
   base: C2ResourceSatelliteRow[],
   incoming: C2ResourceSatelliteRow[],
 ): C2ResourceSatelliteRow[] {
-  const map = new Map<string, C2ResourceSatelliteRow>()
-  base.forEach((row) => map.set(row.rowKey, row))
-  incoming.forEach((row) => map.set(row.rowKey, row))
-  return [...map.values()]
+  return dedupeC2ResourceRows([...base, ...incoming])
 }
 
 export function filterC2SatellitesByTreeSelection(

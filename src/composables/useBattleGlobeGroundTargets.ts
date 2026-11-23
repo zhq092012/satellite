@@ -58,11 +58,13 @@ interface GroundTargetVisual {
  * @param deductionStruckReceiveKeysRef 推演中已被打击的接收站 ID/名称集合
  * @param deductionPassHighlightReceiveKeysRef 推演当前过站窗口内接收站 ID/名称集合
  * @param deductionPassHighlightPassesRef 推演高亮过站窗口（含坐标）
+ * @param followSelectedRef 选中地面目标时是否自动飞行定位
  */
 export const useBattleGlobeGroundTargets = (
   viewerRef: Ref<Cesium.Viewer | null>,
   targetsRef: Ref<BattleGlobeGroundTarget[]> | ComputedRef<BattleGlobeGroundTarget[]>,
   selectedTargetKeyRef: Ref<string | null> | ComputedRef<string | null>,
+  followSelectedRef: Ref<boolean> | ComputedRef<boolean> = ref(false),
   deductionStruckReceiveKeysRef: Ref<Set<string>> | ComputedRef<Set<string>> = ref(new Set()),
   deductionPassHighlightReceiveKeysRef: Ref<Set<string>> | ComputedRef<Set<string>> = ref(
     new Set()
@@ -213,17 +215,11 @@ export const useBattleGlobeGroundTargets = (
   }
 
   /**
-   * 最近 LOD 层是否应显示名称标签。
+   * 地面目标在地球上可见时是否显示名称（与点位同一可见性，不再按距离 LOD 隐藏）。
    *
-   * @param distance 相机距离（米）
-   * @param selected 是否选中
    * @returns 是否显示标签
    */
-  const shouldShowTargetLabel = (
-    distance: number,
-    selected: boolean,
-    passHighlight: boolean
-  ): boolean => selected || passHighlight || distance <= LOD_NEAR_DISTANCE // 判断是否选中、是否在推演当前过站窗口内、是否在近距离范围内
+  const shouldShowTargetLabel = (): boolean => true
 
   /**
    * 清理地面站 Point 集合。
@@ -398,17 +394,15 @@ export const useBattleGlobeGroundTargets = (
             STATION_POINT_COLOR
       // 计算 LOD 样式
       const lodStyle = resolveLodStyle(distance, selected, passHighlightInDeduction, baseColor)
-      // 判断是否显示标签
-      const showLabel = shouldShowTargetLabel(distance, selected, passHighlightInDeduction)
-      // 没有选中，也没有在推演当前过站窗口内，在背面剔除，则不显示点
-      if (!selected && !passHighlightInDeduction && !facing) {
+      const showLabel = shouldShowTargetLabel()
+
+      if (!facing) {
         visual.point.show = false
         visual.label.show = false
         return
       }
 
-      // 没有选中，也没有在推演当前过站窗口内，也没有在视锥体内，则不显示点
-      if (!selected && !passHighlightInDeduction && !inFrustum) {
+      if (!inFrustum) {
         visual.point.show = false
         visual.label.show = false
         return
@@ -514,8 +508,7 @@ export const useBattleGlobeGroundTargets = (
    * 作用：选中时 `flyToGroundTarget` 并刷新 visual。
    */
   watch(selectedTargetKeyRef, (targetKey) => {
-    // 如果选中目标键不为空，则飞到目标
-    if (targetKey) flyToGroundTarget(targetKey)
+    if (targetKey && followSelectedRef.value) flyToGroundTarget(targetKey)
     // 更新地面站可视化
     updateGroundTargetVisuals()
   })

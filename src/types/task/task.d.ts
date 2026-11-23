@@ -18,6 +18,38 @@ export interface TaskResourceItem {
     code: string
 }
 
+/** 任务挂载卫星（`GET /battle-task/{id}/resources` 中 `satellites` 元素） */
+export interface TaskResourceSatelliteItem extends TaskResourceItem {
+    /** NORAD 编号 */
+    noradId?: string
+    /** TLE 第 1 行；无 TLE 时为空 */
+    tleLine1?: string
+    /** TLE 第 2 行；无 TLE 时为空 */
+    tleLine2?: string
+}
+
+/** 任务挂载地面接收站（含经纬度） */
+export interface TaskResourceStationItem extends TaskResourceItem {
+    /** 经度 */
+    longitude?: number
+    /** 纬度 */
+    latitude?: number
+}
+
+/** 指定任务下的挂载资源汇总（OpenAPI `BattleTaskResourceResp`） */
+export interface BattleTaskResourceResp {
+    /** 任务 id */
+    taskId?: string
+    /** 挂载卫星（含 TLE） */
+    satellites?: TaskResourceSatelliteItem[]
+    /** 挂载接收站（含经纬度） */
+    receiveStations?: TaskResourceStationItem[]
+    /** 挂载武器 */
+    weapons?: TaskResourceItem[]
+    /** 资源总数 */
+    total?: number
+}
+
 /** 任务后台算法计算进度 */
 export interface TaskAlgorithmProgressEntity {
     /** Mongo 文档 ID */
