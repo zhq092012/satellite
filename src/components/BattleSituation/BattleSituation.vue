@@ -110,7 +110,6 @@ import {
 import {
   buildBattleGlobeGroundTargets,
   buildBattleGlobeGroundTargetsFromMatrix,
-  parseGroundTargetKey,
 } from '@/utils/buildBattleGlobeGroundTargets'
 import { computed, nextTick, onActivated, onBeforeUnmount, ref, watch } from 'vue'
 import { ArrowDown, ArrowUp, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
@@ -160,8 +159,6 @@ const {
   isDeductionPlaying,
   toastHighlightLines: deductionToastHighlightLines,
   deductionVisualPlan,
-  startDeduction,
-  stopDeduction,
   resetDeductionUi,
 } = useSatelliteDeductionPlayback(currentTimeMs)
 
@@ -185,10 +182,6 @@ let playbackRafId: number | null = null
 
 /** 上一帧播放时间戳 */
 let lastPlaybackFrameMs = 0
-
-/** 选中卫星前是否正在播放（清除后用于恢复） */
-let wasPlayingBeforeSelection = false
-
 /**
  * 计算：当前系列/任务范围内的算法传输矩阵。
  * 返回：`MatrixResult | null`，与 layout Store 中 `matrixData` 一致。
@@ -284,66 +277,7 @@ const globeGroundTargets = computed(() => {
 /** 地球组件引用 */
 const globeRef = ref<{ restoreOverviewView: () => void } | null>(null)
 
-/**
- * 计算：顶部选中条展示的卫星名称。
- * 返回：字符串（无选中或找不到名称时为空或 `Sat-{norad}`）。
- * 作用：地图选中卫星信息条文案。
- */
-const selectedSatelliteName = computed(() => {
-  if (!selectedNorad.value) return ''
-  const fromGlobe = globeSatellites.value.find((sat) => sat.norad === selectedNorad.value)
-  if (fromGlobe?.name) return fromGlobe.name
-  const fromMatrix = matrixData.value?.initMatrixList?.find((sat) => sat.norad === selectedNorad.value)
-  return fromMatrix?.name || `Sat-${selectedNorad.value}`
-})
 
-/**
- * 开始选中卫星 Cesium 推演（暂停底部时间轴播放）。
- */
-const handleStartSatelliteDeduction = () => {
-  const norad = selectedNorad.value
-  if (!norad) return
-  stopTimelinePlayback()
-  startDeduction(norad, taskAnalysisData.value, matrixData.value)
-}
-
-/** 暂停选中卫星推演 */
-const handleStopSatelliteDeduction = () => {
-  stopDeduction()
-}
-
-/**
- * 计算：顶部选中条展示的武器名称。
- * 返回：字符串（无选中时为空，否则名称或武器 ID）。
- * 作用：地图选中武器信息条文案。
- */
-const selectedWeaponName = computed(() => {
-  if (!selectedWeaponId.value) return ''
-  const fromGlobe = globeWeapons.value.find((weapon) => weapon.id === selectedWeaponId.value)
-  return fromGlobe?.name || selectedWeaponId.value
-})
-
-/**
- * 计算：顶部选中条展示的地面目标名称。
- * 返回：字符串（解析键后从列表取名称，否则回退键或 ID）。
- * 作用：地图选中接收站/数据中心信息条文案。
- */
-const selectedGroundTargetName = computed(() => {
-  if (!selectedGroundTargetKey.value) return ''
-  const parsed = parseGroundTargetKey(selectedGroundTargetKey.value)
-  if (!parsed) return selectedGroundTargetKey.value
-  const fromGlobe = globeGroundTargets.value.find(
-    (target) => target.kind === parsed.kind && target.id === parsed.id
-  )
-  return fromGlobe?.name || parsed.id
-})
-
-/**
- * 计算：地面目标选中条前缀标签文案。
- * 返回：`选中数据中心` 或 `选中接收站`。
- * 作用：按目标类型区分信息条标题。
- */
-const selectedGroundTargetBarLabel = computed(() => '选中接收站')
 
 /**
  * 当前是否存在任意地图选中目标。
@@ -482,7 +416,6 @@ const tryStartAutoTimelinePlayback = () => {
  */
 const handleSelectionPlayback = (hadSelection: boolean, hasNewSelection: boolean) => {
   if (hasNewSelection && !hadSelection) {
-    wasPlayingBeforeSelection = isTimelinePlaying.value
     if (isTimelinePlaying.value) {
       stopTimelinePlayback()
     }
@@ -522,47 +455,6 @@ const handleSelectSatellite = async (norad: number | null) => {
 }
 
 
-
-/**
- * 清除选中卫星并恢复战场初始俯视视角。
- */
-const handleClearSelectedSatellite = () => {
-  selectedNorad.value = null
-  store.setSelectedAnalysisNorad(null)
-  resetDeductionUi()
-  globeRef.value?.restoreOverviewView()
-
-  if (wasPlayingBeforeSelection) {
-    wasPlayingBeforeSelection = false
-    startTimelinePlayback()
-  }
-}
-
-/**
- * 清除选中武器并恢复战场初始俯视视角。
- */
-const handleClearSelectedWeapon = () => {
-  selectedWeaponId.value = null
-  globeRef.value?.restoreOverviewView()
-
-  if (wasPlayingBeforeSelection) {
-    wasPlayingBeforeSelection = false
-    startTimelinePlayback()
-  }
-}
-
-/**
- * 清除选中地面目标并恢复战场初始俯视视角。
- */
-const handleClearSelectedGroundTarget = () => {
-  selectedGroundTargetKey.value = null
-  globeRef.value?.restoreOverviewView()
-
-  if (wasPlayingBeforeSelection) {
-    wasPlayingBeforeSelection = false
-    startTimelinePlayback()
-  }
-}
 
 /**
  * 左侧面板保存并重算后：清空矩阵缓存并等待进度完成后由既有 watch 拉取分析。
@@ -633,7 +525,6 @@ watch(
   (range) => {
     stopTimelinePlayback()
     resetDeductionUi()
-    wasPlayingBeforeSelection = false
     selectedWeaponId.value = null
     selectedGroundTargetKey.value = null
     currentTimeMs.value = range ? parseTaskTimeMs(range.start) : 0
