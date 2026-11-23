@@ -1,18 +1,15 @@
 <template>
   <div class="home-threat-analysis home-analysis-page dark-theme">
     <div v-if="!store.activedTask" class="home-analysis-empty">请先选择场景与任务</div>
-  <div v-else class="threat-table-shell">
+    <div v-else class="threat-table-shell">
       <div class="threat-table-panel">
         <div class="threat-table-caption">
           <div class="threat-table-caption-text">
             <span class="threat-table-title">威胁度分析</span>
             <p class="threat-table-formula">综合威胁度 = 静态威胁度 × 动态威胁度（默认聚合算法 multiply）</p>
-            <p v-if="metaLine" class="analysis-meta analysis-meta--inline">{{ metaLine }}</p>
           </div>
-          <el-button size="small" :loading="loading" @click="loadThreatAnalysis">刷新</el-button>
         </div>
-        <p class="analysis-intro">静态、动态因子明细见对应列辅助说明；任务算法未完成时请稍后刷新。</p>
-        <p v-if="algorithmLine" class="analysis-meta analysis-meta--algo">{{ algorithmLine }}</p>
+
         <p v-if="errorMessage" class="analysis-error">{{ errorMessage }}</p>
         <div v-loading="loading" class="threat-table-scroll">
           <table class="threat-dual-table" cellspacing="0" cellpadding="0">
@@ -45,11 +42,8 @@
               <tr v-if="!tableRows.length && !loading">
                 <td colspan="12" class="threat-empty-cell">暂无威胁度数据</td>
               </tr>
-              <tr
-                v-for="row in tableRows"
-                :key="row.rowKey"
-                :class="computeAnalysisCountryRowClass(row.country, priorityCountries)"
-              >
+              <tr v-for="row in tableRows" :key="row.rowKey"
+                :class="computeAnalysisCountryRowClass(row.country, priorityCountries)">
                 <td>{{ row.noradId || '--' }}</td>
                 <td>{{ row.country || '--' }}</td>
                 <td class="threat-cell--name">{{ row.satelliteName || '--' }}</td>
@@ -94,6 +88,7 @@ import {
 
 defineOptions({ name: 'HomeThreatAnalysisView' })
 
+/** 表格列宽 */
 const columnWidths = [
   '8%',
   '7%',
@@ -112,7 +107,9 @@ const columnWidths = [
 const store = useLayoutStore()
 const loading = ref(false)
 const errorMessage = ref('')
+/** 威胁度分析结果 */
 const threatResp = ref<ThreatResp | null>(null)
+/** 算法目录 */
 const algorithmCatalog = ref<AlgorithmInfo[]>([])
 
 /**
@@ -195,6 +192,11 @@ const algorithmLine = computed(() =>
   formatAlgorithmSelectionText(threatResp.value?.algorithms, algorithmCatalog.value),
 )
 
+/**
+ * 计算：算法目录。
+ * 返回：算法目录。
+ * 作用：算法目录。
+ */
 const loadAlgorithmCatalog = async () => {
   try {
     const res = await listRegisteredComputeAlgorithms()
@@ -205,7 +207,11 @@ const loadAlgorithmCatalog = async () => {
     algorithmCatalog.value = []
   }
 }
-
+/**
+ * 计算：威胁度分析。
+ * 返回：威胁度分析结果。
+ * 作用：威胁度分析。
+ */
 const loadThreatAnalysis = async () => {
   const task = store.activedTask
   if (!task?.id) {
@@ -313,6 +319,7 @@ $threat-table-border: rgba(56, 189, 248, 0.55);
   font-size: battleUi.$battle-ui-font-emphasis;
   font-weight: 700;
   color: #7dd3fc;
+  text-align: center;
 }
 
 .threat-table-formula {
@@ -320,7 +327,7 @@ $threat-table-border: rgba(56, 189, 248, 0.55);
   color: #94a3b8;
   font-size: battleUi.$battle-ui-font-base;
   line-height: 1.45;
-  text-align: left;
+  text-align: right;
 }
 
 .analysis-intro,
@@ -331,7 +338,7 @@ $threat-table-border: rgba(56, 189, 248, 0.55);
   color: #94a3b8;
   font-size: battleUi.$battle-ui-font-base;
   line-height: 1.45;
-  text-align: left;
+  text-align: right;
   border-bottom: 1px solid rgba(56, 189, 248, 0.15);
 }
 

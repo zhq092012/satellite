@@ -4,7 +4,7 @@
  * - 标题/强调（含表格表头）：$battle-ui-font-emphasis（当前 20px）
  */
 $battle-ui-font-base: 18px;
-$battle-ui-font-emphasis: 18px;
+$battle-ui-font-emphasis: 20px;
 
 /** Vue scoped：Element Plus 表格表头与单元格 */
 @mixin battle-ui-el-table-typography {

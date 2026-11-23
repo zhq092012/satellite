@@ -7,12 +7,8 @@
           <div class="attack-table-caption-text">
             <span class="attack-table-title">打击度分析</span>
             <p class="attack-table-formula">各蓝方卫星可打击程度及因子分解</p>
-            <p v-if="metaLine" class="analysis-meta analysis-meta--inline">{{ metaLine }}</p>
           </div>
-          <el-button size="small" :loading="loading" @click="loadStrikeAnalysis">刷新</el-button>
         </div>
-        <p class="analysis-intro">打击度与因子明细见对应列；默认算法可在顶栏「算法列表」查看。</p>
-        <p v-if="algorithmLine" class="analysis-meta analysis-meta--algo">{{ algorithmLine }}</p>
         <p v-if="errorMessage" class="analysis-error">{{ errorMessage }}</p>
         <div v-loading="loading" class="attack-table-scroll">
           <table class="attack-dual-table" cellspacing="0" cellpadding="0">
@@ -33,11 +29,8 @@
               <tr v-if="!tableRows.length && !loading">
                 <td colspan="6" class="attack-empty-cell">暂无打击度数据</td>
               </tr>
-              <tr
-                v-for="row in tableRows"
-                :key="row.rowKey"
-                :class="computeAnalysisCountryRowClass(row.country, priorityCountries)"
-              >
+              <tr v-for="row in tableRows" :key="row.rowKey"
+                :class="computeAnalysisCountryRowClass(row.country, priorityCountries)">
                 <td>{{ row.noradId || '--' }}</td>
                 <td>{{ row.country || '--' }}</td>
                 <td class="attack-cell--name">{{ row.satelliteName || '--' }}</td>
@@ -270,6 +263,7 @@ $attack-table-border: rgba(56, 189, 248, 0.55);
   font-size: battleUi.$battle-ui-font-emphasis;
   font-weight: 700;
   color: #7dd3fc;
+  text-align: center;
 }
 
 .attack-table-formula {
@@ -277,7 +271,7 @@ $attack-table-border: rgba(56, 189, 248, 0.55);
   color: #94a3b8;
   font-size: battleUi.$battle-ui-font-base;
   line-height: 1.45;
-  text-align: left;
+  text-align: right;
 }
 
 .analysis-intro,
