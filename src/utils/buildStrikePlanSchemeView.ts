@@ -1,4 +1,4 @@
-import type { SchemeResult } from '@/types/report/report'
+import type { ReportStageResult, SchemeResult } from '@/types/report/report'
 
 /** 方案概要字段（页面顶部依次展示；报告方案多数为空占位） */
 export interface StrikePlanSchemeMeta {
@@ -60,6 +60,8 @@ export interface StrikePlanSchemeView {
   strikePlans: StrikePlanStrikeRow[]
   /** 报告接口返回的选星方案 */
   reportScheme: SchemeResult
+  /** 与方案格子匹配的 stage（scheme.code 前缀对应 stage.code） */
+  reportStage?: ReportStageResult
 }
 
 /**

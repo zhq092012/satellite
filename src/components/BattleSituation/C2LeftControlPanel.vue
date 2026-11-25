@@ -5,18 +5,26 @@
       <div v-else-if="taskLoading" class="zone-loading">正在加载任务列表...</div>
       <div v-else class="task-panel">
         <section class="task-panel-block task-panel-block--tasks">
-          <div class="task-panel-section-head">任务列表</div>
-          <div v-if="!taskList.length" class="task-panel-hint task-panel-hint--center">
-            当前场景暂无任务
-          </div>
-          <el-select v-else v-model="activeTaskId" class="task-panel-task-select" placeholder="选择任务" filterable
-            @change="handleSwitchTask">
-            <el-option v-for="task in taskList" :key="task.id" :label="task.name" :value="task.id" />
-          </el-select>
+          <template v-if="taskList.length">
+            <div class="task-panel-section-head">任务列表</div>
+            <el-select
+              v-model="activeTaskId"
+              class="task-panel-task-select"
+              placeholder="选择任务"
+              filterable
+              @change="handleSwitchTask"
+            >
+              <el-option v-for="task in taskList" :key="task.id" :label="task.name" :value="task.id" />
+            </el-select>
+          </template>
+          <template v-else-if="store.battle?.id">
+            <button type="button" class="task-create-entry" @click="openCreateTask">新建任务</button>
+          </template>
+          <p v-else class="task-panel-hint">请先选择或创建场景</p>
         </section>
 
-        <div v-if="!store.activedTask" class="zone-empty">请选择任务</div>
-        <template v-else>
+        <div v-if="taskList.length && !store.activedTask" class="zone-empty">请选择任务</div>
+        <template v-else-if="store.activedTask">
           <section class="task-panel-block task-panel-block--meta">
             <div class="task-panel-row task-panel-row--name">
               <span class="task-panel-label">任务名称</span>
@@ -1148,6 +1156,19 @@ const openEditTask = () => {
   taskEditVisible.value = true
 }
 
+/**
+ * 当前场景无任务时，打开新建任务弹窗。
+ */
+const openCreateTask = () => {
+  if (!store.battle?.id) {
+    ElMessage.warning('请先选择当前场景')
+    return
+  }
+  taskEditIsEdit.value = false
+  editingTask.value = null
+  taskEditVisible.value = true
+}
+
 const handleTaskSaved = async (updated: TaskForm) => {
   const isCreate = !taskList.value.some((item) => item.id === updated.id)
   await loadBattleTasks()
@@ -1503,6 +1524,31 @@ onUnmounted(() => {
   font-weight: 700;
   color: #7dd3fc;
   border-bottom: 1px solid rgba(0, 225, 255, 0.14);
+}
+
+.task-create-entry {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px dashed rgba(0, 225, 255, 0.45);
+  background: rgba(0, 225, 255, 0.06);
+  color: #7dd3fc;
+  font-size: battleUi.$battle-ui-font-emphasis;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+
+  &:hover {
+    border-color: rgba(0, 225, 255, 0.75);
+    background: rgba(0, 225, 255, 0.12);
+    color: #00e1ff;
+  }
 }
 
 .task-panel-hint {

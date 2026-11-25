@@ -20,7 +20,7 @@
               <tr class="threat-group-header">
                 <th colspan="4" scope="colgroup" class="threat-grp threat-grp--basic">基本信息</th>
                 <th colspan="2" scope="colgroup" class="threat-grp threat-grp--static">静态威胁度</th>
-                <th colspan="5" scope="colgroup" class="threat-grp threat-grp--dynamic">动态威胁度</th>
+                <th colspan="6" scope="colgroup" class="threat-grp threat-grp--dynamic">动态威胁度</th>
                 <th colspan="1" scope="colgroup" class="threat-grp threat-grp--composite">综合威胁度</th>
               </tr>
               <tr class="threat-col-header">
@@ -35,12 +35,13 @@
                 <th scope="col">过境时长</th>
                 <th scope="col">回传时效</th>
                 <th scope="col">动态威胁度</th>
+                <th scope="col">动态因子</th>
                 <th scope="col">综合威胁度</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="!tableRows.length && !loading">
-                <td colspan="12" class="threat-empty-cell">暂无威胁度数据</td>
+                <td colspan="13" class="threat-empty-cell">暂无威胁度数据</td>
               </tr>
               <tr v-for="row in tableRows" :key="row.rowKey"
                 :class="computeAnalysisCountryRowClass(row.country, priorityCountries)">
@@ -59,6 +60,9 @@
                 <td>{{ row.passTotalDurationText }}</td>
                 <td>{{ row.transmissionTimelinessText }}</td>
                 <td>{{ row.dynamicThreatText }}</td>
+                <td class="threat-cell--metric threat-cell--factors">
+                  <span class="threat-cell-hint">{{ row.dynamicFactorsHint || '--' }}</span>
+                </td>
                 <td class="threat-cell--emphasis">{{ row.comprehensiveThreatText }}</td>
               </tr>
             </tbody>
@@ -90,17 +94,18 @@ defineOptions({ name: 'HomeThreatAnalysisView' })
 
 /** 表格列宽 */
 const columnWidths = [
-  '8%',
+  '7%',
+  '6%',
+  '11%',
+  '9%',
   '7%',
   '12%',
-  '10%',
-  '8%',
-  '14%',
-  '10%',
+  '9%',
+  '6%',
   '7%',
-  '8%',
-  '8%',
-  '8%',
+  '7%',
+  '7%',
+  '12%',
   '8%',
 ] as const
 
@@ -132,6 +137,7 @@ interface ThreatTableRow {
   passTotalDurationText: string
   transmissionTimelinessText: string
   dynamicThreatText: string
+  dynamicFactorsHint: string
   comprehensiveThreatText: string
 }
 
@@ -148,6 +154,7 @@ const mapThreatRow = (row: ThreatRow): ThreatTableRow => ({
   passTotalDurationText: formatComputeRatioPercent(row.passTotalDuration),
   transmissionTimelinessText: formatComputeRatioPercent(row.transmissionTimeliness),
   dynamicThreatText: formatComputeScore(row.dynamicThreat),
+  dynamicFactorsHint: formatFactorScoreHints(row.dynamicFactors),
   comprehensiveThreatText: formatComputeScore(row.comprehensiveThreat),
 })
 

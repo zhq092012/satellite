@@ -19,10 +19,12 @@
             <el-dropdown trigger="click" :disabled="sceneSwitching" @command="handleSwitchScene"
               @visible-change="handleSceneDropdownVisible" popper-class="scene-selector-popper">
               <div class="scene-trigger" :class="{ 'is-empty': !layoutStore.battle }">
-                <template v-if="layoutStore.battle">
-                  <span class="scene-name" :title="layoutStore.battle.name">{{ layoutStore.battle.name }}</span>
-                </template>
-
+                <span
+                  v-if="layoutStore.battle?.name"
+                  class="scene-name"
+                  :title="layoutStore.battle.name"
+                >{{ layoutStore.battle.name }}</span>
+                <span v-else class="scene-create">新建场景</span>
                 <el-icon class="scene-arrow">
                   <ArrowDown />
                 </el-icon>
@@ -33,8 +35,23 @@
                     :disabled="sceneSwitching" :class="{ 'is-active': layoutStore.battle?.id === battle.id }">
                     {{ battle.name }}
                   </el-dropdown-item>
-                  <el-dropdown-item v-if="battleList.length === 0" disabled>
-                    {{ loadingData ? '正在加载场景...' : '暂无场景数据' }}
+                  <el-dropdown-item
+                    v-if="battleList.length === 0 && !loadingData"
+                    command="__create__"
+                    class="scene-dropdown-create"
+                  >
+                    新建场景
+                  </el-dropdown-item>
+                  <el-dropdown-item v-if="loadingData && battleList.length === 0" disabled>
+                    正在加载场景...
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    v-if="battleList.length > 0"
+                    divided
+                    command="__create__"
+                    class="scene-dropdown-create"
+                  >
+                    新建场景
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -90,6 +107,12 @@
       </el-scrollbar>
     </el-container>
     <AiAssistant />
+    <SceneEditDialog
+      v-model="sceneDialogVisible"
+      :is-edit="false"
+      :scene="null"
+      @saved="handleSceneCreated"
+    />
   </el-container>
 </template>
 
@@ -100,6 +123,7 @@ import { ElMessage } from 'element-plus'
 import { ArrowDown, Folder, Setting, SwitchButton } from '@element-plus/icons-vue'
 import MenuTree from './MenuTree.vue'
 import AiAssistant from '@/components/ai-assistant/AiAssistant.vue'
+import SceneEditDialog from '@/components/BattleSituation/SceneEditDialog.vue'
 import { logout as logoutApi, type MenuItem } from '@/api/auth'
 import { useAuthStore } from '@/store/modules/auth'
 import { useLayoutStore } from '@/store/modules/layout'
@@ -360,6 +384,10 @@ const loadingData = ref(false)
 const sceneSwitching = ref(false)
 /** 可供切换的场景列表（数据源为战场列表） */
 const battleList = ref<BattleForm[]>([])
+/** 顶栏「新建场景」弹窗 */
+const sceneDialogVisible = ref(false)
+
+const SCENE_CREATE_COMMAND = '__create__'
 
 /**
  * 加载全部场景（战场）列表，供顶栏下拉切换使用。
@@ -381,13 +409,115 @@ const loadBattleList = async () => {
 }
 
 /**
+ * 写入当前场景及任务列表；无任务时清空 activedTask。
+ *
+ * @param battle 场景
+ */
+const applyBattleWithTasks = async (battle: BattleForm) => {
+  if (!battle?.id) return
+  layoutStore.setActivedBattle(battle)
+  layoutStore.setSelectedSatSeries('')
+
+  const taskRes = await getTaskList(battle.id)
+  const tasks =
+    taskRes.code === 200 && Array.isArray(taskRes.data)
+      ? normalizeTaskListFromApi(taskRes.data)
+      : []
+  layoutStore.setActivedBattle({ ...battle, tasks })
+
+  const matchedTask = tasks.find((task) => task.id === layoutStore.activedTask?.id)
+  if (matchedTask) {
+    layoutStore.setActivedTask(matchedTask)
+  } else if (tasks.length > 0) {
+    layoutStore.setActivedTask(tasks[0])
+  } else {
+    layoutStore.setActivedTask(null)
+  }
+}
+
+/**
+ * 列表刷新后同步选中场景：无场景则清空；有场景且当前无效则选第一个；否则保留用户手动切换结果。
+ */
+const syncSceneSelectionAfterLoad = async () => {
+  if (!battleList.value.length) {
+    layoutStore.setActivedBattle(null)
+    layoutStore.setActivedTask(null)
+    return
+  }
+
+  const currentId = layoutStore.battle?.id
+  const matched = currentId
+    ? battleList.value.find((item) => isSameBattleId(item.id, currentId))
+    : undefined
+
+  if (matched) {
+    if (!layoutStore.battle?.tasks?.length) {
+      try {
+        await applyBattleWithTasks(matched)
+      } catch (error) {
+        console.error('刷新当前场景任务失败:', error)
+        layoutStore.setActivedBattle(matched)
+      }
+    } else {
+      layoutStore.setActivedBattle({
+        ...matched,
+        tasks: layoutStore.battle.tasks,
+      })
+    }
+    return
+  }
+
+  const first = battleList.value[0]
+  if (!first?.id) return
+  try {
+    await applyBattleWithTasks(first)
+  } catch (error) {
+    console.error('初始化默认场景任务失败:', error)
+    layoutStore.setActivedBattle(first)
+  }
+}
+
+const openCreateSceneDialog = () => {
+  sceneDialogVisible.value = true
+}
+
+/**
+ * 新建场景成功后选中该场景。
+ *
+ * @param battle 保存后的场景
+ */
+const handleSceneCreated = async (battle: BattleForm) => {
+  await loadBattleList()
+  if (!battle?.id) {
+    await syncSceneSelectionAfterLoad()
+    return
+  }
+  try {
+    await applyBattleWithTasks(battle)
+    ElMessage.success(`已创建并切换到场景：${battle.name}`)
+  } catch (error) {
+    console.error('切换到新建场景失败:', error)
+    ElMessage.error('场景已创建，但切换失败，请从下拉列表手动选择')
+  }
+}
+
+/**
  * 下拉展开时刷新场景列表，保证刚添加的场景能出现在选项中。
  *
  * @param visible 下拉是否展开
  */
 const handleSceneDropdownVisible = async (visible: boolean) => {
-  if (visible) {
-    await loadBattleList()
+  if (!visible) return
+  await loadBattleList()
+  const currentId = layoutStore.battle?.id
+  if (
+    currentId
+    && !battleList.value.some((item) => isSameBattleId(item.id, currentId))
+  ) {
+    await syncSceneSelectionAfterLoad()
+  }
+  if (!currentId && battleList.value.length > 0) {
+    await syncSceneSelectionAfterLoad()
   }
 }
 
@@ -399,31 +529,17 @@ const handleSceneDropdownVisible = async (visible: boolean) => {
  * @param battleId 下拉项 command，对应战场 ID
  */
 const handleSwitchScene = async (battleId: number | string) => {
+  if (battleId === SCENE_CREATE_COMMAND) {
+    openCreateSceneDialog()
+    return
+  }
   const battle = battleList.value.find((item) => isSameBattleId(item.id, battleId))
   if (!battle?.id || sceneSwitching.value) return
   if (isSameBattleId(layoutStore.battle?.id, battle.id)) return
 
   sceneSwitching.value = true
   try {
-    layoutStore.setActivedBattle(battle)
-    layoutStore.setSelectedSatSeries('')
-
-    const taskRes = await getTaskList(battle.id)
-    const tasks =
-      taskRes.code === 200 && Array.isArray(taskRes.data)
-        ? normalizeTaskListFromApi(taskRes.data)
-        : []
-    layoutStore.setActivedBattle({ ...battle, tasks })
-
-    const matchedTask = tasks.find((task) => task.id === layoutStore.activedTask?.id)
-    if (matchedTask) {
-      layoutStore.setActivedTask(matchedTask)
-    } else if (tasks.length > 0) {
-      layoutStore.setActivedTask(tasks[0])
-    } else {
-      layoutStore.setActivedTask(null)
-    }
-
+    await applyBattleWithTasks(battle)
     ElMessage.success(`已切换场景：${battle.name}`)
   } catch (error) {
     console.error('切换场景失败:', error)
@@ -433,33 +549,9 @@ const handleSwitchScene = async (battleId: number | string) => {
   }
 }
 
-/**
- * 进入系统时若未选中场景，则加载首个场景及其任务列表。
- */
-const ensureDefaultBattleAndTasks = async () => {
-  if (layoutStore.battle?.id) return
-  if (!battleList.value.length) return
-  const battle = battleList.value[0]
-  if (!battle?.id) return
-  try {
-    const taskRes = await getTaskList(battle.id)
-    const tasks =
-      taskRes.code === 200 && Array.isArray(taskRes.data)
-        ? normalizeTaskListFromApi(taskRes.data)
-        : []
-    layoutStore.setActivedBattle({ ...battle, tasks })
-    if (tasks.length > 0) {
-      layoutStore.setActivedTask(tasks[0])
-    }
-  } catch (error) {
-    console.error('初始化默认场景任务失败:', error)
-    layoutStore.setActivedBattle(battle)
-  }
-}
-
 onMounted(async () => {
   await loadBattleList()
-  await ensureDefaultBattleAndTasks()
+  await syncSceneSelectionAfterLoad()
 })
 
 </script>
@@ -589,7 +681,7 @@ onMounted(async () => {
             white-space: nowrap;
           }
 
-          .scene-empty {
+          .scene-create {
             color: #fbbf24;
             font-weight: 600;
           }

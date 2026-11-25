@@ -130,7 +130,7 @@ export const useLayoutStore = defineStore('layout-store', {
         expectationCases: normalizeTaskExpectationCases(activedTask.expectationCases),
       }
     },
-    setActivedBattle(battle: BattleForm) {
+    setActivedBattle(battle: BattleForm | null) {
       this.battle = battle
     },
 

@@ -4,9 +4,9 @@ export interface FactorScore {
   code?: string
   /** 因子名称 */
   name?: string
-  /** 因子分值 */
+  /** 归一化分值，0~1 */
   value?: number
-  /** 补充说明 */
+  /** 说明/明细 */
   detail?: string
 }
 
