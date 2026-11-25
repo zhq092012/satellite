@@ -1,6 +1,6 @@
-<template>
+﻿<template>
   <div class="home-attack-analysis home-analysis-page dark-theme">
-    <div v-if="!store.activedTask" class="home-analysis-empty">请先选择场景与任务</div>
+    <div v-if="!store.activedTask" class="home-analysis-empty">请先选择命令与任务</div>
     <div v-else class="attack-table-shell">
       <div class="attack-table-panel">
         <div class="attack-table-caption">
@@ -81,7 +81,9 @@ const algorithmCatalog = ref<AlgorithmInfo[]>([])
  * 返回：enemyCountry 列表。
  * 作用：表格展示优先级。
  */
-const priorityCountries = computed(() => resolveCombatCountriesFromTask(store.activedTask))
+const priorityCountries = computed(() =>
+  resolveCombatCountriesFromTask(store.activedTask, store.command),
+)
 
 interface StrikeTableRow {
   rowKey: string

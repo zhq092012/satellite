@@ -1,5 +1,11 @@
 <template>
-  <div class="strike-scheme-panel" :class="{ 'strike-scheme-panel--dense': dense }">
+  <div
+    class="strike-scheme-panel"
+    :class="{
+      'strike-scheme-panel--dense': dense,
+      'strike-scheme-panel--horizontal': horizontal,
+    }"
+  >
     <template v-if="view.reportScheme">
       <header class="scheme-summary">
         <dl v-if="summaryFields.length" class="scheme-kv">
@@ -86,6 +92,8 @@ const props = defineProps<{
   view: StrikePlanSchemeView
   /** 紧凑卡片模式（报告多列） */
   dense?: boolean
+  /** 仅选一方案时横向分栏撑满列宽 */
+  horizontal?: boolean
 }>()
 
 interface SummaryField {
@@ -137,14 +145,16 @@ const satMetaLine = (row: ReportSchemeSelectedRow): string => formatReportSelect
 </script>
 
 <style scoped lang="scss">
-$scheme-kv-key-width: 96px;
+@use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
+
+$scheme-kv-key-width: 110px;
 
 .strike-scheme-panel {
   display: flex;
   flex-direction: column;
   gap: 14px;
   min-width: 0;
-  font-size: 14px;
+  font-size: battleUi.$battle-ui-font-base;
   line-height: 1.45;
   color: #e2e8f0;
   text-align: left;
@@ -192,7 +202,7 @@ $scheme-kv-key-width: 96px;
     flex: 0 0 $scheme-kv-key-width;
     width: $scheme-kv-key-width;
     margin: 0;
-    font-size: 13px;
+    font-size: battleUi.$battle-ui-font-base;
     color: #94a3b8;
     font-weight: 600;
     text-align: left;
@@ -206,7 +216,7 @@ $scheme-kv-key-width: 96px;
     flex: 1 1 auto;
     min-width: 0;
     margin: 0;
-    font-size: 14px;
+    font-size: battleUi.$battle-ui-font-base;
     color: #f1f5f9;
     word-break: break-word;
     text-align: left;
@@ -234,7 +244,7 @@ $scheme-kv-key-width: 96px;
 
   &__title {
     margin: 0 0 10px;
-    font-size: 15px;
+    font-size: battleUi.$battle-ui-font-emphasis;
     font-weight: 700;
     color: #38bdf8;
   }
@@ -256,7 +266,7 @@ $scheme-kv-key-width: 96px;
     padding: 8px 10px;
     border-radius: 8px;
     background: rgba(15, 25, 42, 0.65);
-    font-size: 13px;
+    font-size: battleUi.$battle-ui-font-base;
 
     &--bad {
       border: 1px solid rgba(248, 113, 113, 0.35);
@@ -278,7 +288,7 @@ $scheme-kv-key-width: 96px;
 
   &__note {
     flex: 1 1 100%;
-    font-size: 12px;
+    font-size: battleUi.$battle-ui-font-base;
     color: #94a3b8;
   }
 }
@@ -305,7 +315,7 @@ $scheme-kv-key-width: 96px;
   }
 
   &__name {
-    font-size: 14px;
+    font-size: battleUi.$battle-ui-font-base;
     font-weight: 600;
     color: #fde68a;
     word-break: break-word;
@@ -324,7 +334,7 @@ $scheme-kv-key-width: 96px;
 
   &__meta {
     margin-top: 4px;
-    font-size: 12px;
+    font-size: battleUi.$battle-ui-font-base;
     color: #94a3b8;
     line-height: 1.4;
     word-break: break-word;
@@ -333,6 +343,50 @@ $scheme-kv-key-width: 96px;
 
 .strike-scheme-panel--dense .scheme-sat-list {
   max-height: 280px;
+}
+
+.strike-scheme-panel--horizontal {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+
+  .scheme-summary {
+    flex: 1 1 320px;
+    min-width: min(100%, 320px);
+  }
+
+  .scheme-kv:not(.scheme-kv--metrics) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+    row-gap: 8px;
+  }
+
+  .scheme-kv--metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px 16px;
+  }
+
+  .scheme-list-block {
+    flex: 1 1 260px;
+    min-width: min(100%, 240px);
+  }
+
+  .scheme-list-block--grow {
+    flex: 1 1 100%;
+    max-height: none;
+  }
+
+  .scheme-sat-list {
+    max-height: 320px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 6px;
+    align-content: start;
+  }
 }
 
 .scheme-empty {
@@ -344,6 +398,8 @@ $scheme-kv-key-width: 96px;
 </style>
 
 <style lang="scss">
+@use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
+
 .scheme-reason-tooltip-popper {
   max-width: min(440px, 92vw);
 
@@ -352,7 +408,7 @@ $scheme-kv-key-width: 96px;
     line-height: 1.5;
     word-break: break-word;
     white-space: pre-wrap;
-    font-size: 14px;
+    font-size: battleUi.$battle-ui-font-base;
   }
 }
 </style>

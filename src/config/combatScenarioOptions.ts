@@ -42,11 +42,11 @@ export const COMBAT_BACKGROUND_OPTIONS: CombatBackgroundOption[] = [
   { id: 'high_intensity', label: '高烈度对抗' },
 ]
 
-/** 命令来源 */
+/** 命令来源（与命令管理表单、C2 只读展示一致） */
 export const COMMAND_SOURCE_OPTIONS: CommandSourceOption[] = [
-  { id: 'space_c2', label: '太空作战指挥中心' },
+  { id: 'space_joint_c2', label: '太空作战联合指挥中心' },
+  { id: 'south_theater', label: '南部战区' },
   { id: 'east_theater', label: '东部战区' },
-  { id: 'north_theater', label: '北部战区' },
 ]
 
 /** 作战阶段（单选） */

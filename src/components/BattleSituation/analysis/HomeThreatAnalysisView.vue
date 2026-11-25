@@ -1,6 +1,6 @@
-<template>
+﻿<template>
   <div class="home-threat-analysis home-analysis-page dark-theme">
-    <div v-if="!store.activedTask" class="home-analysis-empty">请先选择场景与任务</div>
+    <div v-if="!store.activedTask" class="home-analysis-empty">请先选择命令与任务</div>
     <div v-else class="threat-table-shell">
       <div class="threat-table-panel">
         <div class="threat-table-caption">
@@ -122,7 +122,9 @@ const algorithmCatalog = ref<AlgorithmInfo[]>([])
  * 返回：enemyCountry 数组。
  * 作用：表格排序与行高亮。
  */
-const priorityCountries = computed(() => resolveCombatCountriesFromTask(store.activedTask))
+const priorityCountries = computed(() =>
+  resolveCombatCountriesFromTask(store.activedTask, store.command),
+)
 
 interface ThreatTableRow {
   rowKey: string

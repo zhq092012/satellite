@@ -54,6 +54,42 @@
           <ReportStageCompareBlock v-for="section in topStageSections" :key="section.stageCode"
             class="report-comprehensive__stage" :stage-title="section.title" :stage="section.stage!"
             :active-tier-indexes="section.activeTierIndexes" top />
+
+          <section
+            v-if="crossCompareRows.length"
+            class="report-cross-compare"
+            :class="{ 'report-cross-compare--single': crossCompareRows.length === 1 }"
+          >
+            <h3 class="report-cross-compare__title">全部方案指标对比</h3>
+            <div class="report-cross-compare__scroll">
+              <table class="report-cross-compare__table" cellspacing="0" cellpadding="0">
+                <thead>
+                  <tr>
+                    <th>编码</th>
+                    <th>方案</th>
+                    <th>阶段</th>
+                    <th>档位</th>
+                    <th>选星数</th>
+                    <th>达成度</th>
+                    <th>综合分</th>
+                    <th>求解</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in crossCompareRows" :key="row.code">
+                    <td class="report-cross-compare__code">{{ row.code }}</td>
+                    <td class="report-cross-compare__name">{{ row.name }}</td>
+                    <td>{{ row.stageText || '—' }}</td>
+                    <td>{{ row.tierText || '—' }}</td>
+                    <td class="report-cross-compare__num">{{ row.targetSize ?? '—' }}</td>
+                    <td class="report-cross-compare__num">{{ row.attainmentText }}</td>
+                    <td class="report-cross-compare__num">{{ row.scoreText }}</td>
+                    <td>{{ row.solverCaliber || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
         </section>
 
         <div v-if="!selectedSchemeCodes.length" class="empty-container small">
@@ -70,40 +106,46 @@
               <h3 class="column-head__name">{{ getSchemeShortTitle(schemeCode) }}</h3>
             </header>
             <div v-if="getSchemeView(schemeCode)" class="column-content">
-              <StrikePlanSchemePanel :view="getSchemeView(schemeCode)!" dense />
+              <StrikePlanSchemePanel
+                :view="getSchemeView(schemeCode)!"
+                dense
+                :horizontal="selectedSchemeCodes.length === 1"
+              />
             </div>
           </article>
         </div>
 
-        <section v-if="crossCompareRows.length > 1" class="report-cross-compare">
-          <h3 class="report-cross-compare__title">全部方案指标对比</h3>
-          <div class="report-cross-compare__scroll">
-            <table class="report-cross-compare__table" cellspacing="0" cellpadding="0">
-              <thead>
-                <tr>
-                  <th>编码</th>
-                  <th>方案</th>
-                  <th>阶段</th>
-                  <th>档位</th>
-                  <th>选星数</th>
-                  <th>达成度</th>
-                  <th>综合分</th>
-                  <th>求解</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in crossCompareRows" :key="row.code">
-                  <td class="report-cross-compare__code">{{ row.code }}</td>
-                  <td class="report-cross-compare__name">{{ row.name }}</td>
-                  <td>{{ row.stageText || '—' }}</td>
-                  <td>{{ row.tierText || '—' }}</td>
-                  <td class="report-cross-compare__num">{{ row.targetSize ?? '—' }}</td>
-                  <td class="report-cross-compare__num">{{ row.attainmentText }}</td>
-                  <td class="report-cross-compare__num">{{ row.scoreText }}</td>
-                  <td>{{ row.solverCaliber || '—' }}</td>
-                </tr>
-              </tbody>
-            </table>
+        <section
+          v-if="selectedStrikePlanCodes.length"
+          class="strike-plan-detail-section"
+        >
+          <h3 class="strike-plan-detail-section__title">打击方案与前后比对</h3>
+          <p class="strike-plan-detail-section__hint">
+            与上方勾选方案按方案编码一一匹配展示。
+          </p>
+          <div
+            class="plan-columns strike-plan-columns"
+            :class="{
+              'plan-columns--single': selectedStrikePlanCodes.length === 1,
+              'plan-columns--triple': selectedStrikePlanCodes.length === 3,
+            }"
+          >
+            <article
+              v-for="schemeCode in selectedStrikePlanCodes"
+              :key="`strike-${schemeCode}`"
+              class="plan-column plan-column--strike"
+            >
+              <header class="column-head column-head--strike">
+                <span class="column-head__code">{{ schemeCode }}</span>
+                <h3 class="column-head__name">{{ getStrikePlanTitle(schemeCode) }}</h3>
+              </header>
+              <div class="column-content">
+                <ReportStrikePlanPanel
+                  :plan="getStrikePlan(schemeCode)!"
+                  :horizontal="selectedStrikePlanCodes.length === 1"
+                />
+              </div>
+            </article>
           </div>
         </section>
       </template>
@@ -115,7 +157,11 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getReportSchemes } from '@/api/report/report'
-import type { ReportGenerateResp, ReportStageResult, SchemeResult } from '@/types/report/report'
+import type { ReportGenerateResp, ReportStageResult, SchemeResult, StrikePlan } from '@/types/report/report'
+import {
+  buildStrikePlanMapByCode,
+  filterSchemeCodesWithStrikePlan,
+} from '@/utils/strikePlanDisplay'
 import {
   flattenStrikePlanRowsForExport,
   type StrikePlanSchemeView,
@@ -132,6 +178,7 @@ import ReportStageCompareBlock from './strike-plan/ReportStageCompareBlock.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import StrikePlanSchemePanel from './strike-plan/StrikePlanSchemePanel.vue'
 import ReportGenerateOverview from './strike-plan/ReportGenerateOverview.vue'
+import ReportStrikePlanPanel from './strike-plan/ReportStrikePlanPanel.vue'
 
 defineOptions({ name: 'StrikePlanGenerator' })
 
@@ -163,6 +210,24 @@ const schemeByCode = computed(() => {
   }
   return map
 })
+
+/**
+ * 计算：`strikePlans` 按 code 索引（与 `schemes` 对齐）。
+ * 返回 Map。
+ * 作用：仅展示与勾选 scheme 同 code 的打击方案。
+ */
+const strikePlanByCode = computed(() =>
+  buildStrikePlanMapByCode(reportData.value?.strikePlans),
+)
+
+/**
+ * 计算：当前勾选且存在打击方案的 code 列表。
+ * 返回 string[]（顺序与勾选一致）。
+ * 作用：打击方案区列渲染。
+ */
+const selectedStrikePlanCodes = computed(() =>
+  filterSchemeCodesWithStrikePlan(selectedSchemeCodes.value, strikePlanByCode.value),
+)
 
 /**
  * 计算：全部扁平 scheme 的 code 列表（稳定排序）。
@@ -269,6 +334,26 @@ const tierIndexesForGroup = (schemeCodes: string[]) =>
 const getSchemeShortTitle = (schemeCode: string): string => {
   const scheme = schemeByCode.value.get(schemeCode)
   return scheme?.name?.trim() || schemeCode
+}
+
+/**
+ * 取与 scheme 同 code 的打击方案。
+ *
+ * @param schemeCode 方案 code
+ */
+const getStrikePlan = (schemeCode: string): StrikePlan | null => {
+  const code = schemeCode.trim()
+  return strikePlanByCode.value.get(code) ?? null
+}
+
+/**
+ * 打击方案列标题（优先 strikePlans.name）。
+ *
+ * @param schemeCode 方案 code
+ */
+const getStrikePlanTitle = (schemeCode: string): string => {
+  const plan = getStrikePlan(schemeCode)
+  return plan?.name?.trim() || getSchemeShortTitle(schemeCode)
 }
 
 /**
@@ -393,7 +478,10 @@ watch(
 </script>
 
 <style lang="scss" scoped>
+@use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
+
 .strike-plan-generator {
+  font-size: battleUi.$battle-ui-font-base;
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -411,7 +499,7 @@ watch(
   border: 1px solid rgba(248, 113, 113, 0.45);
   background: rgba(127, 29, 29, 0.25);
   color: #fecaca;
-  font-size: 14px;
+  font-size: battleUi.$battle-ui-font-base;
 }
 
 .plan-header {
@@ -434,14 +522,14 @@ watch(
     min-width: 0;
 
     .type-label {
-      font-size: 18px;
+      font-size: battleUi.$battle-ui-font-emphasis;
       color: #94a3b8;
     }
 
     .scheme-count-badge {
       padding: 2px 10px;
       border-radius: 999px;
-      font-size: 14px;
+      font-size: battleUi.$battle-ui-font-base;
       font-weight: 600;
       color: #7dd3fc;
       border: 1px solid rgba(79, 147, 221, 0.35);
@@ -479,7 +567,7 @@ watch(
   &__label {
     flex: 0 0 auto;
     padding-top: 2px;
-    font-size: 14px;
+    font-size: battleUi.$battle-ui-font-base;
     font-weight: 600;
     color: #94a3b8;
     white-space: nowrap;
@@ -495,7 +583,7 @@ watch(
   }
 
   :deep(.el-checkbox__label) {
-    font-size: 14px;
+    font-size: battleUi.$battle-ui-font-base;
     color: #e2e8f0;
     white-space: normal;
     line-height: 1.4;
@@ -515,6 +603,44 @@ watch(
   }
 }
 
+.strike-plan-detail-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px dashed rgba(248, 113, 113, 0.35);
+  text-align: left;
+
+  &__title {
+    margin: 0 0 6px;
+    font-size: battleUi.$battle-ui-font-emphasis;
+    font-weight: 700;
+    color: #f87171;
+  }
+
+  &__hint {
+    margin: 0 0 14px;
+    font-size: battleUi.$battle-ui-font-base;
+    color: #94a3b8;
+
+    code {
+      font-size: battleUi.$battle-ui-font-base;
+      color: #fca5a5;
+    }
+  }
+}
+
+.plan-column--strike {
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.column-head--strike {
+  background: rgba(48, 20, 28, 0.8);
+  border-bottom-color: rgba(248, 113, 113, 0.25);
+}
+
+.strike-plan-columns {
+  margin-top: 0;
+}
+
 .plan-columns {
   display: grid;
   gap: 16px;
@@ -523,7 +649,7 @@ watch(
   grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
 
   &--single {
-    grid-template-columns: minmax(0, 720px);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   &--triple {
@@ -557,7 +683,7 @@ watch(
     margin-bottom: 4px;
     padding: 2px 8px;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: battleUi.$battle-ui-font-base;
     font-family: ui-monospace, monospace;
     color: #94a3b8;
     background: rgba(15, 23, 42, 0.9);
@@ -565,7 +691,7 @@ watch(
 
   &__name {
     margin: 0;
-    font-size: 16px;
+    font-size: battleUi.$battle-ui-font-emphasis;
     font-weight: 700;
     line-height: 1.4;
     color: #e2e8f0;
@@ -580,17 +706,31 @@ watch(
 }
 
 .report-cross-compare {
-  margin-top: 20px;
+  margin-top: 0;
   padding: 14px 16px;
   border-radius: 10px;
   border: 1px solid rgba(167, 139, 250, 0.3);
   background: rgba(16, 12, 36, 0.85);
-
+  width: 100%;
+  box-sizing: border-box;
   text-align: left;
+
+  &--single &__table {
+    min-width: 0;
+  }
+
+  &--single th,
+  &--single td {
+    width: auto;
+  }
+
+  &--single td:not(.report-cross-compare__name) {
+    white-space: nowrap;
+  }
 
   &__title {
     margin: 0 0 12px;
-    font-size: 18px;
+    font-size: battleUi.$battle-ui-font-emphasis;
     font-weight: 700;
     color: #c4b5fd;
     text-align: left;
@@ -606,7 +746,7 @@ watch(
     width: 100%;
     min-width: 720px;
     border-collapse: collapse;
-    font-size: 14px;
+    font-size: battleUi.$battle-ui-font-base;
 
     th,
     td {
@@ -617,6 +757,7 @@ watch(
     }
 
     th {
+      font-size: battleUi.$battle-ui-font-emphasis;
       color: #a78bfa;
       font-weight: 600;
       background: rgba(30, 20, 60, 0.9);
@@ -635,7 +776,7 @@ watch(
 
   &__code {
     font-family: ui-monospace, monospace;
-    font-size: 13px;
+    font-size: battleUi.$battle-ui-font-base;
     color: #94a3b8;
   }
 
@@ -671,7 +812,13 @@ watch(
   }
 
   .empty-text {
-    font-size: 18px;
+    font-size: battleUi.$battle-ui-font-emphasis;
+  }
+}
+
+.strike-plan-generator {
+  :deep(.el-button) {
+    font-size: battleUi.$battle-ui-font-base;
   }
 }
 </style>

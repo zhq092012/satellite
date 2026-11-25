@@ -2,7 +2,7 @@
   <div class="data-manage-page">
     <el-card shadow="never" class="data-manage-card">
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
-        <el-tab-pane label="场景管理" name="battles" />
+        <el-tab-pane label="命令管理" name="commands" />
         <el-tab-pane label="卫星管理" name="satellites" />
         <el-tab-pane label="TLE 数据" name="tle" />
         <el-tab-pane label="地面站管理" name="groundStations" />
@@ -28,7 +28,7 @@ const router = useRouter()
 
 /** 数据管理子路由名称与页签标识的映射 */
 const tabNameMap: Record<string, string> = {
-  BattleManage: 'battles',
+  CommandManage: 'commands',
   SatelliteManage: 'satellites',
   TleManage: 'tle',
   GroundStationManage: 'groundStations',
@@ -41,7 +41,7 @@ const tabNameMap: Record<string, string> = {
  * 作用：页签高亮跟随当前子路由。
  */
 const activeTab = computed({
-  get: () => tabNameMap[String(route.name ?? '')] ?? 'battles',
+  get: () => tabNameMap[String(route.name ?? '')] ?? 'commands',
   set: () => undefined,
 })
 
@@ -51,8 +51,8 @@ const activeTab = computed({
  * @param tabName 页签标识
  */
 const handleTabChange = (tabName: string) => {
-  if (tabName === 'battles') {
-    router.push({ name: 'BattleManage' })
+  if (tabName === 'commands') {
+    router.push({ name: 'CommandManage' })
   } else if (tabName === 'satellites') {
     router.push({ name: 'SatelliteManage' })
   } else if (tabName === 'tle') {
@@ -118,10 +118,11 @@ const handleTabChange = (tabName: string) => {
 
   :deep(> *) {
     flex: 1 1 auto;
-    height: 100%;
-    max-height: 100%;
     min-height: 0;
+    max-height: 100%;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
     box-sizing: border-box;
   }
 }

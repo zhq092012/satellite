@@ -43,7 +43,9 @@ const headlineItems = computed((): HeadlineItem[] => {
 </script>
 
 <style scoped lang="scss">
-$report-kv-key-width: 96px;
+@use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
+
+$report-kv-key-width: 110px;
 
 .report-headline {
   margin-bottom: 14px;
@@ -72,7 +74,7 @@ $report-kv-key-width: 96px;
     flex: 0 0 $report-kv-key-width;
     width: $report-kv-key-width;
     margin: 0;
-    font-size: 14px;
+    font-size: battleUi.$battle-ui-font-base;
     font-weight: 600;
     color: #94a3b8;
     text-align: left;
@@ -86,7 +88,7 @@ $report-kv-key-width: 96px;
     flex: 1 1 auto;
     min-width: 0;
     margin: 0;
-    font-size: 14px;
+    font-size: battleUi.$battle-ui-font-base;
     font-weight: 600;
     color: #f1f5f9;
     word-break: break-word;

@@ -8,6 +8,10 @@ export interface ReportGenerateResp {
   taskName?: string
   /** 战役名称（配置项 report.campaign） */
   campaign?: string
+  /**
+   * 打击方案列表（`code` 与 `schemes[].code` 一一对应；含被打击清单与前后比对）。
+   */
+  strikePlans?: StrikePlan[]
   /** 兼容旧前端的扁平方案列表（阶段 × 档位逐格，每格一条） */
   schemes?: SchemeResult[]
   /** 阶段结构（含三档对比、升级性价比与归因） */
@@ -457,4 +461,190 @@ export interface ReportStability {
   setRetention?: number
   /** 说明 */
   note?: string
+}
+
+/** 打击方案（与扁平 `schemes` 同 code） */
+export interface StrikePlan {
+  /** 方案编码，格式 阶段-规模方案 */
+  code?: string
+  /** 方案名称 */
+  name?: string
+  /** 阶段编码 */
+  stageCode?: string
+  /** 阶段名称 */
+  stageName?: string
+  /** 对手方国家 */
+  country?: string
+  /** 规模方案序号 */
+  tierIndex?: number
+  /** 被打击目标总数 */
+  targetSize?: number
+  /** 被打击卫星清单 */
+  satellites?: StruckSatellite[]
+  /** 清单是否截断 */
+  satellitesTruncated?: boolean
+  /** 按体系分类统计 */
+  struck?: ReportStrikeSystemSplit
+  /** 打击前后比对 */
+  comparison?: ReportStrikeComparison
+  /** 本方案告警 */
+  warnings?: ReportWarning[]
+}
+
+/** 被打击卫星 */
+export interface StruckSatellite {
+  /** NORAD */
+  noradId?: string
+  /** 名称 */
+  name?: string
+  /** 体系 */
+  system?: string
+  /** 系列 */
+  series?: string
+  /** 国家 */
+  country?: string
+  /** 威胁度 */
+  threat?: number
+  /** 配额角色 */
+  quotaRole?: string
+}
+
+/** 打击目标按体系拆分 */
+export interface ReportStrikeSystemSplit {
+  /** 总数 */
+  total?: number
+  /** 侦察数 */
+  reconCount?: number
+  /** 通信数 */
+  commCount?: number
+  /** 中继数 */
+  relayCount?: number
+  /** 按体系 key 计数 */
+  bySystem?: Record<string, number>
+}
+
+/** 打击前后比对 */
+export interface ReportStrikeComparison {
+  /** 卫星数量变化 */
+  satelliteCount?: ReportSatelliteCountChange
+  /** 侦察过境窗口变化 */
+  reconTransitWindows?: ReportTransitWindowChange
+  /** 最早过境变化 */
+  reconFirstTransit?: ReportFirstTransitChange
+  /** 通信覆盖变化 */
+  commCoverage?: ReportCoverageChange
+  /** 打击前基线口径说明 */
+  baselineText?: string
+  /** 过境数据范围 */
+  transitSource?: string
+  /** 覆盖数据范围 */
+  coverageSource?: string
+}
+
+/** 打击前后卫星数量变化 */
+export interface ReportSatelliteCountChange {
+  /** 打击前总数 */
+  beforeTotal?: number
+  /** 打击后总数 */
+  afterTotal?: number
+  /** 被打击数 */
+  struckTotal?: number
+  /** 打击前按体系 */
+  before?: ReportStrikeSystemSplit
+  /** 打击后按体系 */
+  after?: ReportStrikeSystemSplit
+  /** 结论文本 */
+  text?: string
+}
+
+/** 侦察过境窗口数量变化 */
+export interface ReportTransitWindowChange {
+  /** 打击前窗口总数 */
+  beforeWindows?: number
+  /** 打击后窗口总数 */
+  afterWindows?: number
+  /** 消减窗口数 */
+  deltaWindows?: number
+  /** 消减比例 0~100 */
+  reductionPercent?: number
+  /** 基线侦察星数 */
+  reconTargets?: number
+  /** 有过境数据的颗数 */
+  reconTargetsWithData?: number
+  /** 无过境数据的颗数 */
+  reconTargetsWithoutData?: number
+  /** 逐星窗口明细 */
+  shares?: ReportTransitShare[]
+  /** 结论文本 */
+  text?: string
+}
+
+/** 单颗侦察星过境窗口 */
+export interface ReportTransitShare {
+  /** NORAD */
+  noradId?: string
+  /** 名称 */
+  name?: string
+  /** 是否被本方案打击 */
+  struck?: boolean
+  /** 窗口数 */
+  windows?: number
+  /** 最早过境开始时间 */
+  earliestStart?: string
+  /** 取样批次 */
+  batch?: string
+}
+
+/** 最早过境时间变化 */
+export interface ReportFirstTransitChange {
+  /** 打击前最早过境时间 */
+  before?: string
+  /** 打击前所属星 */
+  beforeSatellite?: string
+  /** 打击后最早过境时间 */
+  after?: string
+  /** 打击后所属星 */
+  afterSatellite?: string
+  /** 推迟分钟数 */
+  delayMinutes?: number | null
+  /** 结论文本 */
+  text?: string
+}
+
+/** 通信覆盖占比变化 */
+export interface ReportCoverageChange {
+  /** 打击前覆盖占比 0~100 */
+  beforePercent?: number
+  /** 打击后覆盖占比 */
+  afterPercent?: number
+  /** 下降百分点 */
+  lostPercent?: number
+  /** 基线通信星数 */
+  commTargets?: number
+  /** 有覆盖数据的颗数 */
+  commTargetsWithData?: number
+  /** 无覆盖数据的颗数 */
+  commTargetsWithoutData?: number
+  /** 逐星占比 */
+  shares?: ReportCoverageShare[]
+  /** 结论文本 */
+  text?: string
+}
+
+/** 单颗通信星覆盖占比 */
+export interface ReportCoverageShare {
+  /** NORAD */
+  noradId?: string
+  /** 名称 */
+  name?: string
+  /** 是否被打击 */
+  struck?: boolean
+  /** 覆盖占比 0~100 */
+  percent?: number
+  /** 覆盖网格点数 */
+  coveredPoints?: number
+  /** 区域总网格点 */
+  gridPoints?: number
+  /** 是否有覆盖数据 */
+  hasData?: boolean
 }

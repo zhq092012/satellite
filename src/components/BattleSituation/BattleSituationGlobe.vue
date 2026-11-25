@@ -169,8 +169,8 @@ const restoreOverviewView = () => {
   if (!viewer || viewer.isDestroyed()) return
 
   viewer.camera.cancelFlight()
-  const destination = store.battleCenterCartensian
-  const orientation = store.battleCenterOritentation
+  const destination = store.commandCenterCartensian
+  const orientation = store.commandCenterOritentation
 
   if (destination) {
     viewer.camera.flyTo({
@@ -318,10 +318,10 @@ let battleLabelAnimRemover: (() => void) | null = null
  */
 const renderBattleLabel = () => {
   const viewer = viewerRef.value
-  if (!viewer || viewer.isDestroyed() || !store.battle?.name) return
+  if (!viewer || viewer.isDestroyed() || !store.command?.name) return
 
   // 解析战场区域名称标签经纬度锚点
-  const labelPosition = resolveTaskSpaceLabelPosition(store.activedTask?.areas, store.battleCenterCartensian)
+  const labelPosition = resolveTaskSpaceLabelPosition(store.activedTask?.areas, store.commandCenterCartensian)
   if (!labelPosition) return
 
   // 将标签经纬度锚点转换为 Cartographic 对象
@@ -345,7 +345,7 @@ const renderBattleLabel = () => {
     id: 'battle-area-label',
     position: labelPosition,
     label: {
-      text: store.battle.name,
+      text: store.command.name,
       font: 'bold 14px "Microsoft YaHei", sans-serif',
       fillColor: Cesium.Color.fromCssColorString('#ff3333'),
       outlineColor: Cesium.Color.fromCssColorString('#1a0000'),
@@ -375,10 +375,10 @@ const renderBattleArea = () => {
   if (!viewer || viewer.isDestroyed()) return
 
   try {
-    if (store.battle) {
+    if (store.command) {
       markTaskAreas(viewer, store.activedTask?.areas ?? [], 24000000, { clampToGround: true })
       renderBattleLabel()
-      if (!store.battleCenterCartensian && !resolveTaskSpaceLabelPosition(store.activedTask?.areas)) {
+      if (!store.commandCenterCartensian && !resolveTaskSpaceLabelPosition(store.activedTask?.areas)) {
         flyToDefaultEarthView()
       }
     } else {
@@ -485,7 +485,7 @@ onActivated(() => {
  * 作用：换场景时重绘战场区域与默认视角。
  */
 watch(
-  () => store.battle?.id,
+  () => store.command?.id,
   () => {
     renderBattleArea()
   }
@@ -522,7 +522,7 @@ watch(
  * 作用：名称变化时更新贴地标签文本。
  */
 watch(
-  () => store.battle?.name,
+  () => store.command?.name,
   () => {
     renderBattleLabel()
   }
@@ -534,7 +534,7 @@ watch(
  * 作用：中心点变化时重新计算标签位置与遮挡。
  */
 watch(
-  () => store.battleCenterCartensian,
+  () => store.commandCenterCartensian,
   () => {
     renderBattleLabel()
   }

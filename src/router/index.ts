@@ -92,10 +92,10 @@ const routes: Array<RouteRecordRaw> = [
         path: 'data-manage',
         name: 'DataManage',
         component: () => import('@/layout/DataManage.vue'),
-        redirect: '/data-manage/battles',
+        redirect: '/data-manage/commands',
         beforeEnter: (to: { path: string }) => {
           if (to.path === '/data-manage') {
-            return '/data-manage/battles'
+            return '/data-manage/commands'
           }
           return true
         },
@@ -108,11 +108,11 @@ const routes: Array<RouteRecordRaw> = [
         },
         children: [
           {
-            path: 'battles',
-            name: 'BattleManage',
-            component: () => import('@/views/admin/BattleManage.vue'),
+            path: 'commands',
+            name: 'CommandManage',
+            component: () => import('@/views/admin/CommandManage.vue'),
             meta: {
-              title: '场景管理',
+              title: '命令管理',
               icon: 'icon-situation',
               showInMenu: false,
               requiresAuth: true,

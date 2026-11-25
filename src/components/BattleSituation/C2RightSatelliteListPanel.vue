@@ -54,6 +54,7 @@ import { useLayoutStore } from '@/store/modules/layout'
 import {
   C2_RESOURCE_EMPTY_FIELD,
   filterC2SatellitesByTreeSelection,
+  mergeC2ResourceSatelliteRows,
   resolveTaskSatelliteRowsFromCatalog,
 } from '@/utils/buildC2ResourceCatalog'
 
@@ -69,16 +70,19 @@ const emit = defineEmits<{
 const store = useLayoutStore()
 
 /**
- * 计算：当前任务挂载卫星在 catalog 中的扁平行（去重后）。
- * 返回：`resolveTaskSatelliteRowsFromCatalog` 结果。
- * 作用：右侧列表仅展示任务卫星，不含 catalog 中同系列未挂载项。
+ * 计算：当前任务挂载卫星扁平行（catalog 匹配 + resources 接口并集，与地图颗数一致）。
+ * 返回：去重合并后的行列表。
+ * 作用：避免 catalog 只匹配少量挂载项时漏掉 `GET .../resources` 中的其余卫星。
  */
-const taskSatelliteRows = computed(() =>
-  resolveTaskSatelliteRowsFromCatalog(
-    store.c2ResourceSatelliteRows,
-    store.activedTask?.satellites,
-  ),
-)
+const taskSatelliteRows = computed(() => {
+  const mounts =
+    store.c2RightPanelTaskSatellites.length > 0
+      ? store.c2RightPanelTaskSatellites
+      : (store.activedTask?.satellites ?? [])
+  const fromCatalog = resolveTaskSatelliteRowsFromCatalog(store.c2ResourceSatelliteRows, mounts)
+  const fromResources = store.c2TaskResourceSatelliteRows
+  return mergeC2ResourceSatelliteRows(fromCatalog, fromResources)
+})
 
 /**
  * 计算：右侧列表展示的卫星行。
@@ -88,7 +92,16 @@ const taskSatelliteRows = computed(() =>
 const displayRows = computed(() => {
   const scoped = taskSatelliteRows.value
   if (!store.c2TreeCheckedKeys.length) return scoped
-  return filterC2SatellitesByTreeSelection(scoped, store.c2TreeCheckedKeys)
+  const missingSeriesMeta = scoped.filter((row) => {
+    const series = row.series?.trim()
+    return !series || series === C2_RESOURCE_EMPTY_FIELD
+  }).length
+  /** resources 接口行常缺系列字段，树 key 无法可靠过滤，与地图一致展示全集 */
+  if (scoped.length > 1 && missingSeriesMeta >= Math.ceil(scoped.length / 2)) {
+    return scoped
+  }
+  const filtered = filterC2SatellitesByTreeSelection(scoped, store.c2TreeCheckedKeys)
+  return filtered.length ? filtered : scoped
 })
 
 /**
@@ -97,7 +110,10 @@ const displayRows = computed(() => {
  * 作用：避免任务回显已写入 catalog 但尚未同步树 key 时出现空提示。
  */
 const showSatelliteList = computed(
-  () => store.c2TreeCheckedKeys.length > 0 || displayRows.value.length > 0,
+  () =>
+    store.c2TreeCheckedKeys.length > 0
+    || displayRows.value.length > 0
+    || taskSatelliteRows.value.length > 0,
 )
 
 /**

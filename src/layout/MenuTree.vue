@@ -65,7 +65,7 @@ const getIcon = (item: RouteRecordRaw): string => {
   if (title.includes('用户')) return '👤'
   if (title.includes('角色')) return '🛡️'
   if (title.includes('菜单')) return '📜'
-  if (title.includes('场景管理')) return '🗺️'
+  if (title.includes('命令管理')) return '🗺️'
   if (title.includes('卫星管理')) return '🛰️'
   if (title.includes('地面站')) return '📡'
   if (title.includes('武器管理')) return '🚀'

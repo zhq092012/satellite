@@ -1,6 +1,6 @@
 
 import { normalizeSatelliteUsageLabel, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
-import type { TaskResourceItem } from '@/types/task/task'
+import type { BattleTaskResourceResp, TaskResourceItem, TaskResourceSatelliteItem } from '@/types/task/task'
 import type {
   SatelliteAssembleTreeNode,
   SatelliteSeriesData,
@@ -601,6 +601,42 @@ export const resolveC2SeriesScopeFromNode = (
  * @param item 任务 `satellites` 项
  * @param scope 国家 / 体系 / 系列
  */
+/**
+ * 将 `GET /command-task/{id}/resources` 中的卫星项转为 C2 右侧面板扁平行（与地图同源）。
+ *
+ * @param item 任务资源接口卫星元素
+ */
+export function mapTaskResourceSatelliteItemToC2Row(item: TaskResourceSatelliteItem): C2ResourceSatelliteRow {
+  const resourceId = String(item.resourceId ?? '').trim()
+  const norad = Number(String(item.noradId ?? item.code ?? '').trim())
+  const name = (item.name ?? item.code ?? resourceId).trim() || resourceId
+  return {
+    rowKey: resourceId ? `res|${resourceId}` : buildC2ResourceRowKey('--', '--', Number.isFinite(norad) ? norad : -1),
+    norad: Number.isFinite(norad) && norad > 0 ? norad : -1,
+    name,
+    country: C2_RESOURCE_EMPTY_FIELD,
+    sysType: C2_RESOURCE_EMPTY_FIELD,
+    usage: C2_RESOURCE_EMPTY_FIELD,
+    series: C2_RESOURCE_EMPTY_FIELD,
+    resourceId,
+    sat_type: C2_RESOURCE_EMPTY_FIELD,
+    int_id: C2_RESOURCE_EMPTY_FIELD,
+    launch_date: C2_RESOURCE_EMPTY_FIELD,
+  }
+}
+
+/**
+ * 由任务资源接口响应构建 C2 卫星表行（与地球渲染使用同一接口数据）。
+ *
+ * @param data `BattleTaskResourceResp`
+ */
+export function buildC2RowsFromTaskResources(data: BattleTaskResourceResp): C2ResourceSatelliteRow[] {
+  const rows = (data.satellites ?? [])
+    .map(mapTaskResourceSatelliteItemToC2Row)
+    .filter((row) => row.norad > 0 || Boolean(row.resourceId?.trim()))
+  return dedupeC2ResourceRows(rows)
+}
+
 export function mapTaskResourceItemToC2Row(
   item: TaskResourceItem,
   scope: { country: string; system: string; series: string },

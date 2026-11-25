@@ -7,7 +7,13 @@ import {
   type CombatScenarioSelection,
 } from '@/config/combatScenarioOptions'
 import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
+import type { CommandForm } from '@/types/command/command'
 import type { TaskForm, TaskResourceItem } from '@/types/task/task'
+import {
+  parseCommandEnemyCountries,
+  resolveCombatCountriesForContext,
+  resolveCombatScenarioSelectionFromCommand,
+} from '@/utils/commandEntity'
 
 /** 新建任务默认作战对象（与默认作战阶段一致） */
 export const DEFAULT_TASK_COMBAT_COUNTRY = '美国'
@@ -85,8 +91,16 @@ export const resolveSeriesNamesFromTaskSatellites = (items: TaskResourceItem[] |
  *
  * @param task 任务
  */
-export const resolveCombatCountriesFromTask = (task: TaskForm | null | undefined): string[] =>
-  parseTaskCombatCountries(task?.country)
+/**
+ * 解析作战对象国家：优先当前作战命令 `enemyCountry`，不读任务自有字段。
+ *
+ * @param task 任务（仅在没有 command 时回退历史 `country`）
+ * @param command 所属作战命令
+ */
+export const resolveCombatCountriesFromTask = (
+  task: TaskForm | null | undefined,
+  command?: CommandForm | null,
+): string[] => resolveCombatCountriesForContext(command, task?.country)
 
 /** @deprecated 使用 {@link resolveCombatCountriesFromTask} */
 export const resolveEnemyCountriesFromTask = resolveCombatCountriesFromTask
@@ -112,15 +126,21 @@ export const resolveTaskCountryFieldFromEntity = (raw: TaskForm | (TaskForm & { 
 /**
  * 规范化战场任务列表接口数据（`country`、预期子项等）。
  *
- * @param list `/battle-task/list` 返回的 `data`
+ * @param list `GET /command-task/list` 返回的 `data`
  */
-export const normalizeTaskListFromApi = (list: TaskForm[] | null | undefined): TaskForm[] => {
+export const normalizeTaskListFromApi = (
+  list: (TaskForm & { commandId?: string })[] | null | undefined,
+): TaskForm[] => {
   if (!Array.isArray(list)) return []
-  return list.map((item) => ({
-    ...item,
-    country: resolveTaskCountryFieldFromEntity(item),
-    expectationCases: normalizeTaskExpectationCases(item.expectationCases),
-  }))
+  return list.map((item) => {
+    const commandId = String(item.commandId ?? '').trim()
+    return {
+      ...item,
+      commandId,
+      country: resolveTaskCountryFieldFromEntity(item),
+      expectationCases: normalizeTaskExpectationCases(item.expectationCases),
+    }
+  })
 }
 
 /** C2 / 系列筛选用卫星类型（接口无该字段时默认四分类全选）。 */
@@ -155,7 +175,13 @@ export const applyCombatScenarioSelectionToTaskFields = (
  *
  * @param task 任务
  */
-export const resolveCombatScenarioSelectionFromTask = (task: TaskForm): CombatScenarioSelection => {
+export const resolveCombatScenarioSelectionFromTask = (
+  task: TaskForm,
+  command?: CommandForm | null,
+): CombatScenarioSelection => {
+  const fromCommand = resolveCombatScenarioSelectionFromCommand(command)
+  if (fromCommand) return fromCommand
+
   const commandSourceId =
     COMMAND_SOURCE_OPTIONS.find((item) => item.label === task.taskSource)?.id ??
     COMMAND_SOURCE_OPTIONS[0]?.id ??
@@ -202,13 +228,25 @@ export const resolveCombatScenarioSelectionFromTask = (task: TaskForm): CombatSc
  *
  * @param task 任务
  */
-export const buildStrikePlanDisplayNameFromTask = (task: Pick<TaskForm, 'country' | 'expectation'>): string => {
-  const combatCountries = parseTaskCombatCountries(task.country)
+export const buildStrikePlanDisplayNameFromTask = (
+  task: Pick<TaskForm, 'country' | 'expectation'> | null | undefined,
+  command?: CommandForm | null,
+): string => {
+  const stageFromCommand = command?.stage?.trim() ?? ''
+  const expectationFromCommand = command?.expectation?.trim() ?? ''
+  if (stageFromCommand || expectationFromCommand) {
+    if (!stageFromCommand) return expectationFromCommand
+    if (!expectationFromCommand) return stageFromCommand
+    return `${stageFromCommand}-${expectationFromCommand}`
+  }
+  const combatCountries = parseCommandEnemyCountries(command).length
+    ? parseCommandEnemyCountries(command)
+    : parseTaskCombatCountries(task?.country)
   const phase =
     COMBAT_PHASE_OPTIONS.find((item) =>
       item.enemyCountries.some((country) => combatCountries.includes(country)),
     )?.label ?? ''
-  const expectation = task.expectation?.trim() ?? ''
+  const expectation = task?.expectation?.trim() ?? ''
   if (!phase && !expectation) return '--'
   if (!expectation) return phase
   if (!phase) return expectation

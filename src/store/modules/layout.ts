@@ -2,20 +2,18 @@ import { defineStore } from 'pinia'
 import { markRaw } from 'vue'
 import * as Cesium from 'cesium'
 import { isTaskProgressComplete, taskProgressMap } from '@/composables/useTaskProgressPolling'
-import type { BattleForm } from '@/types/battle/battle'
+import type { CommandForm } from '@/types/command/command'
 import type { SatelliteData } from '@/types/dashboard'
 import type { SatelliteDetail, SatelliteTreeCountryNode } from '@/types/satellite/satellite'
 import type { C2ResourceSatelliteRow } from '@/utils/buildC2ResourceCatalog'
-import type { TaskForm } from '@/types/task/task'
-import {
-  normalizeTaskExpectationCases,
-  resolveTaskCountryFieldFromEntity,
-} from '@/utils/taskEntity'
+import type { TaskForm, TaskResourceItem } from '@/types/task/task'
+import { normalizeTaskExpectationCases } from '@/utils/taskEntity'
 import { collectTaskAreaGeoCoords } from '@/utils/taskAreaGeo'
 interface State {
   isCollapse: boolean
   activedTask: TaskForm | null
-  battle: BattleForm | null
+  /** 当前选中的作战命令 */
+  command: CommandForm | null
   battleCircleMap: Map<number, { name: string; center: [number, number]; radiusKm: number }>
   currentCircleIdx: number
   battlePolygonMap: Map<number, { name: string; lonlats: { lon: number; lat: number }[] }>
@@ -49,6 +47,14 @@ interface State {
   /** C2 资源树勾选 keys */
   c2TreeCheckedKeys: string[]
   /**
+   * C2 右侧面板展示用的任务卫星挂载列表（与左侧 `editorDraft.satellites` 同步；保存前即可预览）。
+   */
+  c2RightPanelTaskSatellites: TaskResourceItem[]
+  /**
+   * C2 右侧列表：`GET /command-task/{id}/resources` 中的卫星扁平行（与地图一致）。
+   */
+  c2TaskResourceSatelliteRows: C2ResourceSatelliteRow[]
+  /**
    * 三国全量卫星资源树 API 快照（`中国台湾` / `日本` / `美国`）。
    * 仅会话内存缓存，由面板按需拉取。
    */
@@ -62,7 +68,7 @@ export const useLayoutStore = defineStore('layout-store', {
     return {
       isCollapse: false,
       activedTask: null,
-      battle: null,
+      command: null,
       battleCircleMap: new Map<number, { name: string; center: [number, number]; radiusKm: number }>(),
       battlePolygonMap: new Map<number, { name: string; lonlats: { lon: number; lat: number }[] }>(),
       currentCircleIdx: 0,
@@ -84,6 +90,8 @@ export const useLayoutStore = defineStore('layout-store', {
       selectedOurWeapon: null,
       c2ResourceSatelliteRows: [],
       c2TreeCheckedKeys: [],
+      c2RightPanelTaskSatellites: [],
+      c2TaskResourceSatelliteRows: [],
       satelliteAssembleTreeRootsCache: [],
       satelliteAssembleTreeCachedAt: null,
     }
@@ -126,12 +134,11 @@ export const useLayoutStore = defineStore('layout-store', {
       }
       this.activedTask = {
         ...activedTask,
-        country: resolveTaskCountryFieldFromEntity(activedTask),
         expectationCases: normalizeTaskExpectationCases(activedTask.expectationCases),
       }
     },
-    setActivedBattle(battle: BattleForm | null) {
-      this.battle = battle
+    setActivedCommand(command: CommandForm | null) {
+      this.command = command
     },
 
     toggleEffectModel(show: boolean) {
@@ -240,10 +247,19 @@ export const useLayoutStore = defineStore('layout-store', {
     setC2TreeCheckedKeys(keys: string[]) {
       this.c2TreeCheckedKeys = [...keys]
     },
+  /** 更新 C2 右侧列表所用的任务卫星挂载（草稿或未保存变更） */
+  setC2RightPanelTaskSatellites(items: TaskResourceItem[]) {
+    this.c2RightPanelTaskSatellites = items.map((item) => ({ ...item }))
+  },
+  /** 更新 C2 右侧列表的任务资源卫星行（与地图 resources 接口同步） */
+  setC2TaskResourceSatelliteRows(rows: C2ResourceSatelliteRow[]) {
+    this.c2TaskResourceSatelliteRows = rows.map((row) => ({ ...row }))
+  },
     /** 清空 C2 资源选择状态 */
     clearC2ResourceSelection() {
       this.c2ResourceSatelliteRows = []
       this.c2TreeCheckedKeys = []
+      this.c2RightPanelTaskSatellites = []
     },
     /**
      * 写入三国卫星资源树缓存。
@@ -262,11 +278,11 @@ export const useLayoutStore = defineStore('layout-store', {
     },
   },
   persist: {
-    key: 'layout-store-v3',
+    key: 'layout-store-v4-command',
     storage: localStorage,
     pick: [
       'activedTask',
-      'battle',
+      'command',
       'allSatelliteOfTask',
       'satelliteTotal',
       'selectedSatType',

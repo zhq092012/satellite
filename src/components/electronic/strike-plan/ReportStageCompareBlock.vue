@@ -98,6 +98,8 @@ const adviceLine = computed(() => {
 </script>
 
 <style scoped lang="scss">
+@use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
+
 .stage-compare {
   margin-top: 16px;
   padding: 16px 18px;
@@ -113,14 +115,14 @@ const adviceLine = computed(() => {
 
 .stage-compare__title {
   margin: 0 0 10px;
-  font-size: 16px;
+  font-size: battleUi.$battle-ui-font-emphasis;
   font-weight: 700;
   color: #c4b5fd;
 }
 
 .stage-compare__rec {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: battleUi.$battle-ui-font-base;
   line-height: 1.55;
   color: #e2e8f0;
 }
@@ -128,7 +130,7 @@ const adviceLine = computed(() => {
 .stage-compare__upgrades {
   margin: 0 0 12px;
   padding-left: 1.2em;
-  font-size: 13px;
+  font-size: battleUi.$battle-ui-font-base;
   line-height: 1.5;
   color: #a5f3fc;
 }
@@ -143,7 +145,7 @@ const adviceLine = computed(() => {
   width: 100%;
   min-width: 520px;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: battleUi.$battle-ui-font-base;
 
   th,
   td {
@@ -153,6 +155,7 @@ const adviceLine = computed(() => {
   }
 
   th {
+    font-size: battleUi.$battle-ui-font-emphasis;
     font-weight: 600;
     color: #a78bfa;
     background: rgba(30, 22, 56, 0.95);
@@ -187,7 +190,7 @@ const adviceLine = computed(() => {
   margin-left: 8px;
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: battleUi.$battle-ui-font-base;
   font-weight: 700;
   background: rgba(56, 189, 248, 0.22);
   color: #7dd3fc;
@@ -200,7 +203,7 @@ const adviceLine = computed(() => {
 
 .stage-compare__advice {
   margin: 10px 0 0;
-  font-size: 13px;
+  font-size: battleUi.$battle-ui-font-base;
   line-height: 1.5;
   color: #94a3b8;
 }

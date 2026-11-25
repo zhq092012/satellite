@@ -80,8 +80,9 @@ import { useBattleTaskGlobeResources } from '@/composables/useBattleTaskGlobeRes
 /** 全局布局 Store */
 const store = useLayoutStore()
 
-/** 任务挂载资源 → 地球卫星 / 地面站（`GET /battle-task/{id}/resources`） */
-const { taskGlobeSatellites, taskGlobeGroundTargets, taskGlobeWeapons } = useBattleTaskGlobeResources()
+/** 任务挂载资源 → 地球卫星 / 地面站（`GET /command-task/{id}/resources`） */
+const { taskGlobeSatellites, taskGlobeGroundTargets, taskGlobeWeapons, loadTaskGlobeResources } =
+  useBattleTaskGlobeResources()
 
 /** 卫星档案弹窗 */
 useSatelliteProfileDialog()
@@ -344,9 +345,10 @@ const handleSelectSatellite = async (norad: number | null) => {
 /**
  * 左侧面板保存并重算后：等待进度完成后由既有 watch 拉取任务分析。
  */
-const handleTaskRecalculated = () => {
+const handleTaskRecalculated = (taskId: string) => {
   autoTimelinePlaybackTaskId = null
   stopTimelinePlayback()
+  void loadTaskGlobeResources(taskId)
 }
 
 /**

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-container class="atlas-app-layout-container">
     <el-container>
       <!-- 头部 -->
@@ -14,44 +14,49 @@
         </div>
 
         <div class="header-right actions-bar">
-          <!-- 当前场景（即战场）显示 / 下拉切换 -->
+          <!-- 当前作战命令下拉切换 -->
           <div class="task-status-bar">
-            <el-dropdown trigger="click" :disabled="sceneSwitching" @command="handleSwitchScene"
-              @visible-change="handleSceneDropdownVisible" popper-class="scene-selector-popper">
-              <div class="scene-trigger" :class="{ 'is-empty': !layoutStore.battle }">
+            <el-dropdown trigger="click" :disabled="commandSwitching" @command="handleSwitchCommand"
+              @visible-change="handleCommandDropdownVisible" popper-class="command-selector-popper">
+              <div class="command-trigger" :class="{ 'is-empty': !layoutStore.command }">
                 <span
-                  v-if="layoutStore.battle?.name"
-                  class="scene-name"
-                  :title="layoutStore.battle.name"
-                >{{ layoutStore.battle.name }}</span>
-                <span v-else class="scene-create">新建场景</span>
-                <el-icon class="scene-arrow">
+                  v-if="layoutStore.command?.name"
+                  class="command-name"
+                  :title="layoutStore.command.name"
+                >{{ layoutStore.command.name }}</span>
+                <span v-else class="command-create">新建命令</span>
+                <el-icon class="command-arrow">
                   <ArrowDown />
                 </el-icon>
               </div>
               <template #dropdown>
-                <el-dropdown-menu class="scene-dropdown-menu">
-                  <el-dropdown-item v-for="battle in battleList" :key="battle.id" :command="battle.id"
-                    :disabled="sceneSwitching" :class="{ 'is-active': layoutStore.battle?.id === battle.id }">
-                    {{ battle.name }}
-                  </el-dropdown-item>
+                <el-dropdown-menu class="command-dropdown-menu">
                   <el-dropdown-item
-                    v-if="battleList.length === 0 && !loadingData"
-                    command="__create__"
-                    class="scene-dropdown-create"
+                    v-for="cmd in commandList"
+                    :key="cmd.id"
+                    :command="cmd.id"
+                    :disabled="commandSwitching"
+                    :class="{ 'is-active': layoutStore.command?.id === cmd.id }"
                   >
-                    新建场景
-                  </el-dropdown-item>
-                  <el-dropdown-item v-if="loadingData && battleList.length === 0" disabled>
-                    正在加载场景...
+                    {{ cmd.name }}
                   </el-dropdown-item>
                   <el-dropdown-item
-                    v-if="battleList.length > 0"
+                    v-if="commandList.length === 0 && !loadingData"
+                    command="__create__"
+                    class="command-dropdown-create"
+                  >
+                    新建命令
+                  </el-dropdown-item>
+                  <el-dropdown-item v-if="loadingData && commandList.length === 0" disabled>
+                    正在加载命令...
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    v-if="commandList.length > 0"
                     divided
                     command="__create__"
-                    class="scene-dropdown-create"
+                    class="command-dropdown-create"
                   >
-                    新建场景
+                    新建命令
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -107,11 +112,11 @@
       </el-scrollbar>
     </el-container>
     <AiAssistant />
-    <SceneEditDialog
-      v-model="sceneDialogVisible"
+    <CommandEditDialog
+      v-model="commandDialogVisible"
       :is-edit="false"
-      :scene="null"
-      @saved="handleSceneCreated"
+      :command="null"
+      @saved="handleCommandCreated"
     />
   </el-container>
 </template>
@@ -123,14 +128,14 @@ import { ElMessage } from 'element-plus'
 import { ArrowDown, Folder, Setting, SwitchButton } from '@element-plus/icons-vue'
 import MenuTree from './MenuTree.vue'
 import AiAssistant from '@/components/ai-assistant/AiAssistant.vue'
-import SceneEditDialog from '@/components/BattleSituation/SceneEditDialog.vue'
+import CommandEditDialog from '@/components/BattleSituation/CommandEditDialog.vue'
 import { logout as logoutApi, type MenuItem } from '@/api/auth'
 import { useAuthStore } from '@/store/modules/auth'
 import { useLayoutStore } from '@/store/modules/layout'
-import { getBattleList } from '@/api/battle/battle'
+import { getCommandList } from '@/api/command/command'
 import { getTaskList } from '@/api/task/task'
-import type { BattleForm } from '@/types/battle/battle'
-import { isSameBattleId } from '@/utils/battleEntity'
+import type { CommandForm } from '@/types/command/command'
+import { isSameCommandId } from '@/utils/commandEntity'
 import { normalizeTaskListFromApi } from '@/utils/taskEntity'
 
 const authStore = useAuthStore()
@@ -381,28 +386,28 @@ const handleLogout = async () => {
 /** 场景（战场）列表加载状态 */
 const loadingData = ref(false)
 /** 场景切换中，避免重复点击 */
-const sceneSwitching = ref(false)
+const commandSwitching = ref(false)
 /** 可供切换的场景列表（数据源为战场列表） */
-const battleList = ref<BattleForm[]>([])
+const commandList = ref<CommandForm[]>([])
 /** 顶栏「新建场景」弹窗 */
-const sceneDialogVisible = ref(false)
+const commandDialogVisible = ref(false)
 
-const SCENE_CREATE_COMMAND = '__create__'
+const COMMAND_CREATE_ITEM = '__create__'
 
 /**
  * 加载全部场景（战场）列表，供顶栏下拉切换使用。
  *
  * @returns 无返回值；失败时保留已有列表
  */
-const loadBattleList = async () => {
+const loadCommandList = async () => {
   loadingData.value = true
   try {
-    const res = await getBattleList()
+    const res = await getCommandList()
     if (res.code === 200 && Array.isArray(res.data)) {
-      battleList.value = res.data
+      commandList.value = res.data
     }
   } catch (error) {
-    console.error('加载场景列表失败:', error)
+    console.error('加载命令列表失败:', error)
   } finally {
     loadingData.value = false
   }
@@ -413,17 +418,17 @@ const loadBattleList = async () => {
  *
  * @param battle 场景
  */
-const applyBattleWithTasks = async (battle: BattleForm) => {
-  if (!battle?.id) return
-  layoutStore.setActivedBattle(battle)
+const applyCommandWithTasks = async (command: CommandForm) => {
+  if (!command?.id) return
+  layoutStore.setActivedCommand(command)
   layoutStore.setSelectedSatSeries('')
 
-  const taskRes = await getTaskList(battle.id)
+  const taskRes = await getTaskList(command.id)
   const tasks =
     taskRes.code === 200 && Array.isArray(taskRes.data)
       ? normalizeTaskListFromApi(taskRes.data)
       : []
-  layoutStore.setActivedBattle({ ...battle, tasks })
+  layoutStore.setActivedCommand({ ...command, tasks })
 
   const matchedTask = tasks.find((task) => task.id === layoutStore.activedTask?.id)
   if (matchedTask) {
@@ -438,47 +443,47 @@ const applyBattleWithTasks = async (battle: BattleForm) => {
 /**
  * 列表刷新后同步选中场景：无场景则清空；有场景且当前无效则选第一个；否则保留用户手动切换结果。
  */
-const syncSceneSelectionAfterLoad = async () => {
-  if (!battleList.value.length) {
-    layoutStore.setActivedBattle(null)
+const syncCommandSelectionAfterLoad = async () => {
+  if (!commandList.value.length) {
+    layoutStore.setActivedCommand(null)
     layoutStore.setActivedTask(null)
     return
   }
 
-  const currentId = layoutStore.battle?.id
+  const currentId = layoutStore.command?.id
   const matched = currentId
-    ? battleList.value.find((item) => isSameBattleId(item.id, currentId))
+    ? commandList.value.find((item) => isSameCommandId(item.id, currentId))
     : undefined
 
   if (matched) {
-    if (!layoutStore.battle?.tasks?.length) {
+    if (!layoutStore.command?.tasks?.length) {
       try {
-        await applyBattleWithTasks(matched)
+        await applyCommandWithTasks(matched)
       } catch (error) {
-        console.error('刷新当前场景任务失败:', error)
-        layoutStore.setActivedBattle(matched)
+        console.error('刷新当前命令任务失败:', error)
+        layoutStore.setActivedCommand(matched)
       }
     } else {
-      layoutStore.setActivedBattle({
+      layoutStore.setActivedCommand({
         ...matched,
-        tasks: layoutStore.battle.tasks,
+        tasks: layoutStore.command.tasks,
       })
     }
     return
   }
 
-  const first = battleList.value[0]
+  const first = commandList.value[0]
   if (!first?.id) return
   try {
-    await applyBattleWithTasks(first)
+    await applyCommandWithTasks(first)
   } catch (error) {
-    console.error('初始化默认场景任务失败:', error)
-    layoutStore.setActivedBattle(first)
+    console.error('初始化默认命令任务失败:', error)
+    layoutStore.setActivedCommand(first)
   }
 }
 
-const openCreateSceneDialog = () => {
-  sceneDialogVisible.value = true
+const openCreateCommandDialog = () => {
+  commandDialogVisible.value = true
 }
 
 /**
@@ -486,18 +491,18 @@ const openCreateSceneDialog = () => {
  *
  * @param battle 保存后的场景
  */
-const handleSceneCreated = async (battle: BattleForm) => {
-  await loadBattleList()
-  if (!battle?.id) {
-    await syncSceneSelectionAfterLoad()
+const handleCommandCreated = async (command: CommandForm) => {
+  await loadCommandList()
+  if (!command?.id) {
+    await syncCommandSelectionAfterLoad()
     return
   }
   try {
-    await applyBattleWithTasks(battle)
-    ElMessage.success(`已创建并切换到场景：${battle.name}`)
+    await applyCommandWithTasks(command)
+    ElMessage.success(`已创建并切换到命令：${command.name}`)
   } catch (error) {
-    console.error('切换到新建场景失败:', error)
-    ElMessage.error('场景已创建，但切换失败，请从下拉列表手动选择')
+    console.error('切换到新建命令失败:', error)
+    ElMessage.error('命令已创建，但切换失败，请从下拉列表手动选择')
   }
 }
 
@@ -506,18 +511,18 @@ const handleSceneCreated = async (battle: BattleForm) => {
  *
  * @param visible 下拉是否展开
  */
-const handleSceneDropdownVisible = async (visible: boolean) => {
+const handleCommandDropdownVisible = async (visible: boolean) => {
   if (!visible) return
-  await loadBattleList()
-  const currentId = layoutStore.battle?.id
+  await loadCommandList()
+  const currentId = layoutStore.command?.id
   if (
     currentId
-    && !battleList.value.some((item) => isSameBattleId(item.id, currentId))
+    && !commandList.value.some((item) => isSameCommandId(item.id, currentId))
   ) {
-    await syncSceneSelectionAfterLoad()
+    await syncCommandSelectionAfterLoad()
   }
-  if (!currentId && battleList.value.length > 0) {
-    await syncSceneSelectionAfterLoad()
+  if (!currentId && commandList.value.length > 0) {
+    await syncCommandSelectionAfterLoad()
   }
 }
 
@@ -528,30 +533,30 @@ const handleSceneDropdownVisible = async (visible: boolean) => {
  *
  * @param battleId 下拉项 command，对应战场 ID
  */
-const handleSwitchScene = async (battleId: number | string) => {
-  if (battleId === SCENE_CREATE_COMMAND) {
-    openCreateSceneDialog()
+const handleSwitchCommand = async (commandId: number | string) => {
+  if (commandId === COMMAND_CREATE_ITEM) {
+    openCreateCommandDialog()
     return
   }
-  const battle = battleList.value.find((item) => isSameBattleId(item.id, battleId))
-  if (!battle?.id || sceneSwitching.value) return
-  if (isSameBattleId(layoutStore.battle?.id, battle.id)) return
+  const command = commandList.value.find((item) => isSameCommandId(item.id, commandId))
+  if (!command?.id || commandSwitching.value) return
+  if (isSameCommandId(layoutStore.command?.id, command.id)) return
 
-  sceneSwitching.value = true
+  commandSwitching.value = true
   try {
-    await applyBattleWithTasks(battle)
-    ElMessage.success(`已切换场景：${battle.name}`)
+    await applyCommandWithTasks(command)
+    ElMessage.success(`已切换命令：${command.name}`)
   } catch (error) {
-    console.error('切换场景失败:', error)
-    ElMessage.error('切换场景失败，请稍后重试')
+    console.error('切换命令失败:', error)
+    ElMessage.error('切换命令失败，请稍后重试')
   } finally {
-    sceneSwitching.value = false
+    commandSwitching.value = false
   }
 }
 
 onMounted(async () => {
-  await loadBattleList()
-  await syncSceneSelectionAfterLoad()
+  await loadCommandList()
+  await syncCommandSelectionAfterLoad()
 })
 
 </script>
@@ -652,7 +657,7 @@ onMounted(async () => {
           outline: none !important;
         }
 
-        .scene-trigger {
+        .command-trigger {
           display: inline-flex;
           align-items: center;
           gap: 6px;
@@ -673,7 +678,7 @@ onMounted(async () => {
             flex-shrink: 0;
           }
 
-          .scene-name {
+          .command-name {
             color: #00e1ff;
             font-weight: 700;
             overflow: hidden;
@@ -681,12 +686,12 @@ onMounted(async () => {
             white-space: nowrap;
           }
 
-          .scene-create {
+          .command-create {
             color: #fbbf24;
             font-weight: 600;
           }
 
-          .scene-arrow {
+          .command-arrow {
             font-size: 12px;
             color: #7dd3fc;
             flex-shrink: 0;
@@ -696,8 +701,8 @@ onMounted(async () => {
           &:hover {
             background: rgba(0, 225, 255, 0.08);
 
-            .scene-name,
-            .scene-arrow {
+            .command-name,
+            .command-arrow {
               color: #00e1ff;
             }
           }
@@ -705,7 +710,7 @@ onMounted(async () => {
           &[aria-expanded="true"] {
             background: rgba(0, 225, 255, 0.14);
 
-            .scene-arrow {
+            .command-arrow {
               transform: rotate(180deg);
               color: #00e1ff;
             }
@@ -876,7 +881,7 @@ onMounted(async () => {
 }
 
 /* 场景下拉菜单（Teleport 到 body） */
-:global(.scene-selector-popper) {
+:global(.command-selector-popper) {
   background: rgba(8, 24, 48, 0.98) !important;
   border: 1px solid rgba(0, 225, 255, 0.3) !important;
   box-shadow:

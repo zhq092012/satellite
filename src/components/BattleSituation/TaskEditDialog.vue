@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-dialog v-model="visible" :title="dialogTitle" width="1480px" align-center append-to-body destroy-on-close
     class="task-edit-dialog" modal-class="task-edit-dialog-modal" @closed="handleClosed">
     <div class="task-edit-layout">
@@ -36,14 +36,14 @@
               </el-select>
             </el-form-item>
             <el-form-item label="命令来源">
-              <el-select v-model="combatScenario.commandSourceId" placeholder="请选择命令来源"
+              <el-select v-model="combatScenario.commandSourceId" placeholder="请选择命令来源" disabled
                 popper-class="task-edit-select-popper" style="width: 100%">
                 <el-option v-for="item in COMMAND_SOURCE_OPTIONS" :key="item.id" :label="item.label" :value="item.id" />
               </el-select>
             </el-form-item>
             <el-form-item label="作战阶段">
               <el-select v-model="combatScenario.combatPhaseId" placeholder="请选择作战阶段" style="width: 100%"
-                popper-class="task-edit-select-popper" @change="handleCombatPhaseChange">
+                disabled popper-class="task-edit-select-popper">
                 <el-option v-for="item in COMBAT_PHASE_OPTIONS" :key="item.id" :label="item.label" :value="item.id" />
               </el-select>
             </el-form-item>
@@ -59,7 +59,7 @@
               </div>
             </el-form-item>
             <el-form-item label="作战背景">
-              <el-select v-model="combatScenario.backgroundId" placeholder="请选择作战背景"
+              <el-select v-model="combatScenario.backgroundId" placeholder="请选择作战背景" disabled
                 popper-class="task-edit-select-popper" style="width: 100%">
                 <el-option v-for="item in COMBAT_BACKGROUND_OPTIONS" :key="item.id" :label="item.label"
                   :value="item.id" />
@@ -68,12 +68,12 @@
             <el-form-item label="作战预期">
               <div class="expectation-select-row">
                 <el-select v-model="combatScenario.expectationPrimaryId" placeholder="一级预期" style="width: 42%"
-                  popper-class="task-edit-select-popper" @change="handleExpectationPrimaryChange">
+                  disabled popper-class="task-edit-select-popper">
                   <el-option v-for="item in COMBAT_EXPECTATION_PRIMARY_OPTIONS" :key="item.id" :label="item.label"
                     :value="item.id" />
                 </el-select>
                 <el-select v-model="combatScenario.expectationSecondaryId" placeholder="二级预期" style="width: 56%"
-                  popper-class="task-edit-select-popper" :disabled="!combatScenario.expectationPrimaryId">
+                  disabled popper-class="task-edit-select-popper">
                   <el-option v-for="item in expectationSecondaryOptions" :key="item.id" :label="item.label"
                     :value="item.id" />
                 </el-select>
@@ -169,17 +169,17 @@ import {
   COMBAT_EXPECTATION_PRIMARY_OPTIONS,
   COMBAT_PHASE_OPTIONS,
   COMMAND_SOURCE_OPTIONS,
-  resolveEnemyCountriesByCombatPhase,
   type CombatScenarioSelection,
 } from '@/config/combatScenarioOptions'
 import {
-  applyCombatScenarioSelectionToTaskFields,
-  DEFAULT_TASK_COMBAT_COUNTRY,
-  formatTaskCountryField,
+  parseCommandEnemyCountries,
+  resolveCombatCountriesForContext,
+  resolveCombatScenarioSelectionFromCommand,
+} from '@/utils/commandEntity'
+import {
   mapAssembleRowToTaskResource,
   parseTaskCombatCountries,
   resolveCombatScenarioSelectionFromTask,
-  resolveTaskCountryFieldFromEntity,
 } from '@/utils/taskEntity'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskAssembleTab, { type TaskAssembleRow } from '@/components/BattleSituation/TaskAssembleTab.vue'
@@ -257,14 +257,16 @@ const combatObjectCountryOptions = [...TASK_ENEMY_COUNTRY_OPTIONS]
  * @param country 国家/地区名称
  */
 const isCombatObjectActive = (country: string): boolean =>
-  parseTaskCombatCountries(taskForm.country).includes(country)
+  parseCommandEnemyCountries(store.command).includes(country)
 
 /**
  * 计算：卫星资源树查询用的作战对象国家列表。
- * 返回：由 `taskForm.country` 拆分后的国家名数组。
+ * 返回：当前作战命令 `enemyCountry`。
  * 作用：传给卫星装配 Tab 拉取资源树。
  */
-const combatCountriesForAssembly = computed(() => parseTaskCombatCountries(taskForm.country))
+const combatCountriesForAssembly = computed(() =>
+  resolveCombatCountriesForContext(store.command, taskForm.country),
+)
 
 /** 回填表单时暂不根据作战对象变化清空卫星（避免打开弹窗误清） */
 const suppressAssemblyCountryWatch = ref(false)
@@ -376,7 +378,7 @@ const formatAreaRadius = (area: TaskArea): string => {
 
 /** 可编辑任务表单。 */
 const taskForm = reactive<TaskForm>({
-  battleId: '',
+  commandId: '',
   name: '',
   description: '',
   beginDate: '',
@@ -387,7 +389,7 @@ const taskForm = reactive<TaskForm>({
   expectationCases: [],
   forecastHour: DEFAULT_TASK_DURATION_HOURS,
   areas: [],
-  country: DEFAULT_TASK_COMBAT_COUNTRY,
+  country: '',
   steps: '',
   focusStatus: 0,
   delayMin: 60,
@@ -402,9 +404,9 @@ const formRules = reactive<FormRules<TaskForm>>({
   name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
   description: [{ required: true, message: '请输入任务概述', trigger: 'blur' }],
   country: [{
-    validator: (_rule, value, callback) => {
-      if (!parseTaskCombatCountries(value).length) {
-        callback(new Error('请选择作战阶段以确定作战对象'))
+    validator: (_rule, _value, callback) => {
+      if (!parseCommandEnemyCountries(store.command).length) {
+        callback(new Error('当前作战命令未配置作战对象（enemyCountry），请在命令管理中维护'))
         return
       }
       callback()
@@ -810,9 +812,10 @@ const createDefaultEndDate = (beginDate: string, hours: number): string => {
 const resetCreateForm = () => {
   const beginDate = createDefaultBeginDate()
   const endDate = createDefaultEndDate(beginDate, DEFAULT_TASK_DURATION_HOURS)
+  const commandId = store.command?.id != null ? String(store.command.id) : ''
   Object.assign(taskForm, {
     id: undefined,
-    battleId: store.battle?.id != null ? String(store.battle.id) : '',
+    commandId,
     name: '',
     description: '',
     beginDate,
@@ -821,7 +824,7 @@ const resetCreateForm = () => {
     background: '',
     expectation: '',
     expectationCases: [],
-    country: DEFAULT_TASK_COMBAT_COUNTRY,
+    country: '',
     steps: '',
     focusStatus: 0,
     delayMin: DEFAULT_DELAY_MIN,
@@ -834,7 +837,7 @@ const resetCreateForm = () => {
   })
   assembleTargetTypes.value = [...DEFAULT_TARGET_TYPES]
   durationHours.value = DEFAULT_TASK_DURATION_HOURS
-  initCombatScenarioDefaults()
+  syncCombatScenarioFromCommand()
   draftAssembledSatellites.value = []
   pendingSatelliteRestore.value = null
   void nextTick(() => {
@@ -845,34 +848,18 @@ const resetCreateForm = () => {
   })
 }
 
-/** 初始化作战场景默认值 */
-const initCombatScenarioDefaults = () => {
-  combatScenario.backgroundId = COMBAT_BACKGROUND_OPTIONS[0]?.id ?? ''
-  combatScenario.commandSourceId = COMMAND_SOURCE_OPTIONS[0]?.id ?? ''
-  combatScenario.combatPhaseId = COMBAT_PHASE_OPTIONS[0]?.id ?? ''
-  combatScenario.expectationPrimaryId = COMBAT_EXPECTATION_PRIMARY_OPTIONS[0]?.id ?? ''
-  combatScenario.expectationSecondaryId =
-    COMBAT_EXPECTATION_PRIMARY_OPTIONS[0]?.children[0]?.id ?? ''
-  applyCombatPhaseToCountry(combatScenario.combatPhaseId)
-}
-
 /**
- * 填充作战场景
- * @param task 任务
+ * 从当前作战命令（`store.command`）只读回显作战场景，不读任务字段。
  */
-const syncCombatScenarioFromTask = (task: TaskForm) => {
-  const selection = resolveCombatScenarioSelectionFromTask({
-    ...task,
-    country: resolveTaskCountryFieldFromEntity(task),
-  })
+const syncCombatScenarioFromCommand = () => {
+  const selection =
+    resolveCombatScenarioSelectionFromCommand(store.command) ??
+    resolveCombatScenarioSelectionFromTask(taskForm as TaskForm, store.command)
   combatScenario.backgroundId = selection.backgroundId
   combatScenario.commandSourceId = selection.commandSourceId
   combatScenario.combatPhaseId = selection.combatPhaseId
   combatScenario.expectationPrimaryId = selection.expectationPrimaryId
   combatScenario.expectationSecondaryId = selection.expectationSecondaryId
-  if (!parseTaskCombatCountries(task.country).length) {
-    applyCombatPhaseToCountry(selection.combatPhaseId)
-  }
 }
 
 /**
@@ -884,14 +871,17 @@ const fillForm = (task: TaskForm | null) => {
   suppressAssemblyCountryWatch.value = true
   if (!task || !props.isEdit) {
     resetCreateForm()
-    syncAssemblyCountrySnapshot(taskForm.country)
+    syncAssemblyCountrySnapshot(
+      resolveCombatCountriesForContext(store.command, taskForm.country).join(','),
+    )
     suppressAssemblyCountryWatch.value = false
     return
   }
+  const commandId = String(task.commandId ?? store.command?.id ?? '')
   Object.assign(taskForm, {
     ...task,
-    battleId: task.battleId != null ? String(task.battleId) : '',
-    country: resolveTaskCountryFieldFromEntity(task),
+    commandId,
+    country: '',
     expectationCases: task.expectationCases ? [...task.expectationCases] : [],
     steps: task.steps || '',
     focusStatus: Number(task.focusStatus) === 1 ? 1 : 0,
@@ -907,45 +897,16 @@ const fillForm = (task: TaskForm | null) => {
   const end = normalizeDateTime(task.endDate)
   taskForm.beginDate = begin
   taskForm.endDate = end
-  syncCombatScenarioFromTask(task)
-  syncCountryFields()
+  syncCombatScenarioFromCommand()
   void nextTick(() => {
     restoreAssembleFromTask(task)
-    syncAssemblyCountrySnapshot(taskForm.country)
+    syncAssemblyCountrySnapshot(
+      resolveCombatCountriesForContext(store.command, taskForm.country).join(','),
+    )
     suppressAssemblyCountryWatch.value = false
   })
 }
 
-/**
- * 将多选国家同步回逗号分隔字段，供提交使用。
- */
-const syncCountryFields = () => {
-  applyCombatScenarioSelectionToTaskFields(combatScenario, taskForm)
-}
-
-/**
- * 作战阶段变更：自动设置作战对象并写入 `country`。
- *
- * @param phaseId 作战阶段 ID
- */
-const applyCombatPhaseToCountry = (phaseId: string) => {
-  const countries = resolveEnemyCountriesByCombatPhase(phaseId)
-  taskForm.country = formatTaskCountryField(countries)
-  syncCountryFields()
-  formRef.value?.validateField('country').catch(() => undefined)
-}
-
-const handleCombatPhaseChange = (phaseId: string) => {
-  applyCombatPhaseToCountry(phaseId)
-}
-
-/**
- * 作战预期一级变更：重置二级为该项首选项。
- */
-const handleExpectationPrimaryChange = () => {
-  const first = expectationSecondaryOptions.value[0]
-  combatScenario.expectationSecondaryId = first?.id ?? ''
-}
 
 
 /**
@@ -996,8 +957,6 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
   const stations = stationAssembleRef.value?.getAssembledRows() ?? []
   const weapons = weaponAssembleRef.value?.getAssembledRows() ?? []
 
-  syncCountryFields()
-
   if (!assembleTargetTypes.value.length) {
     ElMessage.warning('请选择卫星类型')
     activeTab.value = 'basic'
@@ -1010,18 +969,18 @@ const buildAddTaskPayload = (): AddTaskPayload | null => {
     return null
   }
 
+  const commandId =
+    store.command?.id != null
+      ? String(store.command.id)
+      : String(taskForm.commandId ?? '').trim()
   return {
-    battleId: store.battle?.id != null ? String(store.battle.id) : '',
+    commandId,
     name: taskForm.name,
     description: taskForm.description,
     beginDate: normalizeDateTime(taskForm.beginDate),
     endDate: normalizeDateTime(taskForm.endDate),
-    taskSource: taskForm.taskSource ?? '',
-    background: taskForm.background ?? '',
-    expectation: taskForm.expectation ?? '',
-    expectationCases: [...(taskForm.expectationCases ?? [])],
     forecastHour: durationHours.value,
-    country: taskForm.country ?? '',
+    country: '',
     steps: taskForm.steps ?? '',
     focusStatus: taskForm.focusStatus ?? 0,
     areas: cloneTaskAreas(taskForm.areas),
@@ -1054,7 +1013,7 @@ const buildUpdateTaskPayload = (): TaskForm | null => {
     ...base,
     ...assembled,
     id: base.id,
-    battleId: base.battleId,
+    commandId: String(base.commandId ?? store.command?.id ?? ''),
     name: taskForm.name,
     description: taskForm.description,
     steps: taskForm.steps || base.steps || '',
@@ -1069,7 +1028,7 @@ const buildUpdateTaskPayload = (): TaskForm | null => {
  */
 const handleSubmit = async () => {
   if (!formRef.value) return
-  syncCountryFields()
+  syncCombatScenarioFromCommand()
   await formRef.value.validate(async (valid) => {
     if (!valid) {
       activeTab.value = 'basic'
@@ -1091,8 +1050,8 @@ const handleSubmit = async () => {
         ElMessage.warning('缺少任务 ID，无法修改任务')
         return
       }
-    } else if (!store.battle?.id) {
-      ElMessage.warning('请先选择当前场景后再添加任务')
+    } else if (!store.command?.id) {
+      ElMessage.warning('请先选择当前命令后再添加任务')
       return
     }
 

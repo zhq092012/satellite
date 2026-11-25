@@ -18,7 +18,7 @@ export interface TaskResourceItem {
     code: string
 }
 
-/** 任务挂载卫星（`GET /battle-task/{id}/resources` 中 `satellites` 元素） */
+/** 任务挂载卫星（`GET /command-task/{id}/resources` 中 `satellites` 元素） */
 export interface TaskResourceSatelliteItem extends TaskResourceItem {
     /** NORAD 编号 */
     noradId?: string
@@ -121,14 +121,14 @@ export interface TaskCombatArea {
 }
 
 /**
- * 战场任务（`BattleTaskReq` / `BattleTaskResp`）。
- * 与战场仅通过 `battleId` 关联。
+ * 作战命令下的任务（OpenAPI `CommandTaskReq` / `CommandTaskResp`）。
+ * 与作战命令通过 `commandId` 关联。
  */
 export interface TaskForm {
     /** 任务 id */
     id?: string
-    /** 所属战场 id */
-    battleId: string
+    /** 所属作战命令 id */
+    commandId: string
     /** 任务名称 */
     name: string
     /** 描述 */
@@ -137,19 +137,19 @@ export interface TaskForm {
     beginDate: string
     /** 结束日期 yyyy-MM-dd HH:mm */
     endDate: string
-    /** 作战任务来源 */
+    /** @deprecated 改由所属作战命令 `source` 提供，任务接口不再下发 */
     taskSource?: string
-    /** 作战背景 */
+    /** @deprecated 改由作战命令 `backGround` 提供 */
     background?: string
-    /** 作战预期（如：示强威慑） */
+    /** @deprecated 改由作战命令 `expectation` 提供 */
     expectation?: string
-    /** 作战预期下的具体情形 */
+    /** @deprecated 改由作战命令 `expectationOption` 提供 */
     expectationCases?: string[]
     /** 预报小时 */
     forecastHour: number
     /**
-     * 作战对象国家（OpenAPI `country`）。
-     * 多个国家使用英文逗号分隔，例如 `日本` 或 `美国,日本`。
+     * 作战对象（历史字段）。
+     * 现从所属命令 `enemyCountry` 读取；提交任务接口时不传。
      */
     country: string
     /** 作战阶段信息（JSON 字符串） */

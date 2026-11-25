@@ -56,7 +56,7 @@ export const toBattleGlobeGroundTargetFromTaskResource = (
 }
 
 /**
- * 从 `GET /battle-task/{id}/resources` 响应构建地球卫星与地面站列表。
+ * 从 `GET /command-task/{id}/resources` 响应构建地球卫星与地面站列表。
  *
  * @param data 任务挂载资源
  */

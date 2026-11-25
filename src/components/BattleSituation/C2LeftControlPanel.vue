@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <aside class="c2-panel c2-panel--left dark-theme">
     <div class="panel-body">
       <div v-if="taskSwitching" class="zone-loading">正在切换任务...</div>
@@ -17,10 +17,10 @@
               <el-option v-for="task in taskList" :key="task.id" :label="task.name" :value="task.id" />
             </el-select>
           </template>
-          <template v-else-if="store.battle?.id">
+          <template v-else-if="store.command?.id">
             <button type="button" class="task-create-entry" @click="openCreateTask">新建任务</button>
           </template>
-          <p v-else class="task-panel-hint">请先选择或创建场景</p>
+          <p v-else class="task-panel-hint">请先选择或创建命令</p>
         </section>
 
         <div v-if="taskList.length && !store.activedTask" class="zone-empty">请选择任务</div>
@@ -141,13 +141,13 @@ import {
   COMBAT_EXPECTATION_PRIMARY_OPTIONS,
   COMBAT_PHASE_OPTIONS,
 } from '@/config/combatScenarioOptions'
+import { resolveCombatScenarioSelectionFromCommand } from '@/utils/commandEntity'
 import {
   normalizeTaskListFromApi,
   resolveCombatCountriesFromTask,
   resolveCombatScenarioSelectionFromTask,
-  resolveEnemyCountriesFromTask,
 } from '@/utils/taskEntity'
-import { isSameBattleId } from '@/utils/battleEntity'
+import { isSameCommandId } from '@/utils/commandEntity'
 import {
   buildTaskScopedInventoryFromApiTreeRoots,
   pruneSatelliteResourceTreeByTaskSatellites,
@@ -421,9 +421,13 @@ const combatScenarioDisplayToken = ref(0)
  */
 const readActiveCombatScenario = () => {
   combatScenarioDisplayToken.value
+  if (store.command) {
+    const fromCommand = resolveCombatScenarioSelectionFromCommand(store.command)
+    if (fromCommand) return fromCommand
+  }
   const task = store.activedTask
   if (!task?.id) return null
-  return resolveCombatScenarioSelectionFromTask(task)
+  return resolveCombatScenarioSelectionFromTask(task, store.command)
 }
 
 /**
@@ -489,9 +493,9 @@ const currentCombatExpectationSecondaryLabel = computed(() => {
  * @param options.silent 为 true 时不顶掉整面板（避免保存后卸载 el-tree）
  */
 const loadBattleTasks = async (options?: { silent?: boolean }) => {
-  const battleId = store.battle?.id
-  if (!battleId) {
-    taskList.value = store.battle?.tasks || []
+  const commandId = store.command?.id
+  if (!commandId) {
+    taskList.value = store.command?.tasks || []
     return
   }
   const previousTaskList = [...taskList.value]
@@ -501,15 +505,15 @@ const loadBattleTasks = async (options?: { silent?: boolean }) => {
     taskList.value = []
   }
   try {
-    const res = await getTaskList(battleId)
+    const res = await getTaskList(commandId)
     if (res.code === 200 && Array.isArray(res.data)) {
       const tasks = normalizeTaskListFromApi(res.data)
       taskList.value = tasks
       await resumeTaskProgressPollingForTasks(tasks)
       // 请求返回后场景可能已切换；只有仍是本次拉取的战场对象时才写回任务列表。
-      const currentBattle = store.battle
-      if (currentBattle && isSameBattleId(currentBattle.id, battleId)) {
-        store.setActivedBattle({ ...currentBattle, tasks })
+      const currentCommand = store.command
+      if (currentCommand && isSameCommandId(currentCommand.id, commandId)) {
+        store.setActivedCommand({ ...currentCommand, tasks })
       }
       if (options?.silent) {
         if (!tasks.length) {
@@ -525,14 +529,14 @@ const loadBattleTasks = async (options?: { silent?: boolean }) => {
         store.setActivedTask(tasks.find((item) => item.id === activeId) ?? tasks[0])
       }
     } else if (!options?.silent) {
-      taskList.value = store.battle?.tasks || []
+      taskList.value = store.command?.tasks || []
     } else {
       taskList.value = previousTaskList
     }
   } catch (error) {
     console.error('加载场景任务列表失败:', error)
     if (!options?.silent) {
-      taskList.value = store.battle?.tasks || []
+      taskList.value = store.command?.tasks || []
     }
   } finally {
     if (!options?.silent) {
@@ -547,9 +551,9 @@ const loadBattleTasks = async (options?: { silent?: boolean }) => {
  * 作用：切换场景时重新加载该场景任务列表。
  */
 watch(
-  () => store.battle?.id,
-  (battleId, prevBattleId) => {
-    if (!battleId || battleId === prevBattleId) return
+  () => store.command?.id,
+  (commandId, prevCommandId) => {
+    if (!commandId || commandId === prevCommandId) return
     void loadBattleTasks({ silent: true })
   },
   { immediate: true },
@@ -560,10 +564,8 @@ watch(
  *
  * @param task 任务
  */
-const resolveEnemyCountries = (task: TaskForm | null | undefined): string[] => {
-  if (!task) return []
-  return resolveEnemyCountriesFromTask(task)
-}
+const resolveEnemyCountries = (task: TaskForm | null | undefined): string[] =>
+  resolveCombatCountriesFromTask(task, store.command)
 
 /**
  * 解析任务卫星类型列表（接口无字段时由 C2 草稿或默认类型兜底）。
@@ -590,7 +592,7 @@ const isTaskCombatObjectActive = (country: string): boolean =>
  * @param task 当前任务
  */
 const resolveDefaultTreeSortFocusCountry = (task: TaskForm | null | undefined): string | null => {
-  const countries = resolveCombatCountriesFromTask(task)
+  const countries = resolveCombatCountriesFromTask(task, store.command)
   if (!countries.length) return null
   const allowed = new Set<string>(TASK_ENEMY_COUNTRY_OPTIONS as readonly string[])
   const matched = countries.filter((country) => allowed.has(country))
@@ -642,7 +644,7 @@ const fetchTaskSatelliteResourceCatalog = async (task: TaskForm): Promise<boolea
   const mounted = (task.satellites ?? []).filter((item) => item.resourceId?.trim())
   if (!mounted.length) return false
 
-  const countries = resolveCombatCountriesFromTask(task)
+  const countries = resolveCombatCountriesFromTask(task, store.command)
   const queryCountries = countries.length ? countries : [...C2_PANEL_TREE_COUNTRIES]
   const roots = await loadSatelliteResourceTreeRootsForPanel(queryCountries)
   const pruned = pruneSatelliteResourceTreeByTaskSatellites(roots, mounted)
@@ -938,9 +940,11 @@ const clearResourceTreeSelection = async () => {
  * 资源树勾选：系列叶子全选时 search 加载卫星；与 `satellites` 分离维护后写回任务。
  */
 const handleResourceTreeCheck = async () => {
-  if (programmaticTreeSync.value || suppressResourceTreeSave.value || !editorDraft.value) return
+  if (programmaticTreeSync.value || suppressResourceTreeSave.value) return
   const tree = resourceTreeRef.value
   if (!tree) return
+  syncC2TreeCheckedKeysToStore()
+  if (!editorDraft.value) return
   const checkedSeriesIds = resolveC2FullyCheckedSeriesIdsFromTree(tree)
   const prev = trackedC2FullyCheckedSeriesIds.value
   const added = [...checkedSeriesIds].filter((id) => !prev.has(id))
@@ -976,6 +980,7 @@ const handleResourceTreeCheck = async () => {
     }
 
     editorDraft.value.satellites = nextSelected
+    store.setC2RightPanelTaskSatellites(nextSelected)
     flatCatalogRows.value = nextRows
     store.setC2ResourceSatelliteRows(nextRows)
     added.forEach((id) => c2SeriesCheckStateByNodeId.value.set(id, 'all'))
@@ -1043,6 +1048,7 @@ const syncEditorForTask = async (task: TaskForm | null | undefined) => {
   syncEditorInflightTaskId = taskId
   syncEditorInflight = (async () => {
     editorDraft.value = createDraftFromTask(task)
+    store.setC2RightPanelTaskSatellites(editorDraft.value?.satellites ?? [])
     if (task && editorDraft.value) {
       stashedWeaponIds.value = [...readTaskWeaponResourceIds(editorDraft.value)]
       useWeaponsEnabled.value = false
@@ -1081,6 +1087,21 @@ watch(
     void syncEditorForTask(store.activedTask)
   },
   { immediate: true },
+)
+
+/**
+ * 监听：左侧任务草稿中的卫星挂载。
+ * 回调不返回清理函数。
+ * 作用：系列勾选后尚未保存时，右侧列表仍能展示草稿卫星。
+ */
+watch(
+  () => editorDraft.value?.satellites,
+  (satellites) => {
+    if (!editorDraft.value || !store.activedTask?.id) return
+    if (String(editorDraft.value.id) !== String(store.activedTask.id)) return
+    store.setC2RightPanelTaskSatellites(satellites ?? [])
+  },
+  { deep: true },
 )
 
 /**
@@ -1160,8 +1181,8 @@ const openEditTask = () => {
  * 当前场景无任务时，打开新建任务弹窗。
  */
 const openCreateTask = () => {
-  if (!store.battle?.id) {
-    ElMessage.warning('请先选择当前场景')
+  if (!store.command?.id) {
+    ElMessage.warning('请先选择当前命令')
     return
   }
   taskEditIsEdit.value = false

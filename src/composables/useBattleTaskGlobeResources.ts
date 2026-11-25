@@ -2,12 +2,13 @@ import { ref, watch } from 'vue'
 import { getTaskResources } from '@/api/task/task'
 import { useLayoutStore } from '@/store/modules/layout'
 import { buildBattleGlobeLayersFromTaskResources } from '@/utils/buildBattleGlobeFromTaskResources'
+import { buildC2RowsFromTaskResources } from '@/utils/buildC2ResourceCatalog'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import type { BattleGlobeGroundTarget } from '@/utils/buildBattleGlobeGroundTargets'
 import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
 
 /**
- * 按当前任务从 `GET /battle-task/{id}/resources` 拉取卫星与地面站，供态势地球渲染。
+ * 按当前任务从 `GET /command-task/{id}/resources` 拉取卫星与地面站，供态势地球渲染。
  * 本 composable 仅负责任务挂载资源驱动的静态地球图层。
  */
 export const useBattleTaskGlobeResources = () => {
@@ -32,6 +33,7 @@ export const useBattleTaskGlobeResources = () => {
       taskGlobeGroundTargets.value = []
       taskGlobeWeapons.value = []
       taskResourcesTaskId.value = null
+      store.setC2TaskResourceSatelliteRows([])
       return
     }
     const token = (loadToken += 1)
@@ -44,6 +46,7 @@ export const useBattleTaskGlobeResources = () => {
       taskGlobeGroundTargets.value = groundTargets
       taskGlobeWeapons.value = []
       taskResourcesTaskId.value = id
+      store.setC2TaskResourceSatelliteRows(buildC2RowsFromTaskResources(data))
     } catch (error) {
       if (token !== loadToken) return
       console.error('加载任务地球资源失败:', error)
@@ -51,6 +54,7 @@ export const useBattleTaskGlobeResources = () => {
       taskGlobeGroundTargets.value = []
       taskGlobeWeapons.value = []
       taskResourcesTaskId.value = null
+      store.setC2TaskResourceSatelliteRows([])
     } finally {
       if (token === loadToken) {
         taskResourcesLoading.value = false
