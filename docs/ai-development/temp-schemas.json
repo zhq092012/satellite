@@ -1,0 +1,175 @@
+{
+  "SystemSplit": {
+    "type": "object",
+    "properties": {
+      "total": {
+        "type": "integer",
+        "description": "总数",
+        "format": "int32"
+      },
+      "reconCount": {
+        "type": "integer",
+        "description": "侦察卫星数",
+        "format": "int32"
+      },
+      "commCount": {
+        "type": "integer",
+        "description": "通信卫星数",
+        "format": "int32"
+      },
+      "relayCount": {
+        "type": "integer",
+        "description": "中继卫星数",
+        "format": "int32"
+      },
+      "bySystem": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "integer",
+          "description": "按体系计数：key 为体系名，value 为数量",
+          "format": "int32"
+        },
+        "description": "按体系计数：key 为体系名，value 为数量"
+      }
+    },
+    "description": "按体系拆分的目标数"
+  }
+}
+{
+  "Comparison": {
+    "type": "object",
+    "properties": {
+      "satelliteCount": {
+        "$ref": "#/components/schemas/SatelliteCountChange"
+      },
+      "reconTransitWindows": {
+        "$ref": "#/components/schemas/TransitWindowChange"
+      },
+      "reconFirstTransit": {
+        "$ref": "#/components/schemas/FirstTransitChange"
+      }
+    },
+    "description": "打击前后比对结果"
+  }
+}
+{
+  "SatelliteCountChange": {
+    "type": "object",
+    "properties": {
+      "beforeTotal": {
+        "type": "integer",
+        "description": "打击前目标总数（基线集合）",
+        "format": "int32"
+      },
+      "afterTotal": {
+        "type": "integer",
+        "description": "打击后剩余总数",
+        "format": "int32"
+      },
+      "struckTotal": {
+        "type": "integer",
+        "description": "被打击数量 = 打击前 − 打击后",
+        "format": "int32"
+      },
+      "before": {
+        "$ref": "#/components/schemas/SystemSplit"
+      },
+      "after": {
+        "$ref": "#/components/schemas/SystemSplit"
+      },
+      "text": {
+        "type": "string",
+        "description": "结论文本"
+      }
+    },
+    "description": "打击前后卫星数量变化"
+  }
+}
+{
+  "TransitWindowChange": {
+    "type": "object",
+    "properties": {
+      "beforeWindows": {
+        "type": "integer",
+        "description": "打击前过境窗口总数",
+        "format": "int32"
+      },
+      "afterWindows": {
+        "type": "integer",
+        "description": "打击后剩余过境窗口总数",
+        "format": "int32"
+      },
+      "deltaWindows": {
+        "type": "integer",
+        "description": "消减窗口数 = 打击前 − 打击后",
+        "format": "int32"
+      },
+      "reductionPercent": {
+        "type": "number",
+        "description": "消减比例，0~100（百分比）",
+        "format": "double"
+      },
+      "reconTargets": {
+        "type": "integer",
+        "description": "基线内侦察卫星数",
+        "format": "int32"
+      },
+      "reconTargetsWithData": {
+        "type": "integer",
+        "description": "其中有过境计算数据的颗数",
+        "format": "int32"
+      },
+      "reconTargetsWithoutData": {
+        "type": "integer",
+        "description": "其中无过境计算数据的颗数（按 0 窗口计入，见告警）",
+        "format": "int32"
+      },
+      "shares": {
+        "type": "array",
+        "description": "逐星窗口明细（打击星在前，按窗口数降序）",
+        "items": {
+          "$ref": "#/components/schemas/TransitShare"
+        }
+      },
+      "text": {
+        "type": "string",
+        "description": "结论文本"
+      }
+    },
+    "description": "打击前后侦察卫星过境窗口数量变化"
+  }
+}
+{
+  "FirstTransitChange": {
+    "type": "object",
+    "properties": {
+      "before": {
+        "type": "string",
+        "description": "打击前最早过境开始时间（基线内全部侦察星取最早）"
+      },
+      "beforeSatellite": {
+        "type": "string",
+        "description": "打击前最早过境所属卫星"
+      },
+      "after": {
+        "type": "string",
+        "description": "打击后最早过境开始时间（剩余侦察星取最早）"
+      },
+      "afterSatellite": {
+        "type": "string",
+        "description": "打击后最早过境所属卫星"
+      },
+      "delayMinutes": {
+        "type": "integer",
+        "description": "最早过境推迟分钟数；0 表示没推迟，null 表示无过境数据可比",
+        "format": "int64"
+      },
+      "text": {
+        "type": "string",
+        "description": "结论文本"
+      }
+    },
+    "description": "打击前后侦察卫星最早过境时间变化"
+  }
+}
+{}

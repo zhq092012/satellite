@@ -1,18 +1,20 @@
-/** 作战方案报告 OpenAPI 类型（与 `openapi-snapshot.json` 中 report 相关 schema 对齐） */
+/** 作战方案报告 OpenAPI 类型（与 `.cursor-api-docs.json` / `openapi-snapshot.json` 对齐） */
 
-/** 作战方案生成结果（阶段 × 档位矩阵 + 兼容扁平 schemes） */
+/** 作战方案生成结果（当前接口以 strikePlans 为主；以下为 legacy 兼容字段） */
 export interface ReportGenerateResp {
   /** 任务 id */
   taskId?: string
   /** 任务名称 */
   taskName?: string
-  /** 战役名称（配置项 report.campaign） */
-  campaign?: string
   /**
-   * 打击方案列表（`code` 与 `schemes[].code` 一一对应；含被打击清单与前后比对）。
+   * 打击方案列表（含被打击卫星、体系统计与打击前后比对；页面方案 code 以此为主）。
    */
   strikePlans?: StrikePlan[]
-  /** 兼容旧前端的扁平方案列表（阶段 × 档位逐格，每格一条） */
+  /** 报告生成时间 */
+  generatedAt?: string
+  /** 战役名称（legacy 接口；当前响应可能不含） */
+  campaign?: string
+  /** legacy：扁平选星方案列表（阶段 × 档位逐格） */
   schemes?: SchemeResult[]
   /** 阶段结构（含三档对比、升级性价比与归因） */
   stages?: ReportStageResult[]
@@ -22,8 +24,6 @@ export interface ReportGenerateResp {
   caliber?: ReportCaliber
   /** 一致性自检结果 */
   selfCheck?: ReportSelfCheck
-  /** 报告生成时间 */
-  generatedAt?: string
 }
 
 /**
@@ -523,7 +523,7 @@ export interface ReportStrikeSystemSplit {
   bySystem?: Record<string, number>
 }
 
-/** 打击前后比对 */
+/** 打击前后比对（当前 OpenAPI 以卫星数量 / 过境窗口 / 最早过境为主；其余为扩展字段） */
 export interface ReportStrikeComparison {
   /** 卫星数量变化 */
   satelliteCount?: ReportSatelliteCountChange
@@ -531,13 +531,13 @@ export interface ReportStrikeComparison {
   reconTransitWindows?: ReportTransitWindowChange
   /** 最早过境变化 */
   reconFirstTransit?: ReportFirstTransitChange
-  /** 通信覆盖变化 */
+  /** 通信覆盖变化（扩展；新接口可能不返回） */
   commCoverage?: ReportCoverageChange
-  /** 打击前基线口径说明 */
+  /** 打击前基线口径说明（扩展） */
   baselineText?: string
-  /** 过境数据范围 */
+  /** 过境数据范围（扩展） */
   transitSource?: string
-  /** 覆盖数据范围 */
+  /** 覆盖数据范围（扩展） */
   coverageSource?: string
 }
 

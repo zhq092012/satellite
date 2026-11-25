@@ -157,7 +157,7 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getReportSchemes } from '@/api/report/report'
-import type { ReportGenerateResp, ReportStageResult, SchemeResult, StrikePlan } from '@/types/report/report'
+import type { ReportGenerateResp, ReportStageResult, StrikePlan } from '@/types/report/report'
 import {
   buildStrikePlanMapByCode,
   filterSchemeCodesWithStrikePlan,
@@ -169,11 +169,15 @@ import {
 import { buildReportSchemeView } from '@/utils/buildReportSchemeView'
 import { downloadStrikePlanCsv, downloadStrikePlanXls } from '@/utils/exportStrikePlanTable'
 import {
-  buildReportSchemesCompareRows,
+  buildReportCompareRowsFromReport,
   buildReportStageSchemeGroups,
   collectReportTierIndexesForCodes,
   parseReportStageCodeFromSchemeCode,
 } from '@/utils/reportSchemeDisplay'
+import {
+  buildSchemeByCodeMap,
+  listReportSchemeCodes,
+} from '@/utils/strikePlanReportAdapter'
 import ReportStageCompareBlock from './strike-plan/ReportStageCompareBlock.vue'
 import { useLayoutStore } from '@/store/modules/layout'
 import StrikePlanSchemePanel from './strike-plan/StrikePlanSchemePanel.vue'
@@ -201,15 +205,7 @@ const selectedSchemeCodes = ref<string[]>([])
  * 返回 Map。
  * 作用：列渲染与构建视图时查找方案。
  */
-const schemeByCode = computed(() => {
-  const map = new Map<string, SchemeResult>()
-  for (const scheme of reportData.value?.schemes ?? []) {
-    const code = scheme.code?.trim()
-    if (!code) continue
-    map.set(code, scheme)
-  }
-  return map
-})
+const schemeByCode = computed(() => buildSchemeByCodeMap(reportData.value))
 
 /**
  * 计算：`strikePlans` 按 code 索引（与 `schemes` 对齐）。
@@ -234,12 +230,7 @@ const selectedStrikePlanCodes = computed(() =>
  * 返回 string[]。
  * 作用：页面中间区展示全部格子。
  */
-const allSchemeCodes = computed((): string[] => {
-  const codes = (reportData.value?.schemes ?? [])
-    .map((s) => s.code?.trim())
-    .filter((c): c is string => Boolean(c))
-  return [...codes].sort((a, b) => a.localeCompare(b, 'zh-CN', { numeric: true }))
-})
+const allSchemeCodes = computed((): string[] => listReportSchemeCodes(reportData.value))
 
 /**
  * 计算：页底跨方案对比行。
@@ -265,7 +256,7 @@ const schemeCheckboxOptions = computed(() =>
  * 作用：最后一块对比表。
  */
 const crossCompareRows = computed(() => {
-  const rows = buildReportSchemesCompareRows(reportData.value?.schemes ?? [])
+  const rows = buildReportCompareRowsFromReport(reportData.value)
   const picked = new Set(selectedSchemeCodes.value)
   if (!picked.size) return []
   return rows.filter((row) => picked.has(row.code))
@@ -314,17 +305,14 @@ const topStageSections = computed((): TopStageSection[] => {
       stageCode,
       title: group.title,
       stage: group.stage,
-      activeTierIndexes: collectReportTierIndexesForCodes(reportData.value?.schemes, codesInStage),
+      activeTierIndexes: collectReportTierIndexesForCodes(
+        [...schemeByCode.value.values()],
+        codesInStage,
+      ),
     })
   }
   return sections
 })
-
-/**
- * @param schemeCodes 本组 scheme code
- */
-const tierIndexesForGroup = (schemeCodes: string[]) =>
-  collectReportTierIndexesForCodes(reportData.value?.schemes, schemeCodes)
 
 /**
  * 列头短标题：仅方案名。
@@ -401,10 +389,7 @@ const reloadReportSchemes = async (force = false) => {
     const data = await getReportSchemes(taskId)
     if (token !== reportLoadToken) return
     reportData.value = data
-    const codes = (data.schemes ?? [])
-      .map((s) => s.code?.trim())
-      .filter((c): c is string => Boolean(c))
-    const sorted = [...codes].sort((a, b) => a.localeCompare(b, 'zh-CN', { numeric: true }))
+    const sorted = listReportSchemeCodes(data)
     if (!selectedSchemeCodes.value.length) {
       selectedSchemeCodes.value = sorted.slice(0, Math.min(3, sorted.length))
     } else {
@@ -496,9 +481,9 @@ watch(
   margin: 12px 20px 0;
   padding: 10px 14px;
   border-radius: 8px;
-  border: 1px solid rgba(248, 113, 113, 0.45);
-  background: rgba(127, 29, 29, 0.25);
-  color: #fecaca;
+  border: 1px solid rgba(253, 230, 138, 0.45);
+  background: rgba(40, 36, 18, 0.55);
+  color: #fde68a;
   font-size: battleUi.$battle-ui-font-base;
 }
 
@@ -523,7 +508,7 @@ watch(
 
     .type-label {
       font-size: battleUi.$battle-ui-font-emphasis;
-      color: #94a3b8;
+      color: #7dd3fc;
     }
 
     .scheme-count-badge {
@@ -569,7 +554,7 @@ watch(
     padding-top: 2px;
     font-size: battleUi.$battle-ui-font-base;
     font-weight: 600;
-    color: #94a3b8;
+    color: #7dd3fc;
     white-space: nowrap;
   }
 
@@ -606,14 +591,14 @@ watch(
 .strike-plan-detail-section {
   margin-top: 22px;
   padding-top: 18px;
-  border-top: 1px dashed rgba(248, 113, 113, 0.35);
+  border-top: 1px dashed rgba(79, 147, 221, 0.35);
   text-align: left;
 
   &__title {
     margin: 0 0 6px;
     font-size: battleUi.$battle-ui-font-emphasis;
     font-weight: 700;
-    color: #f87171;
+    color: #7dd3fc;
   }
 
   &__hint {
@@ -623,18 +608,18 @@ watch(
 
     code {
       font-size: battleUi.$battle-ui-font-base;
-      color: #fca5a5;
+      color: #7dd3fc;
     }
   }
 }
 
 .plan-column--strike {
-  border-color: rgba(248, 113, 113, 0.35);
+  border-color: rgba(79, 147, 221, 0.28);
 }
 
 .column-head--strike {
-  background: rgba(48, 20, 28, 0.8);
-  border-bottom-color: rgba(248, 113, 113, 0.25);
+  background: rgba(14, 28, 48, 0.75);
+  border-bottom-color: rgba(79, 147, 221, 0.2);
 }
 
 .strike-plan-columns {
@@ -694,23 +679,28 @@ watch(
     font-size: battleUi.$battle-ui-font-emphasis;
     font-weight: 700;
     line-height: 1.4;
-    color: #e2e8f0;
+    color: #7dd3fc;
     word-break: break-word;
   }
 }
 
 .column-content {
   flex: 1;
-  padding: 14px;
+  padding: 14px 14px 16px;
   min-width: 0;
+  text-align: left;
+}
+
+.plan-column--strike .column-content {
+  padding-top: 12px;
 }
 
 .report-cross-compare {
   margin-top: 0;
   padding: 14px 16px;
   border-radius: 10px;
-  border: 1px solid rgba(167, 139, 250, 0.3);
-  background: rgba(16, 12, 36, 0.85);
+  border: 1px solid rgba(79, 147, 221, 0.3);
+  background: rgba(10, 20, 36, 0.85);
   width: 100%;
   box-sizing: border-box;
   text-align: left;
@@ -732,14 +722,14 @@ watch(
     margin: 0 0 12px;
     font-size: battleUi.$battle-ui-font-emphasis;
     font-weight: 700;
-    color: #c4b5fd;
+    color: #7dd3fc;
     text-align: left;
   }
 
   &__scroll {
     overflow-x: auto;
     border-radius: 8px;
-    border: 1px solid rgba(167, 139, 250, 0.15);
+    border: 1px solid rgba(79, 147, 221, 0.2);
   }
 
   &__table {
@@ -751,16 +741,16 @@ watch(
     th,
     td {
       padding: 10px 12px;
-      border-bottom: 1px solid rgba(167, 139, 250, 0.12);
+      border-bottom: 1px solid rgba(79, 147, 221, 0.15);
       text-align: center;
       vertical-align: middle;
     }
 
     th {
       font-size: battleUi.$battle-ui-font-emphasis;
-      color: #a78bfa;
+      color: #7dd3fc;
       font-weight: 600;
-      background: rgba(30, 20, 60, 0.9);
+      background: rgba(12, 28, 48, 0.95);
       position: sticky;
       top: 0;
     }
@@ -770,7 +760,7 @@ watch(
     }
 
     tbody tr:hover td {
-      background: rgba(167, 139, 250, 0.08);
+      background: rgba(56, 189, 248, 0.08);
     }
   }
 
@@ -783,12 +773,13 @@ watch(
   &__name {
     text-align: left;
     font-weight: 600;
-    color: #fde68a;
+    color: #7dd3fc;
   }
 
   &__num {
     font-variant-numeric: tabular-nums;
-    color: #a5f3fc;
+    color: #fde68a;
+    font-weight: 600;
   }
 }
 

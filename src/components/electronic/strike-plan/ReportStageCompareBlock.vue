@@ -7,6 +7,7 @@
     <ul v-if="upgradeLines.length" class="stage-compare__upgrades">
       <li v-for="(line, idx) in upgradeLines" :key="`up-${idx}`">{{ line }}</li>
     </ul>
+    <p v-if="adviceLine" class="stage-compare__advice">{{ adviceLine }}</p>
     <div class="stage-compare__table-wrap">
       <table class="stage-compare__table">
         <thead>
@@ -38,7 +39,6 @@
         </tbody>
       </table>
     </div>
-    <p v-if="adviceLine" class="stage-compare__advice">{{ adviceLine }}</p>
   </section>
 </template>
 
@@ -88,7 +88,7 @@ const upgradeLines = computed(() =>
 /**
  * 计算：当前推荐档的建议文案拼接。
  * 返回 string | undefined。
- * 作用：表下方补充建议。
+ * 作用：表上方补充建议。
  */
 const adviceLine = computed(() => {
   const rec = props.stage.recommendedTier
@@ -100,6 +100,9 @@ const adviceLine = computed(() => {
 <style scoped lang="scss">
 @use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
 
+/** 表格上方说明字号（略小于正文） */
+$table-caption-font: 16px;
+
 .stage-compare {
   margin-top: 16px;
   padding: 16px 18px;
@@ -109,28 +112,28 @@ const adviceLine = computed(() => {
     margin-top: 0;
   }
   border-radius: 12px;
-  border: 1px solid rgba(167, 139, 250, 0.28);
-  background: linear-gradient(180deg, rgba(22, 18, 42, 0.95), rgba(12, 10, 28, 0.98));
+  border: 1px solid rgba(79, 147, 221, 0.28);
+  background: linear-gradient(180deg, rgba(12, 28, 48, 0.95), rgba(8, 18, 32, 0.98));
 }
 
 .stage-compare__title {
   margin: 0 0 10px;
   font-size: battleUi.$battle-ui-font-emphasis;
   font-weight: 700;
-  color: #c4b5fd;
+  color: #7dd3fc;
 }
 
 .stage-compare__rec {
   margin: 0 0 8px;
-  font-size: battleUi.$battle-ui-font-base;
+  font-size: $table-caption-font;
   line-height: 1.55;
   color: #e2e8f0;
 }
 
 .stage-compare__upgrades {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   padding-left: 1.2em;
-  font-size: battleUi.$battle-ui-font-base;
+  font-size: $table-caption-font;
   line-height: 1.5;
   color: #a5f3fc;
 }
@@ -138,7 +141,7 @@ const adviceLine = computed(() => {
 .stage-compare__table-wrap {
   overflow-x: auto;
   border-radius: 8px;
-  border: 1px solid rgba(167, 139, 250, 0.15);
+  border: 1px solid rgba(79, 147, 221, 0.2);
 }
 
 .stage-compare__table {
@@ -151,20 +154,25 @@ const adviceLine = computed(() => {
   td {
     padding: 10px 14px;
     text-align: left;
-    border-bottom: 1px solid rgba(167, 139, 250, 0.1);
+    border-bottom: 1px solid rgba(79, 147, 221, 0.12);
   }
 
   th {
     font-size: battleUi.$battle-ui-font-emphasis;
     font-weight: 600;
-    color: #a78bfa;
-    background: rgba(30, 22, 56, 0.95);
+    color: #7dd3fc;
+    background: rgba(12, 28, 48, 0.95);
     white-space: nowrap;
   }
 
   td {
     color: #e2e8f0;
     font-variant-numeric: tabular-nums;
+
+    &:nth-child(n + 2) {
+      color: #fde68a;
+      font-weight: 600;
+    }
   }
 
   tbody tr:last-child td {
@@ -177,12 +185,12 @@ const adviceLine = computed(() => {
 }
 
 .stage-compare__row--rec td {
-  background: rgba(34, 197, 94, 0.08);
+  background: rgba(253, 230, 138, 0.1);
 }
 
 .stage-compare__tier {
   font-weight: 600;
-  color: #fde68a;
+  color: #7dd3fc;
 }
 
 .stage-compare__tag {
@@ -196,14 +204,14 @@ const adviceLine = computed(() => {
   color: #7dd3fc;
 
   &--rec {
-    background: rgba(34, 197, 94, 0.2);
-    color: #86efac;
+    background: rgba(56, 189, 248, 0.18);
+    color: #7dd3fc;
   }
 }
 
 .stage-compare__advice {
-  margin: 10px 0 0;
-  font-size: battleUi.$battle-ui-font-base;
+  margin: 0 0 10px;
+  font-size: $table-caption-font;
   line-height: 1.5;
   color: #94a3b8;
 }

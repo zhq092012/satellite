@@ -6,7 +6,13 @@ import type {
   ReportStageResult,
   ReportTierResult,
   SchemeResult,
+  StrikePlan,
 } from '@/types/report/report'
+import {
+  buildSyntheticStageFromStrikePlans,
+  deriveStrikePlanAttainment,
+  groupStrikePlansByStageCode,
+} from '@/utils/strikePlanReportAdapter'
 
 /** 按阶段分组的方案格子（同一 stage 只展示一次三档对比） */
 export interface ReportStageSchemeGroup {
@@ -201,21 +207,33 @@ export const formatReportSelectedRowMeta = (row: ReportSchemeSelectedRow): strin
  */
 export const buildReportStageSchemeGroups = (report: ReportGenerateResp | null): ReportStageSchemeGroup[] => {
   const schemes = report?.schemes ?? []
+  const strikePlans = report?.strikePlans ?? []
+  const useLegacySchemes = schemes.length > 0
+
   const groupMap = new Map<string, string[]>()
-  for (const scheme of schemes) {
-    const gridCode = scheme.code?.trim()
+  const sourceList = useLegacySchemes ? schemes : strikePlans
+  for (const item of sourceList) {
+    const gridCode = item.code?.trim()
     if (!gridCode) continue
     const stageCode =
-      scheme.stageCode?.trim() || parseReportStageCodeFromSchemeCode(gridCode) || '未分组'
+      item.stageCode?.trim() || parseReportStageCodeFromSchemeCode(gridCode) || '未分组'
     const list = groupMap.get(stageCode) ?? []
     list.push(gridCode)
     groupMap.set(stageCode, list)
   }
+
   const stages = report?.stages ?? []
+  const strikeByStage = useLegacySchemes ? null : groupStrikePlansByStageCode(strikePlans)
   const groups: ReportStageSchemeGroup[] = []
+
   for (const [stageCode, codes] of groupMap.entries()) {
     const sortedCodes = [...codes].sort((a, b) => a.localeCompare(b, 'zh-CN', { numeric: true }))
-    const stage = stages.find((s) => s.code?.trim() === stageCode)
+    const legacyStage = stages.find((s) => s.code?.trim() === stageCode)
+    const syntheticStage =
+      !legacyStage && strikeByStage
+        ? buildSyntheticStageFromStrikePlans(stageCode, strikeByStage.get(stageCode) ?? [])
+        : undefined
+    const stage = legacyStage ?? syntheticStage
     const name = stage?.name?.trim()
     const title = name ? `${name}（${stageCode}）` : stageCode
     groups.push({ stageCode, title, stage, schemeCodes: sortedCodes })
@@ -250,6 +268,47 @@ export const collectReportTierIndexesForCodes = (
  *
  * @param schemes 全部扁平方案
  */
+/**
+ * 由打击方案列表构建跨方案对比行（新接口仅有 strikePlans 时使用）。
+ *
+ * @param plans 打击方案列表
+ */
+export const buildReportStrikePlansCompareRows = (plans: StrikePlan[]): ReportSchemeCompareRow[] =>
+  plans
+    .map((plan) => {
+      const code = plan.code?.trim()
+      if (!code) return null
+      const stageCode = plan.stageCode?.trim() || parseReportStageCodeFromSchemeCode(code)
+      const stageName = plan.stageName?.trim()
+      const stageText =
+        stageName && stageCode ? `${stageName}（${stageCode}）` : stageName || stageCode
+      const attainment = deriveStrikePlanAttainment(plan.comparison)
+      return {
+        code,
+        name: plan.name?.trim() || code,
+        stageText,
+        tierText: plan.tierIndex != null ? `规模${plan.tierIndex}` : undefined,
+        targetSize: plan.targetSize,
+        attainmentText: formatReportNumber(attainment, 3) ?? '—',
+        scoreText: '—',
+        solverCaliber: undefined,
+      }
+    })
+    .filter((row): row is ReportSchemeCompareRow => row != null)
+
+/**
+ * 按报告响应选择对比行来源（legacy schemes 或 strikePlans）。
+ *
+ * @param report 报告响应
+ */
+export const buildReportCompareRowsFromReport = (
+  report: ReportGenerateResp | null,
+): ReportSchemeCompareRow[] => {
+  const schemes = report?.schemes ?? []
+  if (schemes.length) return buildReportSchemesCompareRows(schemes)
+  return buildReportStrikePlansCompareRows(report?.strikePlans ?? [])
+}
+
 export const buildReportSchemesCompareRows = (schemes: SchemeResult[]): ReportSchemeCompareRow[] =>
   schemes
     .map((scheme) => {

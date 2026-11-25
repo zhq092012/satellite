@@ -203,7 +203,7 @@ $scheme-kv-key-width: 110px;
     width: $scheme-kv-key-width;
     margin: 0;
     font-size: battleUi.$battle-ui-font-base;
-    color: #94a3b8;
+    color: #7dd3fc;
     font-weight: 600;
     text-align: left;
 
@@ -225,7 +225,7 @@ $scheme-kv-key-width: 110px;
   &__num {
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: #7dd3fc;
+    color: #fde68a;
   }
 }
 
@@ -246,7 +246,7 @@ $scheme-kv-key-width: 110px;
     margin: 0 0 10px;
     font-size: battleUi.$battle-ui-font-emphasis;
     font-weight: 700;
-    color: #38bdf8;
+    color: #7dd3fc;
   }
 }
 
@@ -269,8 +269,8 @@ $scheme-kv-key-width: 110px;
     font-size: battleUi.$battle-ui-font-base;
 
     &--bad {
-      border: 1px solid rgba(248, 113, 113, 0.35);
-      background: rgba(127, 29, 29, 0.15);
+      border: 1px solid rgba(253, 230, 138, 0.4);
+      background: rgba(50, 44, 20, 0.35);
     }
   }
 
@@ -282,7 +282,7 @@ $scheme-kv-key-width: 110px;
 
   &__count {
     font-variant-numeric: tabular-nums;
-    color: #7dd3fc;
+    color: #fde68a;
     font-weight: 600;
   }
 
@@ -317,7 +317,7 @@ $scheme-kv-key-width: 110px;
   &__name {
     font-size: battleUi.$battle-ui-font-base;
     font-weight: 600;
-    color: #fde68a;
+    color: #7dd3fc;
     word-break: break-word;
   }
 
@@ -329,7 +329,7 @@ $scheme-kv-key-width: 110px;
     font: inherit;
     color: inherit;
     cursor: pointer;
-    text-decoration: underline dotted rgba(253, 230, 138, 0.4);
+    text-decoration: underline dotted rgba(125, 211, 252, 0.45);
   }
 
   &__meta {

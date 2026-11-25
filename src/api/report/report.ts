@@ -6,8 +6,8 @@ import { isResourceApiSuccess } from '@/utils/resourceApi'
 export type { ReportGenerateResp, SchemeResult, ReportCandidateSatellite } from '@/types/report/report'
 
 /**
- * 按任务生成全部默认选星方案（报告-作战方案生成）。
- * OpenAPI：`GET /report/schemes/{taskId}`，operationId `schemes`。
+ * 按任务生成作战方案报告（报告-作战方案生成）。
+ * OpenAPI：`GET /report/schemes/{taskId}`；当前 `data` 主要为 `strikePlans` + `taskName` + `generatedAt`。
  *
  * @param taskId 任务 id
  * @throws 业务失败或响应体无 `data` 时抛出错误

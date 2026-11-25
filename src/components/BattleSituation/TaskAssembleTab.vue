@@ -77,7 +77,7 @@
           <el-table-column type="selection" width="42" :reserve-selection="true" />
           <el-table-column v-for="col in tableColumns" :key="col.prop" :prop="col.prop" :label="col.label"
             v-bind="assembleColumnTableProps(col)" show-overflow-tooltip />
-          <el-table-column v-if="crudEnabled" label="修改" width="64" fixed="right" align="center">
+          <el-table-column v-if="crudEnabled" label="修改" width="120" fixed="right" align="center">
             <template #default="{ row }">
               <el-button link type="primary" class="assemble-edit-btn" @click="openEditDialog(row)">修改</el-button>
             </template>
@@ -750,11 +750,11 @@ const stationRules = reactive<FormRules<GroundStationFormModel>>({
 })
 
 /**
- * 计算：地面站/数据中心编辑弹窗标题。
- * 返回：表单含 `_id` 时为「修改资源」，否则为「添加资源」。
+ * 计算：地面站编辑弹窗标题。
+ * 返回：表单含 `_id` 时为「修改地面站」，否则为「添加地面站」。
  * 作用：区分新增与编辑模式的弹窗标题展示。
  */
-const stationDialogTitle = computed(() => (stationForm.id ? '修改资源' : '添加资源'))
+const stationDialogTitle = computed(() => (stationForm.id ? '修改地面站' : '添加地面站'))
 
 /**
  * 创建空白武器表单。

@@ -76,7 +76,7 @@ $report-kv-key-width: 110px;
     margin: 0;
     font-size: battleUi.$battle-ui-font-base;
     font-weight: 600;
-    color: #94a3b8;
+    color: #7dd3fc;
     text-align: left;
 
     &::after {
@@ -90,7 +90,7 @@ $report-kv-key-width: 110px;
     margin: 0;
     font-size: battleUi.$battle-ui-font-base;
     font-weight: 600;
-    color: #f1f5f9;
+    color: #fde68a;
     word-break: break-word;
     text-align: left;
   }
