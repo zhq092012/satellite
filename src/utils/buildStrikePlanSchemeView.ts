@@ -1,4 +1,5 @@
 import type { ZhchPlanResp } from '@/api/electronic'
+import type { SchemeResult } from '@/types/report/report'
 import type { C2ResourceSatelliteRow } from '@/utils/buildC2ResourceCatalog'
 import { COMBAT_PHASE_OPTIONS } from '@/config/combatScenarioOptions'
 import type { TaskForm } from '@/types/task/task'
@@ -62,7 +63,7 @@ export interface StrikePlanStrikeRow {
 
 /** 单方案完整视图 */
 export interface StrikePlanSchemeView {
-  /** 用途类型键（军用/民用/军用民用） */
+  /** 列标识（历史为用途类型；报告接口为 scheme.code） */
   usageType: string
   /** 概要字段 */
   meta: StrikePlanSchemeMeta
@@ -70,8 +71,10 @@ export interface StrikePlanSchemeView {
   satellites: StrikePlanSatelliteRow[]
   /** 打击计划列表 */
   strikePlans: StrikePlanStrikeRow[]
-  /** 原始方案（能力对比表复用） */
-  plan: ZhchPlanResp
+  /** 历史综合打击方案（能力对比表）；报告方案为 null */
+  plan: ZhchPlanResp | null
+  /** 报告接口返回的选星方案（与 `plan` 二选一） */
+  reportScheme?: SchemeResult | null
 }
 
 const EMPTY = '--'

@@ -64,7 +64,7 @@ const menuTabs: MenuTabItem[] = [
   { key: '威胁度分析', name: '威胁度分析', icon: '⚠️', path: '/home/threat', component: HomeThreatAnalysisView },
   { key: '打击度分析', name: '打击度分析', icon: '🎯', path: '/home/attack', component: HomeAttackAnalysisView },
   { key: '算法列表', name: '算法列表', icon: '🧮', path: '/home/algorithms', component: HomeComputeAlgorithmsView },
-  { key: '打击方案管理', name: '打击方案管理', icon: '⚔️', path: '/home/strike-plan', component: StrikePlanGenerator },
+  { key: '打击方案管理', name: '作战方案管理', icon: '⚔️', path: '/home/strike-plan', component: StrikePlanGenerator },
 ]
 
 /** [变量说明] 路由 path → 分析页 Key */

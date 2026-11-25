@@ -1,0 +1,73 @@
+---
+description: Vue 模板与组件引用的注释规范（页面级布局、条件渲染、import 职责）
+globs: "**/*.vue"
+alwaysApply: false
+---
+
+# Vue 模板与组件引用注释
+
+编写或修改 Vue 单文件组件时，除现有 `code-understanding` 中的 script 说明外，必须让 **import** 与 **template** 可被离线阅读。
+
+## 1. 组件 import 注释
+
+`script setup` 中每一个**页面级 / 区块级**子组件 import 上方用单行 `//` 或块注释说明：
+
+1. 该组件在本文件中的**业务职责**（展示什么、响应什么交互）。
+2. 在页面布局中的**位置关系**（如「铺满主视区底层」「左侧固定 360px」）。
+3. 若显隐或挂载依赖路由、Store、`v-if` 等，注明**何时出现**（与 template 注释一致即可）。
+
+不要求为仅在本组件内使用一次的极小组件写冗长说明；Element Plus、图标等第三方 import 可不逐条注释。
+
+```ts
+// 不允许：成堆 import 无任何说明
+import Map from "@/components/Map.vue";
+import SituationStrip from "@/components/SituationStrip.vue";
+
+// 允许
+/** 主视区 Cesium 地图与异常/设施图层，占满底层。 */
+import Map from "@/components/Map.vue";
+/** 地图与右栏之间的底部态势条（潜在异常 + 威胁评估）；仅非图谱模式展示。 */
+import SituationStrip from "@/components/SituationStrip.vue";
+```
+
+同一文件顶部的**文件职责**仍用块注释（`/** ... */`）概括整页，import 注释写「这一块是干什么的」。
+
+## 2. template 布局与逻辑注释
+
+在 `<template>` 中用 **HTML 注释** 标注：
+
+1. **区域分块**：主视区、左栏、右栏、浮层、工具条等；注释写业务名，不只写「div1」。
+2. **互斥 / 分支**：`v-if`、`v-show`、`v-else`、`template v-if` 等，注明**分支的业务含义**与**判定条件来源**（如 `isGraphMode ← store.mapLeftTab === 'third'`）。
+3. **关键绑定**：影响布局或显隐的 `:style`、`:class`、`v-model`、重要 `@事件`，在紧邻上一行用简短注释说明目的（不必复述属性名）。
+
+```vue
+<!-- 不允许：大段 v-show 无说明 -->
+<div v-show="!isGraphMode">...</div>
+<div v-show="isGraphMode">...</div>
+
+<!-- 允许 -->
+<!-- 主视区 · 地图模式：左栏非「战场图谱」时显示；图谱模式整块隐藏避免与 GraphMain 叠层 -->
+<div v-show="!isGraphMode" ...>
+  ...
+</div>
+<!-- 主视区 · 图谱模式：与地图模式二选一（同为 absolute inset-0） -->
+<div v-show="isGraphMode" ...>
+  <GraphMain />
+</div>
+```
+
+### 密度要求
+
+- **页面级**（`pages/*.vue`）、**多区域布局**的容器组件：每个一级分支和主要并列子组件前应有注释。
+- **单一块 UI**、条件少于 2 个且无业务分支的片段：可不强制分段注释。
+- 注释写**业务语义**，避免只重复标签名（如不要仅写「RightPanel 组件」）。
+
+## 3. 与 script 注释的衔接
+
+- template 注释中的条件名（`isGraphMode`、`showMapNodeDock` 等）应在 script 中对应用块注释说明计算/来源（见 `code-understanding.mdc` 中 `watch` / `computed` 规范）。
+- 新增 `watch`、`computed` 驱动 template 显隐时，须同时补 template 分支注释与 script 块注释，避免两边不一致。
+
+## 4. 禁止
+
+- 不允许用注释掩盖未理解的逻辑或编造与代码不符的分支说明。
+- 不允许为了凑注释而给每个 DOM 节点都加一行（保持与布局层级一致即可）。

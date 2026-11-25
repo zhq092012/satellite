@@ -380,22 +380,14 @@ const handlePlaybackSpeedChange = (speed: number) => {
 }
 
 /**
- * 任务算法与态势数据就绪后，以 10 倍速自动播放 Cesium 时间轴（每任务仅一次，重算或换任务后重置）。
+ * 当前任务具备有效时间范围后，以 10 倍速自动播放时间轴（每任务仅一次，重算或换任务后重置）。
+ * 不等待算法分析完成；进入整体态势或任务就绪时应默认处于播放态。
  */
 const tryStartAutoTimelinePlayback = () => {
   const taskId = store.activedTask?.id
-  if (!taskId || !algorithmComplete.value) return
+  if (!taskId) return
   if (autoTimelinePlaybackTaskId === taskId) return
-  if (taskAnalysisLoading.value) return
   if (hasGlobeSelection()) return
-
-  const hasGlobeData =
-    Boolean(taskAnalysisData.value) ||
-    globeSatellites.value.length > 0 ||
-    globeWeapons.value.length > 0 ||
-    globeGroundTargets.value.length > 0 ||
-    Boolean(matrixData.value)
-  if (!hasGlobeData) return
 
   const start = taskStartMs.value
   const end = taskEndMs.value
@@ -584,25 +576,16 @@ watch(
 )
 
 /**
- * 监听：任务 ID、算法完成态、分析加载态及地球各图层数据是否就绪。
- * 返回：回调不返回清理函数。
- * 作用：条件满足时调用 `tryStartAutoTimelinePlayback` 以 10 倍速自动播放时间轴。
+ * 监听：当前任务 ID 与任务起止时间是否可用。
+ * 回调不返回清理函数。
+ * 作用：进入整体态势或任务/时间范围就绪时调用 `tryStartAutoTimelinePlayback`（含 immediate 首次执行）。
  */
 watch(
-  () =>
-    [
-      store.activedTask?.id,
-      algorithmComplete.value,
-      taskAnalysisLoading.value,
-      taskAnalysisData.value,
-      matrixData.value,
-      globeSatellites.value.length,
-      globeWeapons.value.length,
-      globeGroundTargets.value.length,
-    ] as const,
+  () => [store.activedTask?.id, taskStartMs.value, taskEndMs.value] as const,
   () => {
     tryStartAutoTimelinePlayback()
-  }
+  },
+  { immediate: true },
 )
 
 /**
@@ -633,6 +616,7 @@ onActivated(() => {
   if (!store.taskAnalysisData && algorithmComplete.value) {
     void loadTaskAnalysis()
   }
+  tryStartAutoTimelinePlayback()
 })
 </script>
 

@@ -1,90 +1,79 @@
 <template>
   <div class="strike-scheme-panel" :class="{ 'strike-scheme-panel--align': alignBlocks }">
-    <section class="scheme-section scheme-section--meta">
-      <div class="scheme-section-scroll scheme-section-scroll--meta">
-        <dl class="scheme-meta-list">
-          <div v-for="item in metaItems" :key="item.label" class="scheme-meta-row">
+    <template v-if="view.reportScheme">
+      <header class="scheme-report-header">
+        <h2 class="scheme-report-title">
+          {{ view.reportScheme.name?.trim() || view.usageType }}
+        </h2>
+        <dl v-if="summaryFields.length" class="scheme-summary-grid">
+          <div v-for="item in summaryFields" :key="item.label" class="scheme-summary-item">
             <dt>{{ item.label }}</dt>
             <dd>{{ item.value }}</dd>
           </div>
         </dl>
-      </div>
-    </section>
+      </header>
 
-    <section class="scheme-section scheme-section--satellites">
-      <h3 class="scheme-section-title">卫星清单</h3>
-      <div class="scheme-table-scroll">
-        <table class="scheme-table" cellspacing="0" cellpadding="0">
-          <thead>
-            <tr>
-              <th>国家</th>
-              <th>卫星名称</th>
-              <th>卫星类型</th>
-              <th>卫星系列</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, idx) in view.satellites" :key="`sat-${idx}-${row.satelliteName}`">
-              <td>{{ row.country }}</td>
-              <td class="scheme-cell--left">{{ row.satelliteName }}</td>
-              <td>{{ row.satelliteType }}</td>
-              <td>{{ row.series }}</td>
-            </tr>
-            <tr v-if="!view.satellites.length">
-              <td colspan="4" class="scheme-empty">暂无卫星数据</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+      <section v-if="selectedRows.length" class="scheme-section scheme-section--selected">
+        <h3 class="scheme-section-title">入选卫星（{{ selectedRows.length }}）</h3>
+        <div class="scheme-table-scroll">
+          <table class="scheme-table scheme-table--report" cellspacing="0" cellpadding="0">
+            <thead>
+              <tr>
+                <th v-if="colCountry">国家</th>
+                <th>卫星名称</th>
+                <th v-if="colSystem">体系</th>
+                <th v-if="colSeries">系列</th>
+                <th v-if="colThreat">威胁度</th>
+                <th v-if="colScore">综合得分</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, idx) in selectedRows" :key="`sel-${idx}-${row.name}`">
+                <td v-if="colCountry">{{ row.country }}</td>
+                <td class="scheme-cell--name">
+                  <el-tooltip
+                    v-if="row.reasonText"
+                    placement="top"
+                    trigger="click"
+                    effect="dark"
+                    :teleported="true"
+                    popper-class="scheme-reason-tooltip-popper"
+                  >
+                    <template #content>
+                      <p class="scheme-reason-tooltip-body">{{ row.reasonText }}</p>
+                    </template>
+                    <button type="button" class="scheme-name-reason-trigger" @click.stop>
+                      {{ row.name }}
+                    </button>
+                  </el-tooltip>
+                  <span v-else class="scheme-name-plain">{{ row.name }}</span>
+                </td>
+                <td v-if="colSystem">{{ row.system }}</td>
+                <td v-if="colSeries">{{ row.series }}</td>
+                <td v-if="colThreat" class="scheme-cell--num">{{ row.threatText }}</td>
+                <td v-if="colScore" class="scheme-cell--num">{{ row.scoreText }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-    <section class="scheme-section scheme-section--strike">
-      <h3 class="scheme-section-title">打击计划</h3>
-      <div class="scheme-table-scroll">
-        <table class="scheme-table" cellspacing="0" cellpadding="0">
-          <thead>
-            <tr>
-              <th>国家</th>
-              <th>卫星名称</th>
-              <th>卫星类型</th>
-              <!-- <th>卫星系列</th> -->
-              <th>武器名称</th>
-              <th>武器类型</th>
-              <!-- <th>打击窗口</th> -->
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, idx) in view.strikePlans" :key="`strike-${idx}-${row.satelliteName}-${row.weaponName}`">
-              <td>{{ row.country }}</td>
-              <td class="scheme-cell--left">{{ row.satelliteName }}</td>
-              <td>{{ row.satelliteType }}</td>
-              <!-- <td>{{ row.series }}</td> -->
-              <td class="scheme-cell--left">{{ row.weaponName }}</td>
-              <td>{{ row.weaponType }}</td>
-              <!-- <td>{{ row.attackWindow }}</td> -->
-            </tr>
-            <tr v-if="!view.strikePlans.length">
-              <td colspan="5" class="scheme-empty">暂无打击计划（演示数据待接口 attackPlanList）</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+      <p v-else class="scheme-empty-block">该方案暂无入选卫星</p>
+    </template>
 
-    <section class="scheme-section scheme-section--capability scheme-section--capability-recon">
-      <ZhchPlanCapabilityCompareTable :plan="view.plan" kind="recon" :vertical="alignBlocks" />
-    </section>
-
-    <section class="scheme-section scheme-section--capability scheme-section--capability-comm">
-      <ZhchPlanCapabilityCompareTable :plan="view.plan" kind="comm" :vertical="alignBlocks" />
-    </section>
+    <p v-else class="scheme-empty-block">暂无方案数据</p>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { StrikePlanSchemeView } from '@/utils/buildStrikePlanSchemeView'
-import ZhchPlanCapabilityCompareTable from './ZhchPlanCapabilityCompareTable.vue'
+import { useLayoutStore } from '@/store/modules/layout'
+import {
+  buildReportSchemeSelectedRows,
+  buildReportSchemeSummaryFields,
+  reportTableColumnVisible,
+} from '@/utils/reportSchemeDisplay'
 
 const props = defineProps<{
   /** 单方案视图数据 */
@@ -93,340 +82,269 @@ const props = defineProps<{
   alignBlocks?: boolean
 }>()
 
+const store = useLayoutStore()
+
 /**
- * 计算：按固定顺序从 props.view.meta 组装方案概要字段行。
- * 返回：{ label: string; value: string }[]。
- * 作用：渲染单方案概要信息列表。
+ * 计算：方案概要字段（仅接口与任务有值项）。
+ * 返回 { label, value }[]。
+ * 作用：顶部概要卡片。
  */
-const metaItems = computed(() => {
-  const m = props.view.meta
-  return [
-    { label: '方案名称', value: m.planName },
-    { label: '作战背景', value: m.combatBackground },
-    { label: '命令来源', value: m.commandSource },
-    { label: '作战阶段', value: m.combatPhase },
-    { label: '作战预期', value: m.combatExpectation },
-    { label: '分析结果', value: m.analysisResult },
-    { label: '方案描述', value: m.planDescription },
-  ]
+const summaryFields = computed(() => {
+  const scheme = props.view.reportScheme
+  if (!scheme) return []
+  const taskName = store.activedTask?.name?.trim()
+  return buildReportSchemeSummaryFields(scheme, taskName)
 })
+
+/**
+ * 计算：入选卫星表行。
+ * 返回 ReportSchemeSelectedRow[]。
+ * 作用：主表格数据源；map 键用 satelliteId 解析，展示用 name。
+ */
+const selectedRows = computed(() =>
+  props.view.reportScheme ? buildReportSchemeSelectedRows(props.view.reportScheme) : [],
+)
+
+/**
+ * 计算：是否展示 NORAD 列。
+ * 返回 boolean。
+ * 作用：无数据列不渲染表头。
+ */
+const colNorad = computed(() => reportTableColumnVisible(selectedRows.value, (r) => r.noradId))
+const colCountry = computed(() => reportTableColumnVisible(selectedRows.value, (r) => r.country))
+const colSystem = computed(() => reportTableColumnVisible(selectedRows.value, (r) => r.system))
+const colSeries = computed(() => reportTableColumnVisible(selectedRows.value, (r) => r.series))
+const colThreat = computed(() => reportTableColumnVisible(selectedRows.value, (r) => r.threatText))
+const colScore = computed(() => reportTableColumnVisible(selectedRows.value, (r) => r.scoreText))
+const colWindow = computed(() => reportTableColumnVisible(selectedRows.value, (r) => r.windowText))
+const colInWindow = computed(() =>
+  reportTableColumnVisible(selectedRows.value, (r) => r.inTimeWindow),
+)
 </script>
 
 <style scoped lang="scss">
-/** 表格可见行数 */
-$scheme-table-visible-rows: 5;
-$scheme-table-head-h: 48px;
-
-/** 卫星清单（列少，行高略低） */
-$scheme-sat-table-row-h: 52px;
-$scheme-sat-table-body-min-h: $scheme-table-head-h + $scheme-sat-table-row-h * $scheme-table-visible-rows;
-$scheme-scroll-sat-max: $scheme-sat-table-body-min-h + 32px;
-
-/** 打击计划（列多 + 长文本换行，行高更高） */
-$scheme-strike-table-row-h: 64px;
-$scheme-strike-table-body-min-h: $scheme-table-head-h + $scheme-strike-table-row-h * $scheme-table-visible-rows;
-$scheme-scroll-strike-max: $scheme-strike-table-body-min-h + 40px;
-
-/** 能力表等指标行（与天基/通信区块共用基准行高） */
-$scheme-capability-table-row-h: 42px;
-$scheme-table-body-min-h: $scheme-table-head-h + $scheme-capability-table-row-h * $scheme-table-visible-rows;
-
-/** 方案概要 7 个字段，预留换行以尽量完整展示 */
-$scheme-meta-field-count: 7;
-$scheme-meta-row-est-h: 44px;
-$scheme-meta-gap: 10px;
-$scheme-meta-block-min-h: 24px + $scheme-meta-field-count * $scheme-meta-row-est-h + ($scheme-meta-field-count - 1) * $scheme-meta-gap;
-
-$scheme-section-title-block: 38px;
-$scheme-section-pad-v: 24px;
-
-$scheme-scroll-meta-max: max($scheme-meta-block-min-h, 450px);
-$scheme-scroll-capability-recon-max: 44px + $scheme-table-head-h + $scheme-capability-table-row-h * $scheme-table-visible-rows;
-/** 通信保障 5 项指标 + 换行留白，略高于天基侦察 */
-$scheme-capability-comm-extra-h: 128px;
-$scheme-scroll-capability-comm-max: $scheme-scroll-capability-recon-max + $scheme-capability-comm-extra-h;
-
-$scheme-align-meta-h: $scheme-scroll-meta-max;
-$scheme-align-sat-h: $scheme-section-pad-v + $scheme-section-title-block + $scheme-scroll-sat-max;
-$scheme-align-strike-h: $scheme-section-pad-v + $scheme-section-title-block + $scheme-scroll-strike-max;
-$scheme-align-capability-recon-h: $scheme-scroll-capability-recon-max + 8px;
-$scheme-align-capability-comm-h: $scheme-scroll-capability-comm-max + 8px;
+@use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
 
 .strike-scheme-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   min-width: 0;
-  font-size: 18px;
+  height: 100%;
+  color: #e2e8f0;
+}
+
+.scheme-report-header {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 225, 255, 0.18);
+  background: linear-gradient(135deg, rgba(12, 28, 48, 0.95), rgba(8, 18, 32, 0.98));
   text-align: left;
 }
 
+.scheme-report-title {
+  margin: 0 0 12px;
+  font-size: battleUi.$battle-ui-font-emphasis;
+  font-weight: 700;
+  color: #7dd3fc;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.scheme-summary-grid {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  width: 100%;
+}
+
+.scheme-summary-item {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  text-align: left;
+
+  dt {
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: 14px;
+    color: #94a3b8;
+    font-weight: 600;
+    white-space: nowrap;
+    min-width: 80px;
+
+    &::after {
+      content: '：';
+    }
+  }
+
+  dd {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    font-size: battleUi.$battle-ui-font-base;
+    color: #e2efff;
+    word-break: break-word;
+  }
+}
+
 .scheme-section {
-  border: 1px solid rgba(79, 147, 221, 0.28);
-  border-radius: 8px;
-  background: rgba(8, 18, 32, 0.75);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   padding: 12px 14px;
-  min-width: 0;
-  box-sizing: border-box;
-
-  &--satellites,
-  &--strike {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  &--capability {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    padding: 0;
-    overflow: hidden;
-  }
+  border-radius: 10px;
+  border: 1px solid rgba(79, 147, 221, 0.22);
+  background: rgba(8, 15, 26, 0.72);
 }
 
 .scheme-section-title {
   margin: 0 0 10px;
-  font-size: 20px;
+  font-size: battleUi.$battle-ui-font-emphasis;
   font-weight: 700;
-  color: #40f2ff;
-  text-align: left;
-  flex-shrink: 0;
-  min-height: 28px;
-  line-height: 28px;
-}
-
-.scheme-section-scroll {
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
-
-  &--meta {
-    max-height: $scheme-scroll-meta-max;
-    min-height: min($scheme-meta-block-min-h, $scheme-scroll-meta-max);
-  }
+  color: #00e1ff;
 }
 
 .scheme-table-scroll {
-  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
   overflow-x: hidden;
-}
-
-.scheme-section--satellites .scheme-table-scroll {
-  min-height: $scheme-sat-table-body-min-h;
-  max-height: $scheme-scroll-sat-max;
-}
-
-.scheme-section--strike .scheme-table-scroll {
-  min-height: $scheme-strike-table-body-min-h;
-  max-height: $scheme-scroll-strike-max;
-}
-
-.scheme-meta-list {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  text-align: left;
-}
-
-.scheme-meta-row {
-  display: grid;
-  grid-template-columns: 108px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-  text-align: left;
-
-  dt {
-    margin: 0;
-    color: #94a3b8;
-    font-weight: 600;
-    text-align: left;
-  }
-
-  dd {
-    margin: 0;
-    color: #e2e8f0;
-    line-height: 1.5;
-    word-break: break-word;
-    text-align: left;
-  }
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 225, 255, 0.1);
 }
 
 .scheme-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
   table-layout: fixed;
-  font-size: 18px;
-
-  th,
-  td {
-    border: 1px solid rgba(56, 189, 248, 0.35);
-    padding: 8px 6px;
-    text-align: center;
-    vertical-align: middle;
-    box-sizing: border-box;
-  }
-
-  .scheme-section--satellites & {
-
-    th,
-    td {
-      min-height: $scheme-sat-table-row-h;
-    }
-  }
-
-  .scheme-section--strike & {
-
-    th,
-    td {
-      min-height: $scheme-strike-table-row-h;
-    }
-  }
-
-  thead th {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-  }
+  border-collapse: collapse;
+  font-size: battleUi.$battle-ui-font-base;
 
   th {
-    background: rgba(13, 27, 49, 0.98);
-    color: #f1f5f9;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 8px 10px;
+    text-align: center;
     font-weight: 600;
+    color: #00e1ff;
+    background: rgba(13, 27, 49, 0.98);
+    border-bottom: 1px solid rgba(0, 225, 255, 0.15);
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.35;
   }
 
   td {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(0, 225, 255, 0.08);
+    vertical-align: middle;
+    text-align: center;
     color: #cbd5e1;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  tbody tr:hover td {
+    background: rgba(0, 225, 255, 0.06);
   }
 }
 
-.scheme-cell--left {
-  text-align: left;
+.scheme-cell--name {
+  font-weight: 600;
+  color: #fde68a;
+}
+
+.scheme-name-plain {
+  display: inline;
+  color: #fde68a;
+  font-weight: 600;
+}
+
+.scheme-name-reason-trigger {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #fde68a;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
   word-break: break-word;
+  text-decoration: underline dotted rgba(253, 230, 138, 0.45);
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: #fef3c7;
+    text-decoration-color: rgba(254, 243, 199, 0.75);
+  }
 }
 
-.scheme-empty {
+.scheme-cell--num {
+  font-variant-numeric: tabular-nums;
+  color: #a5f3fc;
+  white-space: normal;
+}
+
+.scheme-cell--time {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.scheme-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+
+  &--yes {
+    background: rgba(34, 197, 94, 0.2);
+    color: #86efac;
+  }
+
+  &--no {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+  }
+}
+
+.scheme-empty-block {
+  margin: 0;
+  padding: 24px;
+  text-align: center;
   color: #64748b;
-  padding: 16px;
+  border: 1px dashed rgba(0, 225, 255, 0.15);
+  border-radius: 8px;
 }
 
-.strike-scheme-panel:not(.strike-scheme-panel--align) {
-  .scheme-section--capability-recon {
-    max-height: $scheme-scroll-capability-recon-max;
-    overflow: hidden;
-
-    :deep(.zhch-metrics-table) {
-      display: flex;
-      flex-direction: column;
-      max-height: $scheme-scroll-capability-recon-max;
-      min-height: 0;
-    }
-
-    :deep(.zhch-metrics-table__scroll) {
-      overflow-y: auto;
-      flex: 1;
-      min-height: 0;
-    }
-  }
-
-  .scheme-section--capability-comm {
-    max-height: $scheme-scroll-capability-comm-max;
-    overflow: hidden;
-
-    :deep(.zhch-metrics-table) {
-      display: flex;
-      flex-direction: column;
-      max-height: $scheme-scroll-capability-comm-max;
-      min-height: 0;
-    }
-
-    :deep(.zhch-metrics-table__scroll) {
-      overflow-y: auto;
-      flex: 1;
-      min-height: 0;
-    }
-  }
-}
-
-/** 多方案对比：固定行高网格，保证各列区块标题水平对齐 */
 .strike-scheme-panel--align {
-  display: grid;
-  grid-template-rows:
-    $scheme-align-meta-h $scheme-align-sat-h $scheme-align-strike-h $scheme-align-capability-recon-h $scheme-align-capability-comm-h;
-  gap: 14px;
-  height: 100%;
-  min-height: 0;
-
-  .scheme-section {
-    height: 100%;
-    max-height: 100%;
-    overflow: hidden;
+  .scheme-section--selected {
+    min-height: 420px;
   }
+}
+</style>
 
-  .scheme-section--meta {
-    padding: 12px 14px;
-  }
+<style lang="scss">
+.scheme-reason-tooltip-popper {
+  max-width: min(440px, 92vw);
 
-  .scheme-section-scroll--meta {
-    max-height: none;
-    height: 100%;
-    min-height: $scheme-meta-block-min-h;
-  }
-
-  .scheme-section--satellites .scheme-table-scroll {
-    max-height: none;
-    flex: 1;
-    min-height: $scheme-sat-table-body-min-h;
-  }
-
-  .scheme-section--strike .scheme-table-scroll {
-    max-height: none;
-    flex: 1;
-    min-height: $scheme-strike-table-body-min-h;
-  }
-
-  .scheme-section--capability {
-    :deep(.zhch-metrics-table) {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      min-height: 0;
-      height: 100%;
-      border: none;
-      border-radius: 0;
-      background: transparent;
-    }
-
-    :deep(.zhch-metrics-table__head) {
-      flex-shrink: 0;
-      min-height: 44px;
-      box-sizing: border-box;
-      display: flex;
-      align-items: center;
-      font-size: 20px;
-      font-weight: 700;
-      color: #40f2ff;
-      background: transparent;
-      border-bottom: 1px solid rgba(79, 147, 221, 0.25);
-    }
-
-    :deep(.zhch-metrics-table__scroll) {
-      flex: 1;
-      min-height: 0;
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
-
-    :deep(.zhch-metrics-table--vertical .zhch-metrics-table__head) {
-      font-size: 20px;
-      padding: 10px 14px;
-    }
-
-    :deep(.zhch-metrics-table--vertical .zhch-metrics-table__grid--vertical) {
-      font-size: 16px;
-    }
+  .scheme-reason-tooltip-body {
+    margin: 0;
+    line-height: 1.5;
+    word-break: break-word;
+    white-space: pre-wrap;
+    font-size: 14px;
   }
 }
 </style>

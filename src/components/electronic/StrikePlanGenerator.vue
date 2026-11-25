@@ -1,19 +1,22 @@
 <template>
-  <div class="strike-plan-generator dark-theme" v-loading="store.zhchPlanLoading">
+  <div class="strike-plan-generator dark-theme" v-loading="reportLoading">
     <div class="plan-header">
       <div class="header-center">
-        <span class="type-label">方案名称：</span>
-        <el-checkbox-group v-model="selectedPlanTypes" class="plan-checkbox-group">
-          <el-checkbox v-for="item in usageTypeOptions" :key="item.value" :label="item.value">
+        <span class="type-label">作战方案：</span>
+        <el-checkbox-group v-model="selectedSchemeCodes" class="plan-checkbox-group">
+          <el-checkbox v-for="item in schemeOptions" :key="item.value" :label="item.value">
             {{ item.label }}
           </el-checkbox>
         </el-checkbox-group>
+        <el-button v-if="store.activedTask?.id" type="primary" link @click="reloadReportSchemes(true)">
+          刷新方案
+        </el-button>
       </div>
 
       <div class="header-right">
         <el-dropdown trigger="click" @command="handleDownload">
           <el-button type="primary" size="default">
-            下载打击计划
+            导入选星清单
           </el-button>
           <template #dropdown>
             <el-dropdown-menu>
@@ -31,22 +34,29 @@
         <div class="empty-text">请先在右上角选择战场与任务</div>
       </div>
 
-      <div v-else-if="!selectedPlanTypes.length" class="empty-container">
+      <p v-if="reportError" class="report-error">{{ reportError }}</p>
+
+      <div v-else-if="!schemeOptions.length && !reportLoading" class="empty-container">
+        <div class="empty-icon">📄</div>
+        <div class="empty-text">当前任务暂无作战方案，请点击刷新或稍后重试</div>
+      </div>
+
+      <div v-else-if="!selectedSchemeCodes.length" class="empty-container">
         <div class="empty-icon">🎯</div>
-        <div class="empty-text">请勾选 1～3 个方案名称进行对比展示</div>
+        <div class="empty-text">请勾选 1～3 个作战方案进行对比展示</div>
       </div>
 
       <div v-else class="plan-columns" :class="{
-        'plan-columns--single': selectedPlanTypes.length === 1,
-        'plan-columns--compare': selectedPlanTypes.length > 1,
-      }" :style="{ gridTemplateColumns: `repeat(${selectedPlanTypes.length}, minmax(0, 1fr))` }">
-        <div v-for="usageType in selectedPlanTypes" :key="usageType" class="plan-column">
-          <div class="column-type-title">{{ getPlanColumnTitle(usageType) }}</div>
-          <div v-if="getSchemeView(usageType)" class="column-content">
-            <StrikePlanSchemePanel :view="getSchemeView(usageType)!" :align-blocks="selectedPlanTypes.length > 1" />
+        'plan-columns--single': selectedSchemeCodes.length === 1,
+        'plan-columns--compare': selectedSchemeCodes.length > 1,
+      }" :style="{ gridTemplateColumns: `repeat(${selectedSchemeCodes.length}, minmax(0, 1fr))` }">
+        <div v-for="schemeCode in selectedSchemeCodes" :key="schemeCode" class="plan-column">
+          <div class="column-type-title">{{ getSchemeColumnTitle(schemeCode) }}</div>
+          <div v-if="getSchemeView(schemeCode)" class="column-content">
+            <StrikePlanSchemePanel :view="getSchemeView(schemeCode)!" :align-blocks="selectedSchemeCodes.length > 1" />
           </div>
           <div v-else class="empty-container small">
-            <div class="empty-text">暂无 {{ getPlanColumnTitle(usageType) }} 方案数据</div>
+            <div class="empty-text">暂无 {{ getSchemeColumnTitle(schemeCode) }} 数据</div>
           </div>
         </div>
       </div>
@@ -55,132 +65,167 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { ZhchPlanResp } from '@/api/electronic'
+import { getReportSchemes } from '@/api/report/report'
+import type { ReportGenerateResp, SchemeResult } from '@/types/report/report'
 import {
-  buildStrikePlanSchemeView,
   flattenStrikePlanRowsForExport,
   type StrikePlanSchemeView,
 } from '@/utils/buildStrikePlanSchemeView'
+import { buildReportSchemeView } from '@/utils/buildReportSchemeView'
 import { downloadStrikePlanCsv, downloadStrikePlanXls } from '@/utils/exportStrikePlanTable'
-import { buildStrikePlanDisplayNameFromTask, resolveCombatCountriesFromTask } from '@/utils/taskEntity'
-import {
-  useLayoutStore,
-  ZHCH_USAGE_TYPE_OPTIONS,
-  getZhchUsageTypeLabel,
-} from '@/store/modules/layout'
+import { buildStrikePlanDisplayNameFromTask } from '@/utils/taskEntity'
+import { useLayoutStore } from '@/store/modules/layout'
 import StrikePlanSchemePanel from './strike-plan/StrikePlanSchemePanel.vue'
-import { buildMockZhchPlanResp, isZhchPlanRespEmpty } from '@/utils/mockZhchPlanResp'
 
 defineOptions({ name: 'StrikePlanGenerator' })
 
-interface UsageTypeOption {
+interface SchemeOption {
   label: string
   value: string
 }
 
 const store = useLayoutStore()
 
-/**
- * 顶栏/列标题：作战阶段-作战预期；多方案并存时附加用途类型以区分。
- *
- * @param usageType 用途类型键
- */
-const getPlanColumnTitle = (usageType: string): string => {
-  const task = store.activedTask
-  if (!task?.id) return getZhchUsageTypeLabel(usageType)
-  const base = buildStrikePlanDisplayNameFromTask(task)
-  return `${base}（${getZhchUsageTypeLabel(usageType)}）`
-}
+/** 报告接口加载中 */
+const reportLoading = ref(false)
+/** 报告接口错误文案 */
+const reportError = ref('')
+/** 当前任务方案报告 */
+const reportData = ref<ReportGenerateResp | null>(null)
+/** 请求序号，用于丢弃过期响应 */
+let reportLoadToken = 0
+
+/** 勾选对比的方案 code（最多 3 个） */
+const selectedSchemeCodes = ref<string[]>([])
 
 /**
- * 计算：将 ZHCH 用途类型枚举映射为带任务显示名的下拉选项。
- * 返回：UsageTypeOption[]。
- * 作用：方案对比勾选区 usageTypeOptions 数据源。
+ * 计算：接口返回的方案 code → 方案实体。
+ * 返回 Map。
+ * 作用：列渲染与构建视图时查找方案。
  */
-const usageTypeOptions = computed((): UsageTypeOption[] =>
-  ZHCH_USAGE_TYPE_OPTIONS.map((value) => ({
-    label: getPlanColumnTitle(value),
-    value,
-  })),
-)
-
-/** 勾选对比的方案（最多 3 个） */
-const selectedPlanTypes = ref<string[]>([])
-
-onMounted(() => {
-  store.sanitizeZhchUsageTypes()
+const schemeByCode = computed(() => {
+  const map = new Map<string, SchemeResult>()
+  for (const scheme of reportData.value?.schemes ?? []) {
+    const code = scheme.code?.trim()
+    if (!code) continue
+    map.set(code, scheme)
+  }
+  return map
 })
 
 /**
- * 计算：当前任务的作战对象国家列表。
- * 返回：`string[]`；无任务时为 `[]`。
- * 作用：构建 Mock 综合方案与 `buildStrikePlanSchemeView` 的 priorityCountries 入参。
+ * 计算：顶栏复选框选项（报告 schemes）。
+ * 返回 SchemeOption[]。
+ * 作用：用户选择对比的方案列。
  */
-const priorityCountries = computed(() => resolveCombatCountriesFromTask(store.activedTask))
-
-/**
- * 读取展示用方案：优先接口缓存，缺失或空数据时使用演示 Mock。
- *
- * @param type 用途类型
- */
-const getPlanByType = (type: string): ZhchPlanResp | null => {
-  const taskId = store.activedTask?.id
-  if (!taskId) return null
-  const cached = store.zhchPlanMap[type]
-  if (cached && !isZhchPlanRespEmpty(cached)) {
-    return cached
-  }
-  return buildMockZhchPlanResp(type, Number(taskId), priorityCountries.value)
-}
-
-/**
- * 构建单方案页面视图。
- *
- * @param usageType 用途类型
- */
-const getSchemeView = (usageType: string): StrikePlanSchemeView | null => {
-  const plan = getPlanByType(usageType)
+const schemeOptions = computed((): SchemeOption[] => {
   const task = store.activedTask
-  if (!plan || !task?.id) return null
-  return buildStrikePlanSchemeView(
-    usageType,
-    plan,
-    task,
-    store.c2ResourceSatelliteRows,
-    priorityCountries.value,
-  )
+  const baseTitle = task?.id ? buildStrikePlanDisplayNameFromTask(task) : '作战方案'
+  return (reportData.value?.schemes ?? [])
+    .map((scheme) => {
+      const code = scheme.code?.trim()
+      if (!code) return null
+      const name = scheme.name?.trim() || code
+      return {
+        value: code,
+        label: `${baseTitle} · ${name}`,
+      }
+    })
+    .filter((item): item is SchemeOption => item != null)
+})
+
+/**
+ * 列标题：任务显示名 + 方案名称。
+ *
+ * @param schemeCode 方案 code
+ */
+const getSchemeColumnTitle = (schemeCode: string): string => {
+  const scheme = schemeByCode.value.get(schemeCode)
+  const task = store.activedTask
+  if (!task?.id) return scheme?.name?.trim() || schemeCode
+  const base = buildStrikePlanDisplayNameFromTask(task)
+  const name = scheme?.name?.trim() || schemeCode
+  return `${base}（${name}）`
 }
 
 /**
- * 计算：将 selectedPlanTypes 对应方案视图扁平化为导出行。
+ * 构建单方案页面视图（报告 API）。
+ *
+ * @param schemeCode 方案 code
+ */
+const getSchemeView = (schemeCode: string): StrikePlanSchemeView | null => {
+  const scheme = schemeByCode.value.get(schemeCode)
+  const task = store.activedTask
+  if (!scheme || !task?.id) return null
+  return buildReportSchemeView(schemeCode, scheme, task)
+}
+
+/**
+ * 计算：将 selectedSchemeCodes 对应视图扁平化为导出行。
  * 返回：flattenStrikePlanRowsForExport 返回的导出行数组。
  * 作用：CSV/XLS 导出按钮的数据源。
  */
 const exportRows = computed(() => {
-  const views = selectedPlanTypes.value
-    .map((type) => getSchemeView(type))
+  const views = selectedSchemeCodes.value
+    .map((code) => getSchemeView(code))
     .filter((view): view is StrikePlanSchemeView => view != null)
   return flattenStrikePlanRowsForExport(views)
 })
 
 /**
- * 拉取全部用途类型方案（不按卫星类型过滤）。
+ * 拉取任务作战方案报告（GET /report/schemes/{taskId}）。
  *
- * @param force 是否强制刷新
+ * @param force 保留参数以兼容刷新按钮；每次调用都会重新请求
  */
-const reloadAllPlans = async (force = false) => {
-  if (!store.activedTask?.id) return
-  store.sanitizeZhchUsageTypes()
-  await store.fetchZhchPlans([...ZHCH_USAGE_TYPE_OPTIONS], force, null)
+const reloadReportSchemes = async (force = false) => {
+  void force
+  const taskId = store.activedTask?.id
+  if (!taskId) {
+    reportData.value = null
+    reportError.value = ''
+    selectedSchemeCodes.value = []
+    return
+  }
+
+  const token = ++reportLoadToken
+  reportLoading.value = true
+  reportError.value = ''
+  try {
+    const data = await getReportSchemes(taskId)
+    if (token !== reportLoadToken) return
+    reportData.value = data
+    const codes = (data.schemes ?? [])
+      .map((s) => s.code?.trim())
+      .filter((c): c is string => Boolean(c))
+    if (!selectedSchemeCodes.value.length) {
+      selectedSchemeCodes.value = codes.slice(0, Math.min(3, codes.length))
+    } else {
+      selectedSchemeCodes.value = selectedSchemeCodes.value.filter((c) => codes.includes(c))
+    }
+    if (!codes.length) {
+      selectedSchemeCodes.value = []
+    }
+  } catch (err) {
+    if (token !== reportLoadToken) return
+    console.error('获取作战方案报告失败:', err)
+    reportData.value = null
+    reportError.value = err instanceof Error ? err.message : '获取作战方案报告失败'
+    selectedSchemeCodes.value = []
+  } finally {
+    if (token === reportLoadToken) {
+      reportLoading.value = false
+    }
+  }
 }
 
 /**
- * 初始化默认勾选（优先已有数据的方案，最多 3 个）。
+ * 有新方案时默认勾选前 3 个。
  */
-const syncDefaultSelectedPlans = () => {
-  selectedPlanTypes.value = [...ZHCH_USAGE_TYPE_OPTIONS]
+const syncDefaultSelectedSchemes = () => {
+  const codes = schemeOptions.value.map((item) => item.value)
+  selectedSchemeCodes.value = codes.slice(0, Math.min(3, codes.length))
 }
 
 /** 下载打击计划 */
@@ -190,7 +235,7 @@ const handleDownload = (format: 'csv' | 'xls') => {
     return
   }
   if (!exportRows.value.length) {
-    ElMessage.warning('当前勾选方案无打击计划可导出')
+    ElMessage.warning('当前勾选方案无入选卫星可导出')
     return
   }
   const prefix = `打击计划_${store.activedTask.name || store.activedTask.id}`
@@ -203,13 +248,13 @@ const handleDownload = (format: 'csv' | 'xls') => {
 }
 
 /**
- * 监听：selectedPlanTypes。
+ * 监听：selectedSchemeCodes。
  * 返回：回调不返回清理函数。
  * 作用：勾选超过 3 个方案时截断列表并提示用户上限。
  */
-watch(selectedPlanTypes, (val) => {
+watch(selectedSchemeCodes, (val) => {
   if (val.length > 3) {
-    selectedPlanTypes.value = val.slice(0, 3)
+    selectedSchemeCodes.value = val.slice(0, 3)
     ElMessage.warning('最多选择 3 个方案对比')
   }
 })
@@ -217,18 +262,21 @@ watch(selectedPlanTypes, (val) => {
 /**
  * 监听：store.activedTask?.id。
  * 返回：回调不返回清理函数。
- * 作用：任务切换时清空方案缓存与勾选，拉取新任务方案并恢复默认勾选。
+ * 作用：任务切换时清空报告数据并重新拉取。
  */
 watch(
   () => store.activedTask?.id,
   async (taskId, prevId) => {
     if (taskId !== prevId) {
-      store.clearZhchPlans()
-      selectedPlanTypes.value = []
+      reportData.value = null
+      selectedSchemeCodes.value = []
+      reportError.value = ''
     }
     if (!taskId) return
-    await reloadAllPlans(true)
-    syncDefaultSelectedPlans()
+    await reloadReportSchemes(true)
+    if (!selectedSchemeCodes.value.length) {
+      syncDefaultSelectedSchemes()
+    }
   },
   { immediate: true },
 )
@@ -244,6 +292,16 @@ watch(
   background-color: #060913;
   color: #e2e8f0;
   overflow: hidden;
+}
+
+.report-error {
+  margin: 12px 20px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(127, 29, 29, 0.25);
+  color: #fecaca;
+  font-size: 14px;
 }
 
 .plan-header {
