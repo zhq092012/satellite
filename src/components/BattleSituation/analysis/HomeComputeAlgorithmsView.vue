@@ -5,28 +5,18 @@
         <h2 class="analysis-panel-title">已注册算法列表</h2>
         <el-button :loading="loading" @click="loadAlgorithms">刷新</el-button>
       </header>
-      <p class="analysis-intro">
-        展示计算模块已注册的全部算法实现；标记为「默认生效」的项为未指定编码时接口自动采用的算法。
-        威胁度分析可覆盖静态、动态与聚合算法；打击度分析可覆盖打击度算法。
-      </p>
+
       <p v-if="errorMessage" class="analysis-error">{{ errorMessage }}</p>
       <div class="analysis-table-scroll">
-        <el-table
-          v-loading="loading"
-          :data="tableRows"
-          class="analysis-algorithms-table"
-          border
-          stripe
-          height="100%"
-          row-key="rowKey"
-        >
+        <el-table v-loading="loading" :data="tableRows" class="analysis-algorithms-table" border stripe height="100%"
+          row-key="rowKey">
           <el-table-column prop="kindLabel" label="算法种类" min-width="140" show-overflow-tooltip />
           <el-table-column prop="code" label="算法编码" min-width="160" show-overflow-tooltip />
           <el-table-column prop="name" label="算法名称" min-width="200" show-overflow-tooltip />
           <el-table-column label="默认生效" width="108" align="center">
             <template #default="{ row }">
               <el-tag v-if="row.active" type="success">是</el-tag>
-              <span v-else class="analysis-tag-muted">否</span>
+              <el-tag v-else type="danger">否</el-tag>
             </template>
           </el-table-column>
         </el-table>
@@ -146,15 +136,6 @@ $panel-border: rgba(56, 189, 248, 0.55);
   color: #7dd3fc;
 }
 
-.analysis-intro {
-  flex-shrink: 0;
-  margin: 0;
-  padding: 10px 16px;
-  color: #94a3b8;
-  line-height: 1.55;
-  font-size: battleUi.$battle-ui-font-base;
-  border-bottom: 1px solid rgba(56, 189, 248, 0.2);
-}
 
 .analysis-error {
   flex-shrink: 0;

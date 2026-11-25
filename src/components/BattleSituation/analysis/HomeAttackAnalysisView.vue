@@ -7,6 +7,8 @@
           <div class="attack-table-caption-text">
             <span class="attack-table-title">打击度分析</span>
             <p class="attack-table-formula">各蓝方卫星可打击程度及因子分解</p>
+            <p v-if="metaLine" class="analysis-meta analysis-meta--inline">{{ metaLine }}</p>
+            <p v-if="algorithmLine" class="analysis-meta analysis-meta--algo">{{ algorithmLine }}</p>
           </div>
         </div>
         <p v-if="errorMessage" class="analysis-error">{{ errorMessage }}</p>
@@ -17,7 +19,6 @@
             </colgroup>
             <thead>
               <tr class="attack-col-header">
-                <th scope="col">NORAD</th>
                 <th scope="col">所属国家</th>
                 <th scope="col">卫星名称</th>
                 <th scope="col">卫星类型</th>
@@ -31,7 +32,6 @@
               </tr>
               <tr v-for="row in tableRows" :key="row.rowKey"
                 :class="computeAnalysisCountryRowClass(row.country, priorityCountries)">
-                <td>{{ row.noradId || '--' }}</td>
                 <td>{{ row.country || '--' }}</td>
                 <td class="attack-cell--name">{{ row.satelliteName || '--' }}</td>
                 <td>{{ row.satelliteType || '--' }}</td>
@@ -68,7 +68,7 @@ import {
 
 defineOptions({ name: 'HomeAttackAnalysisView' })
 
-const columnWidths = ['10%', '10%', '18%', '14%', '10%', '38%'] as const
+const columnWidths = ['10%', '28%', '14%', '10%', '38%'] as const
 
 const store = useLayoutStore()
 const loading = ref(false)
@@ -114,10 +114,12 @@ const tableRows = computed((): StrikeTableRow[] => {
   const rows = strikeResp.value?.rows ?? []
   const mapped = rows.map(mapStrikeRow)
   return sortComputeRowsByCountryAndScore(
-    mapped.map((item) => ({
-      ...item,
-      score: Number.parseFloat(item.strikeText) || 0,
-    })),
+    mapped.map(
+      (item): StrikeTableRow & { score: number } => ({
+        ...item,
+        score: Number.parseFloat(item.strikeText) || 0,
+      }),
+    ),
     priorityCountries.value,
   )
 })

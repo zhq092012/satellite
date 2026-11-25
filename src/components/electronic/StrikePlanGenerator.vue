@@ -48,18 +48,18 @@
           </el-checkbox-group>
         </div>
 
+        <!-- 综合信息 -->
         <ReportGenerateOverview :report="reportData" />
 
+        <!-- 阶段三档对比 -->
         <section v-if="topStageSections.length" class="report-comprehensive">
           <ReportStageCompareBlock v-for="section in topStageSections" :key="section.stageCode"
             class="report-comprehensive__stage" :stage-title="section.title" :stage="section.stage!"
             :active-tier-indexes="section.activeTierIndexes" top />
 
-          <section
-            v-if="crossCompareRows.length"
-            class="report-cross-compare"
-            :class="{ 'report-cross-compare--single': crossCompareRows.length === 1 }"
-          >
+          <!-- 全部方案指标对比 -->
+          <section v-if="crossCompareRows.length" class="report-cross-compare"
+            :class="{ 'report-cross-compare--single': crossCompareRows.length === 1 }">
             <h3 class="report-cross-compare__title">全部方案指标对比</h3>
             <div class="report-cross-compare__scroll">
               <table class="report-cross-compare__table" cellspacing="0" cellpadding="0">
@@ -106,44 +106,30 @@
               <h3 class="column-head__name">{{ getSchemeShortTitle(schemeCode) }}</h3>
             </header>
             <div v-if="getSchemeView(schemeCode)" class="column-content">
-              <StrikePlanSchemePanel
-                :view="getSchemeView(schemeCode)!"
-                dense
-                :horizontal="selectedSchemeCodes.length === 1"
-              />
+              <StrikePlanSchemePanel :view="getSchemeView(schemeCode)!" dense
+                :horizontal="selectedSchemeCodes.length === 1" />
             </div>
           </article>
         </div>
 
-        <section
-          v-if="selectedStrikePlanCodes.length"
-          class="strike-plan-detail-section"
-        >
+        <section v-if="selectedStrikePlanCodes.length" class="strike-plan-detail-section">
           <h3 class="strike-plan-detail-section__title">打击方案与前后比对</h3>
           <p class="strike-plan-detail-section__hint">
             与上方勾选方案按方案编码一一匹配展示。
           </p>
-          <div
-            class="plan-columns strike-plan-columns"
-            :class="{
-              'plan-columns--single': selectedStrikePlanCodes.length === 1,
-              'plan-columns--triple': selectedStrikePlanCodes.length === 3,
-            }"
-          >
-            <article
-              v-for="schemeCode in selectedStrikePlanCodes"
-              :key="`strike-${schemeCode}`"
-              class="plan-column plan-column--strike"
-            >
+          <div class="plan-columns strike-plan-columns" :class="{
+            'plan-columns--single': selectedStrikePlanCodes.length === 1,
+            'plan-columns--triple': selectedStrikePlanCodes.length === 3,
+          }">
+            <article v-for="schemeCode in selectedStrikePlanCodes" :key="`strike-${schemeCode}`"
+              class="plan-column plan-column--strike">
               <header class="column-head column-head--strike">
                 <span class="column-head__code">{{ schemeCode }}</span>
                 <h3 class="column-head__name">{{ getStrikePlanTitle(schemeCode) }}</h3>
               </header>
               <div class="column-content">
-                <ReportStrikePlanPanel
-                  :plan="getStrikePlan(schemeCode)!"
-                  :horizontal="selectedStrikePlanCodes.length === 1"
-                />
+                <ReportStrikePlanPanel :plan="getStrikePlan(schemeCode)!"
+                  :horizontal="selectedStrikePlanCodes.length === 1" />
               </div>
             </article>
           </div>

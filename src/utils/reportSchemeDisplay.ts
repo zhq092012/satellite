@@ -275,7 +275,7 @@ export const collectReportTierIndexesForCodes = (
  */
 export const buildReportStrikePlansCompareRows = (plans: StrikePlan[]): ReportSchemeCompareRow[] =>
   plans
-    .map((plan) => {
+    .map((plan): ReportSchemeCompareRow | null => {
       const code = plan.code?.trim()
       if (!code) return null
       const stageCode = plan.stageCode?.trim() || parseReportStageCodeFromSchemeCode(code)
@@ -283,18 +283,18 @@ export const buildReportStrikePlansCompareRows = (plans: StrikePlan[]): ReportSc
       const stageText =
         stageName && stageCode ? `${stageName}（${stageCode}）` : stageName || stageCode
       const attainment = deriveStrikePlanAttainment(plan.comparison)
-      return {
+      const row: ReportSchemeCompareRow = {
         code,
         name: plan.name?.trim() || code,
-        stageText,
-        tierText: plan.tierIndex != null ? `规模${plan.tierIndex}` : undefined,
-        targetSize: plan.targetSize,
         attainmentText: formatReportNumber(attainment, 3) ?? '—',
         scoreText: '—',
-        solverCaliber: undefined,
       }
+      if (stageText) row.stageText = stageText
+      if (plan.tierIndex != null) row.tierText = `规模${plan.tierIndex}`
+      if (plan.targetSize != null) row.targetSize = plan.targetSize
+      return row
     })
-    .filter((row): row is ReportSchemeCompareRow => row != null)
+    .filter((row): row is ReportSchemeCompareRow => row !== null)
 
 /**
  * 按报告响应选择对比行来源（legacy schemes 或 strikePlans）。
@@ -311,25 +311,29 @@ export const buildReportCompareRowsFromReport = (
 
 export const buildReportSchemesCompareRows = (schemes: SchemeResult[]): ReportSchemeCompareRow[] =>
   schemes
-    .map((scheme) => {
+    .map((scheme): ReportSchemeCompareRow | null => {
       const code = scheme.code?.trim()
       if (!code) return null
       const stageCode = scheme.stageCode?.trim() || parseReportStageCodeFromSchemeCode(code)
       const stageName = scheme.stageName?.trim()
       const stageText =
         stageName && stageCode ? `${stageName}（${stageCode}）` : (stageName || stageCode)
-      return {
+      const row: ReportSchemeCompareRow = {
         code,
         name: scheme.name?.trim() || code,
-        stageText,
-        tierText: scheme.scale?.trim() || (scheme.tierIndex != null ? `档${scheme.tierIndex}` : undefined),
-        targetSize: scheme.targetSize,
         attainmentText: formatReportNumber(scheme.attainment, 3) ?? '—',
         scoreText: formatReportNumber(scheme.metrics?.score, 3) ?? '—',
-        solverCaliber: scheme.solverCaliber?.trim(),
       }
+      if (stageText) row.stageText = stageText
+      const tierText =
+        scheme.scale?.trim() || (scheme.tierIndex != null ? `档${scheme.tierIndex}` : undefined)
+      if (tierText) row.tierText = tierText
+      if (scheme.targetSize != null) row.targetSize = scheme.targetSize
+      const solverCaliber = scheme.solverCaliber?.trim()
+      if (solverCaliber) row.solverCaliber = solverCaliber
+      return row
     })
-    .filter((row): row is ReportSchemeCompareRow => row != null)
+    .filter((row): row is ReportSchemeCompareRow => row !== null)
 
 export const formatReportQuotaRole = (role?: string): string | undefined => {
   const key = role?.trim()
@@ -468,7 +472,7 @@ export const buildReportMetricsSummaryFields = (
 export const buildReportSchemeQuotaRows = (quota?: ReportQuotaLine[]): ReportSchemeQuotaRow[] => {
   if (!quota?.length) return []
   return quota
-    .map((line) => {
+    .map((line): ReportSchemeQuotaRow | null => {
       const system = line.system?.trim()
       if (!system) return null
       const required = line.required
@@ -482,18 +486,20 @@ export const buildReportSchemeQuotaRows = (quota?: ReportQuotaLine[]): ReportSch
         countText = `需 ${required}`
       }
       const notes: string[] = []
-      if (line.mode?.trim()) notes.push(line.mode.trim())
+      const mode = line.mode?.trim()
+      if (mode) notes.push(mode)
       if (line.forced) notes.push('强制集')
       if (line.satisfied === false) notes.push('未满足')
-      return {
+      const row: ReportSchemeQuotaRow = {
         system,
-        mode: line.mode?.trim(),
         countText: countText || '—',
-        satisfied: line.satisfied,
-        note: notes.length ? notes.join(' · ') : undefined,
       }
+      if (mode) row.mode = mode
+      if (line.satisfied != null) row.satisfied = line.satisfied
+      if (notes.length) row.note = notes.join(' · ')
+      return row
     })
-    .filter((row): row is ReportSchemeQuotaRow => row != null)
+    .filter((row): row is ReportSchemeQuotaRow => row !== null)
 }
 
 /**
