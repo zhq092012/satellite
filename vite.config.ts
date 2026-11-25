@@ -42,7 +42,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       hmr: true,
-      port: 7102,
+      port: 7104,
       open: false,
       host: '0.0.0.0',
       cors: true,
