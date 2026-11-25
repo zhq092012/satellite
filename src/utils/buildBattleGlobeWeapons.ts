@@ -133,16 +133,6 @@ export const buildBattleGlobeWeapons = (
 }
 
 /**
- * 从当前系列矩阵汇总可渲染武器（分析结果未返回时的兜底）。
- *
- * @param matrix 当前系列算法矩阵
- * @returns 去重后的武器列表
- */
-export const buildBattleGlobeWeaponsFromMatrix = (
-  matrix: { satelliteMatrixList?: BattleGlobeWeaponMatrixSource[] | null } | null | undefined
-): BattleGlobeWeapon[] => buildBattleGlobeWeaponsFromSatelliteMatrices(matrix?.satelliteMatrixList)
-
-/**
  * 按武器名称解析武器 ID（名称重复时返回首个匹配项）。
  *
  * @param weapons 武器列表

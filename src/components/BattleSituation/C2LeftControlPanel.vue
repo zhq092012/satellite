@@ -126,7 +126,6 @@ import type { TaskForm } from '@/api/task/task'
 import type { TaskResourceItem } from '@/types/task/task'
 import type { SatelliteTreeCountryNode } from '@/types/satellite/satellite'
 import type { Weapon } from '@/types/dashboard'
-import type { MatrixResult } from '@/api/electronic'
 import { useTaskProgressPolling } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskEditDialog from '@/components/BattleSituation/TaskEditDialog.vue'
@@ -150,7 +149,8 @@ import {
   createDraftFromTask,
   mergeTaskFormWithDraft,
   parseTaskPanelTimeMs,
-  type C2TaskEditorDraft,
+  readTaskWeaponResourceIds,
+  writeTaskWeaponResourceIds,
 } from '@/utils/c2TaskPanelEditor'
 import {
   parseSeriesApiBuckets,
@@ -160,7 +160,6 @@ import {
   buildC2PanelResourceTreeFromApiRoots,
   buildC2PanelSystemNodeId,
   parseC2PanelSeriesNodeId,
-  buildC2SatelliteFlatRowsFromMatrix,
   C2_PANEL_TREE_COUNTRIES,
   C2_RESOURCE_EMPTY_FIELD,
   collectC2ResourceTreeSeriesIdsUnderNode,
@@ -168,7 +167,6 @@ import {
   filterC2ResourceRowsToPanelCountries,
   mapTaskResourceItemToC2Row,
   mergeC2ResourceSatelliteRows,
-  mergeMatrixCatalogIntoPanelCatalog,
   resolveC2SeriesScopeFromNode,
   type C2ResourceSatelliteRow,
   type C2ResourceTreeNode,
@@ -190,8 +188,6 @@ import {
 import { resolveSeriesNamesFromTaskSatellites } from '@/utils/taskEntity'
 
 defineProps<{
-  /** 算法矩阵（与父组件兼容） */
-  matrixData?: MatrixResult | null
   /** 当前选中 NORAD（与父组件兼容） */
   selectedNorad?: number | null
 }>()
@@ -217,8 +213,8 @@ const taskEditVisible = ref(false)
 const taskEditIsEdit = ref(false)
 const editingTask = ref<TaskForm | null>(null)
 
-/** 当前选中任务的内联编辑草稿（系列/武器） */
-const editorDraft = ref<C2TaskEditorDraft | null>(null)
+/** 当前选中任务的内联编辑副本（系列/武器） */
+const editorDraft = ref<TaskForm | null>(null)
 /** 是否启用任务武器配置 */
 const useWeaponsEnabled = ref(false)
 /** 关闭「使用武器」时暂存的武器 ID */
@@ -235,7 +231,6 @@ const catalogFromTaskResource = ref(false)
 /** 首次加载卫星资源树（不遮挡已挂载的 el-tree） */
 const treeBootLoading = ref(false)
 const catalogLoading = ref(false)
-const catalogUsesMatrix = ref(false)
 const programmaticTreeSync = ref(false)
 /** 程序化回显期间禁止 @check 触发保存 / 重算（避免连锁写任务） */
 const suppressResourceTreeSave = ref(false)
@@ -431,7 +426,6 @@ const readActiveCombatScenario = () => {
 const catalogSourceHint = computed(() => {
   if (catalogLoading.value || !flatCatalogRows.value.length) return ''
   if (catalogFromTaskResource.value) return ''
-  if (catalogUsesMatrix.value) return ''
   return '算法未完成：当前为系列预览数据，用途/国际编号/发射时间可能为空。'
 })
 
@@ -569,7 +563,7 @@ const resolveEnemyCountries = (task: TaskForm | null | undefined): string[] => {
  * @param task 任务
  */
 const resolveTaskTargetTypes = (task: TaskForm | null | undefined): string[] => {
-  if (editorDraft.value?.targetTypeShow.length) return [...editorDraft.value.targetTypeShow]
+  if (editorDraft.value?.targetTypeShow?.length) return [...editorDraft.value.targetTypeShow]
   if (!task) return []
   return [...MISSION_SYS_TYPES]
 }
@@ -720,33 +714,6 @@ const fetchSeriesFallbackCatalog = async (task: TaskForm): Promise<C2ResourceSat
   return filterC2ResourceRowsToPanelCountries(skeletonRows)
 }
 
-/**
- * 刷新 C2 卫星资源 catalog（树固定展示三国；matrix 仅覆盖对应系列，不裁剪整树）。
- *
- * @param task 当前任务
- */
-/**
- * 仅合并 matrix 扁平行，不重建左树（避免分析就绪时把勾选冲掉）。
- *
- * @param task 当前任务
- */
-const mergeC2CatalogRowsFromTaskMatrix = (task: TaskForm) => {
-  const analysis = store.taskAnalysisData
-  const hasMatrix =
-    Boolean(analysis?.levelSeriesEntities?.length) && store.taskAnalysisTaskId === task.id
-  if (!hasMatrix || !analysis) {
-    catalogUsesMatrix.value = false
-    return
-  }
-  const taskEnemies = resolveEnemyCountries(task)
-  const matrixRows = filterC2ResourceRowsToPanelCountries(
-    buildC2SatelliteFlatRowsFromMatrix(analysis, taskEnemies),
-  )
-  flatCatalogRows.value = mergeMatrixCatalogIntoPanelCatalog(flatCatalogRows.value, matrixRows)
-  catalogUsesMatrix.value = true
-  store.setC2ResourceSatelliteRows(flatCatalogRows.value)
-}
-
 const refreshResourceCatalog = async (task: TaskForm | null | undefined) => {
   await yieldToUiBeforeHeavyTreeMount()
   if (!task) {
@@ -756,46 +723,20 @@ const refreshResourceCatalog = async (task: TaskForm | null | undefined) => {
     c2TreeExpandedKeys.value = []
     catalogFromTaskResource.value = false
     store.setC2ResourceSatelliteRows([])
-    catalogUsesMatrix.value = false
     return
   }
-  const taskEnemies = resolveEnemyCountries(task)
   try {
     catalogFromTaskResource.value = false
     await ensureC2PanelResourceTreeLoaded()
 
     const usedTaskResourceTree = await fetchTaskSatelliteResourceCatalog(task)
-    const analysis = store.taskAnalysisData
-    const hasMatrix =
-      Boolean(analysis?.levelSeriesEntities?.length) &&
-      store.taskAnalysisTaskId === task.id
-
     if (usedTaskResourceTree) {
-      if (hasMatrix && analysis) {
-        const matrixRows = filterC2ResourceRowsToPanelCountries(
-          buildC2SatelliteFlatRowsFromMatrix(analysis, taskEnemies),
-        )
-        flatCatalogRows.value = mergeMatrixCatalogIntoPanelCatalog(flatCatalogRows.value, matrixRows)
-        catalogUsesMatrix.value = true
-      } else {
-        catalogUsesMatrix.value = false
-      }
       store.setC2ResourceSatelliteRows(flatCatalogRows.value)
-    } else if (hasMatrix && analysis) {
-      const matrixRows = filterC2ResourceRowsToPanelCountries(
-        buildC2SatelliteFlatRowsFromMatrix(analysis, taskEnemies),
-      )
-      let baseRows = flatCatalogRows.value
-      if (!baseRows.length) {
-        baseRows = await fetchSeriesFallbackCatalog(task)
-      }
-      flatCatalogRows.value = mergeMatrixCatalogIntoPanelCatalog(baseRows, matrixRows)
-      catalogUsesMatrix.value = true
     } else {
-      catalogUsesMatrix.value = false
       flatCatalogRows.value = await fetchSeriesFallbackCatalog(task)
+      store.setC2ResourceSatelliteRows(flatCatalogRows.value)
     }
-    const taskSats = editorDraft.value?.selectedSatellites ?? task.satellites ?? []
+    const taskSats = editorDraft.value?.satellites ?? task.satellites ?? []
     store.setC2ResourceSatelliteRows(flatCatalogRows.value)
     suppressResourceTreeSave.value = true
     try {
@@ -966,7 +907,7 @@ const applyC2TreeVisualCheckStates = async () => {
  */
 const applyTaskResourceTreeCheckedKeys = async () => {
   await nextTick()
-  const taskSats = editorDraft.value?.selectedSatellites ?? store.activedTask?.satellites ?? []
+  const taskSats = editorDraft.value?.satellites ?? store.activedTask?.satellites ?? []
   if (!taskSats.length) return
   buildC2SeriesCheckEchoFromTaskSatellites(taskSats)
   await applyC2TreeVisualCheckStates()
@@ -986,7 +927,7 @@ const clearResourceTreeSelection = async () => {
 
 
 /**
- * 资源树勾选：系列叶子全选时 search 加载卫星；与 `selectedSatellites` 分离维护后写回任务。
+ * 资源树勾选：系列叶子全选时 search 加载卫星；与 `satellites` 分离维护后写回任务。
  */
 const handleResourceTreeCheck = async () => {
   if (programmaticTreeSync.value || suppressResourceTreeSave.value || !editorDraft.value) return
@@ -1003,7 +944,7 @@ const handleResourceTreeCheck = async () => {
 
   programmaticTreeSync.value = true
   try {
-    let nextSelected = editorDraft.value.selectedSatellites.map((item) => ({ ...item }))
+    let nextSelected = editorDraft.value.satellites.map((item) => ({ ...item }))
     let nextRows = [...flatCatalogRows.value]
 
     for (const seriesId of added) {
@@ -1026,8 +967,7 @@ const handleResourceTreeCheck = async () => {
       nextRows = nextRows.filter((row) => !row.resourceId || !removedKeys.has(row.resourceId))
     }
 
-    editorDraft.value.selectedSatellites = nextSelected
-    editorDraft.value.selectedSeries = resolveSeriesNamesFromTaskSatellites(nextSelected)
+    editorDraft.value.satellites = nextSelected
     flatCatalogRows.value = nextRows
     store.setC2ResourceSatelliteRows(nextRows)
     added.forEach((id) => c2SeriesCheckStateByNodeId.value.set(id, 'all'))
@@ -1038,7 +978,7 @@ const handleResourceTreeCheck = async () => {
     trackedC2FullyCheckedSeriesIds.value = resolveC2FullyCheckedSeriesIdsFromTree(tree)
     syncC2TreeCheckedKeysToStore()
 
-    if (editorDraft.value.selectedSatellites.length > 0) {
+    if (editorDraft.value.satellites.length > 0) {
       void handleSaveAndRecalculate()
     }
   } catch (error) {
@@ -1058,7 +998,7 @@ const handleResourceTreeCheck = async () => {
 const handleWeaponSelectionChange = (rows: Weapon[]) => {
   if (!useWeaponsEnabled.value || !editorDraft.value) return
   const ids = rows.map((row) => String(row.id ?? '')).filter(Boolean)
-  editorDraft.value.selectedWeaponIds = ids
+  writeTaskWeaponResourceIds(editorDraft.value, ids)
   stashedWeaponIds.value = [...ids]
   void handleSaveAndRecalculate()
 }
@@ -1069,7 +1009,7 @@ const syncWeaponTableSelection = async () => {
   const table = weaponTableRef.value
   if (!table || !useWeaponsEnabled.value || !editorDraft.value) return
   table.clearSelection()
-  const wanted = new Set(editorDraft.value.selectedWeaponIds)
+  const wanted = new Set(readTaskWeaponResourceIds(editorDraft.value))
   weaponTableRows.value.forEach((row) => {
     const id = String(row.id ?? '')
     if (id && wanted.has(id)) {
@@ -1096,9 +1036,9 @@ const syncEditorForTask = async (task: TaskForm | null | undefined) => {
   syncEditorInflight = (async () => {
     editorDraft.value = createDraftFromTask(task)
     if (task && editorDraft.value) {
-      stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
+      stashedWeaponIds.value = [...readTaskWeaponResourceIds(editorDraft.value)]
       useWeaponsEnabled.value = false
-      editorDraft.value.selectedWeaponIds = []
+      writeTaskWeaponResourceIds(editorDraft.value, [])
     } else {
       stashedWeaponIds.value = []
       useWeaponsEnabled.value = false
@@ -1119,27 +1059,6 @@ const syncEditorForTask = async (task: TaskForm | null | undefined) => {
   })
   return syncEditorInflight
 }
-
-/**
- * 监听：任务分析数据 `store.taskAnalysisData`（深度）。
- * 返回：回调不返回清理函数。
- * 作用：分析矩阵就绪且任务 ID 匹配时用 matrix 合并重建资源 catalog。
- */
-watch(
-  () => store.taskAnalysisData,
-  (analysis) => {
-    const task = store.activedTask
-    if (!task?.id) return
-    // 仅在拉取到新的 matrix 分析时重建树；清空分析（保存后等待重算）时不切到系列预览，避免结构闪变
-    if (
-      analysis?.levelSeriesEntities?.length &&
-      store.taskAnalysisTaskId === task.id
-    ) {
-      mergeC2CatalogRowsFromTaskMatrix(task)
-    }
-  },
-  { deep: true },
-)
 
 /**
  * 监听：当前激活任务 ID。
@@ -1205,13 +1124,13 @@ watch(
 const handleUseWeaponsChange = (enabled: boolean) => {
   if (!editorDraft.value) return
   if (!enabled) {
-    stashedWeaponIds.value = [...editorDraft.value.selectedWeaponIds]
-    editorDraft.value.selectedWeaponIds = []
+    stashedWeaponIds.value = [...readTaskWeaponResourceIds(editorDraft.value)]
+    writeTaskWeaponResourceIds(editorDraft.value, [])
     weaponTableRef.value?.clearSelection()
     void handleSaveAndRecalculate({ forceWeaponIds: [] })
     return
   }
-  editorDraft.value.selectedWeaponIds = [...stashedWeaponIds.value]
+  writeTaskWeaponResourceIds(editorDraft.value, [...stashedWeaponIds.value])
   void syncWeaponTableSelection()
   void handleSaveAndRecalculate()
 }
@@ -1254,12 +1173,12 @@ const handleTaskSaved = async (updated: TaskForm) => {
 const handleSaveAndRecalculate = async (options?: { forceWeaponIds?: string[] }) => {
   const baseTask = store.activedTask
   const draft = editorDraft.value
-  if (!baseTask?.id || !draft || draft.taskId !== baseTask.id) return
+  if (!baseTask?.id || !draft || draft.id !== baseTask.id) return
   if (savingRecalc.value) return
   if (!draft.beginDate || !draft.endDate) return
   if (parseTaskPanelTimeMs(draft.endDate) <= parseTaskPanelTimeMs(draft.beginDate)) return
-  if (!draft.selectedSeries.length) return
-  if (!draft.targetTypeShow.length) return
+  if (!resolveSeriesNamesFromTaskSatellites(draft.satellites).length) return
+  if (!draft.targetTypeShow?.length) return
   const payload = mergeTaskFormWithDraft(baseTask, draft)
   if (options?.forceWeaponIds !== undefined) {
     payload.weapons = options.forceWeaponIds.map((resourceId) => ({
@@ -1278,7 +1197,6 @@ const handleSaveAndRecalculate = async (options?: { forceWeaponIds?: string[] })
       return
     }
     await loadBattleTasks({ silent: true })
-    store.clearTaskAnalysisData()
     await startTaskProgressPolling(baseTask.id)
     emit('task-recalculated', baseTask.id)
   } catch (error) {

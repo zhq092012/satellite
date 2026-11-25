@@ -129,17 +129,3 @@ export const buildBattleGlobeSatellites = (
   data: SatelliteAnalysisData | null | undefined
 ): BattleGlobeSatellite[] => buildBattleGlobeSatellitesFromEntities(data?.levelSeriesEntities)
 
-/**
- * 从当前系列矩阵汇总可渲染卫星（分析结果未返回时的兜底）。
- *
- * @param matrix 当前系列算法矩阵
- * @returns 带有效 TLE 的卫星列表
- */
-export const buildBattleGlobeSatellitesFromMatrix = (
-  matrix: BattleGlobeEntitySource | null | undefined
-): BattleGlobeSatellite[] => {
-  if (!matrix) return []
-  return buildBattleGlobeSatellitesFromEntities([
-    { series: matrix.series, initMatrixList: matrix.initMatrixList },
-  ])
-}

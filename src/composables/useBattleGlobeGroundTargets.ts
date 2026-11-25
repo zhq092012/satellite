@@ -1,14 +1,6 @@
 import * as Cesium from 'cesium'
 import { onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
-import {
-  buildGroundTargetKey,
-  isGroundTargetNearDeductionPass,
-  type BattleGlobeGroundTarget,
-} from '@/utils/buildBattleGlobeGroundTargets'
-import {
-  matchesDeductionReceiveHighlight,
-  type DeductionStationPassWindow,
-} from '@/utils/buildSatelliteDeductionTimeline'
+import { buildGroundTargetKey, type BattleGlobeGroundTarget } from '@/utils/buildBattleGlobeGroundTargets'
 
 /** 近距离 LOD 阈值（米） */
 const LOD_NEAR_DISTANCE = 2_000_000
@@ -24,8 +16,6 @@ const RECEIVE_POINT_COLOR = Cesium.Color.fromCssColorString('#facc15')
 const STATION_POINT_COLOR = Cesium.Color.fromCssColorString('#fb923c')
 /** 被打击状态点颜色 */
 const STRUCK_POINT_COLOR = Cesium.Color.fromCssColorString('#f87171')
-/** 推演过站高亮颜色（与过站虚线一致） */
-const DEDUCTION_PASS_HIGHLIGHT_COLOR = Cesium.Color.fromCssColorString('#facc15')
 /** 选中目标相机距离（米） */
 const SELECTED_CAMERA_RANGE = 600_000
 
@@ -54,24 +44,13 @@ interface GroundTargetVisual {
  *
  * @param viewerRef Cesium Viewer 引用
  * @param targetsRef 地面目标列表
- * @param selectedTargetKeyRef 当前选中键（receive: / station:）
- * @param deductionStruckReceiveKeysRef 推演中已被打击的接收站 ID/名称集合
- * @param deductionPassHighlightReceiveKeysRef 推演当前过站窗口内接收站 ID/名称集合
- * @param deductionPassHighlightPassesRef 推演高亮过站窗口（含坐标）
  * @param followSelectedRef 选中地面目标时是否自动飞行定位
  */
 export const useBattleGlobeGroundTargets = (
   viewerRef: Ref<Cesium.Viewer | null>,
   targetsRef: Ref<BattleGlobeGroundTarget[]> | ComputedRef<BattleGlobeGroundTarget[]>,
   selectedTargetKeyRef: Ref<string | null> | ComputedRef<string | null>,
-  followSelectedRef: Ref<boolean> | ComputedRef<boolean> = ref(false),
-  deductionStruckReceiveKeysRef: Ref<Set<string>> | ComputedRef<Set<string>> = ref(new Set()),
-  deductionPassHighlightReceiveKeysRef: Ref<Set<string>> | ComputedRef<Set<string>> = ref(
-    new Set()
-  ),
-  deductionPassHighlightPassesRef: Ref<DeductionStationPassWindow[]> | ComputedRef<
-    DeductionStationPassWindow[]
-  > = ref([])
+  followSelectedRef: Ref<boolean> | ComputedRef<boolean> = ref(false)
 ) => {
   // 可视化对象映射
   const visualMap = new Map<string, GroundTargetVisual>()
@@ -190,17 +169,9 @@ export const useBattleGlobeGroundTargets = (
    * @param baseColor 默认颜色
    * @returns 点样式
    */
-  const resolveLodStyle = (
-    distance: number,
-    selected: boolean,
-    passHighlight: boolean,
-    baseColor: Cesium.Color
-  ) => {
+  const resolveLodStyle = (distance: number, selected: boolean, baseColor: Cesium.Color) => {
     if (selected) {
       return { pixelSize: 12, color: Cesium.Color.YELLOW }
-    }
-    if (passHighlight) {
-      return { pixelSize: 12, color: DEDUCTION_PASS_HIGHLIGHT_COLOR }
     }
     if (distance <= LOD_NEAR_DISTANCE) {
       return { pixelSize: 8, color: baseColor }
@@ -364,36 +335,12 @@ export const useBattleGlobeGroundTargets = (
       const targetKind = visual.key.startsWith('receive:') ? 'receive' : 'station'
       // 获取目标 ID
       const targetId = visual.key.split(':')[1] || ''
-      // 获取推演中已被打击的接收站 ID/名称集合
-      const deductionStruck = deductionStruckReceiveKeysRef.value
-      // 获取推演当前过站窗口内接收站 ID/名称集合
-      const passHighlightKeys = deductionPassHighlightReceiveKeysRef.value
-      // 获取推演高亮过站窗口（含坐标）
-      const passHighlightPasses = deductionPassHighlightPassesRef.value
-      // 判断是否被打击
-      const struckInDeduction =
-        targetKind === 'receive' &&
-        (deductionStruck.has(targetId) ||
-          deductionStruck.has(visual.name) ||
-          matchesDeductionReceiveHighlight(targetId, visual.name, deductionStruck))
-      // 判断是否在推演当前过站窗口内
-      const passHighlightInDeduction =
-        !struckInDeduction &&
-        (matchesDeductionReceiveHighlight(targetId, visual.name, passHighlightKeys) ||
-          isGroundTargetNearDeductionPass(visual.latitude, visual.longitude, passHighlightPasses))
-      // 获取默认颜色
-      const baseColor = struckInDeduction
+      const baseColor = visual.struck
         ? STRUCK_POINT_COLOR
-        : // 判断是否被打击
-        visual.struck
-          ? STRUCK_POINT_COLOR
-          : // 接收站默认颜色
-          targetKind === 'receive'
-            ? RECEIVE_POINT_COLOR
-            : // 数据中心默认颜色
-            STATION_POINT_COLOR
-      // 计算 LOD 样式
-      const lodStyle = resolveLodStyle(distance, selected, passHighlightInDeduction, baseColor)
+        : targetKind === 'receive'
+          ? RECEIVE_POINT_COLOR
+          : STATION_POINT_COLOR
+      const lodStyle = resolveLodStyle(distance, selected, baseColor)
       const showLabel = shouldShowTargetLabel()
 
       if (!facing) {
@@ -415,11 +362,7 @@ export const useBattleGlobeGroundTargets = (
 
       // 显示标签
       visual.label.show = showLabel
-      visual.label.fillColor = selected
-        ? Cesium.Color.YELLOW
-        : passHighlightInDeduction
-          ? DEDUCTION_PASS_HIGHLIGHT_COLOR
-          : baseColor
+      visual.label.fillColor = selected ? Cesium.Color.YELLOW : baseColor
     })
 
     viewer.scene.requestRender()
@@ -512,25 +455,6 @@ export const useBattleGlobeGroundTargets = (
     // 更新地面站可视化
     updateGroundTargetVisuals()
   })
-
-  /**
-   * 监听：推演已打击接收站键集合 Ref（深度）。
-   * 返回：回调不返回清理函数。
-   * 作用：打击态变化时更新地面点颜色/图标。
-   */
-  watch(deductionStruckReceiveKeysRef, () => updateGroundTargetVisuals(), { deep: true })
-  /**
-   * 监听：推演过站高亮接收站键集合 Ref（深度）。
-   * 返回：回调不返回清理函数。
-   * 作用：过站高亮集合变化时刷新 visual。
-   */
-  watch(deductionPassHighlightReceiveKeysRef, () => updateGroundTargetVisuals(), { deep: true })
-  /**
-   * 监听：推演过站窗口列表 Ref（深度）。
-   * 返回：回调不返回清理函数。
-   * 作用：过站窗口几何或时刻变化时刷新地面目标样式。
-   */
-  watch(deductionPassHighlightPassesRef, () => updateGroundTargetVisuals(), { deep: true })
 
   /**
    * 卸载组件时清理资源。

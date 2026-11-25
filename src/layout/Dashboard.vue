@@ -425,10 +425,6 @@ const handleSwitchScene = async (battleId: number | string) => {
     }
 
     ElMessage.success(`已切换场景：${battle.name}`)
-
-    if (layoutStore.activedTask?.id && layoutStore.selectedSatSeries) {
-      await layoutStore.fetchMatrixForCurrentScope(true)
-    }
   } catch (error) {
     console.error('切换场景失败:', error)
     ElMessage.error('切换场景失败，请稍后重试')
@@ -464,10 +460,6 @@ const ensureDefaultBattleAndTasks = async () => {
 onMounted(async () => {
   await loadBattleList()
   await ensureDefaultBattleAndTasks()
-
-  if (layoutStore.activedTask?.id && layoutStore.selectedSatSeries) {
-    await layoutStore.fetchMatrixForCurrentScope(false)
-  }
 })
 
 </script>

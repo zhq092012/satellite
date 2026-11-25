@@ -460,7 +460,6 @@ const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
       { prop: 'name', label: '卫星名称', minWidth: 96, flex: true },
       { prop: 'series', label: '卫星系列', minWidth: 120 },
       { prop: 'extra1', label: '卫星体系', minWidth: 120 },
-      { prop: 'extra2', label: '代号', minWidth: 120 },
     ],
   },
   station: {

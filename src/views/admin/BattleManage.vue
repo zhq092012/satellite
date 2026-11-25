@@ -29,19 +29,18 @@
             <el-tag size="small" type="info" round class="battle-desc-tag">
               {{ battle.description || '无概述' }}
             </el-tag>
-            <el-button type="primary" size="small" plain round class="create-task-btn"
-              @click.stop="handleCreateTask(battle)">
-              新建任务
-            </el-button>
-          </div>
-          <div class="header-right" @click.stop>
             <el-button type="success" size="small" plain round @click.stop="handleEditBattle(battle)">
               编辑场景
             </el-button>
             <el-button type="danger" size="small" plain round @click.stop="handleDeleteBattle(battle.id)">
               删除场景
             </el-button>
+            <el-button type="primary" size="small" plain round class="create-task-btn"
+              @click.stop="handleCreateTask(battle)">
+              新建任务
+            </el-button>
           </div>
+
         </div>
 
         <!-- 战场展开展示的任务列表 -->
@@ -60,22 +59,7 @@
                   {{ formatBattleTaskCountryDisplay(scope.row) }}
                 </template>
               </el-table-column>
-              <!-- <el-table-column label="关注状态" width="100" align="center">
-                <template #default="scope">
-                  <el-tag :type="scope.row.focusStatus === 1 ? 'danger' : 'info'" size="small">
-                    {{ scope.row.focusStatus === 1 ? '已关注' : '未关注' }}
-                  </el-tag>
-                </template>
-              </el-table-column> -->
-              <!-- <el-table-column label="算法计算进度" width="180">
-                <template #default="scope">
-                  <div v-if="getTaskProgress(scope.row)" class="progress-box">
-                    <el-progress :percentage="getTaskProgressPercent(getTaskProgress(scope.row))"
-                      :status="isTaskProgressComplete(getTaskProgress(scope.row)) ? 'success' : ''" :stroke-width="6" />
-                  </div>
-                  <span v-else class="text-muted">未开始或未获取</span>
-                </template>
-              </el-table-column> -->
+
               <el-table-column label="操作" width="300" fixed="right" align="center">
                 <template #default="scope">
                   <div class="table-action-group">

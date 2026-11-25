@@ -7,45 +7,16 @@
         :selected-weapon-id="selectedWeaponId" :selected-ground-target-key="selectedGroundTargetKey"
         :task-start-ms="taskStartMs" :task-end-ms="taskEndMs" :follow-selected-satellite="false"
         :follow-selected-weapon="false" :follow-selected-ground-target="false"
-        :follow-deduction-satellite="followDeductionSatellite" :is-deduction-playing="isDeductionPlaying"
-        :is-timeline-playing="isTimelinePlaying" :deduction-visual-plan="deductionVisualPlan" />
+        :is-timeline-playing="isTimelinePlaying" />
 
-      <!-- <div v-if="selectedNorad" class="globe-selected-bar">
-        <span class="globe-selected-label">选中卫星：</span>
-        <span class="globe-selected-name">{{ selectedSatelliteName }}</span>
-        <button type="button" class="globe-deduction-btn" :disabled="!selectedNorad || isDeductionPlaying"
-          @click="handleStartSatelliteDeduction">
-          播放推演
-        </button>
-        <button type="button" class="globe-deduction-btn globe-deduction-btn--pause" :disabled="!isDeductionPlaying"
-          @click="handleStopSatelliteDeduction">
-          暂停推演
-        </button>
-        <label class="globe-follow-check">
-          <input v-model="followDeductionSatellite" type="checkbox" />
-          跟随卫星
-        </label>
-        <button type="button" class="globe-clear-btn" @click="handleClearSelectedSatellite">清除</button>
-      </div>
 
-      <div v-if="selectedWeaponId" class="globe-selected-bar globe-selected-bar--weapon">
-        <span class="globe-selected-label">选中武器：</span>
-        <span class="globe-selected-name globe-selected-name--weapon">{{ selectedWeaponName }}</span>
-        <button type="button" class="globe-clear-btn" @click="handleClearSelectedWeapon">清除</button>
-      </div>
-
-      <div v-if="selectedGroundTargetKey" class="globe-selected-bar globe-selected-bar--ground">
-        <span class="globe-selected-label">{{ selectedGroundTargetBarLabel }}：</span>
-        <span class="globe-selected-name globe-selected-name--ground">{{ selectedGroundTargetName }}</span>
-        <button type="button" class="globe-clear-btn" @click="handleClearSelectedGroundTarget">清除</button>
-      </div> -->
     </div>
 
     <!-- 2. 悬浮左侧控制面板 -->
     <div class="floating-panel floating-panel--left" :class="{ 'is-collapsed': isLeftCollapsed }">
       <div class="panel-inner">
-        <C2LeftControlPanel :matrix-data="matrixData" :selected-norad="selectedNorad"
-          @select-satellite="handleSelectSatellite" @task-recalculated="handleTaskRecalculated" />
+        <C2LeftControlPanel :selected-norad="selectedNorad" @select-satellite="handleSelectSatellite"
+          @task-recalculated="handleTaskRecalculated" />
       </div>
       <button type="button" class="toggle-btn toggle-btn--left" :title="isLeftCollapsed ? '展开左侧面板' : '收起左侧面板'"
         @click="isLeftCollapsed = !isLeftCollapsed">
@@ -85,9 +56,6 @@
         <span class="btn-text">{{ isTimelineCollapsed ? '展开时间轴' : '收起时间轴' }}</span>
       </button>
 
-      <BattleGlobeDeductionToast v-if="isDeductionPlaying && deductionToastHighlightLines.length"
-        :lines="deductionToastHighlightLines" />
-
       <div class="timeline-inner">
         <BattleGlobeTimeline :task-start="taskTimeRange.start" :task-end="taskTimeRange.end"
           :current-time-ms="currentTimeMs" :is-playing="isTimelinePlaying" :playback-speed="playbackSpeed"
@@ -99,40 +67,21 @@
 </template>
 
 <script setup lang="ts">
-import {
-  buildBattleGlobeSatellites,
-  buildBattleGlobeSatellitesFromMatrix,
-} from '@/utils/buildBattleGlobeSatellites'
-import {
-  buildBattleGlobeWeapons,
-  buildBattleGlobeWeaponsFromMatrix,
-} from '@/utils/buildBattleGlobeWeapons'
-import {
-  buildBattleGlobeGroundTargets,
-  buildBattleGlobeGroundTargetsFromMatrix,
-} from '@/utils/buildBattleGlobeGroundTargets'
 import { computed, nextTick, onActivated, onBeforeUnmount, ref, watch } from 'vue'
 import { ArrowDown, ArrowUp, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import C2LeftControlPanel from '@/components/BattleSituation/C2LeftControlPanel.vue'
 import C2RightSatelliteListPanel from '@/components/BattleSituation/C2RightSatelliteListPanel.vue'
 import BattleGlobeTimeline from '@/components/BattleSituation/BattleGlobeTimeline.vue'
 import BattleSituationGlobe from '@/components/BattleSituation/BattleSituationGlobe.vue'
-import BattleGlobeDeductionToast from '@/components/BattleSituation/BattleGlobeDeductionToast.vue'
-import { taskProgressMap } from '@/composables/useTaskProgressPolling'
 import { useLayoutStore } from '@/store/modules/layout'
-import type { MatrixResult } from '@/api/electronic'
 import { useSatelliteProfileDialog } from '@/composables/useSatelliteProfileDialog'
-import { useSatelliteDeductionPlayback } from '@/composables/useSatelliteDeductionPlayback'
 import { useBattleTaskGlobeResources } from '@/composables/useBattleTaskGlobeResources'
 
 /** 全局布局 Store */
 const store = useLayoutStore()
 
 /** 任务挂载资源 → 地球卫星 / 地面站（`GET /battle-task/{id}/resources`） */
-const {
-  taskGlobeSatellites,
-  taskGlobeGroundTargets,
-} = useBattleTaskGlobeResources()
+const { taskGlobeSatellites, taskGlobeGroundTargets, taskGlobeWeapons } = useBattleTaskGlobeResources()
 
 /** 卫星档案弹窗 */
 useSatelliteProfileDialog()
@@ -154,16 +103,6 @@ const selectedGroundTargetKey = ref<string | null>(null)
 /** 时间轴当前时刻（毫秒） */
 const currentTimeMs = ref(0)
 
-/** 选中卫星推演播放 */
-const {
-  isDeductionPlaying,
-  toastHighlightLines: deductionToastHighlightLines,
-  deductionVisualPlan,
-  resetDeductionUi,
-} = useSatelliteDeductionPlayback(currentTimeMs)
-
-/** 推演时是否让相机跟随卫星 */
-const followDeductionSatellite = ref(true)
 
 /** 时间轴是否正在播放 */
 const isTimelinePlaying = ref(false)
@@ -182,34 +121,6 @@ let playbackRafId: number | null = null
 
 /** 上一帧播放时间戳 */
 let lastPlaybackFrameMs = 0
-/**
- * 计算：当前系列/任务范围内的算法传输矩阵。
- * 返回：`MatrixResult | null`，与 layout Store 中 `matrixData` 一致。
- * 作用：供左侧面板与地球态势在无分析全量数据时兜底展示矩阵。
- */
-const matrixData = computed<MatrixResult | null>(() => store.matrixData)
-
-/**
- * 计算：当前任务的算法分析全量结果。
- * 返回：任务分析实体或 null/undefined（与 Store `taskAnalysisData` 一致）。
- * 作用：驱动地球卫星/武器/地面目标构建及推演数据源。
- */
-const taskAnalysisData = computed(() => store.taskAnalysisData)
-
-/**
- * 计算：任务分析接口是否正在加载。
- * 返回：boolean。
- * 作用：阻止自动时间轴在分析未就绪时启动。
- */
-const taskAnalysisLoading = computed(() => store.taskAnalysisLoading)
-
-/**
- * 计算：当前激活任务的三类算法进度是否均已结束。
- * 返回：boolean。
- * 作用：控制分析拉取与自动时间轴播放的前置条件。
- */
-const algorithmComplete = computed(() => store.isTaskAlgorithmComplete(store.activedTask))
-
 /**
  * 计算：当前任务在界面可用的起止时间字符串。
  * 返回：`{ start, end }` 或 `null`（缺少 `beginDate`/`endDate` 时）。
@@ -240,39 +151,21 @@ const taskEndMs = computed(() => parseTaskTimeMs(taskTimeRange.value?.end))
  * 返回：`BattleGlobeSatellite[]`（优先任务分析，否则当前矩阵）。
  * 作用：绑定 `BattleSituationGlobe` 的 `satellites`。
  */
-const globeSatellites = computed(() => {
-  if (taskGlobeSatellites.value.length) {
-    return taskGlobeSatellites.value
-  }
-  const fromAnalysis = buildBattleGlobeSatellites(taskAnalysisData.value)
-  if (fromAnalysis.length) return fromAnalysis
-  return buildBattleGlobeSatellitesFromMatrix(matrixData.value)
-})
+const globeSatellites = computed(() => taskGlobeSatellites.value)
 
 /**
  * 计算：地球组件所需的武器列表。
  * 返回：武器行数组（优先任务分析，否则当前矩阵）。
  * 作用：绑定 `BattleSituationGlobe` 的 `weapons`。
  */
-const globeWeapons = computed(() => {
-  const fromAnalysis = buildBattleGlobeWeapons(taskAnalysisData.value)
-  if (fromAnalysis.length) return fromAnalysis
-  return buildBattleGlobeWeaponsFromMatrix(matrixData.value)
-})
+const globeWeapons = computed(() => taskGlobeWeapons.value)
 
 /**
  * 计算：地球组件所需的接收站与数据中心列表。
  * 返回：地面目标数组（优先任务分析，否则当前矩阵）。
  * 作用：绑定 `BattleSituationGlobe` 的 `ground-targets`。
  */
-const globeGroundTargets = computed(() => {
-  if (taskGlobeGroundTargets.value.length) {
-    return taskGlobeGroundTargets.value
-  }
-  const fromAnalysis = buildBattleGlobeGroundTargets(taskAnalysisData.value)
-  if (fromAnalysis.length) return fromAnalysis
-  return buildBattleGlobeGroundTargetsFromMatrix(matrixData.value)
-})
+const globeGroundTargets = computed(() => taskGlobeGroundTargets.value)
 
 /** 地球组件引用 */
 const globeRef = ref<{ restoreOverviewView: () => void } | null>(null)
@@ -449,74 +342,22 @@ const handleSelectSatellite = async (norad: number | null) => {
 
 
 /**
- * 左侧面板保存并重算后：清空矩阵缓存并等待进度完成后由既有 watch 拉取分析。
+ * 左侧面板保存并重算后：等待进度完成后由既有 watch 拉取任务分析。
  */
 const handleTaskRecalculated = () => {
   autoTimelinePlaybackTaskId = null
   stopTimelinePlayback()
-  resetDeductionUi()
-  void loadMatrixForCurrentScope()
-}
-
-/** 矩阵加载序号，用于丢弃过期响应 */
-let matrixLoadToken = 0
-
-/** 任务分析加载序号，用于丢弃过期响应 */
-let taskAnalysisLoadToken = 0
-
-/**
- * 按当前任务算法进度拉取分析结果。
- */
-const loadTaskAnalysis = async () => {
-  const loadToken = ++taskAnalysisLoadToken
-  try {
-    await store.fetchTaskAnalysis()
-    if (loadToken !== taskAnalysisLoadToken) return
-  } catch (err) {
-    console.error('获取任务算法分析结果失败:', err)
-  }
-}
-
-/**
- * 按当前系列筛选范围加载矩阵数据。
- */
-const loadMatrixForCurrentScope = async () => {
-  const taskId = store.activedTask?.id
-  if (!taskId) {
-    store.clearMatrixData()
-    selectedNorad.value = null
-    selectedWeaponId.value = null
-    selectedGroundTargetKey.value = null
-    store.setSelectedAnalysisNorad(null)
-    return
-  }
-
-  const loadToken = ++matrixLoadToken
-  try {
-    const data = await store.fetchMatrixForCurrentScope()
-    if (loadToken !== matrixLoadToken) return
-    selectedNorad.value = null
-    selectedWeaponId.value = null
-    selectedGroundTargetKey.value = null
-    store.setSelectedAnalysisNorad(null)
-    if (!data) {
-      console.warn('当前系列矩阵加载失败')
-    }
-  } catch (err) {
-    console.error('获取算法传输矩阵失败:', err)
-  }
 }
 
 /**
  * 监听：`taskTimeRange`（任务起止时间字符串）。
  * 返回：回调不返回清理函数。
- * 作用：任务时间变更时停止播放与推演、清空武器/地面选中并将游标置为任务开始。
+ * 作用：任务时间变更时停止播放、清空武器/地面选中并将游标置为任务开始。
  */
 watch(
   taskTimeRange,
   (range) => {
     stopTimelinePlayback()
-    resetDeductionUi()
     selectedWeaponId.value = null
     selectedGroundTargetKey.value = null
     currentTimeMs.value = range ? parseTaskTimeMs(range.start) : 0
@@ -524,39 +365,14 @@ watch(
   { immediate: true }
 )
 
-/**
- * 监听：选中卫星 NORAD（`selectedNorad`）。
- * 返回：回调不返回清理函数。
- * 作用：切换选中卫星时重置推演 UI 状态。
- */
-watch(selectedNorad, (norad, prevNorad) => {
-  if (norad !== prevNorad) {
-    resetDeductionUi()
-  }
-})
-
 onBeforeUnmount(() => {
   stopTimelinePlayback()
-  resetDeductionUi()
 })
-
-/**
- * 监听：左侧系列筛选三元组（系列名、卫星类型、综合用途）。
- * 返回：回调不返回清理函数。
- * 作用：筛选变化时按新范围重新拉取矩阵数据。
- */
-watch(
-  () => [store.selectedSatSeries, store.selectedSatType, store.activeZhchUsageType] as const,
-  () => {
-    void loadMatrixForCurrentScope()
-  },
-  { immediate: true }
-)
 
 /**
  * 监听：当前激活任务 ID。
  * 返回：回调不返回清理函数。
- * 作用：换任务时重置自动播放标记、无任务时清空分析，否则重拉矩阵与分析。
+ * 作用：换任务时重置自动播放标记、无任务时清空分析，否则重拉任务分析。
  */
 watch(
   () => store.activedTask?.id,
@@ -564,13 +380,12 @@ watch(
     if (taskId !== prevTaskId) {
       autoTimelinePlaybackTaskId = null
     }
-    if (!taskId) {
-      store.clearTaskAnalysisData()
-      return
-    }
+    if (!taskId) return
     if (taskId === prevTaskId) return
-    void loadMatrixForCurrentScope()
-    void loadTaskAnalysis()
+    selectedNorad.value = null
+    selectedWeaponId.value = null
+    selectedGroundTargetKey.value = null
+    store.setSelectedAnalysisNorad(null)
   },
   { immediate: true }
 )
@@ -588,33 +403,9 @@ watch(
   { immediate: true },
 )
 
-/**
- * 监听：当前任务算法进度轮询键（任务 ID 与三类子状态拼接）。
- * 返回：回调不返回清理函数。
- * 作用：算法全部完成后自动 `loadTaskAnalysis` 拉取分析结果。
- */
-watch(
-  () => {
-    const taskId = store.activedTask?.id
-    if (!taskId) return ''
-    const progress = taskProgressMap[String(taskId)]
-    return `${taskId}:${progress?.totalStatus}:${progress?.transitStatus}:${progress?.threatAndStrikeStatus}`
-  },
-  () => {
-    if (!algorithmComplete.value) return
-    void loadTaskAnalysis()
-  }
-)
-
 onActivated(() => {
   if (store.selectedAnalysisNorad && selectedNorad.value !== store.selectedAnalysisNorad) {
     selectedNorad.value = store.selectedAnalysisNorad
-  }
-  if (!store.matrixData) {
-    void loadMatrixForCurrentScope()
-  }
-  if (!store.taskAnalysisData && algorithmComplete.value) {
-    void loadTaskAnalysis()
   }
   tryStartAutoTimelinePlayback()
 })

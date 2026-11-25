@@ -35,10 +35,9 @@ interface SatellitePointVisual {
  *
  * @param viewerRef Cesium Viewer 引用
  * @param satellitesRef 卫星列表
- * @param currentTimeMsRef 当前推演时刻（毫秒）
+ * @param currentTimeMsRef 当前时刻（毫秒）
  * @param selectedNoradRef 当前选中 NORAD
  * @param followSelectedRef 选中卫星时是否自动飞行定位
- * @param hidePointNoradRef 推演打击后隐藏点与标签的 NORAD（由爆炸特效代替）
  * @param timelinePlaybackActiveRef 时间轴播放中（选中星持续高亮并始终显示名称）
  */
 export const useBattleGlobeSatellites = (
@@ -47,7 +46,6 @@ export const useBattleGlobeSatellites = (
   currentTimeMsRef: Ref<number> | ComputedRef<number>,
   selectedNoradRef: Ref<number | null> | ComputedRef<number | null>,
   followSelectedRef: Ref<boolean> | ComputedRef<boolean> = ref(true),
-  hidePointNoradRef: Ref<number | null> | ComputedRef<number | null> = ref(null),
   timelinePlaybackActiveRef: Ref<boolean> | ComputedRef<boolean> = ref(false)
 ) => {
   const satrecCache = new Map<number, satellitejs.SatRec>()
@@ -96,7 +94,7 @@ export const useBattleGlobeSatellites = (
    * 根据 TLE 计算指定时刻的 ECEF 坐标。
    *
    * @param norad 卫星 NORAD
-   * @param date 推演时刻
+   * @param date 当前时刻
    * @returns 世界坐标或 null
    */
   const propagatePosition = (norad: number, date: Date): Cesium.Cartesian3 | null => {
@@ -323,18 +321,11 @@ export const useBattleGlobeSatellites = (
       const selected = selectedNorad === visual.norad
       /** 选中星：加强点大小与名称标签（播放时同样保持） */
       const emphasizeSelected = selected
-      const hideForExplosion = hidePointNoradRef.value === visual.norad
       const facing = isPositionFacingCamera(visual.position, cameraPosition)
       const inFrustum = isPositionInCameraFrustum(viewer, visual.position)
       const distance = Cesium.Cartesian3.distance(cameraPosition, visual.position)
       const lodStyle = resolveLodStyle(distance, selected, emphasizeSelected)
       const showLabel = shouldShowSatelliteLabel()
-
-      if (hideForExplosion) {
-        visual.point.show = false
-        visual.label.show = false
-        return
-      }
 
       if (!facing) {
         visual.point.show = false
@@ -460,15 +451,6 @@ export const useBattleGlobeSatellites = (
    */
   watch(selectedNoradRef, (norad) => {
     if (norad && followSelectedRef.value) flyToSatellite(norad)
-    updateSatelliteVisuals()
-  })
-
-  /**
-   * 监听：需隐藏点位的 NORAD（如爆炸）Ref。
-   * 返回：回调不返回清理函数。
-   * 作用：隐藏指定卫星点位显示。
-   */
-  watch(hidePointNoradRef, () => {
     updateSatelliteVisuals()
   })
 

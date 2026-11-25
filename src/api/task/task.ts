@@ -1,16 +1,11 @@
 import type { AxiosResponseType } from '@/types/http'
 
 import { requestAPI } from '@/utils/tools/request'
-import type {
-  BattleTaskResourceResp,
-  SatelliteAnalysisData,
-  TaskForm,
-} from '@/types/task/task'
+import type { BattleTaskResourceResp, TaskForm } from '@/types/task/task'
 import { isResourceApiSuccess } from '@/utils/resourceApi'
 
 export type {
   BattleTaskResourceResp,
-  SatelliteAnalysisData,
   TaskForm,
   TaskArea,
   TaskCombatArea,
@@ -23,14 +18,6 @@ export type {
 } from '@/types/task/task'
 
 export type { SatelliteSeriesData } from '@/types/satellite/satellite'
-
-/**
- * 获取任务矩阵
- */
-export const getTaskMatrix = (data: { taskId: string }) => {
-    const url = '/api/algorithm/taskMatrix'
-    return requestAPI.post<AxiosResponseType<SatelliteAnalysisData>>(url, data)
-}
 
 /**
  * 按战场 ID 查询任务列表。

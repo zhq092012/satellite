@@ -19,7 +19,6 @@ export const buildReportSchemeView = (
 
   return {
     usageType: schemeCode,
-    plan: null,
     reportScheme: scheme,
     meta: {
       planName: scheme.name?.trim() || schemeCode,

@@ -4,15 +4,17 @@ import { useLayoutStore } from '@/store/modules/layout'
 import { buildBattleGlobeLayersFromTaskResources } from '@/utils/buildBattleGlobeFromTaskResources'
 import type { BattleGlobeSatellite } from '@/utils/buildBattleGlobeSatellites'
 import type { BattleGlobeGroundTarget } from '@/utils/buildBattleGlobeGroundTargets'
+import type { BattleGlobeWeapon } from '@/utils/buildBattleGlobeWeapons'
 
 /**
  * 按当前任务从 `GET /battle-task/{id}/resources` 拉取卫星与地面站，供态势地球渲染。
- * 推演逻辑仍使用任务分析 / 矩阵数据，本 composable 仅负责静态图层数据源。
+ * 本 composable 仅负责任务挂载资源驱动的静态地球图层。
  */
 export const useBattleTaskGlobeResources = () => {
   const store = useLayoutStore()
   const taskGlobeSatellites = ref<BattleGlobeSatellite[]>([])
   const taskGlobeGroundTargets = ref<BattleGlobeGroundTarget[]>([])
+  const taskGlobeWeapons = ref<BattleGlobeWeapon[]>([])
   const taskResourcesLoading = ref(false)
   const taskResourcesTaskId = ref<string | null>(null)
 
@@ -28,6 +30,7 @@ export const useBattleTaskGlobeResources = () => {
     if (!id) {
       taskGlobeSatellites.value = []
       taskGlobeGroundTargets.value = []
+      taskGlobeWeapons.value = []
       taskResourcesTaskId.value = null
       return
     }
@@ -39,12 +42,14 @@ export const useBattleTaskGlobeResources = () => {
       const { satellites, groundTargets } = buildBattleGlobeLayersFromTaskResources(data)
       taskGlobeSatellites.value = satellites
       taskGlobeGroundTargets.value = groundTargets
+      taskGlobeWeapons.value = []
       taskResourcesTaskId.value = id
     } catch (error) {
       if (token !== loadToken) return
       console.error('加载任务地球资源失败:', error)
       taskGlobeSatellites.value = []
       taskGlobeGroundTargets.value = []
+      taskGlobeWeapons.value = []
       taskResourcesTaskId.value = null
     } finally {
       if (token === loadToken) {
@@ -69,6 +74,7 @@ export const useBattleTaskGlobeResources = () => {
   return {
     taskGlobeSatellites,
     taskGlobeGroundTargets,
+    taskGlobeWeapons,
     taskResourcesLoading,
     taskResourcesTaskId,
     loadTaskGlobeResources,

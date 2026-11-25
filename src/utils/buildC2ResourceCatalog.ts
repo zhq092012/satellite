@@ -1,6 +1,6 @@
 
 import { normalizeSatelliteUsageLabel, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
-import type { LevelSeriesEntity, SatelliteAnalysisData, TaskResourceItem } from '@/types/task/task'
+import type { TaskResourceItem } from '@/types/task/task'
 import type {
   SatelliteAssembleTreeNode,
   SatelliteSeriesData,
@@ -102,56 +102,6 @@ export interface C2SeriesPreviewSatellite {
  */
 export function buildC2ResourceRowKey(series: string, sysType: string, norad: number): string {
   return `${series}|${sysType}|${norad}`
-}
-
-/**
- * 从任务分析 matrix（levelSeriesEntities）生成扁卫星行。
- *
- * @param analysis 任务分析数据
- * @param defaultCountries 任务蓝方国家（matrix 无 country 时的回退）
- */
-export function buildC2SatelliteFlatRowsFromMatrix(
-  analysis: SatelliteAnalysisData | null | undefined,
-  defaultCountries: string[],
-): C2ResourceSatelliteRow[] {
-  if (!analysis?.levelSeriesEntities?.length) return []
-  const fallbackCountry =
-    defaultCountries.length === 1 ? defaultCountries[0] : C2_RESOURCE_EMPTY_FIELD
-  const rows: C2ResourceSatelliteRow[] = []
-  analysis.levelSeriesEntities.forEach((entity) => {
-    rows.push(...flatRowsFromLevelSeriesEntity(entity, fallbackCountry))
-  })
-  return dedupeC2ResourceRows(rows)
-}
-
-/**
- * 从单个 LevelSeriesEntity 展开扁平行。
- *
- * @param entity 系列实体
- * @param fallbackCountry 默认国家
- */
-function flatRowsFromLevelSeriesEntity(
-  entity: LevelSeriesEntity,
-  fallbackCountry: string,
-): C2ResourceSatelliteRow[] {
-  const series = entity.series?.trim()
-  if (!series) return []
-  const sysType = entity.sysType?.trim() || '未分类'
-  const list = entity.initMatrixList || []
-  return list
-    .filter((sat) => Number.isFinite(sat.norad))
-    .map((sat) => ({
-      rowKey: buildC2ResourceRowKey(series, sysType, sat.norad),
-      norad: sat.norad,
-      name: sat.name?.trim() || String(sat.norad),
-      country: fallbackCountry,
-      sysType,
-      usage: normalizeSatelliteUsageLabel(sat.usage),
-      series,
-      sat_type: sat.satType?.trim() || C2_RESOURCE_EMPTY_FIELD,
-      int_id: C2_RESOURCE_EMPTY_FIELD,
-      launch_date: C2_RESOURCE_EMPTY_FIELD,
-    }))
 }
 
 /**
@@ -442,23 +392,6 @@ export function buildSeriesNodeId(
   seriesName: string,
 ): string {
   return `series|${encodePart(country)}|${encodePart(sysType)}|${encodePart(usage)}|${encodePart(seriesName)}`
-}
-
-/**
- * 将 matrix 扁平行合并进完整 catalog：仅覆盖 matrix 中出现的系列，其余系列保留。
- *
- * @param baseRows 完整系列 catalog（通常为系列预览接口）
- * @param matrixRows 任务分析 matrix 扁平行
- */
-export function mergeMatrixCatalogIntoPanelCatalog(
-  baseRows: C2ResourceSatelliteRow[],
-  matrixRows: C2ResourceSatelliteRow[],
-): C2ResourceSatelliteRow[] {
-  if (!matrixRows.length) return baseRows
-  if (!baseRows.length) return dedupeC2ResourceRows(matrixRows)
-  const matrixSeries = new Set(matrixRows.map((row) => row.series))
-  const kept = baseRows.filter((row) => !matrixSeries.has(row.series))
-  return dedupeC2ResourceRows([...kept, ...matrixRows])
 }
 
 /** C2 面板树国家节点 id（与装配页 `country::` 一致） */

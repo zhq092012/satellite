@@ -13,13 +13,11 @@ const SELECTED_ORBIT_ENTITY_PREFIX = 'battle-selected-sat-path-'
 
 /**
  * 为当前选中卫星使用 Entity.path 绘制轨道（位置由 SampledPositionProperty + 时钟驱动）。
- * 单星推演期间由推演模块绘制轨迹，此处不重复显示。
  *
  * @param viewerRef Cesium Viewer 引用
  * @param satellitesRef 卫星列表
- * @param currentTimeMsRef 当前推演时刻（毫秒）
+ * @param currentTimeMsRef 当前时刻（毫秒）
  * @param selectedNoradRef 选中 NORAD
- * @param isDeductionPlayingRef 是否处于单星推演
  * @param taskStartMsRef 任务开始时刻（毫秒）
  * @param taskEndMsRef 任务结束时刻（毫秒）
  */
@@ -28,7 +26,6 @@ export const useBattleGlobeTimelineSelectedOrbit = (
   satellitesRef: Ref<BattleGlobeSatellite[]> | ComputedRef<BattleGlobeSatellite[]>,
   currentTimeMsRef: Ref<number> | ComputedRef<number>,
   selectedNoradRef: Ref<number | null> | ComputedRef<number | null>,
-  isDeductionPlayingRef: Ref<boolean> | ComputedRef<boolean>,
   taskStartMsRef: Ref<number> | ComputedRef<number>,
   taskEndMsRef: Ref<number> | ComputedRef<number>
 ) => {
@@ -149,11 +146,10 @@ export const useBattleGlobeTimelineSelectedOrbit = (
     if (!viewer || viewer.isDestroyed()) return
 
     const norad = selectedNoradRef.value
-    const deductionPlaying = isDeductionPlayingRef.value
     const startMs = taskStartMsRef.value
     const endMs = taskEndMsRef.value
 
-    if (!norad || deductionPlaying || !startMs || !endMs || endMs <= startMs) {
+    if (!norad || !startMs || !endMs || endMs <= startMs) {
       clearSelectedPathEntities(viewer)
       viewer.scene.requestRender()
       return
@@ -229,29 +225,16 @@ export const useBattleGlobeTimelineSelectedOrbit = (
   /**
    * 监听：选中 NORAD。
    * 返回：回调不返回清理函数。
-   * 作用：无选中或推演播放时清除 path，否则重建选中轨道。
+   * 作用：无选中时清除 path，否则重建选中轨道。
    */
   watch(
     () => selectedNoradRef.value,
     (norad) => {
       activePathNorad = null
       const viewer = viewerRef.value
-      if ((!norad || isDeductionPlayingRef.value) && viewer && !viewer.isDestroyed()) {
+      if (!norad && viewer && !viewer.isDestroyed()) {
         clearSelectedPathEntities(viewer)
       }
-      syncSelectedSatelliteOrbit()
-    }
-  )
-
-  /**
-   * 监听：单星推演播放状态。
-   * 返回：回调不返回清理函数。
-   * 作用：推演开关切换时失效当前 path 并重新同步轨道显示。
-   */
-  watch(
-    () => isDeductionPlayingRef.value,
-    () => {
-      activePathNorad = null
       syncSelectedSatelliteOrbit()
     }
   )

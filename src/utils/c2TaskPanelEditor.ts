@@ -1,9 +1,8 @@
 
 import { TASK_PANEL_SATELLITE_TYPES as MISSION_TASK_TYPES } from '@/constants/missionSatellite'
-import type { TaskArea, TaskCombatArea, TaskForm, TaskResourceItem } from '@/types/task/task'
+import type { TaskCombatArea, TaskForm, TaskResourceItem } from '@/types/task/task'
 import {
   DEFAULT_TASK_CATALOG_TARGET_TYPES,
-  resolveSeriesNamesFromTaskSatellites,
 } from '@/utils/taskEntity'
 
 /** 标签候选项（系列名或资源 ID + 展示名） */
@@ -12,32 +11,6 @@ export interface TaskPanelTagOption {
   id: string
   /** 展示文案 */
   label: string
-}
-
-/** 左侧面板内联编辑草稿（仅 C2 面板本地状态，含接口未定义的筛选字段） */
-export interface C2TaskEditorDraft {
-  /** 任务 ID */
-  taskId: string
-  /** 开始时间 */
-  beginDate: string
-  /** 结束时间 */
-  endDate: string
-  /** 已选卫星系列（由 selectedSatellites 推导，提交前同步） */
-  selectedSeries: string[]
-  /** 任务已挂载卫星（与资源树勾选分离） */
-  selectedSatellites: TaskResourceItem[]
-  /** 已选武器 ID */
-  selectedWeaponIds: string[]
-  /** 已选地面接收站 ID */
-  selectedReceiveIds: string[]
-  /** 链路时延（分钟） */
-  delayMin: number
-  /** 覆盖率（0–100） */
-  coverage: number
-  /** 卫星类型（侦察 / 通信，C2 资源树筛选用） */
-  targetTypeShow: string[]
-  /** 任务作战区域（由 areas 推导的圆形草稿） */
-  combatArea: TaskCombatArea
 }
 
 /** 任务未配置作战区域时的占位（不在地图展示） */
@@ -160,117 +133,107 @@ export const calcTaskDurationHours = (beginDate: string, endDate: string): numbe
 }
 
 /**
- * 按任务时长（小时）更新草稿结束时间。
+ * 按任务时长（小时）更新任务编辑态结束时间。
  *
- * @param draft 编辑草稿
+ * @param task 任务编辑副本
  * @param hours 时长（小时）
  */
-export const applyDurationHoursToDraft = (draft: C2TaskEditorDraft, hours: number): void => {
-  const beginMs = parseTaskPanelTimeMs(draft.beginDate)
+export const applyDurationHoursToTask = (task: TaskForm, hours: number): void => {
+  const beginMs = parseTaskPanelTimeMs(task.beginDate)
   if (!beginMs) return
   const safeHours = Math.max(1, Math.round(hours))
-  draft.endDate = formatDateToTaskPanelTime(new Date(beginMs + safeHours * 3600000))
+  task.endDate = formatDateToTaskPanelTime(new Date(beginMs + safeHours * 3600000))
 }
 
 /**
- * 从任务对象构建左侧面板编辑草稿。
+ * 读取任务武器资源 ID 列表（去重）。
  *
  * @param task 任务
- * @returns 草稿；无 ID 时返回 null
  */
-export const createDraftFromTask = (task: TaskForm | null | undefined): C2TaskEditorDraft | null => {
+export const readTaskWeaponResourceIds = (task: TaskForm): string[] =>
+  [...new Set((task.weapons ?? []).map((item) => item.resourceId).filter(Boolean))]
+
+/**
+ * 将武器资源 ID 写回任务编辑副本。
+ *
+ * @param task 任务编辑副本
+ * @param ids 武器资源 ID
+ */
+export const writeTaskWeaponResourceIds = (task: TaskForm, ids: string[]): void => {
+  task.weapons = ids.map((resourceId) => ({
+    resourceId,
+    name: resourceId,
+    code: '',
+  }))
+}
+
+/**
+ * 从任务对象构建 C2 左侧面板本地编辑副本（`TaskForm`）。
+ *
+ * @param task 任务
+ * @returns 编辑副本；无 ID 时返回 null
+ */
+export const createDraftFromTask = (task: TaskForm | null | undefined): TaskForm | null => {
   if (!task?.id) return null
-  const selectedSatellites = (task.satellites ?? []).map((item) => ({
+  const satellites = (task.satellites ?? []).map((item) => ({
     resourceId: item.resourceId,
     name: item.name,
     code: item.code,
   }))
-  const selectedSeries = resolveSeriesNamesFromTaskSatellites(task.satellites)
-  const selectedReceiveIds = [...new Set((task.receiveStations ?? []).map((item) => item.resourceId).filter(Boolean))]
+  const receiveStations = (task.receiveStations ?? []).map((item) => ({
+    resourceId: item.resourceId,
+    name: item.name,
+    code: item.code,
+  }))
+  const weapons = (task.weapons ?? []).map((item) => ({
+    resourceId: item.resourceId,
+    name: item.name,
+    code: item.code,
+  }))
   return {
-    taskId: task.id,
+    ...task,
     beginDate: normalizeTaskDateTime(task.beginDate),
     endDate: normalizeTaskDateTime(task.endDate),
-    selectedSeries,
-    selectedSatellites,
-    selectedWeaponIds: [...new Set((task.weapons ?? []).map((item) => item.resourceId).filter(Boolean))],
-    selectedReceiveIds,
     delayMin: Number.isFinite(task.delayMin) ? Number(task.delayMin) : 60,
     coverage: Number.isFinite(task.coverage) ? Number(task.coverage) : 50,
+    satellites,
+    receiveStations,
+    weapons,
+    areas: [...(task.areas ?? [])],
     targetTypeShow: [...DEFAULT_TASK_CATALOG_TARGET_TYPES],
-    combatArea: resolveTaskCombatAreaFromAreas(task),
   }
 }
 
 /**
- * 将 C2 草稿中的圆形区域写回 `areas`（保留其它多边形区域）。
- *
- * @param areas 原区域列表
- * @param combatArea 圆形草稿
- */
-const upsertCircleAreaFromCombatDraft = (areas: TaskArea[], combatArea: TaskCombatArea): TaskArea[] => {
-  const rest = areas.filter((area) => area.type !== 'CIRCLE')
-  if (!combatArea.enabled) return rest
-  return [
-    ...rest,
-    {
-      id: areas.find((area) => area.type === 'CIRCLE')?.id,
-      name: '任务作战区域',
-      type: 'CIRCLE',
-      points: [],
-      center: { lng: combatArea.centerLon, lat: combatArea.centerLat },
-      radius: combatArea.radiusKm,
-      enabled: true,
-    },
-  ]
-}
-
-/**
- * 将草稿合并回完整任务对象，供 updateTask 提交。
+ * 将 C2 编辑副本合并回完整任务对象，供 `updateTask` 提交。
  *
  * @param base 原任务
- * @param draft 编辑草稿
+ * @param editor 编辑副本
  * @returns 更新后的任务表单
  */
-export const mergeTaskFormWithDraft = (base: TaskForm, draft: C2TaskEditorDraft): TaskForm => {
+export const mergeTaskFormWithDraft = (base: TaskForm, editor: TaskForm): TaskForm => {
   return {
     ...base,
-    beginDate: normalizeTaskDateTime(draft.beginDate),
-    endDate: normalizeTaskDateTime(draft.endDate),
-    delayMin: draft.delayMin,
-    coverage: draft.coverage,
-    areas: upsertCircleAreaFromCombatDraft(base.areas ?? [], draft.combatArea),
-    satellites: draft.selectedSatellites.map((item) => ({
+    beginDate: normalizeTaskDateTime(editor.beginDate),
+    endDate: normalizeTaskDateTime(editor.endDate),
+    delayMin: editor.delayMin,
+    coverage: editor.coverage,
+    areas: editor.areas ?? base.areas ?? [],
+    satellites: editor.satellites.map((item) => ({
       resourceId: item.resourceId,
       name: item.name,
       code: item.code,
     })),
-    receiveStations: draft.selectedReceiveIds.map((resourceId) => ({
-      resourceId,
-      name: resourceId,
-      code: '',
+    receiveStations: (editor.receiveStations ?? []).map((item) => ({
+      resourceId: item.resourceId,
+      name: item.name,
+      code: item.code,
     })),
-    weapons: draft.selectedWeaponIds.map((resourceId) => ({
-      resourceId,
-      name: resourceId,
-      code: '',
+    weapons: editor.weapons.map((item: TaskResourceItem) => ({
+      resourceId: item.resourceId,
+      name: item.name,
+      code: item.code,
     })),
   }
 }
 
-/**
- * 按任务卫星类型从系列接口 data 中提取可选系列名。
- *
- * @param data 系列接口 data
- * @param targetTypes 任务卫星类型（侦察/通信）
- * @returns 系列名列表
- */
-export const buildSeriesOptionsFromApiData = (
-  data: { 侦察?: string[]; 通信?: string[] },
-  targetTypes: string[],
-): string[] => {
-  const merged: string[] = []
-  if (targetTypes.includes('侦察')) merged.push(...(data.侦察 || []))
-  if (targetTypes.includes('通信')) merged.push(...(data.通信 || []))
-  return Array.from(new Set(merged.filter(Boolean))).sort((a, b) => a.localeCompare(b, 'zh-CN'))
-}
