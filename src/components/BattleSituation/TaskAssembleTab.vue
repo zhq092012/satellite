@@ -246,12 +246,10 @@ import {
   buildSeriesScopeCacheKey,
   resolveSeriesScopeFromAssembleNode,
   applyElTreeSeriesCheckStates,
-  buildTaskSatelliteDisplayMetaFromInventory,
   type SatelliteSeriesScope,
   type TaskSatelliteTreeDisplayMeta,
 } from '@/utils/taskSatelliteTreeBridge'
 import {
-  buildTaskScopedInventoryFromApiTreeRoots,
   type AssembleSeriesCheckState,
   type AssembleSeriesCheckStateEntry,
 } from '@/utils/satelliteResourceTree'
@@ -264,6 +262,7 @@ import {
   updateGroundStation,
 } from '@/api/ground-station/ground-station'
 import type { GroundStation, GroundStationUpsertPayload } from '@/types/ground-station/groundstation'
+import { resolveTaskSatelliteDisplayScope } from '@/utils/taskEntity'
 
 /** 地面站弹窗表单。 */
 type GroundStationFormModel = GroundStationUpsertPayload & { id?: number }
@@ -450,7 +449,8 @@ const candidatePool = reactive<Record<TaskAssembleKind, TaskAssembleRow[]>>({
 const KIND_CONFIG: Record<TaskAssembleKind, AssembleKindConfig> = {
   satellite: {
     title: '卫星装配',
-    description: '按国家拉取资源树（国家→体系→系列→卫星）；勾选卫星叶子即装配，并写入任务 satellites 字段。',
+    description:
+      '按国家拉取资源树（国家→体系→系列→卫星）；勾选系列加载并写入任务。编辑回显以接口卫星字段为准，树勾选不保存。',
     searchPlaceholder: '国家 / 名称 / 系列',
     typePlaceholder: '卫星类型',
     typeOptions: [],
@@ -889,43 +889,32 @@ const clearSatelliteAssemblyState = () => {
   satelliteTreeRef.value?.setCheckedKeys([], false)
 }
 
-/**
- * 合并 Worker 与 Store 树快照，用于任务卫星反向归属查询。
- */
 const layoutStore = useLayoutStore()
 
 /**
- * 合并 Worker / Store 树快照，用于任务卫星反向归属（仅扫任务相关系列）。
+ * 由任务 `satellites` 接口字段写入展示元数据（不再依赖资源树反查）。
  */
-const resolveSatelliteEchoInventorySnapshot = (): Record<string, TaskResourceItem[]> => ({
-  ...buildTaskScopedInventoryFromApiTreeRoots(
-    layoutStore.satelliteAssembleTreeRootsCache,
-    assembledTaskSatellites.value,
-  ),
-  ...seriesInventoryFromApiByScopeKey.value,
-})
-
-/**
- * 从树快照反查任务卫星的国家 / 体系 / 系列并写入展示元数据。
- */
-const hydrateSatelliteDisplayMetaFromInventory = () => {
-  if (!assembledTaskSatellites.value.length) {
-    satelliteDisplayMetaByResourceId.value = new Map()
-    return
+const hydrateSatelliteDisplayMetaFromTaskItems = () => {
+  const next = new Map<string, TaskSatelliteTreeDisplayMeta>()
+  for (const item of assembledTaskSatellites.value) {
+    const sat = item as import('@/types/task/task').TaskResourceSatelliteItem
+    const resourceId = item.resourceId?.trim() ?? sat.noradId?.trim()
+    if (!resourceId) continue
+    const scope = resolveTaskSatelliteDisplayScope(item)
+    const country = scope.country
+    const system = scope.system
+    const series = scope.series
+    if (!country && !system && !series) continue
+    next.set(resourceId, {
+      country: country ?? '',
+      system: system ?? '',
+      series: series ?? '',
+      name: item.name?.trim() || resourceId,
+      code: item.code?.trim() || sat.noradId?.trim() || resourceId,
+    })
   }
-  satelliteDisplayMetaByResourceId.value = buildTaskSatelliteDisplayMetaFromInventory(
-    assembledTaskSatellites.value,
-    resolveSatelliteEchoInventorySnapshot(),
-  )
+  satelliteDisplayMetaByResourceId.value = next
 }
-
-/**
- * 生成装配树节点 id（与 `satelliteResourceTree` 建树规则一致）。
- */
-const buildAssembleTreeEchoNodeId = (
-  nodeType: 'country' | 'system',
-  parts: string[],
-): string => [nodeType, ...parts].join('::')
 
 /**
  * 根据子系列 Worker 勾选态汇总 country / system 在树上的展示态。
@@ -989,55 +978,6 @@ const refreshMountedTreeEchoCheckStates = () => {
 }
 
 /**
- * 展开回显路径后等待系列叶子挂载到 ElTree store。
- */
-const waitForLazyEchoSeriesNodes = async () => {
-  const tree = satelliteTreeRef.value
-  if (!tree) return
-  const targetSeriesIds = [...seriesCheckStateByNodeId.value.entries()]
-    .filter(([, state]) => state !== 'none')
-    .map(([id]) => id)
-  if (!targetSeriesIds.length) return
-  for (let round = 0; round < 40; round += 1) {
-    await nextTick()
-    const pending = targetSeriesIds.filter((id) => !tree.getNode(id))
-    if (!pending.length) return
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-  }
-}
-
-/**
- * 根据系列勾选态收集需展开的 country / system 节点 id。
- */
-const collectSatelliteTreeEchoExpandedKeys = (): string[] => {
-  const keys = new Set<string>()
-  for (const [seriesNodeId, state] of seriesCheckStateByNodeId.value) {
-    if (state === 'none') continue
-    const node = findBuiltAssembleNodeById(seriesNodeId)
-    if (!node || node.nodeType !== 'series' || !node.country?.trim()) continue
-    const country = node.country.trim()
-    keys.add(buildAssembleTreeEchoNodeId('country', [country]))
-    const system = node.system?.trim()
-    if (system) keys.add(buildAssembleTreeEchoNodeId('system', [country, system]))
-  }
-  return [...keys]
-}
-
-/**
- * 树加载或任务卫星变更后：回填列表元数据、展开路径并回写系列勾选态。
- */
-const applyTaskSatelliteTreeEcho = async () => {
-  if (!isSatelliteKind.value || !satelliteTreeLazyReady.value) return
-  hydrateSatelliteDisplayMetaFromInventory()
-  syncAssembledRowsFromTaskSatellites()
-  satelliteTreeExpandedKeys.value = collectSatelliteTreeEchoExpandedKeys()
-  await nextTick()
-  refreshMountedTreeEchoCheckStates()
-  await waitForLazyEchoSeriesNodes()
-  refreshMountedTreeEchoCheckStates()
-}
-
-/**
  * 登记系列下卫星的展示元数据。
  *
  * @param scope 系列
@@ -1061,15 +1001,21 @@ const registerSeriesSatelliteDisplayMeta = (scope: SatelliteSeriesScope, items: 
 const syncAssembledRowsFromTaskSatellites = () => {
   if (!isSatelliteKind.value) return
   assembledRows.value = assembledTaskSatellites.value.map((item) => {
-    const meta = satelliteDisplayMetaByResourceId.value.get(item.resourceId)
+    const resourceId =
+      item.resourceId?.trim() ||
+      (item as import('@/types/task/task').TaskResourceSatelliteItem).noradId?.trim() ||
+      ''
+    const meta = satelliteDisplayMetaByResourceId.value.get(resourceId)
+    const scope = resolveTaskSatelliteDisplayScope(item)
+    const sat = item as import('@/types/task/task').TaskResourceSatelliteItem
     return {
-      id: item.resourceId,
-      name: item.name || meta?.name || item.resourceId,
-      series: meta?.series || '--',
-      type: '--',
-      country: meta?.country || '--',
-      extra1: meta?.system || '--',
-      extra2: item.code || meta?.code || '--',
+      id: resourceId || item.resourceId,
+      name: item.name || meta?.name || resourceId || item.resourceId,
+      series: scope.series || meta?.series || '--',
+      type: scope.system || meta?.system || '--',
+      country: scope.country || meta?.country || '--',
+      extra1: scope.system || meta?.system || '--',
+      extra2: item.code || sat.noradId?.trim() || meta?.code || '--',
     }
   })
 }
@@ -1213,7 +1159,8 @@ const loadSatelliteTree = async (options?: { forceRefresh?: boolean }) => {
     if (loadGeneration !== satelliteTreeLoadGeneration) return
     clearSeriesSatelliteCache()
     trackedFullyCheckedSeriesIds.value = new Set()
-    const taskSnapshot = assembledTaskSatellites.value.map((item) => ({ ...item }))
+    /** 树勾选态由用户操作维护；编辑回显不回写树（后端不保存系列勾选） */
+    const taskSnapshot: TaskResourceItem[] = []
     const { nodes, seriesCheckStates, seriesInventory } = await buildSatelliteAssembleTreeInBackground(
       treeRoots,
       systems,
@@ -1237,9 +1184,8 @@ const loadSatelliteTree = async (options?: { forceRefresh?: boolean }) => {
       seriesCheckStates.filter((item) => item.state === 'all').map((item) => item.id),
     )
     satelliteTreeLazyReady.value = nodes.length > 0
-    await nextTick()
-    if (loadGeneration !== satelliteTreeLoadGeneration) return
-    await applyTaskSatelliteTreeEcho()
+    hydrateSatelliteDisplayMetaFromTaskItems()
+    syncAssembledRowsFromTaskSatellites()
   } catch (error) {
     if (loadGeneration !== satelliteTreeLoadGeneration) return
     console.error('加载卫星资源树失败:', error)
@@ -1261,14 +1207,8 @@ const loadSatelliteTree = async (options?: { forceRefresh?: boolean }) => {
  */
 const setAssembledTaskSatellites = (items: TaskResourceItem[]) => {
   assembledTaskSatellites.value = items.map((item) => ({ ...item }))
+  hydrateSatelliteDisplayMetaFromTaskItems()
   syncAssembledRowsFromTaskSatellites()
-  void (async () => {
-    hydrateSatelliteDisplayMetaFromInventory()
-    syncAssembledRowsFromTaskSatellites()
-    if (!satelliteTreeLazyReady.value || !satelliteTreeLastBuildContext.value) return
-    await refreshAssembleSeriesCheckStatesViaWorker(assembledTaskSatellites.value)
-    await applyTaskSatelliteTreeEcho()
-  })()
 }
 
 /**
@@ -1579,12 +1519,25 @@ watch(
   { deep: true }
 )
 
+/**
+ * 监听：编辑任务传入的 `initialTaskSatellites`（含深度变更）。
+ * 回调不返回清理函数。
+ * 作用：弹窗回填草稿晚于组件挂载时，仍回显右侧卫星列表。
+ */
+watch(
+  () => props.initialTaskSatellites,
+  (items) => {
+    if (!isSatelliteKind.value || !items?.length) return
+    setAssembledTaskSatellites(items)
+  },
+  { deep: true },
+)
+
 onMounted(async () => {
   if (isSatelliteKind.value) {
     const initial = props.initialTaskSatellites
     if (initial?.length) {
-      assembledTaskSatellites.value = initial.map((item) => ({ ...item }))
-      syncAssembledRowsFromTaskSatellites()
+      setAssembledTaskSatellites(initial)
     }
     await loadSatelliteTree()
     return
@@ -1610,8 +1563,9 @@ const getAssembledSeries = (): string[] => {
   }
   const series = new Set<string>()
   for (const item of assembledTaskSatellites.value) {
-    const meta = satelliteDisplayMetaByResourceId.value.get(item.resourceId)
-    if (meta?.series) series.add(meta.series)
+    const sat = item as import('@/types/task/task').TaskResourceSatelliteItem
+    const name = sat.series?.trim() || satelliteDisplayMetaByResourceId.value.get(item.resourceId)?.series
+    if (name) series.add(name)
   }
   return [...series].sort((a, b) => a.localeCompare(b, 'zh-CN'))
 }
@@ -1636,8 +1590,14 @@ const setAssembledRows = (rows: TaskAssembleRow[]) => {
     return
   }
   assembledRows.value = rows.map((row) => ({ ...row }))
-  enrichAssembledFromPool()
-  void restoreDirectAssemblySelection()
+  void (async () => {
+    if (crudEnabled.value && candidatePool[props.kind].length === 0) {
+      await loadCandidatePool()
+      return
+    }
+    enrichAssembledFromPool()
+    await restoreDirectAssemblySelection()
+  })()
 }
 
 defineExpose({

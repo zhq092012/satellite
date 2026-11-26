@@ -53,7 +53,19 @@ export const mapSatelliteResourceToTaskResource = (item: SatelliteResource): Tas
   }
   const name = (item.nameCn ?? item.nameEn ?? resourceId).trim() || resourceId
   const code = (item.code?.trim() || norad || resourceId).trim() || resourceId
-  return { resourceId, name, code }
+  const mapped: import('@/types/task/task').TaskResourceSatelliteItem = {
+    resourceId,
+    name,
+    code,
+    noradId: norad || code,
+  }
+  const country = item.country?.trim()
+  if (country) mapped.country = country
+  const satelliteType = item.system?.trim()
+  if (satelliteType) mapped.satelliteType = satelliteType
+  const series = item.series?.trim()
+  if (series) mapped.series = series
+  return mapped
 }
 
 /**
@@ -166,11 +178,26 @@ export const buildTaskSatelliteDisplayMetaFromInventory = (
   inventory: Record<string, TaskResourceItem[]>,
 ): Map<string, TaskSatelliteTreeDisplayMeta> => {
   const meta = new Map<string, TaskSatelliteTreeDisplayMeta>()
-  if (!taskSatellites.length || !Object.keys(inventory).length) return meta
+  if (!taskSatellites.length) return meta
 
   for (const picked of taskSatellites) {
-    const resourceId = picked.resourceId?.trim()
+    const sat = picked as import('@/types/task/task').TaskResourceSatelliteItem
+    const resourceId = picked.resourceId?.trim() ?? sat.noradId?.trim()
     if (!resourceId || meta.has(resourceId)) continue
+
+    const country = sat.country?.trim()
+    const system = sat.satelliteType?.trim()
+    const series = sat.series?.trim()
+    if (country && system && series) {
+      meta.set(resourceId, {
+        country,
+        system,
+        series,
+        name: picked.name?.trim() || resourceId,
+        code: picked.code?.trim() || sat.noradId?.trim() || resourceId,
+      })
+      continue
+    }
 
     for (const [scopeKey, seriesSatellites] of Object.entries(inventory)) {
       const scope = parseInventoryScopeKey(scopeKey)

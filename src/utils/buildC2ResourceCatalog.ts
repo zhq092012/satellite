@@ -1,6 +1,7 @@
 
 import { normalizeSatelliteUsageLabel, TASK_ENEMY_COUNTRY_OPTIONS } from '@/constants/missionSatellite'
 import type { BattleTaskResourceResp, TaskResourceItem, TaskResourceSatelliteItem } from '@/types/task/task'
+import { resolveTaskSatelliteDisplayScope } from '@/utils/taskEntity'
 import type {
   SatelliteAssembleTreeNode,
   SatelliteSeriesData,
@@ -231,7 +232,9 @@ export function resolveTaskSatelliteRowsFromCatalog(
   mounts.forEach((item) => {
     const rid = item.resourceId?.trim()
     if (rid) resourceIds.add(rid)
-    const norad = Number(String(item.code ?? '').trim())
+    const sat = item as TaskResourceSatelliteItem
+    const noradRaw = String(sat.noradId ?? item.code ?? '').trim()
+    const norad = Number(noradRaw)
     if (Number.isFinite(norad) && norad > 0) norads.add(norad)
   })
 
@@ -247,13 +250,14 @@ export function resolveTaskSatelliteRowsFromCatalog(
   }
 
   return dedupeC2ResourceRows(
-    mounts.map((item) =>
-      mapTaskResourceItemToC2Row(item, {
-        country: C2_RESOURCE_EMPTY_FIELD,
-        system: C2_RESOURCE_EMPTY_FIELD,
-        series: C2_RESOURCE_EMPTY_FIELD,
-      }),
-    ),
+    mounts.map((item) => {
+      const scope = resolveTaskSatelliteDisplayScope(item)
+      return mapTaskResourceItemToC2Row(item, {
+        country: scope.country || C2_RESOURCE_EMPTY_FIELD,
+        system: scope.system || C2_RESOURCE_EMPTY_FIELD,
+        series: scope.series || C2_RESOURCE_EMPTY_FIELD,
+      })
+    }),
   )
 }
 
@@ -607,19 +611,23 @@ export const resolveC2SeriesScopeFromNode = (
  * @param item 任务资源接口卫星元素
  */
 export function mapTaskResourceSatelliteItemToC2Row(item: TaskResourceSatelliteItem): C2ResourceSatelliteRow {
-  const resourceId = String(item.resourceId ?? '').trim()
+  const resourceId = String(item.resourceId ?? item.noradId ?? '').trim()
   const norad = Number(String(item.noradId ?? item.code ?? '').trim())
   const name = (item.name ?? item.code ?? resourceId).trim() || resourceId
+  const scope = resolveTaskSatelliteDisplayScope(item)
+  const country = scope.country || C2_RESOURCE_EMPTY_FIELD
+  const sysType = scope.system || C2_RESOURCE_EMPTY_FIELD
+  const series = scope.series || C2_RESOURCE_EMPTY_FIELD
   return {
     rowKey: resourceId ? `res|${resourceId}` : buildC2ResourceRowKey('--', '--', Number.isFinite(norad) ? norad : -1),
     norad: Number.isFinite(norad) && norad > 0 ? norad : -1,
     name,
-    country: C2_RESOURCE_EMPTY_FIELD,
-    sysType: C2_RESOURCE_EMPTY_FIELD,
+    country,
+    sysType,
     usage: C2_RESOURCE_EMPTY_FIELD,
-    series: C2_RESOURCE_EMPTY_FIELD,
+    series,
     resourceId,
-    sat_type: C2_RESOURCE_EMPTY_FIELD,
+    sat_type: sysType,
     int_id: C2_RESOURCE_EMPTY_FIELD,
     launch_date: C2_RESOURCE_EMPTY_FIELD,
   }
@@ -641,21 +649,28 @@ export function mapTaskResourceItemToC2Row(
   item: TaskResourceItem,
   scope: { country: string; system: string; series: string },
 ): C2ResourceSatelliteRow {
+  const fromItem = resolveTaskSatelliteDisplayScope(item)
+  const merged = {
+    country: scope.country !== C2_RESOURCE_EMPTY_FIELD ? scope.country : (fromItem.country || scope.country),
+    system: scope.system !== C2_RESOURCE_EMPTY_FIELD ? scope.system : (fromItem.system || scope.system),
+    series: scope.series !== C2_RESOURCE_EMPTY_FIELD ? scope.series : (fromItem.series || scope.series),
+  }
   const resourceId = String(item.resourceId ?? '').trim()
-  const norad = Number(String(item.code ?? '').trim())
+  const sat = item as TaskResourceSatelliteItem
+  const norad = Number(String(sat.noradId ?? item.code ?? '').trim())
   const name = (item.name ?? resourceId).trim() || resourceId
   return {
     rowKey: resourceId
       ? `res|${resourceId}`
-      : buildC2ResourceRowKey(scope.series, scope.system, Number.isFinite(norad) ? norad : -1),
+      : buildC2ResourceRowKey(merged.series, merged.system, Number.isFinite(norad) ? norad : -1),
     norad: Number.isFinite(norad) ? norad : -1,
     name,
-    country: scope.country,
-    sysType: scope.system,
+    country: merged.country,
+    sysType: merged.system,
     usage: C2_RESOURCE_EMPTY_FIELD,
-    series: scope.series,
+    series: merged.series,
     resourceId,
-    sat_type: scope.system,
+    sat_type: merged.system,
     int_id: C2_RESOURCE_EMPTY_FIELD,
     launch_date: C2_RESOURCE_EMPTY_FIELD,
   }

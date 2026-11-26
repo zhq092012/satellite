@@ -12,6 +12,31 @@ export const normalizeTaskAreaKind = (type: string): 'POLYGON' | 'CIRCLE' | null
 }
 
 /**
+ * 规范化单条任务区域（接口 POLYGON 可能无 `center`）。
+ *
+ * @param raw 任务 `areas` 元素
+ */
+export const normalizeTaskAreaFromApi = (raw: TaskArea): TaskArea => {
+  const points = (raw.points ?? []).flatMap((pt) => {
+    if (!pt || !Number.isFinite(pt.lng) || !Number.isFinite(pt.lat)) return []
+    return [{ lng: pt.lng, lat: pt.lat }]
+  })
+  const normalized: TaskArea = {
+    ...raw,
+    points,
+    radius: Number.isFinite(raw.radius) ? raw.radius : 0,
+    enabled: raw.enabled !== false,
+  }
+  const center = raw.center
+  if (center && Number.isFinite(center.lng) && Number.isFinite(center.lat)) {
+    normalized.center = { lng: center.lng, lat: center.lat }
+  } else {
+    delete normalized.center
+  }
+  return normalized
+}
+
+/**
  * 仅保留启用中的任务区域（`enabled !== false`）。
  *
  * @param areas 任务区域列表

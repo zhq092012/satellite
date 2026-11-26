@@ -4,20 +4,22 @@
     <div v-else class="attack-table-shell">
       <div class="attack-table-panel">
         <div class="attack-table-caption">
-          <div class="attack-table-caption-text">
-            <span class="attack-table-title">打击度分析</span>
-            <p class="attack-table-formula">各蓝方卫星可打击程度及因子分解</p>
-            <p v-if="metaLine" class="analysis-meta analysis-meta--inline">{{ metaLine }}</p>
-            <p v-if="algorithmLine" class="analysis-meta analysis-meta--algo">{{ algorithmLine }}</p>
-          </div>
+          <span class="attack-table-title">打击度分析</span>
+          <span class="attack-table-formula">各蓝方卫星可打击程度及因子分解</span>
+          <p v-if="captionSubline" class="attack-table-caption-sub">{{ captionSubline }}</p>
         </div>
         <p v-if="errorMessage" class="analysis-error">{{ errorMessage }}</p>
-        <div v-loading="loading" class="attack-table-scroll">
+        <!-- 单表原生列网格：仅表体区域滚动，双行表头 sticky 固定（与威胁度分析一致） -->
+        <div v-loading="loading" class="attack-table-body">
           <table class="attack-dual-table" cellspacing="0" cellpadding="0">
             <colgroup>
               <col v-for="(width, idx) in columnWidths" :key="`col-${idx}`" :style="{ width }" />
             </colgroup>
             <thead>
+              <tr class="attack-group-header">
+                <th colspan="3" scope="colgroup" class="attack-grp attack-grp--basic">基本信息</th>
+                <th colspan="2" scope="colgroup" class="attack-grp attack-grp--strike">打击度</th>
+              </tr>
               <tr class="attack-col-header">
                 <th scope="col">所属国家</th>
                 <th scope="col">卫星名称</th>
@@ -28,7 +30,7 @@
             </thead>
             <tbody>
               <tr v-if="!tableRows.length && !loading">
-                <td colspan="6" class="attack-empty-cell">暂无打击度数据</td>
+                <td colspan="5" class="attack-empty-cell">暂无打击度数据</td>
               </tr>
               <tr v-for="row in tableRows" :key="row.rowKey"
                 :class="computeAnalysisCountryRowClass(row.country, priorityCountries)">
@@ -149,6 +151,20 @@ const algorithmLine = computed(() =>
   formatAlgorithmSelectionText(strikeResp.value?.algorithms, algorithmCatalog.value),
 )
 
+/**
+ * 计算：表头副标题（任务/时间 + 有效算法说明，合并为一行）。
+ * 返回：拼接文本或空字符串。
+ * 作用：避免表头区域多行堆叠占位过高。
+ */
+const captionSubline = computed(() => {
+  const parts: string[] = []
+  const meta = metaLine.value.trim()
+  if (meta) parts.push(meta)
+  const algo = algorithmLine.value.trim()
+  if (algo && algo !== '--') parts.push(algo)
+  return parts.join(' · ')
+})
+
 const loadAlgorithmCatalog = async () => {
   try {
     const res = await listRegisteredComputeAlgorithms()
@@ -206,6 +222,8 @@ void loadAlgorithmCatalog()
 @use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
 
 $attack-table-border: rgba(56, 189, 248, 0.55);
+/** 分组表头行高（与 .attack-group-header th 的 box 一致，供列名行 sticky top） */
+$attack-group-header-height: 33px;
 
 .home-attack-analysis {
   box-sizing: border-box;
@@ -246,59 +264,38 @@ $attack-table-border: rgba(56, 189, 248, 0.55);
 }
 
 .attack-table-caption {
-  display: flex;
+  display: grid;
   flex-shrink: 0;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 8px 16px;
   background: rgba(13, 27, 49, 0.6);
   border-bottom: 1px solid $attack-table-border;
 }
 
-.attack-table-caption-text {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-
 .attack-table-title {
-  display: block;
   font-size: battleUi.$battle-ui-font-emphasis;
   font-weight: 700;
   color: #7dd3fc;
-  text-align: center;
+  white-space: nowrap;
 }
 
 .attack-table-formula {
-  margin: 6px 0 0;
+  margin: 0;
   color: #94a3b8;
   font-size: battleUi.$battle-ui-font-base;
-  line-height: 1.45;
+  line-height: 1.35;
   text-align: right;
 }
 
-.analysis-intro,
-.analysis-meta {
-  flex-shrink: 0;
+.attack-table-caption-sub {
+  grid-column: 1 / -1;
   margin: 0;
-  padding: 10px 16px;
-  color: #94a3b8;
+  color: #cbd5e1;
   font-size: battleUi.$battle-ui-font-base;
-  line-height: 1.45;
+  line-height: 1.35;
   text-align: left;
-  border-bottom: 1px solid rgba(56, 189, 248, 0.15);
-}
-
-.analysis-meta--inline {
-  margin: 6px 0 0;
-  padding: 0;
-  border-bottom: none;
-  color: #cbd5e1;
-}
-
-.analysis-meta--algo {
-  color: #cbd5e1;
 }
 
 .analysis-error {
@@ -310,7 +307,7 @@ $attack-table-border: rgba(56, 189, 248, 0.55);
   text-align: left;
 }
 
-.attack-table-scroll {
+.attack-table-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -318,21 +315,49 @@ $attack-table-border: rgba(56, 189, 248, 0.55);
 
 .attack-dual-table {
   width: 100%;
-  border-collapse: collapse;
   table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: battleUi.$battle-ui-font-base;
+}
+
+.attack-group-header th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  box-sizing: border-box;
+  height: $attack-group-header-height;
+  padding: 0 8px;
+  border: 1px solid $attack-table-border;
+  color: #e2e8f0;
+  font-size: battleUi.$battle-ui-font-base;
+  font-weight: 700;
+  line-height: $attack-group-header-height;
+  text-align: center;
+  vertical-align: middle;
 }
 
 .attack-col-header th {
   position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 10px 8px;
+  top: $attack-group-header-height;
+  z-index: 4;
+  box-sizing: border-box;
+  padding: 8px;
   border: 1px solid $attack-table-border;
-  background: rgba(13, 27, 49, 0.95);
+  background: rgb(13, 27, 49);
   color: #e2e8f0;
   font-size: battleUi.$battle-ui-font-emphasis;
   font-weight: 700;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+.attack-grp--basic {
+  background: rgb(30, 58, 95) !important;
+}
+
+.attack-grp--strike {
+  background: rgb(22, 78, 99) !important;
 }
 
 .attack-dual-table td {

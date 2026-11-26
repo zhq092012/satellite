@@ -8,12 +8,19 @@ import {
 } from '@/config/combatScenarioOptions'
 import { MISSION_SYS_TYPES } from '@/constants/missionSatellite'
 import type { CommandForm } from '@/types/command/command'
-import type { TaskForm, TaskResourceItem } from '@/types/task/task'
+import type {
+  TaskForm,
+  TaskResourceItem,
+  TaskResourceSatelliteItem,
+  TaskResourceStationItem,
+  TaskResourceWeaponItem,
+} from '@/types/task/task'
 import {
   parseCommandEnemyCountries,
   resolveCombatCountriesForContext,
   resolveCombatScenarioSelectionFromCommand,
 } from '@/utils/commandEntity'
+import { normalizeTaskAreaFromApi } from '@/utils/taskAreaGeo'
 
 /** 新建任务默认作战对象（与默认作战阶段一致） */
 export const DEFAULT_TASK_COMBAT_COUNTRY = '美国'
@@ -57,6 +64,123 @@ export const normalizeTaskExpectationCases = (value: unknown): string[] => {
 }
 
 /**
+ * 将 OpenAPI `SatelliteItem` 规范为前端任务卫星挂载项（保留国家/类型/系列）。
+ *
+ * @param raw 接口卫星元素
+ */
+export const mapSatelliteItemFromApi = (raw: unknown): TaskResourceSatelliteItem => {
+  const item = raw as TaskResourceSatelliteItem & {
+    /** 历史/列表接口体系字段（与 `satelliteType` 同义） */
+    system?: string
+  }
+  const noradId = String(item.noradId ?? item.resourceId ?? item.code ?? '').trim()
+  const name = String(item.name ?? noradId).trim() || noradId
+  const code = noradId || String(item.code ?? '').trim() || name
+  const resourceId = noradId || String(item.resourceId ?? '').trim() || code
+  if (!resourceId) {
+    throw new Error('mapSatelliteItemFromApi: 卫星项缺少 NORAD / resourceId')
+  }
+  const mapped: TaskResourceSatelliteItem = {
+    resourceId,
+    name,
+    code,
+    noradId: noradId || resourceId,
+  }
+  const country = item.country?.trim()
+  if (country) mapped.country = country
+  const satelliteType = item.satelliteType?.trim() || item.system?.trim()
+  if (satelliteType) mapped.satelliteType = satelliteType
+  const series = item.series?.trim()
+  if (series) mapped.series = series
+  const line1 = item.tleLine1?.trim()
+  if (line1) mapped.tleLine1 = line1
+  const line2 = item.tleLine2?.trim()
+  if (line2) mapped.tleLine2 = line2
+  return mapped
+}
+
+/**
+ * 将 OpenAPI `StationItem` 规范为前端接收站挂载项。
+ *
+ * @param raw 接口接收站元素
+ */
+export const mapStationItemFromApi = (raw: unknown): TaskResourceStationItem => {
+  const item = raw as TaskResourceStationItem & { id?: string }
+  const id = String(item.id ?? item.resourceId ?? '').trim()
+  if (!id) {
+    throw new Error('mapStationItemFromApi: 接收站项缺少 id')
+  }
+  const name = String(item.name ?? id).trim() || id
+  return {
+    resourceId: id,
+    name,
+    code: id,
+    longitude: item.longitude,
+    latitude: item.latitude,
+  }
+}
+
+/**
+ * 将 OpenAPI `WeaponItem` 规范为前端武器挂载项。
+ *
+ * @param raw 接口武器元素
+ */
+export const mapWeaponItemFromApi = (raw: unknown): TaskResourceWeaponItem => {
+  const item = raw as TaskResourceWeaponItem
+  const code = String(item.code ?? item.resourceId ?? '').trim()
+  if (!code) {
+    throw new Error('mapWeaponItemFromApi: 武器项缺少 code')
+  }
+  const name = String(item.name ?? code).trim() || code
+  const mapped: TaskResourceWeaponItem = {
+    resourceId: code,
+    name,
+    code,
+  }
+  const weaponType = item.weaponType?.trim()
+  if (weaponType) mapped.weaponType = weaponType
+  const country = item.country?.trim()
+  if (country) mapped.country = country
+  return mapped
+}
+
+/**
+ * 从任务卫星挂载项读取 C2/列表展示用国家、体系、系列（优先接口字段）。
+ *
+ * @param item 任务卫星项
+ */
+export const resolveTaskSatelliteDisplayScope = (
+  item: TaskResourceItem,
+): { country?: string; system?: string; series?: string } => {
+  const sat = item as TaskResourceSatelliteItem & { system?: string }
+  const country = sat.country?.trim()
+  const system = sat.satelliteType?.trim() || sat.system?.trim()
+  const series = sat.series?.trim()
+  return { country, system, series }
+}
+
+/**
+ * 将任务接收站挂载项转为地面站装配表行（编辑回显；不依赖候选池反查）。
+ *
+ * @param item 规范化后的 `TaskResourceStationItem`
+ */
+export const mapTaskStationItemToAssembleRow = (item: TaskResourceStationItem): TaskAssembleRow => {
+  const formatCoord = (value?: number): string => {
+    if (value == null || !Number.isFinite(value)) return '--'
+    return value.toFixed(3)
+  }
+  return {
+    id: item.resourceId,
+    name: item.name?.trim() || item.resourceId,
+    series: '',
+    type: '--',
+    country: '--',
+    extra1: formatCoord(item.longitude),
+    extra2: formatCoord(item.latitude),
+  }
+}
+
+/**
  * 将装配行转为任务挂载资源项。
  *
  * @param row 装配行
@@ -84,7 +208,16 @@ export const mapSeriesNameToTaskSatellite = (series: string): TaskResourceItem =
  * @param items 卫星挂载项
  */
 export const resolveSeriesNamesFromTaskSatellites = (items: TaskResourceItem[] | undefined): string[] =>
-  [...new Set((items ?? []).map((item) => (item.code || item.name || item.resourceId).trim()).filter(Boolean))]
+  [
+    ...new Set(
+      (items ?? [])
+        .map((item) => {
+          const sat = item as TaskResourceSatelliteItem
+          return (sat.series || item.code || item.name || item.resourceId).trim()
+        })
+        .filter(Boolean),
+    ),
+  ]
 
 /**
  * 从任务解析作战对象国家列表（由 `country` 拆分）。
@@ -124,7 +257,33 @@ export const resolveTaskCountryFieldFromEntity = (raw: TaskForm | (TaskForm & { 
 }
 
 /**
- * 规范化战场任务列表接口数据（`country`、预期子项等）。
+ * 规范化单条任务接口数据（`CommandTaskResp` → `TaskForm`）。
+ *
+ * @param raw `GET /command-task/{id}` 或列表项
+ */
+export const normalizeTaskFromApi = (raw: TaskForm): TaskForm => {
+  const commandId = String(raw.commandId ?? '').trim()
+  const satellites = Array.isArray(raw.satellites)
+    ? raw.satellites.map((item) => mapSatelliteItemFromApi(item))
+    : []
+  const receiveStations = Array.isArray(raw.receiveStations)
+    ? raw.receiveStations.map((item) => mapStationItemFromApi(item))
+    : []
+  const weapons = Array.isArray(raw.weapons) ? raw.weapons.map((item) => mapWeaponItemFromApi(item)) : []
+  return {
+    ...raw,
+    commandId,
+    country: resolveTaskCountryFieldFromEntity(raw),
+    expectationCases: normalizeTaskExpectationCases(raw.expectationCases),
+    areas: Array.isArray(raw.areas) ? raw.areas.map((area) => normalizeTaskAreaFromApi(area)) : [],
+    satellites,
+    receiveStations,
+    weapons,
+  }
+}
+
+/**
+ * 规范化战场任务列表接口数据（`country`、挂载资源、`SatelliteItem` 等）。
  *
  * @param list `GET /command-task/list` 返回的 `data`
  */
@@ -132,15 +291,7 @@ export const normalizeTaskListFromApi = (
   list: (TaskForm & { commandId?: string })[] | null | undefined,
 ): TaskForm[] => {
   if (!Array.isArray(list)) return []
-  return list.map((item) => {
-    const commandId = String(item.commandId ?? '').trim()
-    return {
-      ...item,
-      commandId,
-      country: resolveTaskCountryFieldFromEntity(item),
-      expectationCases: normalizeTaskExpectationCases(item.expectationCases),
-    }
-  })
+  return list.map((item) => normalizeTaskFromApi(item))
 }
 
 /** C2 / 系列筛选用卫星类型（接口无该字段时默认四分类全选）。 */

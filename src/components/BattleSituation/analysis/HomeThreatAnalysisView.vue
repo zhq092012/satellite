@@ -4,27 +4,26 @@
     <div v-else class="threat-table-shell">
       <div class="threat-table-panel">
         <div class="threat-table-caption">
-          <div class="threat-table-caption-text">
-            <span class="threat-table-title">威胁度分析</span>
-            <p class="threat-table-formula">综合威胁度 = 静态威胁度 × 动态威胁度（默认聚合算法 multiply）</p>
-          </div>
+          <span class="threat-table-title">威胁度分析</span>
+          <span class="threat-table-formula">综合威胁度 = 静态威胁度 × 动态威胁度（默认聚合算法 multiply）</span>
+          <p v-if="captionSubline" class="threat-table-caption-sub">{{ captionSubline }}</p>
         </div>
 
         <p v-if="errorMessage" class="analysis-error">{{ errorMessage }}</p>
-        <div v-loading="loading" class="threat-table-scroll">
+        <!-- 单表原生列网格：仅表体区域滚动，双行表头 sticky 固定 -->
+        <div v-loading="loading" class="threat-table-body">
           <table class="threat-dual-table" cellspacing="0" cellpadding="0">
             <colgroup>
               <col v-for="(width, idx) in columnWidths" :key="`col-${idx}`" :style="{ width }" />
             </colgroup>
             <thead>
               <tr class="threat-group-header">
-                <th colspan="4" scope="colgroup" class="threat-grp threat-grp--basic">基本信息</th>
+                <th colspan="3" scope="colgroup" class="threat-grp threat-grp--basic">基本信息</th>
                 <th colspan="2" scope="colgroup" class="threat-grp threat-grp--static">静态威胁度</th>
                 <th colspan="6" scope="colgroup" class="threat-grp threat-grp--dynamic">动态威胁度</th>
                 <th colspan="1" scope="colgroup" class="threat-grp threat-grp--composite">综合威胁度</th>
               </tr>
               <tr class="threat-col-header">
-                <th scope="col">NORAD</th>
                 <th scope="col">所属国家</th>
                 <th scope="col">卫星名称</th>
                 <th scope="col">卫星类型</th>
@@ -41,11 +40,10 @@
             </thead>
             <tbody>
               <tr v-if="!tableRows.length && !loading">
-                <td colspan="13" class="threat-empty-cell">暂无威胁度数据</td>
+                <td colspan="12" class="threat-empty-cell">暂无威胁度数据</td>
               </tr>
               <tr v-for="row in tableRows" :key="row.rowKey"
                 :class="computeAnalysisCountryRowClass(row.country, priorityCountries)">
-                <td>{{ row.noradId || '--' }}</td>
                 <td>{{ row.country || '--' }}</td>
                 <td class="threat-cell--name">{{ row.satelliteName || '--' }}</td>
                 <td>{{ row.satelliteType || '--' }}</td>
@@ -94,18 +92,18 @@ defineOptions({ name: 'HomeThreatAnalysisView' })
 
 /** 表格列宽 */
 const columnWidths = [
-  '7%',
+
   '6%',
   '11%',
   '9%',
   '7%',
-  '12%',
+  '18%',
   '9%',
   '6%',
   '7%',
   '7%',
   '7%',
-  '12%',
+  '18%',
   '8%',
 ] as const
 
@@ -202,6 +200,20 @@ const algorithmLine = computed(() =>
 )
 
 /**
+ * 计算：表头副标题（任务/时间 + 有效算法说明，合并为一行）。
+ * 返回：拼接文本或空字符串。
+ * 作用：与打击度页一致，压低表头说明区高度。
+ */
+const captionSubline = computed(() => {
+  const parts: string[] = []
+  const meta = metaLine.value.trim()
+  if (meta) parts.push(meta)
+  const algo = algorithmLine.value.trim()
+  if (algo && algo !== '--') parts.push(algo)
+  return parts.join(' · ')
+})
+
+/**
  * 计算：算法目录。
  * 返回：算法目录。
  * 作用：算法目录。
@@ -267,6 +279,8 @@ void loadAlgorithmCatalog()
 @use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
 
 $threat-table-border: rgba(56, 189, 248, 0.55);
+/** 分组表头行高（与 .threat-group-header th 的 box 一致，供列名行 sticky top） */
+$threat-group-header-height: 33px;
 
 .home-threat-analysis {
   box-sizing: border-box;
@@ -307,59 +321,38 @@ $threat-table-border: rgba(56, 189, 248, 0.55);
 }
 
 .threat-table-caption {
-  display: flex;
+  display: grid;
   flex-shrink: 0;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 8px 16px;
   background: rgba(13, 27, 49, 0.6);
   border-bottom: 1px solid $threat-table-border;
 }
 
-.threat-table-caption-text {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-
 .threat-table-title {
-  display: block;
   font-size: battleUi.$battle-ui-font-emphasis;
   font-weight: 700;
   color: #7dd3fc;
-  text-align: center;
+  white-space: nowrap;
 }
 
 .threat-table-formula {
-  margin: 6px 0 0;
-  color: #94a3b8;
-  font-size: battleUi.$battle-ui-font-base;
-  line-height: 1.45;
-  text-align: right;
-}
-
-.analysis-intro,
-.analysis-meta {
-  flex-shrink: 0;
   margin: 0;
-  padding: 10px 16px;
   color: #94a3b8;
   font-size: battleUi.$battle-ui-font-base;
-  line-height: 1.45;
+  line-height: 1.35;
   text-align: right;
-  border-bottom: 1px solid rgba(56, 189, 248, 0.15);
 }
 
-.analysis-meta--inline {
-  margin: 6px 0 0;
-  padding: 0;
-  border-bottom: none;
+.threat-table-caption-sub {
+  grid-column: 1 / -1;
+  margin: 0;
   color: #cbd5e1;
-}
-
-.analysis-meta--algo {
-  color: #cbd5e1;
+  font-size: battleUi.$battle-ui-font-base;
+  line-height: 1.35;
+  text-align: left;
 }
 
 .analysis-error {
@@ -371,7 +364,7 @@ $threat-table-border: rgba(56, 189, 248, 0.55);
   text-align: left;
 }
 
-.threat-table-scroll {
+.threat-table-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -379,39 +372,57 @@ $threat-table-border: rgba(56, 189, 248, 0.55);
 
 .threat-dual-table {
   width: 100%;
-  border-collapse: collapse;
   table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: battleUi.$battle-ui-font-base;
 }
 
-.threat-group-header th,
-.threat-col-header th {
+.threat-group-header th {
   position: sticky;
   top: 0;
-  z-index: 2;
-  padding: 10px 8px;
+  z-index: 3;
+  box-sizing: border-box;
+  height: $threat-group-header-height;
+  padding: 0 8px;
   border: 1px solid $threat-table-border;
-  background: rgba(13, 27, 49, 0.95);
+  color: #e2e8f0;
+  font-size: battleUi.$battle-ui-font-base;
+  font-weight: 700;
+  line-height: $threat-group-header-height;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.threat-col-header th {
+  position: sticky;
+  top: $threat-group-header-height;
+  z-index: 4;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid $threat-table-border;
+  background: rgb(13, 27, 49);
   color: #e2e8f0;
   font-size: battleUi.$battle-ui-font-emphasis;
   font-weight: 700;
   text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
 .threat-grp--basic {
-  background: rgba(30, 58, 95, 0.85) !important;
+  background: rgb(30, 58, 95) !important;
 }
 
 .threat-grp--static {
-  background: rgba(78, 52, 20, 0.85) !important;
+  background: rgb(78, 52, 20) !important;
 }
 
 .threat-grp--dynamic {
-  background: rgba(22, 78, 99, 0.85) !important;
+  background: rgb(22, 78, 99) !important;
 }
 
 .threat-grp--composite {
-  background: rgba(88, 28, 66, 0.85) !important;
+  background: rgb(88, 28, 66) !important;
 }
 
 .threat-dual-table td {

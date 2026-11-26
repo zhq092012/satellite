@@ -4,6 +4,11 @@ import { requestAPI } from '@/utils/tools/request'
 import type { BattleTaskResourceResp, TaskForm } from '@/types/task/task'
 import { isResourceApiSuccess } from '@/utils/resourceApi'
 import { toCommandTaskWriteBody } from '@/utils/commandTaskApi'
+import {
+  mapSatelliteItemFromApi,
+  mapStationItemFromApi,
+  mapWeaponItemFromApi,
+} from '@/utils/taskEntity'
 
 export type {
   BattleTaskResourceResp,
@@ -13,6 +18,7 @@ export type {
   TaskResourceItem,
   TaskResourceSatelliteItem,
   TaskResourceStationItem,
+  TaskResourceWeaponItem,
   TaskRelationEndpointOption,
   TaskTargetRelation,
   TaskTargetRelationKind,
@@ -87,5 +93,11 @@ export const getTaskResources = async (taskId: string | number): Promise<BattleT
   if (!isResourceApiSuccess(res.code) || !res.data) {
     throw new Error(res.msg || '获取任务挂载资源失败')
   }
-  return res.data
+  const data = res.data
+  return {
+    ...data,
+    satellites: (data.satellites ?? []).map((item) => mapSatelliteItemFromApi(item)),
+    receiveStations: (data.receiveStations ?? []).map((item) => mapStationItemFromApi(item)),
+    weapons: (data.weapons ?? []).map((item) => mapWeaponItemFromApi(item)),
+  }
 }

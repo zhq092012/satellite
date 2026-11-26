@@ -22,12 +22,13 @@ export const toBattleGlobeSatelliteFromTaskResource = (
   if (!Number.isFinite(norad) || norad <= 0) return null
   if (!hasValidTle(item.tleLine1, item.tleLine2)) return null
   const name = item.name?.trim() || item.code?.trim() || noradRaw || String(norad)
+  const series = item.series?.trim() ?? ''
   return {
     norad,
     name,
     line1: item.tleLine1!.trim(),
     line2: item.tleLine2!.trim(),
-    series: '',
+    series,
   }
 }
 

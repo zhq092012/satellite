@@ -146,6 +146,7 @@ import {
   normalizeTaskListFromApi,
   resolveCombatCountriesFromTask,
   resolveCombatScenarioSelectionFromTask,
+  resolveTaskSatelliteDisplayScope,
 } from '@/utils/taskEntity'
 import { isSameCommandId } from '@/utils/commandEntity'
 import {
@@ -641,7 +642,10 @@ const formatWeaponCoordinate = (value: number | string | undefined | null): stri
  * @returns 是否成功走任务资源树模式
  */
 const fetchTaskSatelliteResourceCatalog = async (task: TaskForm): Promise<boolean> => {
-  const mounted = (task.satellites ?? []).filter((item) => item.resourceId?.trim())
+  const mounted = (task.satellites ?? []).filter((item) => {
+    const sat = item as import('@/types/task/task').TaskResourceSatelliteItem
+    return Boolean(item.resourceId?.trim() || sat.noradId?.trim())
+  })
   if (!mounted.length) return false
 
   const countries = resolveCombatCountriesFromTask(task, store.command)
@@ -675,14 +679,17 @@ const hydrateC2FlatRowsFromTaskSatellites = async (taskSatellites: TaskResourceI
   const rowsFromMeta: C2ResourceSatelliteRow[] = []
   for (const item of taskSatellites) {
     const meta = metaById.get(item.resourceId)
+    const fromApi = resolveTaskSatelliteDisplayScope(item)
     rowsFromMeta.push(
       mapTaskResourceItemToC2Row(
         item,
-        meta ?? {
-          country: C2_RESOURCE_EMPTY_FIELD,
-          system: C2_RESOURCE_EMPTY_FIELD,
-          series: C2_RESOURCE_EMPTY_FIELD,
-        },
+        meta
+          ? { country: meta.country, system: meta.system, series: meta.series }
+          : {
+              country: fromApi.country || C2_RESOURCE_EMPTY_FIELD,
+              system: fromApi.system || C2_RESOURCE_EMPTY_FIELD,
+              series: fromApi.series || C2_RESOURCE_EMPTY_FIELD,
+            },
       ),
     )
   }

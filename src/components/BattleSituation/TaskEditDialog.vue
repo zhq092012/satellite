@@ -178,9 +178,13 @@ import {
 } from '@/utils/commandEntity'
 import {
   mapAssembleRowToTaskResource,
+  mapSatelliteItemFromApi,
+  mapStationItemFromApi,
+  mapTaskStationItemToAssembleRow,
   parseTaskCombatCountries,
   resolveCombatScenarioSelectionFromTask,
 } from '@/utils/taskEntity'
+import { normalizeTaskAreaFromApi } from '@/utils/taskAreaGeo'
 import { useLayoutStore } from '@/store/modules/layout'
 import TaskAssembleTab, { type TaskAssembleRow } from '@/components/BattleSituation/TaskAssembleTab.vue'
 import TaskTargetRelationTab from '@/components/BattleSituation/TaskTargetRelationTab.vue'
@@ -322,11 +326,7 @@ const assembleTargetTypes = ref<string[]>([...DEFAULT_TARGET_TYPES])
 
 /** 深拷贝任务区域列表，避免编辑时污染原任务对象。 */
 const cloneTaskAreas = (areas?: TaskArea[]): TaskArea[] =>
-  (areas ?? []).map((area) => ({
-    ...area,
-    points: area.points?.map((pt) => ({ lng: pt.lng, lat: pt.lat })) ?? [],
-    center: { lng: area.center.lng, lat: area.center.lat },
-  }))
+  (areas ?? []).map((area) => normalizeTaskAreaFromApi(area))
 
 /** 客户端临时区域 ID 序列（待后端分配正式 ID）。 */
 let tempTaskAreaIdSeq = 0
@@ -758,11 +758,8 @@ watch(activeTab, (tab, prevTab) => {
 })
 
 const restoreAssembleFromTask = (task: TaskForm) => {
-  const satellites = (task.satellites ?? []).map((item) => ({
-    resourceId: item.resourceId,
-    name: item.name,
-    code: item.code,
-  }))
+  /** 规范卫星/地面站字段，兼容接口 `system` 与 `StationItem.id` */
+  const satellites = (task.satellites ?? []).map((item) => mapSatelliteItemFromApi(item))
   draftAssembledSatellites.value = satellites.map((item) => ({ ...item }))
   pendingSatelliteRestore.value = satellites.length ? satellites.map((item) => ({ ...item })) : null
   satelliteAssembleRef.value?.setAssembledTaskSatellites(satellites)
@@ -771,7 +768,7 @@ const restoreAssembleFromTask = (task: TaskForm) => {
   }
   stationAssembleRef.value?.setAssembledRows(
     (task.receiveStations ?? []).map((item) =>
-      createPlaceholderRow(item.resourceId, item.name || item.resourceId),
+      mapTaskStationItemToAssembleRow(mapStationItemFromApi(item)),
     ),
   )
   weaponAssembleRef.value?.setAssembledRows(

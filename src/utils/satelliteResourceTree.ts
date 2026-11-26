@@ -541,9 +541,11 @@ export const buildTaskSatelliteMatchKeys = (items: TaskResourceItem[]): Set<stri
     const resourceId = item.resourceId?.trim()
     const code = item.code?.trim()
     const name = item.name?.trim()
+    const noradId = (item as import('@/types/task/task').TaskResourceSatelliteItem).noradId?.trim()
     if (resourceId) keys.add(resourceId)
     if (code) keys.add(code)
     if (name) keys.add(name)
+    if (noradId) keys.add(noradId)
   }
   return keys
 }
