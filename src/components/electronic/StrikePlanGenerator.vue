@@ -3,7 +3,6 @@
     <div class="plan-header">
       <div class="header-center">
         <span class="type-label">作战方案报告</span>
-        <span v-if="allSchemeCodes.length" class="scheme-count-badge">{{ allSchemeCodes.length }} 格</span>
         <el-button v-if="store.activedTask?.id" type="primary" link @click="reloadReportSchemes(true)">
           刷新方案
         </el-button>
@@ -48,92 +47,31 @@
           </el-checkbox-group>
         </div>
 
-        <!-- 综合信息 -->
+        <!-- 报告级：任务名、生成时间 -->
         <ReportGenerateOverview :report="reportData" />
 
-        <!-- 阶段三档对比 -->
-        <section v-if="topStageSections.length" class="report-comprehensive">
-          <ReportStageCompareBlock v-for="section in topStageSections" :key="section.stageCode"
-            class="report-comprehensive__stage" :stage-title="section.title" :stage="section.stage!"
-            :active-tier-indexes="section.activeTierIndexes" top />
-
-          <!-- 全部方案指标对比 -->
-          <section v-if="crossCompareRows.length" class="report-cross-compare"
-            :class="{ 'report-cross-compare--single': crossCompareRows.length === 1 }">
-            <h3 class="report-cross-compare__title">全部方案指标对比</h3>
-            <div class="report-cross-compare__scroll">
-              <table class="report-cross-compare__table" cellspacing="0" cellpadding="0">
-                <thead>
-                  <tr>
-                    <th>编码</th>
-                    <th>方案</th>
-                    <th>阶段</th>
-                    <th>档位</th>
-                    <th>选星数</th>
-                    <th>达成度</th>
-                    <th>综合分</th>
-                    <th>求解</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in crossCompareRows" :key="row.code">
-                    <td class="report-cross-compare__code">{{ row.code }}</td>
-                    <td class="report-cross-compare__name">{{ row.name }}</td>
-                    <td>{{ row.stageText || '—' }}</td>
-                    <td>{{ row.tierText || '—' }}</td>
-                    <td class="report-cross-compare__num">{{ row.targetSize ?? '—' }}</td>
-                    <td class="report-cross-compare__num">{{ row.attainmentText }}</td>
-                    <td class="report-cross-compare__num">{{ row.scoreText }}</td>
-                    <td>{{ row.solverCaliber || '—' }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </section>
-
-        <div v-if="!selectedSchemeCodes.length" class="empty-container small">
+        <div v-if="!selectedStrikePlanCodes.length" class="empty-container small">
           <div class="empty-text">请勾选 1～3 个方案查看明细</div>
         </div>
 
-        <div v-else class="plan-columns" :class="{
-          'plan-columns--single': selectedSchemeCodes.length === 1,
-          'plan-columns--triple': selectedSchemeCodes.length === 3,
-        }">
-          <article v-for="schemeCode in selectedSchemeCodes" :key="schemeCode" class="plan-column">
-            <header class="column-head">
-              <span class="column-head__code">{{ schemeCode }}</span>
-              <h3 class="column-head__name">{{ getSchemeShortTitle(schemeCode) }}</h3>
-            </header>
-            <div v-if="getSchemeView(schemeCode)" class="column-content">
-              <StrikePlanSchemePanel :view="getSchemeView(schemeCode)!" dense
-                :horizontal="selectedSchemeCodes.length === 1" />
+        <div
+          v-else
+          class="plan-columns strike-plan-columns"
+          :class="{
+            'plan-columns--single': selectedStrikePlanCodes.length === 1,
+            'plan-columns--triple': selectedStrikePlanCodes.length === 3,
+          }"
+        >
+          <article
+            v-for="schemeCode in selectedStrikePlanCodes"
+            :key="`strike-${schemeCode}`"
+            class="plan-column plan-column--strike"
+          >
+            <div class="column-content">
+              <ReportStrikePlanPanel :plan="getStrikePlan(schemeCode)!" />
             </div>
           </article>
         </div>
-
-        <section v-if="selectedStrikePlanCodes.length" class="strike-plan-detail-section">
-          <h3 class="strike-plan-detail-section__title">打击方案与前后比对</h3>
-          <p class="strike-plan-detail-section__hint">
-            与上方勾选方案按方案编码一一匹配展示。
-          </p>
-          <div class="plan-columns strike-plan-columns" :class="{
-            'plan-columns--single': selectedStrikePlanCodes.length === 1,
-            'plan-columns--triple': selectedStrikePlanCodes.length === 3,
-          }">
-            <article v-for="schemeCode in selectedStrikePlanCodes" :key="`strike-${schemeCode}`"
-              class="plan-column plan-column--strike">
-              <header class="column-head column-head--strike">
-                <span class="column-head__code">{{ schemeCode }}</span>
-                <h3 class="column-head__name">{{ getStrikePlanTitle(schemeCode) }}</h3>
-              </header>
-              <div class="column-content">
-                <ReportStrikePlanPanel :plan="getStrikePlan(schemeCode)!"
-                  :horizontal="selectedStrikePlanCodes.length === 1" />
-              </div>
-            </article>
-          </div>
-        </section>
       </template>
     </div>
   </div>
@@ -143,30 +81,14 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getReportSchemes } from '@/api/report/report'
-import type { ReportGenerateResp, ReportStageResult, StrikePlan } from '@/types/report/report'
+import type { ReportGenerateResp, StrikePlan } from '@/types/report/report'
 import {
   buildStrikePlanMapByCode,
   filterSchemeCodesWithStrikePlan,
 } from '@/utils/strikePlanDisplay'
-import {
-  flattenStrikePlanRowsForExport,
-  type StrikePlanSchemeView,
-} from '@/utils/buildStrikePlanSchemeView'
-import { buildReportSchemeView } from '@/utils/buildReportSchemeView'
-import { downloadStrikePlanCsv, downloadStrikePlanXls } from '@/utils/exportStrikePlanTable'
-import {
-  buildReportCompareRowsFromReport,
-  buildReportStageSchemeGroups,
-  collectReportTierIndexesForCodes,
-  parseReportStageCodeFromSchemeCode,
-} from '@/utils/reportSchemeDisplay'
-import {
-  buildSchemeByCodeMap,
-  listReportSchemeCodes,
-} from '@/utils/strikePlanReportAdapter'
-import ReportStageCompareBlock from './strike-plan/ReportStageCompareBlock.vue'
+import { downloadStrikePlanCsv, downloadStrikePlanXls, type StrikePlanStrikeRow } from '@/utils/exportStrikePlanTable'
+import { listReportSchemeCodes } from '@/utils/strikePlanReportAdapter'
 import { useLayoutStore } from '@/store/modules/layout'
-import StrikePlanSchemePanel from './strike-plan/StrikePlanSchemePanel.vue'
 import ReportGenerateOverview from './strike-plan/ReportGenerateOverview.vue'
 import ReportStrikePlanPanel from './strike-plan/ReportStrikePlanPanel.vue'
 
@@ -185,13 +107,6 @@ let reportLoadToken = 0
 
 /** 勾选对比的方案 code（最多 3 个） */
 const selectedSchemeCodes = ref<string[]>([])
-
-/**
- * 计算：接口返回的方案 code → 方案实体。
- * 返回 Map。
- * 作用：列渲染与构建视图时查找方案。
- */
-const schemeByCode = computed(() => buildSchemeByCodeMap(reportData.value))
 
 /**
  * 计算：`strikePlans` 按 code 索引（与 `schemes` 对齐）。
@@ -230,85 +145,11 @@ const allSchemeCodes = computed((): string[] => listReportSchemeCodes(reportData
  */
 const schemeCheckboxOptions = computed(() =>
   allSchemeCodes.value.map((code) => {
-    const scheme = schemeByCode.value.get(code)
-    const name = scheme?.name?.trim() || code
+    const plan = strikePlanByCode.value.get(code)
+    const name = plan?.name?.trim() || code
     return { value: code, label: `${code} · ${name}` }
   }),
 )
-
-/**
- * 计算：页底跨方案对比（仅当前勾选）。
- * 返回 ReportSchemeCompareRow[]。
- * 作用：最后一块对比表。
- */
-const crossCompareRows = computed(() => {
-  const rows = buildReportCompareRowsFromReport(reportData.value)
-  const picked = new Set(selectedSchemeCodes.value)
-  if (!picked.size) return []
-  return rows.filter((row) => picked.has(row.code))
-})
-
-/**
- * 计算：按 stage 分组的方案列表。
- * 返回 ReportStageSchemeGroup[]。
- * 作用：解析 stage 与三档对比数据。
- */
-const stageGroups = computed(() => buildReportStageSchemeGroups(reportData.value))
-
-interface TopStageSection {
-  stageCode: string
-  title: string
-  stage?: ReportStageResult
-  activeTierIndexes: number[]
-}
-
-/**
- * 计算：页面顶部综合区——勾选方案涉及的阶段三档对比。
- * 返回 TopStageSection[]。
- * 作用：综合信息置顶展示。
- */
-const topStageSections = computed((): TopStageSection[] => {
-  const codes = selectedSchemeCodes.value
-  if (!codes.length) return []
-  const stageCodeSet = new Set<string>()
-  for (const code of codes) {
-    const scheme = schemeByCode.value.get(code)
-    const stageCode =
-      scheme?.stageCode?.trim() || parseReportStageCodeFromSchemeCode(code) || undefined
-    if (stageCode) stageCodeSet.add(stageCode)
-  }
-  const sections: TopStageSection[] = []
-  for (const stageCode of [...stageCodeSet].sort((a, b) => a.localeCompare(b, 'zh-CN', { numeric: true }))) {
-    const group = stageGroups.value.find((g) => g.stageCode === stageCode)
-    if (!group?.stage) continue
-    const codesInStage = codes.filter((code) => {
-      const scheme = schemeByCode.value.get(code)
-      const sc =
-        scheme?.stageCode?.trim() || parseReportStageCodeFromSchemeCode(code) || ''
-      return sc === stageCode
-    })
-    sections.push({
-      stageCode,
-      title: group.title,
-      stage: group.stage,
-      activeTierIndexes: collectReportTierIndexesForCodes(
-        [...schemeByCode.value.values()],
-        codesInStage,
-      ),
-    })
-  }
-  return sections
-})
-
-/**
- * 列头短标题：仅方案名。
- *
- * @param schemeCode 格子 code
- */
-const getSchemeShortTitle = (schemeCode: string): string => {
-  const scheme = schemeByCode.value.get(schemeCode)
-  return scheme?.name?.trim() || schemeCode
-}
 
 /**
  * 取与 scheme 同 code 的打击方案。
@@ -321,37 +162,28 @@ const getStrikePlan = (schemeCode: string): StrikePlan | null => {
 }
 
 /**
- * 打击方案列标题（优先 strikePlans.name）。
- *
- * @param schemeCode 方案 code
+ * 计算：勾选方案的打击清单导出行。
+ * 返回 StrikePlanStrikeRow[]。
+ * 作用：CSV/XLS 导出。
  */
-const getStrikePlanTitle = (schemeCode: string): string => {
-  const plan = getStrikePlan(schemeCode)
-  return plan?.name?.trim() || getSchemeShortTitle(schemeCode)
-}
-
-/**
- * 构建单方案页面视图（报告 API）。
- *
- * @param schemeCode 方案 code
- */
-const getSchemeView = (schemeCode: string): StrikePlanSchemeView | null => {
-  const scheme = schemeByCode.value.get(schemeCode)
-  const task = store.activedTask
-  if (!scheme || !task?.id) return null
-  return buildReportSchemeView(schemeCode, scheme, task, reportData.value)
-}
-
-/**
- * 计算：将全部 scheme 视图扁平化为导出行。
- * 返回：flattenStrikePlanRowsForExport 返回的导出行数组。
- * 作用：CSV/XLS 导出按钮的数据源。
- */
-const exportRows = computed(() => {
-  const views = selectedSchemeCodes.value
-    .map((code) => getSchemeView(code))
-    .filter((view): view is StrikePlanSchemeView => view != null)
-  return flattenStrikePlanRowsForExport(views)
+const exportRows = computed((): StrikePlanStrikeRow[] => {
+  const rows: StrikePlanStrikeRow[] = []
+  for (const code of selectedSchemeCodes.value) {
+    const plan = strikePlanByCode.value.get(code)
+    if (!plan) continue
+    for (const sat of plan.satellites ?? []) {
+      rows.push({
+        country: sat.country?.trim() ?? '',
+        satelliteName: sat.name?.trim() ?? sat.noradId?.trim() ?? '',
+        satelliteType: sat.system?.trim() ?? '',
+        series: sat.series?.trim() ?? '',
+        weaponName: '',
+        weaponType: '',
+        attackWindow: '',
+      })
+    }
+  }
+  return rows
 })
 
 /**
@@ -495,16 +327,6 @@ watch(
     .type-label {
       font-size: battleUi.$battle-ui-font-emphasis;
       color: #7dd3fc;
-    }
-
-    .scheme-count-badge {
-      padding: 2px 10px;
-      border-radius: 999px;
-      font-size: battleUi.$battle-ui-font-base;
-      font-weight: 600;
-      color: #7dd3fc;
-      border: 1px solid rgba(79, 147, 221, 0.35);
-      background: rgba(14, 28, 48, 0.8);
     }
   }
 

@@ -59,6 +59,8 @@ const getIcon = (item: RouteRecordRaw): string => {
   if (title.includes('方案管理')) return '📋'
   if (title.includes('打击方案')) return '⚔️'
   if (title.includes('威胁')) return '⚠️'
+  if (title.includes('打击度')) return '🎯'
+  if (title.includes('算法')) return '🧮'
   if (title.includes('攻击')) return '🎯'
   if (title.includes('战场')) return '🌐'
   if (title.includes('系统')) return '⚙️'

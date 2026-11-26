@@ -3,7 +3,7 @@ import type { ReportGenerateResp } from '@/types/report/report'
 import { requestAPI } from '@/utils/tools/request'
 import { isResourceApiSuccess } from '@/utils/resourceApi'
 
-export type { ReportGenerateResp, SchemeResult, ReportCandidateSatellite } from '@/types/report/report'
+export type { ReportGenerateResp } from '@/types/report/report'
 
 /**
  * 按任务生成作战方案报告（报告-作战方案生成）。

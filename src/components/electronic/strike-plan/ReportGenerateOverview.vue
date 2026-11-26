@@ -32,8 +32,6 @@ const headlineItems = computed((): HeadlineItem[] => {
   const report = props.report
   if (!report) return []
   const items: HeadlineItem[] = []
-  const campaign = report.campaign?.trim()
-  if (campaign) items.push({ label: '战役', value: campaign })
   const taskName = report.taskName?.trim()
   if (taskName) items.push({ label: '任务', value: taskName })
   const generatedAt = report.generatedAt?.trim()

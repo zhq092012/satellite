@@ -6,16 +6,17 @@
       <div v-else class="task-panel">
         <section class="task-panel-block task-panel-block--tasks">
           <template v-if="taskList.length">
-            <div class="task-panel-section-head">任务列表</div>
-            <el-select
-              v-model="activeTaskId"
-              class="task-panel-task-select"
-              placeholder="选择任务"
-              filterable
-              @change="handleSwitchTask"
-            >
-              <el-option v-for="task in taskList" :key="task.id" :label="task.name" :value="task.id" />
-            </el-select>
+            <div class="task-panel-task-toolbar">
+              <span class="task-panel-section-head task-panel-section-head--inline">任务列表</span>
+              <el-select v-model="activeTaskId" class="task-panel-task-select" placeholder="选择任务" filterable
+                @change="handleSwitchTask">
+                <el-option v-for="task in taskList" :key="task.id" :label="task.name" :value="task.id" />
+              </el-select>
+              <button v-if="store.activedTask" type="button" class="task-edit-link task-edit-link--toolbar"
+                @click="openEditTask">
+                编辑
+              </button>
+            </div>
           </template>
           <template v-else-if="store.command?.id">
             <button type="button" class="task-create-entry" @click="openCreateTask">新建任务</button>
@@ -30,7 +31,6 @@
               <span class="task-panel-label">任务名称</span>
               <span class="task-panel-value task-panel-name" :title="store.activedTask.name">{{ store.activedTask.name
               }}</span>
-              <button type="button" class="task-edit-link" @click="openEditTask">编辑</button>
             </div>
             <div class="task-panel-row">
               <span class="task-panel-label">作战阶段</span>
@@ -686,10 +686,10 @@ const hydrateC2FlatRowsFromTaskSatellites = async (taskSatellites: TaskResourceI
         meta
           ? { country: meta.country, system: meta.system, series: meta.series }
           : {
-              country: fromApi.country || C2_RESOURCE_EMPTY_FIELD,
-              system: fromApi.system || C2_RESOURCE_EMPTY_FIELD,
-              series: fromApi.series || C2_RESOURCE_EMPTY_FIELD,
-            },
+            country: fromApi.country || C2_RESOURCE_EMPTY_FIELD,
+            system: fromApi.system || C2_RESOURCE_EMPTY_FIELD,
+            series: fromApi.series || C2_RESOURCE_EMPTY_FIELD,
+          },
       ),
     )
   }
@@ -1283,8 +1283,23 @@ onUnmounted(() => {
   }
 }
 
+.task-panel-task-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .task-panel-task-select {
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+.task-edit-link--toolbar {
+  flex-shrink: 0;
+  min-height: 20px;
+  padding: 0 10px;
 }
 
 .panel-body {
@@ -1423,7 +1438,7 @@ onUnmounted(() => {
   gap: 8px;
 
   &--name {
-    grid-template-columns: 88px minmax(0, 1fr) auto;
+    grid-template-columns: 88px minmax(0, 1fr);
   }
 
   &--objects {
@@ -1552,6 +1567,12 @@ onUnmounted(() => {
   font-weight: 700;
   color: #7dd3fc;
   border-bottom: 1px solid rgba(0, 225, 255, 0.14);
+
+  &--inline {
+    margin: 0;
+    padding: 0;
+    border-bottom: none;
+  }
 }
 
 .task-create-entry {

@@ -1,10 +1,6 @@
 import type {
-  ReportCoverageChange,
-  ReportFirstTransitChange,
-  ReportSatelliteCountChange,
-  ReportStrikeComparison,
-  ReportStrikeSystemSplit,
-  ReportTransitWindowChange,
+  ReportCommComparison,
+  ReportReconComparison,
   StruckSatellite,
   StrikePlan,
 } from '@/types/report/report'
@@ -15,8 +11,14 @@ export interface StrikePlanCompareBlock {
   title: string
   /** 前后对照行 */
   rows: Array<{ label: string; before: string; after: string; delta: string }>
-  /** 接口结论文本 */
-  summary?: string
+}
+
+/** 方案概要键值（顶部展示区） */
+export interface StrikePlanMetaField {
+  /** 字段标签 */
+  label: string
+  /** 展示值 */
+  value: string
 }
 
 const fmtInt = (v: number | undefined | null): string =>
@@ -28,20 +30,17 @@ const fmtNum = (v: number | undefined | null, digits = 3): string =>
 const fmtPercent = (v: number | undefined | null): string =>
   v != null && Number.isFinite(v) ? `${v.toFixed(2)}%` : '—'
 
-/**
- * 格式化体系拆分为一行文案。
- *
- * @param split 体系统计
- */
-export const formatStrikeSystemSplitLine = (split: ReportStrikeSystemSplit | undefined): string => {
-  if (!split) return '—'
-  const parts: string[] = []
-  if (split.reconCount != null) parts.push(`侦察 ${split.reconCount}`)
-  if (split.commCount != null) parts.push(`通信 ${split.commCount}`)
-  if (split.relayCount != null) parts.push(`中继 ${split.relayCount}`)
-  if (!parts.length && split.total != null) return `合计 ${split.total}`
-  const total = split.total != null ? `（共 ${split.total}）` : ''
-  return parts.length ? `${parts.join(' · ')}${total}` : '—'
+const fmtSignedInt = (delta: number | undefined | null): string => {
+  if (delta == null || !Number.isFinite(delta)) return '—'
+  if (delta === 0) return '0'
+  return delta > 0 ? `+${fmtInt(delta)}` : fmtInt(delta)
+}
+
+const fmtSignedPercent = (delta: number | undefined | null): string => {
+  if (delta == null || !Number.isFinite(delta)) return '—'
+  if (delta === 0) return '0.00 pp'
+  const sign = delta > 0 ? '+' : ''
+  return `${sign}${delta.toFixed(2)} pp`
 }
 
 /**
@@ -71,128 +70,125 @@ export const filterSchemeCodesWithStrikePlan = (
 ): string[] => schemeCodes.filter((code) => strikeMap.has(code.trim()))
 
 /**
- * 将比对对象拆成 UI 块。
+ * 构建方案顶部概要字段（与 `StrikePlan` 84–97 对齐）。
  *
- * @param comparison 打击前后比对
+ * @param plan 打击方案
  */
-export const buildStrikePlanCompareBlocks = (
-  comparison: ReportStrikeComparison | undefined,
-): StrikePlanCompareBlock[] => {
-  if (!comparison) return []
+export const buildStrikePlanMetaFields = (plan: StrikePlan): StrikePlanMetaField[] => {
+  const tierLabel = plan.tierIndex != null ? `规模${plan.tierIndex}` : undefined
+  const items: Array<{ label: string; value?: string }> = [
+    { label: '方案编码', value: plan.code?.trim() },
+    { label: '方案名称', value: plan.name?.trim() },
+    { label: '阶段编码', value: plan.stageCode?.trim() },
+    { label: '阶段名称', value: plan.stageName?.trim() },
+    { label: '作战对象', value: plan.country?.trim() },
+    { label: '规模方案', value: tierLabel },
+    {
+      label: '打击目标',
+      value: plan.targetSize != null && Number.isFinite(plan.targetSize) ? String(plan.targetSize) : undefined,
+    },
+  ]
+  return items
+    .filter((item): item is StrikePlanMetaField => Boolean(item.value?.trim()))
+    .map((item) => ({ label: item.label, value: item.value.trim() }))
+}
+
+/**
+ * 由侦察比对构建展示块。
+ *
+ * @param recon 侦察打击前后比对
+ */
+const buildReconCompareBlock = (recon: ReportReconComparison | undefined): StrikePlanCompareBlock | null => {
+  if (!recon) return null
+  const rows: StrikePlanCompareBlock['rows'] = []
+  const count = recon.satelliteCount
+  if (count) {
+    rows.push({
+      label: '卫星总数',
+      before: fmtInt(count.beforeTotal),
+      after: fmtInt(count.afterTotal),
+      delta: fmtSignedInt(count.deltaTotal),
+    })
+  }
+  const transit = recon.transitWindows
+  if (transit) {
+    rows.push(
+      {
+        label: '过境窗口数',
+        before: fmtInt(transit.beforeWindows),
+        after: fmtInt(transit.afterWindows),
+        delta: fmtSignedInt(transit.deltaWindows),
+      },
+      {
+        label: '最早过境时间',
+        before: transit.beforeFirstTransit?.trim() || '—',
+        after: transit.afterFirstTransit?.trim() || '—',
+        delta:
+          transit.delayMinutes != null && Number.isFinite(transit.delayMinutes)
+            ? `推迟 ${fmtInt(transit.delayMinutes)} 分钟`
+            : '—',
+      },
+    )
+  }
+  if (!rows.length) return null
+  return { title: '侦察卫星打击前后对比', rows }
+}
+
+/**
+ * 由通信比对构建展示块。
+ *
+ * @param comm 通信打击前后比对
+ */
+const buildCommCompareBlock = (comm: ReportCommComparison | undefined): StrikePlanCompareBlock | null => {
+  if (!comm) return null
+  const rows: StrikePlanCompareBlock['rows'] = []
+  const count = comm.satelliteCount
+  if (count) {
+    rows.push({
+      label: '卫星总数',
+      before: fmtInt(count.beforeTotal),
+      after: fmtInt(count.afterTotal),
+      delta: fmtSignedInt(count.deltaTotal),
+    })
+  }
+  const coverage = comm.coverage
+  if (coverage) {
+    rows.push({
+      label: '区域覆盖占比',
+      before: fmtPercent(coverage.beforeCoverage),
+      after: fmtPercent(coverage.afterCoverage),
+      delta: fmtSignedPercent(coverage.deltaCoverage),
+    })
+  }
+  if (!rows.length) return null
+  return { title: '通信卫星打击前后对比', rows }
+}
+
+/**
+ * 将方案上的 recon / comm 比对拆成 UI 块。
+ *
+ * @param plan 打击方案（含 `reconComparison`、`commComparison`）
+ */
+export const buildStrikePlanCompareBlocks = (plan: StrikePlan): StrikePlanCompareBlock[] => {
   const blocks: StrikePlanCompareBlock[] = []
-
-  const pushCount = (title: string, change: ReportSatelliteCountChange | undefined) => {
-    if (!change) return
-    blocks.push({
-      title,
-      summary: change.text?.trim(),
-      rows: [
-        {
-          label: '目标总数',
-          before: fmtInt(change.beforeTotal),
-          after: fmtInt(change.afterTotal),
-          delta: change.struckTotal != null ? `−${fmtInt(change.struckTotal)}` : '—',
-        },
-        {
-          label: '体系拆分',
-          before: formatStrikeSystemSplitLine(change.before),
-          after: formatStrikeSystemSplitLine(change.after),
-          delta: '—',
-        },
-      ],
-    })
-  }
-
-  const pushTransit = (change: ReportTransitWindowChange | undefined) => {
-    if (!change) return
-    blocks.push({
-      title: '侦察过境窗口',
-      summary: change.text?.trim(),
-      rows: [
-        {
-          label: '过境窗口总数',
-          before: fmtInt(change.beforeWindows),
-          after: fmtInt(change.afterWindows),
-          delta:
-            change.deltaWindows != null
-              ? `${change.deltaWindows >= 0 ? '−' : '+'}${fmtInt(Math.abs(change.deltaWindows))}`
-              : '—',
-        },
-        {
-          label: '消减比例',
-          before: '—',
-          after: '—',
-          delta:
-            change.reductionPercent != null && Number.isFinite(change.reductionPercent)
-              ? fmtPercent(change.reductionPercent)
-              : '—',
-        },
-        {
-          label: '侦察星（有/无过境数据）',
-          before: fmtInt(change.reconTargets),
-          after: `${fmtInt(change.reconTargetsWithData)} / ${fmtInt(change.reconTargetsWithoutData)}`,
-          delta: '—',
-        },
-      ],
-    })
-  }
-
-  const pushFirstTransit = (change: ReportFirstTransitChange | undefined) => {
-    if (!change) return
-    blocks.push({
-      title: '最早过境',
-      summary: change.text?.trim(),
-      rows: [
-        {
-          label: '最早时间',
-          before: change.before?.trim() || '—',
-          after: change.after?.trim() || '—',
-          delta:
-            change.delayMinutes != null
-              ? `推迟 ${fmtInt(change.delayMinutes)} 分钟`
-              : '—',
-        },
-        {
-          label: '对应卫星',
-          before: change.beforeSatellite?.trim() || '—',
-          after: change.afterSatellite?.trim() || '—',
-          delta: '—',
-        },
-      ],
-    })
-  }
-
-  const pushCoverage = (change: ReportCoverageChange | undefined) => {
-    if (!change) return
-    blocks.push({
-      title: '通信区域覆盖',
-      summary: change.text?.trim(),
-      rows: [
-        {
-          label: '覆盖占比',
-          before: fmtPercent(change.beforePercent),
-          after: fmtPercent(change.afterPercent),
-          delta:
-            change.lostPercent != null && Number.isFinite(change.lostPercent)
-              ? `−${change.lostPercent.toFixed(2)} pp`
-              : '—',
-        },
-        {
-          label: '通信星（有/无覆盖数据）',
-          before: fmtInt(change.commTargets),
-          after: `${fmtInt(change.commTargetsWithData)} / ${fmtInt(change.commTargetsWithoutData)}`,
-          delta: '—',
-        },
-      ],
-    })
-  }
-
-  pushCount('卫星数量', comparison.satelliteCount)
-  pushTransit(comparison.reconTransitWindows)
-  pushFirstTransit(comparison.reconFirstTransit)
-  pushCoverage(comparison.commCoverage)
-
+  const recon = buildReconCompareBlock(plan.reconComparison)
+  if (recon) blocks.push(recon)
+  const comm = buildCommCompareBlock(plan.commComparison)
+  if (comm) blocks.push(comm)
   return blocks
+}
+
+/**
+ * 由被打击数与打击前总数估算达成度（无数据时不返回）。
+ *
+ * @param plan 打击方案
+ */
+export const deriveStrikePlanAttainment = (plan: StrikePlan): number | undefined => {
+  const before = plan.reconComparison?.satelliteCount?.beforeTotal
+  if (before == null || before <= 0) return undefined
+  if (plan.targetSize == null || !Number.isFinite(plan.targetSize)) return undefined
+  const ratio = plan.targetSize / before
+  return Number.isFinite(ratio) ? ratio : undefined
 }
 
 /**
@@ -207,5 +203,4 @@ export const formatStruckSatelliteRow = (sat: StruckSatellite) => ({
   series: sat.series?.trim() || '—',
   country: sat.country?.trim() || '—',
   threatText: fmtNum(sat.threat, 3),
-  quotaRole: sat.quotaRole?.trim() || '—',
 })

@@ -1,136 +1,76 @@
 <template>
-  <div
-    class="report-strike-plan"
-    :class="{ 'report-strike-plan--horizontal': horizontal }"
-  >
-    <div v-if="plan.struck" class="report-strike-plan__split">
-      <span class="report-strike-plan__split-label">打击分类</span>
-      <span class="report-strike-plan__split-value">{{ struckSplitLine }}</span>
-    </div>
+  <div class="report-strike-plan">
+    <!-- 顶部：方案概要（StrikePlan 元字段） -->
+    <header v-if="metaFields.length" class="report-strike-plan__meta">
+      <dl class="report-strike-plan__meta-list">
+        <div v-for="item in metaFields" :key="item.label" class="report-strike-plan__meta-row">
+          <dt>{{ item.label }}</dt>
+          <dd>{{ item.value }}</dd>
+        </div>
+      </dl>
+    </header>
 
-    <section v-if="struckRows.length" class="report-strike-plan__section">
-      <h4 class="report-strike-plan__section-title">
-        被打击卫星（{{ struckRows.length }}）
-      </h4>
-      <p v-if="plan.satellitesTruncated" class="report-strike-plan__caption">
-        被打击清单已截断，完整明细见阶段结构中对应档位。
-      </p>
-      <div class="report-strike-plan__table-wrap">
+    <!-- 中部：被打击卫星清单 -->
+    <section class="report-strike-plan__section report-strike-plan__section--satellites">
+      <h4 class="report-strike-plan__section-title">打击卫星（{{ struckRows.length }}）</h4>
+      <p v-if="!struckRows.length" class="report-strike-plan__empty">暂无被打击卫星</p>
+      <div v-else class="report-strike-plan__table-wrap">
         <table class="report-strike-plan__table">
           <thead>
             <tr>
+              <th>国家</th>
+
               <th>名称</th>
               <th>体系</th>
               <th>系列</th>
+
               <th>威胁度</th>
-              <th>角色</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(row, idx) in struckRows" :key="`${row.noradId}-${idx}`">
+              <td>{{ row.country }}</td>
               <td class="report-strike-plan__name">{{ row.name }}</td>
               <td>{{ row.system }}</td>
               <td>{{ row.series }}</td>
+
               <td class="report-strike-plan__num">{{ row.threatText }}</td>
-              <td>{{ row.quotaRole }}</td>
             </tr>
           </tbody>
         </table>
       </div>
     </section>
 
-    <div
-      v-if="compareBlocks.length"
-      class="report-strike-plan__compare-group"
-    >
-      <h4 class="report-strike-plan__section-title report-strike-plan__section-title--major">
-        打击前后比对
-      </h4>
-      <p v-if="comparisonBaseline" class="report-strike-plan__caption">{{ comparisonBaseline }}</p>
-
-      <div
-        class="report-strike-plan__compare-list"
-        :class="{ 'report-strike-plan__compare-list--matrix': horizontal }"
-        :style="horizontalCompareGridStyle"
-      >
-        <template v-if="horizontal">
-          <h5
-            v-for="(block, bidx) in compareBlocks"
-            :key="`title-${block.title}-${bidx}`"
-            class="report-strike-plan__subsection-title report-strike-plan__compare-matrix-title"
-          >
-            {{ block.title }}
-          </h5>
-          <p
-            v-for="(block, bidx) in compareBlocks"
-            :key="`caption-${block.title}-${bidx}`"
-            class="report-strike-plan__caption report-strike-plan__compare-matrix-caption"
-          >
-            {{ block.summary?.trim() || '\u00a0' }}
-          </p>
-          <div
-            v-for="(block, bidx) in compareBlocks"
-            :key="`table-${block.title}-${bidx}`"
-            class="report-strike-plan__compare-matrix-table"
-          >
-            <div class="report-strike-plan__table-wrap">
-              <table class="report-strike-plan__compare-table">
-                <thead>
-                  <tr>
-                    <th>指标</th>
-                    <th>打击前</th>
-                    <th>打击后</th>
-                    <th>变化</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(row, ridx) in block.rows" :key="`${row.label}-${ridx}`">
-                    <td class="report-strike-plan__metric">{{ row.label }}</td>
-                    <td class="report-strike-plan__cell">{{ row.before }}</td>
-                    <td class="report-strike-plan__cell">{{ row.after }}</td>
-                    <td class="report-strike-plan__cell">{{ row.delta }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+    <!-- 底部：侦察 / 通信卫星打击前后对比 -->
+    <section v-if="compareBlocks.length" class="report-strike-plan__section report-strike-plan__section--compare">
+      <div class="report-strike-plan__compare-list">
+        <section v-for="(block, bidx) in compareBlocks" :key="`${block.title}-${bidx}`"
+          class="report-strike-plan__compare-card">
+          <h5 class="report-strike-plan__subsection-title">{{ block.title }}</h5>
+          <div class="report-strike-plan__table-wrap">
+            <table class="report-strike-plan__compare-table">
+              <thead>
+                <tr>
+                  <th>指标</th>
+                  <th>打击前</th>
+                  <th>打击后</th>
+                  <th>变化</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, ridx) in block.rows" :key="`${row.label}-${ridx}`">
+                  <td class="report-strike-plan__metric">{{ row.label }}</td>
+                  <td class="report-strike-plan__cell">{{ row.before }}</td>
+                  <td class="report-strike-plan__cell">{{ row.after }}</td>
+                  <td class="report-strike-plan__cell">{{ row.delta }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </template>
-        <template v-else>
-          <section
-            v-for="(block, bidx) in compareBlocks"
-            :key="`${block.title}-${bidx}`"
-            class="report-strike-plan__section report-strike-plan__section--compare"
-          >
-            <h5 class="report-strike-plan__subsection-title">{{ block.title }}</h5>
-            <p v-if="block.summary" class="report-strike-plan__caption">{{ block.summary }}</p>
-            <div class="report-strike-plan__table-wrap">
-              <table class="report-strike-plan__compare-table">
-                <thead>
-                  <tr>
-                    <th>指标</th>
-                    <th>打击前</th>
-                    <th>打击后</th>
-                    <th>变化</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(row, ridx) in block.rows" :key="`${row.label}-${ridx}`">
-                    <td class="report-strike-plan__metric">{{ row.label }}</td>
-                    <td class="report-strike-plan__cell">{{ row.before }}</td>
-                    <td class="report-strike-plan__cell">{{ row.after }}</td>
-                    <td class="report-strike-plan__cell">{{ row.delta }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </template>
+        </section>
       </div>
-    </div>
-
-    <ul v-if="warningTexts.length" class="report-strike-plan__warnings">
-      <li v-for="(text, idx) in warningTexts" :key="idx">{{ text }}</li>
-    </ul>
+    </section>
+    <p v-else class="report-strike-plan__empty report-strike-plan__empty--compare">无比对数据</p>
   </div>
 </template>
 
@@ -139,28 +79,26 @@ import { computed } from 'vue'
 import type { StrikePlan } from '@/types/report/report'
 import {
   buildStrikePlanCompareBlocks,
+  buildStrikePlanMetaFields,
   formatStruckSatelliteRow,
-  formatStrikeSystemSplitLine,
 } from '@/utils/strikePlanDisplay'
 
 const props = defineProps<{
-  /** 与 scheme 同 code 的打击方案 */
+  /** 打击方案（与勾选格子同 code） */
   plan: StrikePlan
-  /** 横向撑满（仅选一方案时） */
-  horizontal?: boolean
 }>()
 
 /**
- * 计算：打击分类一行文案。
- * 返回 string。
- * 作用：顶部体系拆分摘要。
+ * 计算：方案顶部概要键值。
+ * 返回 StrikePlanMetaField[]。
+ * 作用：头部信息区数据源。
  */
-const struckSplitLine = computed(() => formatStrikeSystemSplitLine(props.plan.struck))
+const metaFields = computed(() => buildStrikePlanMetaFields(props.plan))
 
 /**
  * 计算：被打击卫星表行。
  * 返回格式化后的行数组。
- * 作用：清单表格数据源。
+ * 作用：中部卫星清单表格。
  */
 const struckRows = computed(() =>
   (props.plan.satellites ?? []).map(formatStruckSatelliteRow),
@@ -169,44 +107,17 @@ const struckRows = computed(() =>
 /**
  * 计算：打击前后比对块。
  * 返回 StrikePlanCompareBlock[]。
- * 作用：多卡片对比区。
+ * 作用：底部侦察/通信对比区。
  */
-const compareBlocks = computed(() => buildStrikePlanCompareBlocks(props.plan.comparison))
+const compareBlocks = computed(() => buildStrikePlanCompareBlocks(props.plan))
 
-/**
- * 计算：基线口径说明。
- * 返回 string | undefined。
- * 作用：比对区顶部说明。
- */
-const comparisonBaseline = computed(() => props.plan.comparison?.baselineText?.trim() || undefined)
-
-/**
- * 计算：本方案告警文案列表。
- * 返回 string[]。
- * 作用：底部提示。
- */
-const warningTexts = computed(() =>
-  (props.plan.warnings ?? []).map((w) => w.text?.trim()).filter((t): t is string => Boolean(t)),
-)
-
-/**
- * 计算：横排比对网格列数 CSS 变量。
- * 返回 style 对象或 undefined。
- * 作用：说明行等高后表格顶对齐。
- */
-const horizontalCompareGridStyle = computed(() => {
-  if (!props.horizontal) return undefined
-  const count = compareBlocks.value.length
-  if (count < 1) return undefined
-  return { '--compare-cols': String(count) } as Record<string, string>
-})
 </script>
 
 <style scoped lang="scss">
 @use '@/components/BattleSituation/styles/battle-ui-typography.scss' as battleUi;
 
-/** 表格上方说明字号（略小于正文） */
-$table-caption-font: 16px;
+/** 概要区标签列固定宽度（与最长标签「被打击目标总数」对齐） */
+$report-meta-key-width: 80px;
 
 .report-strike-plan {
   display: flex;
@@ -218,14 +129,98 @@ $table-caption-font: 16px;
   font-size: battleUi.$battle-ui-font-base;
   color: #e2e8f0;
 
-  &--horizontal {
-    width: 100%;
+}
+
+.report-strike-plan__meta {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(79, 147, 221, 0.28);
+  background: linear-gradient(135deg, rgba(12, 28, 48, 0.92), rgba(8, 18, 32, 0.96));
+}
+
+.report-strike-plan__meta-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.report-strike-plan__meta-row {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0;
+  min-width: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(79, 147, 221, 0.12);
+
+  &:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  dt {
+    flex: 0 0 $report-meta-key-width;
+    width: $report-meta-key-width;
+    margin: 0;
+    font-weight: 600;
+    color: #7dd3fc;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  dd {
+    flex: 1 1 auto;
+    margin: 0;
+    min-width: 0;
+    color: #fde68a;
+    font-weight: 600;
+    line-height: 1.5;
+    text-align: left;
+    word-break: break-word;
   }
 }
 
-.report-strike-plan__compare-group {
-  margin-top: 24px;
+.report-strike-plan__section {
+  margin-top: 4px;
+  padding: 0;
   text-align: left;
+
+  &--compare {
+    margin-top: 24px;
+  }
+}
+
+.report-strike-plan__section-title {
+  margin: 0 0 10px;
+  font-size: battleUi.$battle-ui-font-emphasis;
+  font-weight: 700;
+  color: #7dd3fc;
+  text-align: left;
+
+  &--major {
+    margin-bottom: 12px;
+  }
+}
+
+.report-strike-plan__subsection-title {
+  margin: 0 0 8px;
+  font-size: battleUi.$battle-ui-font-base;
+  font-weight: 700;
+  color: #7dd3fc;
+  text-align: left;
+}
+
+.report-strike-plan__empty {
+  margin: 0;
+  font-size: battleUi.$battle-ui-font-base;
+  color: #94a3b8;
+
+  &--compare {
+    margin-top: 16px;
+  }
 }
 
 .report-strike-plan__compare-list {
@@ -235,92 +230,8 @@ $table-caption-font: 16px;
   align-items: stretch;
 }
 
-/**
- * 横排：标题一行、说明一行（行高取最高）、表格一行，保证表头顶对齐。
- */
-.report-strike-plan__compare-list--matrix {
-  display: grid;
-  grid-template-columns: repeat(var(--compare-cols, 1), minmax(0, 1fr));
-  column-gap: 28px;
-  row-gap: 8px;
-  align-items: stretch;
-}
-
-.report-strike-plan__compare-matrix-title {
+.report-strike-plan__compare-card {
   margin: 0;
-  align-self: end;
-}
-
-.report-strike-plan__compare-matrix-caption {
-  margin: 0;
-  min-height: 0;
-}
-
-.report-strike-plan__compare-matrix-table {
-  min-width: 0;
-  align-self: start;
-}
-
-.report-strike-plan__split {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: flex-start;
-  gap: 6px 10px;
-  margin-bottom: 16px;
-  text-align: left;
-}
-
-.report-strike-plan__split-label {
-  font-weight: 700;
-  color: #7dd3fc;
-}
-
-.report-strike-plan__split-value {
-  color: #fde68a;
-  font-weight: 600;
-}
-
-.report-strike-plan__section {
-  margin-top: 20px;
-  padding: 0;
-  text-align: left;
-
-  &:first-of-type {
-    margin-top: 0;
-  }
-
-  &--compare {
-    margin-top: 16px;
-  }
-}
-
-.report-strike-plan__section-title {
-  margin: 0 0 8px;
-  font-size: battleUi.$battle-ui-font-emphasis;
-  font-weight: 700;
-  color: #7dd3fc;
-  text-align: left;
-
-  &--major {
-    margin-top: 0;
-  }
-}
-
-.report-strike-plan__subsection-title {
-  margin: 0 0 6px;
-  font-size: battleUi.$battle-ui-font-base;
-  font-weight: 700;
-  color: #7dd3fc;
-  text-align: left;
-}
-
-.report-strike-plan__caption {
-  margin: 0 0 8px;
-  font-size: $table-caption-font;
-  line-height: 1.5;
-  color: #94a3b8;
-  text-align: left;
 }
 
 .report-strike-plan__table-wrap {
@@ -339,7 +250,7 @@ $table-caption-font: 16px;
 }
 
 .report-strike-plan__table {
-  min-width: 420px;
+  min-width: 560px;
 
   th,
   td {
@@ -366,6 +277,11 @@ $table-caption-font: 16px;
   color: #7dd3fc;
 }
 
+.report-strike-plan__mono {
+  font-variant-numeric: tabular-nums;
+  color: #a5f3fc;
+}
+
 .report-strike-plan__num {
   font-variant-numeric: tabular-nums;
   color: #fde68a;
@@ -373,12 +289,11 @@ $table-caption-font: 16px;
 }
 
 .report-strike-plan__compare-table {
-  min-width: 480px;
+  min-width: 420px;
   font-size: battleUi.$battle-ui-font-base;
 
   thead th {
     padding: 8px 10px;
-    font-size: battleUi.$battle-ui-font-emphasis;
     font-weight: 600;
     color: #7dd3fc;
     border-bottom: 1px solid rgba(79, 147, 221, 0.22);
@@ -419,14 +334,5 @@ $table-caption-font: 16px;
   word-break: break-word;
   color: #fde68a;
   font-weight: 600;
-}
-
-.report-strike-plan__warnings {
-  margin: 20px 0 0;
-  padding-left: 1.2em;
-  font-size: $table-caption-font;
-  color: #fde68a;
-  line-height: 1.45;
-  text-align: left;
 }
 </style>

@@ -1,4 +1,20 @@
-import type { StrikePlanStrikeRow } from '@/utils/buildStrikePlanSchemeView'
+/** 打击计划行（导出与表格共用） */
+export interface StrikePlanStrikeRow {
+  /** 所属国家 */
+  country: string
+  /** 卫星名称 */
+  satelliteName: string
+  /** 卫星类型（体系） */
+  satelliteType: string
+  /** 卫星系列 */
+  series: string
+  /** 武器名称 */
+  weaponName: string
+  /** 武器类型 */
+  weaponType: string
+  /** 打击窗口 */
+  attackWindow: string
+}
 
 /** CSV 导出列（与需求一致） */
 const EXPORT_HEADERS = ['国家', '卫星名称', '卫星类型', '武器', '武器类型', '打击窗口'] as const
